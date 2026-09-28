@@ -9,7 +9,7 @@
 ## 1. TỔNG QUAN DỰ ÁN (PROJECT OVERVIEW)
 
 ### 1.1. Bối cảnh & Ý tưởng
-* **LocalPress** là nền tảng báo điện tử phục vụ quy mô cấp tỉnh/địa phương (bối cảnh mẫu: Hà Tĩnh), giải quyết bài toán tự chủ tài chính cho tòa soạn báo địa phương bằng mô hình doanh thu kép:
+* **LocalPress** là nền tảng báo điện tử phục vụ quy mô cấp tỉnh/địa phương (bối cảnh mẫu: TP. Hải Phòng), giải quyết bài toán tự chủ tài chính cho tòa soạn báo địa phương bằng mô hình doanh thu kép:
   1. **B2B (Quảng cáo doanh nghiệp):** Doanh nghiệp địa phương tự đặt chỗ (booking), tải banner, ký hợp đồng và xem báo cáo minh bạch (Impression, Click, CTR).
   2. **B2C (Nội dung chuyên sâu trả phí - Paywall):** Độc giả có thể đọc bài Free, hoặc trả tiền mua gói tháng/năm hoặc mua lẻ từng bài phóng sự điều tra chuyên sâu.
   3. **Hỗ trợ tòa soạn bằng AI:** AI hỗ trợ tóm tắt tin tức, gợi ý tiêu đề, tự động sinh thẻ tag và hỗ trợ kiểm duyệt nội dung, định giá quảng cáo.

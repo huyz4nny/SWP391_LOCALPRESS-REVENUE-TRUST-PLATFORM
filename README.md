@@ -8,7 +8,7 @@
 
 ## 1. TỔNG QUAN HỆ THỐNG (SYSTEM OVERVIEW)
 
-LocalPress là giải pháp toàn diện cho tòa soạn báo điện tử địa phương (mô hình mẫu: Hà Tĩnh) nhằm xây dựng nguồn thu độc lập và đảm bảo độ tin cậy thông tin:
+LocalPress là giải pháp toàn diện cho tòa soạn báo điện tử địa phương (mô hình mẫu: TP. Hải Phòng) nhằm xây dựng nguồn thu độc lập và đảm bảo độ tin cậy thông tin:
 1. **B2C (Paywall nội dung chuyên sâu):** Đọc báo miễn phí, bản dùng thử (preview) và trả phí mua bài phóng sự điều tra (15.000 ₫/bài) hoặc gói hội viên định kỳ (tháng/quý/năm).
 2. **B2B (Quảng cáo doanh nghiệp tự phục vụ):** Doanh nghiệp tự kiểm tra vị trí hiển thị (Ad Slots), đặt lịch chiến dịch, tải lên banner quảng cáo và theo dõi chỉ số minh bạch (Impressions, Clicks, CTR).
 3. **Tòa soạn & Kiểm duyệt:** Quản lý vòng đời bài viết, kiểm duyệt nội dung, kiểm duyệt banner quảng cáo, kiểm duyệt bình luận và trợ lý AI hỗ trợ gợi ý tiêu đề/sapo.
