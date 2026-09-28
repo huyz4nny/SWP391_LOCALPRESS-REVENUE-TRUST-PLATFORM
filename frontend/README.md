@@ -3,11 +3,17 @@
 > **Dự án tốt nghiệp / Đồ án:** SWP391 — Học kỳ FALL 2026 — Đại học FPT  
 > **Nhóm thực hiện:** Nhóm 2 (Leader: SV4 - Huy)
 
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-Passing_100%25-729B1B?style=flat-square&logo=vitest&logoColor=white)](https://vitest.dev/)
+
 ---
 
 ## 1. GIỚI THIỆU TỔNG QUAN
 
-LocalPress là frontend hoàn chỉnh, có tính tương tác cao (Interactive Mockup & Production-Ready Architecture) mô phỏng nền tảng báo điện tử địa phương (bối cảnh mẫu: Tỉnh Hà Tĩnh). Ứng dụng giải quyết bài toán tự chủ tài chính cho tòa soạn bằng mô hình doanh thu kép:
+LocalPress là frontend hoàn chỉnh, có tính tương tác cao (Interactive Mockup & Production-Ready Architecture) mô phỏng nền tảng báo điện tử địa phương (bối cảnh mẫu: TP. Hải Phòng). Ứng dụng giải quyết bài toán tự chủ tài chính cho tòa soạn bằng mô hình doanh thu kép:
 1. **B2C (Paywall nội dung chuyên sâu):** Đọc báo miễn phí, xem bản dùng thử và trả phí đọc phóng sự điều tra độc quyền (mua lẻ 15.000 ₫ hoặc đăng ký gói tháng/quý/năm).
 2. **B2B (Quảng cáo doanh nghiệp tự phục vụ):** Cổng Doanh nghiệp tra cứu vị trí trống (Ad Slots), gửi yêu cầu booking, tải lên banner quảng cáo (Creatives), xem báo cáo minh bạch (Impressions, Clicks, CTR).
 3. **Tòa soạn & Kiểm duyệt:** Quản lý bản thảo, phiên bản bài viết (version history), kiểm duyệt banner, kiểm duyệt bình luận và trợ lý AI hỗ trợ gợi ý tiêu đề/sapo.
@@ -107,8 +113,8 @@ npm run build
 | 1 | `user-guest` | Khách vãng lai | `GUEST` | Đọc tin Free, xem thử trích đoạn Paywall 120 từ |
 | 2 | `user-reader-free` | Nguyễn Văn An | `READER` (Free) | Độc giả thường, có bookmark/lịch sử, chưa mua VIP |
 | 3 | `user-reader-premium` | Trần Thị Mai | `READER` (VIP) | Độc giả sở hữu Gói Năm & 2 bài phóng sự độc quyền |
-| 4 | `user-adv-1` | Đặng Quang Huy | `ADVERTISER` | Đại diện Công ty CP Nông sản Sạch Hà Tĩnh (ADV-001) |
-| 5 | `user-adv-2` | Lê Hồng Phong | `ADVERTISER` | Đại diện Bất động sản Đất Sen Hồng (ADV-002) |
+| 4 | `user-adv-1` | Đặng Quang Huy | `ADVERTISER` | Đại diện Công ty CP Logistics Cảng Hải Phòng (ADV-001) |
+| 5 | `user-adv-2` | Lê Hồng Phong | `ADVERTISER` | Đại diện Bất động sản Đất Cảng Hải Phòng (ADV-002) |
 | 6 | `user-editor` | Nguyễn Văn Biên Tập | `EDITOR` | Phóng viên soạn bài, lưu bản nháp, nộp duyệt |
 | 7 | `user-reviewer` | Trần Thị Thư Ký | `REVIEWER` | Thư ký tòa soạn: Duyệt bài, duyệt banner quảng cáo |
 | 8 | `user-fin-staff` | Lê Thị Thu Ngân | `FINANCE_STAFF` | Kế toán viên: Đối soát biên lai ngân hàng, lập đề xuất hoàn tiền |
