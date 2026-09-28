@@ -3,12 +3,6 @@
 > **Dự án tốt nghiệp / Đồ án:** SWP391 — Học kỳ FALL 2026 — Đại học FPT  
 > **Nhóm thực hiện:** Nhóm 2 (Leader: SV4 - Huy)
 
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Vitest](https://img.shields.io/badge/Vitest-Passing_100%25-729B1B?style=flat-square&logo=vitest&logoColor=white)](https://vitest.dev/)
-
 ---
 
 ## 1. GIỚI THIỆU TỔNG QUAN
