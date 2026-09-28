@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: localpress-backend
+  profiles:
+    active: dev
+  mvc:
+    format:
+      date-time: iso
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+localpress:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    expiration-ms: 86400000 # 24 hours
