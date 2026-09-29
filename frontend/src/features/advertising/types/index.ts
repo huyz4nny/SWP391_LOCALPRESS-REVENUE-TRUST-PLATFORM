@@ -40,6 +40,8 @@ export interface AdSlot {
   deviceType?: 'DESKTOP' | 'MOBILE' | 'TABLET' | 'ALL'
   description?: string
   locationNote: string
+  categoryName?: string | null
+  inventoryMode?: 'EXCLUSIVE' | 'ROTATING'
   maxCapacity: number
   currentBookings?: number
   isActive: boolean
@@ -54,11 +56,23 @@ export interface AdvertiserProfile {
   phone: string
   address: string
   businessLicenseUrl: string
+  businessSector: string
+  invoiceName: string
+  invoiceTaxCode: string
+  invoiceAddress: string
+  invoiceEmail: string
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
 }
 
-export type AdvertiserProfileInput = Pick<AdvertiserProfile,
-  'companyName' | 'taxCode' | 'contactPerson' | 'email' | 'phone' | 'address' | 'businessLicenseUrl'>
+export type AdvertiserProfileInput = Omit<AdvertiserProfile, 'id' | 'verificationStatus'>
+
+export interface AdvertiserProfileChange {
+  id: string
+  action: 'CREATE' | 'UPDATE'
+  oldValue: AdvertiserProfile | null
+  newValue: AdvertiserProfile
+  createdAt: string
+}
 
 export interface AdCreative {
   id: string

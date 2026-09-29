@@ -128,6 +128,9 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   if (pathname === '/advertiser/profile' && method === 'GET') {
     return mockStore.getAdvertiserProfile()
   }
+  if (pathname === '/advertiser/profile/history' && method === 'GET') {
+    return mockStore.getAdvertiserProfileHistory()
+  }
   if (pathname === '/advertiser/profile' && method === 'PUT') {
     return mockStore.saveAdvertiserProfile(body)
   }

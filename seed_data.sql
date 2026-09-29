@@ -38,10 +38,10 @@ INSERT INTO tags (tag_id, name, slug) VALUES
 (4, 'Đất Cảng', 'dat-cang');
 
 -- 4. AD SLOTS (Vị trí quảng cáo - Khớp 100% với SlotCode của Frontend React)
-INSERT INTO ad_slots (slot_id, slot_code, name, page_location, device_type, dimensions, capacity, base_price, pricing_type, status) VALUES
-(1, 'SLOT-TOP-LEADERBOARD', 'Top Leaderboard (Đầu trang chủ)', 'Trang chủ, ngay dưới Header', 'ALL', '1140x120', 1, 1500000.00, 'CPD', 'ACTIVE'),
-(2, 'SLOT-ARTICLE-INLINE', 'Inline Banner (Thân bài viết)', 'Nội dung chi tiết mỗi bài viết', 'ALL', '728x90', 2, 800000.00, 'CPD', 'ACTIVE'),
-(3, 'SLOT-SIDEBAR-STICKY', 'Sidebar Sticky (Cột phải đọc báo)', 'Cột bên phải trang đọc báo', 'DESKTOP', '300x600', 1, 1200000.00, 'CPD', 'ACTIVE');
+INSERT INTO ad_slots (slot_id, slot_code, name, page_location, category_id, device_type, dimensions, capacity, inventory_mode, base_price, pricing_type, status) VALUES
+(1, 'SLOT-TOP-LEADERBOARD', 'Top Leaderboard (Đầu trang chủ)', 'Trang chủ, ngay dưới Header', NULL, 'ALL', '1140x120', 1, 'EXCLUSIVE', 1500000.00, 'CPD', 'ACTIVE'),
+(2, 'SLOT-ARTICLE-INLINE', 'Inline Banner (Thân bài viết)', 'Nội dung chi tiết mỗi bài viết', NULL, 'ALL', '728x90', 2, 'ROTATING', 800000.00, 'CPD', 'ACTIVE'),
+(3, 'SLOT-SIDEBAR-STICKY', 'Sidebar Sticky (Cột phải đọc báo)', 'Cột bên phải trang đọc báo', NULL, 'DESKTOP', '300x600', 1, 'EXCLUSIVE', 1200000.00, 'CPD', 'ACTIVE');
 
 -- 5. SUBSCRIPTION PLANS (Gói cước hội viên Paywall)
 INSERT INTO subscription_plans (plan_id, name, price, duration_days, has_ad_free, has_audio, status) VALUES
@@ -50,8 +50,8 @@ INSERT INTO subscription_plans (plan_id, name, price, duration_days, has_ad_free
 (3, 'Gói Năm (Hội viên VIP)', 480000.00, 365, TRUE, TRUE, 'ACTIVE');
 
 -- 6. ADVERTISERS (Hồ sơ doanh nghiệp B2B)
-INSERT INTO advertisers (advertiser_id, user_id, company_name, tax_code, contact_person, email, phone, address, business_license_url, verification_status) VALUES
-(1, 5, 'Công ty CP Logistics & Cảng Quốc tế Đình Vũ', '0201988888', 'Đặng Quang Huy', 'adv.canghaiphong@gmail.com', '0934567890', 'Khu kinh tế Đình Vũ - Cát Hải, Đông Hải 2, Hải An, Hải Phòng', 'https://example.com/licenses/dinhvu_port_license.pdf', 'VERIFIED');
+INSERT INTO advertisers (advertiser_id, user_id, company_name, business_sector, invoice_name, invoice_tax_code, invoice_address, invoice_email, tax_code, contact_person, email, phone, address, business_license_url, verification_status) VALUES
+(1, 5, 'Công ty CP Logistics & Cảng Quốc tế Đình Vũ', 'Logistics và dịch vụ cảng biển', 'Công ty CP Logistics & Cảng Quốc tế Đình Vũ', '0201988888', 'Khu kinh tế Đình Vũ - Cát Hải, Đông Hải 2, Hải An, Hải Phòng', 'adv.canghaiphong@gmail.com', '0201988888', 'Đặng Quang Huy', 'adv.canghaiphong@gmail.com', '0934567890', 'Khu kinh tế Đình Vũ - Cát Hải, Đông Hải 2, Hải An, Hải Phòng', 'https://example.com/licenses/dinhvu_port_license.pdf', 'VERIFIED');
 
 -- 7. ARTICLES & ARTICLE_VERSIONS (Bài viết & Phiên bản biên tập)
 -- Bài 1: Premium (15.000đ)

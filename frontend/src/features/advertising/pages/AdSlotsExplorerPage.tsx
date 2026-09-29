@@ -75,6 +75,14 @@ export function AdSlotsExplorerPage() {
                     <span className="text-slate-700 text-right">{slot.locationNote}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-slate-500">Chuyên mục:</span>
+                    <span className="text-slate-700 text-right">{slot.categoryName || 'Tất cả chuyên mục'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Hình thức:</span>
+                    <span className="text-slate-700">{slot.inventoryMode === 'ROTATING' ? 'Luân phiên' : 'Độc quyền'}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-slate-500">Sức chứa tối đa:</span>
                     <span className="text-slate-700">{slot.maxCapacity} chiến dịch</span>
                   </div>
