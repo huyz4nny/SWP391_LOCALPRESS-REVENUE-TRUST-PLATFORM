@@ -1,5 +1,8 @@
 import React from 'react'
 import { createBrowserRouter, Navigate, Link } from 'react-router-dom'
+import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
+import { UserRole, PERMISSION_CHECKERS } from '@/app/config'
+import { mockStore } from '@/mocks/store'
 
 // Layouts
 import { PublicLayout } from '@/layouts/PublicLayout'
@@ -86,6 +89,17 @@ function NotFoundPage() {
   )
 }
 
+// Role permission groups for backoffice routing
+const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'AUTHOR', 'SYSTEM_ADMIN']
+const FINANCE_ROLES: UserRole[] = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN']
+const ADMIN_ROLES: UserRole[] = ['SYSTEM_ADMIN']
+
+function BackofficeIndexRedirect() {
+  const currentUser = mockStore.getCurrentUser()
+  const target = PERMISSION_CHECKERS.getDefaultBackofficeRoute(currentUser.role)
+  return <Navigate to={target} replace />
+}
+
 export const router = createBrowserRouter([
   // 1. Public Reader Routes
   {
@@ -139,34 +153,163 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // 4. Backoffice Internal Routes
+  // 4. Backoffice Internal Routes (Phân quyền bảo vệ theo phân hệ)
   {
     path: '/backoffice',
     element: <BackofficeLayout />,
     children: [
-      // Editorial (SV2)
-      { path: 'editorial', element: <ArticleListPage /> },
-      { path: 'editorial/articles', element: <ArticleListPage /> },
-      { path: 'editorial/articles/new', element: <ArticleEditorPage /> },
-      { path: 'editorial/articles/:id/edit', element: <ArticleEditorPage /> },
-      { path: 'editorial/bookings', element: <BookingManagementPage /> },
-      { path: 'editorial/creatives', element: <CreativeReviewPage /> },
-      { path: 'editorial/comments', element: <CommentModerationPage /> },
+      // Điều hướng tự động về phân hệ đúng thẩm quyền của vai trò hiện tại
+      { index: true, element: <BackofficeIndexRedirect /> },
 
-      // Finance (SV4)
-      { path: 'finance', element: <FinanceDashboard /> },
-      { path: 'finance/orders', element: <OrderListPage /> },
-      { path: 'finance/orders/:id', element: <OrderDetailPage /> },
-      { path: 'finance/refunds', element: <RefundManagementPage /> },
-      { path: 'finance/reconciliation', element: <ReconciliationPage /> },
-      { path: 'finance/ledger', element: <GeneralLedgerPage /> },
+      // Tòa Soạn & Biên Tập (SV2: Editor / Reviewer / Author / Admin)
+      {
+        path: 'editorial',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <ArticleListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/articles',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <ArticleListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/articles/new',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <ArticleEditorPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/articles/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <ArticleEditorPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/bookings',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <BookingManagementPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/creatives',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <CreativeReviewPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/comments',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <CommentModerationPage />
+          </ProtectedRoute>
+        ),
+      },
 
-      // Administration (SV5)
-      { path: 'admin', element: <AdminDashboard /> },
-      { path: 'admin/users', element: <UserManagementPage /> },
-      { path: 'admin/paywall', element: <PaywallConfigPage /> },
-      { path: 'admin/delivery', element: <AdDeliveryMonitorPage /> },
-      { path: 'admin/audit-logs', element: <AuditLogsPage /> },
+      // Tài Chính & Kế Toán (SV4: Accountant / Finance Staff / Finance Manager / Admin)
+      {
+        path: 'finance',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <FinanceDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/orders',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <OrderListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/orders/:id',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <OrderDetailPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/refunds',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <RefundManagementPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/reconciliation',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <ReconciliationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/ledger',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <GeneralLedgerPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // Quản Trị Hệ Thống (SV5: System Admin duy nhất)
+      {
+        path: 'admin',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Quản Trị Hệ Thống (SV5)">
+            <AdminDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/users',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Quản Trị Hệ Thống (SV5)">
+            <UserManagementPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/paywall',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Quản Trị Hệ Thống (SV5)">
+            <PaywallConfigPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/delivery',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Quản Trị Hệ Thống (SV5)">
+            <AdDeliveryMonitorPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/audit-logs',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Quản Trị Hệ Thống (SV5)">
+            <AuditLogsPage />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
 ])
