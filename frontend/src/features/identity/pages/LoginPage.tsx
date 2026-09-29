@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { ShieldCheck, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
+import { APP_CONFIG } from '@/app/config'
+import { advertisingApi } from '@/features/advertising/api'
+import { httpClient } from '@/lib/http/client'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -16,12 +19,28 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
 
   const users = mockStore.getState().users
 
-  const handleCustomLogin = (e: React.FormEvent) => {
+  const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setLoginError('')
+    if (!APP_CONFIG.useMockApi) {
+      try {
+        httpClient.setBasicAuth(email, password)
+        const user = await advertisingApi.getMe()
+        mockStore.setRealAdvertiser({ ...user, createdAt: new Date().toISOString() })
+        navigate('/advertiser/profile', { replace: true })
+      } catch (error) {
+        httpClient.clearBasicAuth()
+        setLoginError(error instanceof Error ? error.message : 'Không thể đăng nhập doanh nghiệp')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
     setTimeout(() => {
       // Find matching user or fallback to reader-free
       const matched = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
@@ -62,7 +81,7 @@ export function LoginPage() {
         <p className="text-sm text-stone-500 mt-1">Đăng nhập tài khoản Báo điện tử LocalPress</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div className={`grid grid-cols-1 gap-8 items-start ${APP_CONFIG.useMockApi ? 'md:grid-cols-2' : 'max-w-md mx-auto'}`}>
         {/* Left: Standard Form */}
         <Card>
           <CardHeader>
@@ -104,6 +123,7 @@ export function LoginPage() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col space-y-3">
+              {loginError && <p role="alert" className="text-sm text-red-700">{loginError}</p>}
               <Button type="submit" className="w-full" isLoading={isLoading}>
                 Đăng nhập
               </Button>
@@ -118,7 +138,7 @@ export function LoginPage() {
         </Card>
 
         {/* Right: Quick Demo Persona Selector */}
-        <div className="bg-slate-900 text-white rounded-xl p-6 shadow-xl border border-slate-700">
+        {APP_CONFIG.useMockApi && <div className="bg-slate-900 text-white rounded-xl p-6 shadow-xl border border-slate-700">
           <div className="flex items-center space-x-2 text-amber-400 mb-2">
             <Sparkles className="w-5 h-5" />
             <h3 className="font-bold text-sm uppercase tracking-wider">Chọn nhanh vai trò Demo (Mock)</h3>
@@ -153,7 +173,7 @@ export function LoginPage() {
                 </button>
               ))}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { User } from '@/types'
 import { Article, Category, SubscriptionPlan } from '@/features/reader/types'
-import { AdSlot, AdBooking, AdCampaign } from '@/features/advertising/types'
+import { AdSlot, AdBooking, AdCampaign, AdvertiserProfile } from '@/features/advertising/types'
 import { Order, RefundRequest, ReconciliationPeriod, GeneralLedgerEntry } from '@/features/finance/types'
 import { SystemAuditLog, PaywallSettings, AdDeliveryLiveStatus } from '@/features/administration/types'
 
@@ -1030,9 +1030,11 @@ export const SEED_AD_SLOTS: AdSlot[] = [
     width: 1140,
     height: 120,
     pricePerDay: 1500000,
+    pricingType: 'CPD',
+    deviceType: 'ALL',
     description: 'Vị trí banner nổi bật nhất ngay dưới thanh điều hướng trang chủ, tiếp cận 100% độc giả Hải Phòng truy cập.',
     locationNote: 'Trang chủ, ngay dưới Header',
-    maxCapacity: 2,
+    maxCapacity: 1,
     currentBookings: 1,
     isActive: true,
   },
@@ -1044,9 +1046,11 @@ export const SEED_AD_SLOTS: AdSlot[] = [
     width: 728,
     height: 90,
     pricePerDay: 800000,
+    pricingType: 'CPD',
+    deviceType: 'ALL',
     description: 'Xuất hiện xen giữa đoạn văn thứ 2 và thứ 3 của tất cả các bài viết tin tức, tỷ lệ CTR trung bình cao nhất.',
     locationNote: 'Nội dung chi tiết mọi bài viết',
-    maxCapacity: 3,
+    maxCapacity: 2,
     currentBookings: 0,
     isActive: true,
   },
@@ -1058,13 +1062,28 @@ export const SEED_AD_SLOTS: AdSlot[] = [
     width: 300,
     height: 600,
     pricePerDay: 1200000,
+    pricingType: 'CPD',
+    deviceType: 'DESKTOP',
     description: 'Banner trượt cố định theo màn hình khi độc giả cuộn chuột đọc tin tức kinh tế và đời sống Đất Cảng.',
     locationNote: 'Sidebar phải trang chuyên mục & bài viết',
-    maxCapacity: 2,
+    maxCapacity: 1,
     currentBookings: 1,
     isActive: true,
   },
 ]
+
+export const SEED_ADVERTISER_PROFILES: Record<string, AdvertiserProfile> = {
+  'user-adv-1': {
+    id: 'ADV-001', companyName: 'Công ty CP Logistics Cảng Hải Phòng', taxCode: '0201988888',
+    contactPerson: 'Đặng Quang Huy', email: 'huy.dang@logisticshaiphong.vn', phone: '0934567890',
+    address: 'Hải An, Hải Phòng', businessLicenseUrl: '', verificationStatus: 'VERIFIED',
+  },
+  'user-adv-2': {
+    id: 'ADV-002', companyName: 'Bất động sản Đất Cảng Hải Phòng', taxCode: '0201999999',
+    contactPerson: 'Lê Hồng Phong', email: 'phong.le@datcanghaiphong.vn', phone: '0977665544',
+    address: 'Hồng Bàng, Hải Phòng', businessLicenseUrl: '', verificationStatus: 'VERIFIED',
+  },
+}
 
 export const SEED_AD_BOOKINGS: AdBooking[] = [
   {

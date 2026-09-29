@@ -125,6 +125,13 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   }
 
   // ---------------- ADVERTISING / ADVERTISER ----------------
+  if (pathname === '/advertiser/profile' && method === 'GET') {
+    return mockStore.getAdvertiserProfile()
+  }
+  if (pathname === '/advertiser/profile' && method === 'PUT') {
+    return mockStore.saveAdvertiserProfile(body)
+  }
+
   if (pathname === '/ad-slots' && method === 'GET') {
     return mockStore.getState().adSlots
   }

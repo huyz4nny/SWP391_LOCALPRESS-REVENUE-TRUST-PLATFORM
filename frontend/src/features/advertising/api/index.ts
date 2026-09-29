@@ -1,7 +1,13 @@
 import { httpClient } from '@/lib/http/client'
-import { AdSlot, AdBooking, AdCampaign, AdCreative } from '../types'
+import { User } from '@/types'
+import { AdSlot, AdBooking, AdCampaign, AdCreative, AdvertiserProfile, AdvertiserProfileInput } from '../types'
 
 export const advertisingApi = {
+  getMe: () => httpClient.get<User>('/advertiser/me'),
+  getProfile: () => httpClient.get<AdvertiserProfile>('/advertiser/profile'),
+  saveProfile: (profile: AdvertiserProfileInput) =>
+    httpClient.put<AdvertiserProfile>('/advertiser/profile', profile),
+
   getSlots: () => {
     return httpClient.get<AdSlot[]>('/ad-slots')
   },

@@ -33,15 +33,32 @@ export interface AdSlot {
   name: string
   code: string
   dimensions: string
-  width: number
-  height: number
+  width?: number
+  height?: number
   pricePerDay: number
-  description: string
+  pricingType?: 'CPD' | 'CPM' | 'CPC' | 'FLAT_FEE'
+  deviceType?: 'DESKTOP' | 'MOBILE' | 'TABLET' | 'ALL'
+  description?: string
   locationNote: string
   maxCapacity: number
-  currentBookings: number
+  currentBookings?: number
   isActive: boolean
 }
+
+export interface AdvertiserProfile {
+  id: string
+  companyName: string
+  taxCode: string
+  contactPerson: string
+  email: string
+  phone: string
+  address: string
+  businessLicenseUrl: string
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
+}
+
+export type AdvertiserProfileInput = Pick<AdvertiserProfile,
+  'companyName' | 'taxCode' | 'contactPerson' | 'email' | 'phone' | 'address' | 'businessLicenseUrl'>
 
 export interface AdCreative {
   id: string

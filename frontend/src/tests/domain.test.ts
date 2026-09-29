@@ -197,6 +197,26 @@ describe('LocalPress Core Business Domain Tests', () => {
   })
 
   describe('5. Data Ownership & Privacy (Flow 7)', () => {
+    it('keeps each advertiser profile private when users switch', async () => {
+      mockStore.setCurrentUser('user-adv-1')
+      const original = await handleMockRequest('GET', '/advertiser/profile')
+      await handleMockRequest('PUT', '/advertiser/profile', { ...original, companyName: 'Công ty mới' })
+
+      mockStore.setCurrentUser('user-adv-2')
+      const other = await handleMockRequest('GET', '/advertiser/profile')
+      expect(other.companyName).not.toBe('Công ty mới')
+      await expect(handleMockRequest('PUT', '/advertiser/profile', { ...other, taxCode: original.taxCode }))
+        .rejects.toThrow('Mã số thuế đã được sử dụng')
+
+      mockStore.setCurrentUser('user-adv-1')
+      expect((await handleMockRequest('GET', '/advertiser/profile')).companyName).toBe('Công ty mới')
+      mockStore.setCurrentUser('user-reader-free')
+      await expect(handleMockRequest('GET', '/advertiser/profile')).rejects.toThrow('Không có quyền')
+      mockStore.resetToDefaults()
+      mockStore.setCurrentUser('user-adv-1')
+      expect((await handleMockRequest('GET', '/advertiser/profile')).companyName).toBe(original.companyName)
+    })
+
     it('Advertiser A cannot see bookings or private financial records of Advertiser B', async () => {
       mockStore.setCurrentUser('user-adv-1') // Đặng Quang Huy (ADV-001)
       const adv1Bookings = await handleMockRequest('GET', '/advertiser/bookings')
