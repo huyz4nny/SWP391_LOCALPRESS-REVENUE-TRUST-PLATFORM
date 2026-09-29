@@ -66,6 +66,7 @@ Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BU�
 14. **Cách ly dữ liệu đa người thuê (Multi-tenant Isolation):** Doanh nghiệp A tuyệt đối không được xem báo cáo CTR, banner hoặc hóa đơn của Doanh nghiệp B, kể cả khi đoán được ID trên URL (chống lỗ hổng IDOR).
 15. **Quyền độc giả Ad-Free không làm sai lệch số liệu:** Khi độc giả có gói Ad-Free đọc bài, hệ thống không tính lượt đọc này là một slot quảng cáo bị bỏ trống (Unfilled Impression).
 16. **Nhất quán định nghĩa chỉ số:** Số liệu Impressions, Clicks, CTR, MRR, ARR, Doanh thu trên Dashboard doanh nghiệp, Dashboard tòa soạn và Báo cáo xuất file phải khớp 100% về công thức và mốc thời gian.
+17. **Nguyên tắc phân định ranh giới & Code Ownership (Strict Boundary):** Tuyệt đối **KHÔNG ĐƯỢC PHÉP SỬA ĐỔI** code, giao diện, bảng dữ liệu hoặc logic thuộc phân hệ của thành viên khác (`advertising` - SV1, `editorial` - SV2, `reader` - SV3, `delivery`/CMS/AI/`administration` - SV5). Mỗi thành viên chỉ làm đúng phần của mình (SV4 - Huy: Kế toán, Thanh toán & Đối soát trong `com.localpress.finance`, `transactions`, `refund_requests`, tài liệu tài chính). Mọi giao tiếp liên module chỉ đi qua Shared Service Contracts / DTOs / Events dùng chung, không can thiệp trực tiếp vào mã nguồn nội bộ của module khác.
 
 ---
 
