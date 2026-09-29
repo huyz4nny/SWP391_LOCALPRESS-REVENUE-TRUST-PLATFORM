@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS articles (
         (access_type = 'FREE' AND (single_price IS NULL OR single_price = 0)) OR
         (access_type = 'PREMIUM' AND single_price IS NOT NULL AND single_price >= 0)
     ),
+    -- Lưu ý kiến trúc: Loại bỏ Foreign Key 2 chiều sang article_versions để chống Circular Dependency Deadlock (Error 1451/1452).
+    -- Tính toàn vẹn được kiểm soát triệt để bằng CHECK constraint bên dưới kết hợp tầng Backend Service.
     CONSTRAINT chk_articles_published_version CHECK (
         (published_version IS NULL OR (published_version > 0 AND published_version <= latest_version)) AND
         (status <> 'PUBLISHED' OR published_version IS NOT NULL)
