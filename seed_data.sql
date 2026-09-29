@@ -44,14 +44,14 @@ INSERT INTO ad_slots (slot_id, slot_code, name, page_location, device_type, dime
 (3, 'SLOT-SIDEBAR-STICKY', 'Sidebar Sticky (Cột phải đọc báo)', 'Cột bên phải trang đọc báo', 'DESKTOP', '300x600', 1, 1200000.00, 'CPD', 'ACTIVE');
 
 -- 5. SUBSCRIPTION PLANS (Gói cước hội viên Paywall)
-INSERT INTO subscription_plans (plan_id, name, price, duration_days, status) VALUES
-(1, 'Gói Tháng (Tiêu chuẩn)', 50000.00, 30, 'ACTIVE'),
-(2, 'Gói Quý (Tiết kiệm)', 135000.00, 90, 'ACTIVE'),
-(3, 'Gói Năm (Hội viên VIP)', 480000.00, 365, 'ACTIVE');
+INSERT INTO subscription_plans (plan_id, name, price, duration_days, has_ad_free, has_audio, status) VALUES
+(1, 'Gói Tháng (Tiêu chuẩn)', 50000.00, 30, FALSE, FALSE, 'ACTIVE'),
+(2, 'Gói Quý (Tiết kiệm)', 135000.00, 90, TRUE, FALSE, 'ACTIVE'),
+(3, 'Gói Năm (Hội viên VIP)', 480000.00, 365, TRUE, TRUE, 'ACTIVE');
 
 -- 6. ADVERTISERS (Hồ sơ doanh nghiệp B2B)
-INSERT INTO advertisers (advertiser_id, user_id, company_name, tax_code, contact_person, email, phone, address, verification_status) VALUES
-(1, 5, 'Công ty CP Logistics & Cảng Quốc tế Đình Vũ', '0201988888', 'Đặng Quang Huy', 'adv.canghaiphong@gmail.com', '0934567890', 'Khu kinh tế Đình Vũ - Cát Hải, Đông Hải 2, Hải An, Hải Phòng', 'VERIFIED');
+INSERT INTO advertisers (advertiser_id, user_id, company_name, tax_code, contact_person, email, phone, address, business_license_url, verification_status) VALUES
+(1, 5, 'Công ty CP Logistics & Cảng Quốc tế Đình Vũ', '0201988888', 'Đặng Quang Huy', 'adv.canghaiphong@gmail.com', '0934567890', 'Khu kinh tế Đình Vũ - Cát Hải, Đông Hải 2, Hải An, Hải Phòng', 'https://example.com/licenses/dinhvu_port_license.pdf', 'VERIFIED');
 
 -- 7. ARTICLES & ARTICLE_VERSIONS (Bài viết & Phiên bản biên tập)
 -- Bài 1: Premium (15.000đ)
@@ -135,8 +135,8 @@ INSERT INTO article_purchases (purchase_id, user_id, article_id, purchase_price,
 (1, 6, 2, 25000.00, 'ACTIVE', '2026-09-23 14:20:00');
 
 -- 13. AD CAMPAIGNS, CREATIVES & STATS (Quảng cáo B2B)
-INSERT INTO ad_campaigns (campaign_id, advertiser_id, slot_id, reviewed_by, campaign_name, start_date, end_date, quoted_amount, quotation_status, contract_reference, payment_status, status) VALUES
-(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'PAID', 'ACTIVE');
+INSERT INTO ad_campaigns (campaign_id, advertiser_id, slot_id, reviewed_by, campaign_name, start_date, end_date, quoted_amount, quotation_status, contract_reference, contract_file_url, payment_status, status) VALUES
+(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE');
 
 INSERT INTO ad_creatives (creative_id, campaign_id, reviewed_by, version_number, media_url, target_url, resolved_url, review_status, scan_status, approved_at) VALUES
 (1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00');
@@ -146,16 +146,16 @@ INSERT INTO ad_stats (stat_id, campaign_id, creative_id, stat_date, impressions,
 
 -- 14. TRANSACTIONS (Sổ cái thu tiền)
 -- Giao dịch 1: Độc giả Mai mua gói năm 480k
-INSERT INTO transactions (transaction_id, user_id, subscription_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, status, paid_at) VALUES
-(1, 7, 1, 'SUBSCRIPTION', 480000.00, 'VND', 'VIETQR', 'VNPAY_TXN_SUB_001', 'SUCCESS', '2026-09-01 08:30:00');
+INSERT INTO transactions (transaction_id, user_id, subscription_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES
+(1, 7, 1, 'SUBSCRIPTION', 480000.00, 'VND', 'VIETQR', 'VNPAY_TXN_SUB_001', 'VCB', 'SUCCESS', '2026-09-01 08:30:00', '2026-09-01 17:00:00', 2);
 
 -- Giao dịch 2: Độc giả An mua bài điều tra Bạch Long Vĩ 25k
-INSERT INTO transactions (transaction_id, user_id, purchase_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, status, paid_at) VALUES
-(2, 6, 1, 'ARTICLE', 25000.00, 'VND', 'MOMO', 'MOMO_TXN_ART_002', 'SUCCESS', '2026-09-23 14:20:00');
+INSERT INTO transactions (transaction_id, user_id, purchase_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES
+(2, 6, 1, 'ARTICLE', 25000.00, 'VND', 'MOMO', 'MOMO_TXN_ART_002', 'MOMO', 'SUCCESS', '2026-09-23 14:20:00', '2026-09-23 18:00:00', 2);
 
 -- Giao dịch 3: Doanh nghiệp thanh toán hợp đồng quảng cáo 45tr
-INSERT INTO transactions (transaction_id, user_id, campaign_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, status, paid_at) VALUES
-(3, 5, 1, 'AD', 45000000.00, 'VND', 'VNPAY', 'VNPAY_TXN_AD_003', 'SUCCESS', '2026-08-31 17:00:00');
+INSERT INTO transactions (transaction_id, user_id, campaign_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES
+(3, 5, 1, 'AD', 45000000.00, 'VND', 'VNPAY', 'VNPAY_TXN_AD_003', 'TCB', 'SUCCESS', '2026-08-31 17:00:00', '2026-08-31 18:00:00', 2);
 
 -- 15. REFUND REQUESTS (Dữ liệu mẫu cho SV4 demo luồng Hoàn tiền 4 mắt)
 INSERT INTO refund_requests (refund_id, transaction_id, user_id, refund_amount, reason, evidence_url, status, proposed_by, reviewed_by, review_notes) VALUES

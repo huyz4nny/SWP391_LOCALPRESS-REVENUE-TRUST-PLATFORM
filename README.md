@@ -216,21 +216,53 @@ npm run test
 * Ứng dụng chạy tại: `http://localhost:5173`
 * Tích hợp sẵn thanh chuyển vai trò nhanh (**Role Switcher Bar**) để kiểm thử nhanh giữa 11 vai trò: Guest, Reader, Reader Premium, Advertiser, Staff/Editor, Finance, Admin.
 
-### 6.3. Cài đặt & Chạy Backend (Spring Boot 3)
+### 6.3. Cài đặt & Khởi chạy Cơ sở dữ liệu & Backend (Spring Boot 3)
+
+#### Bước 1: Tạo Database trên MySQL 8.0+
 ```bash
-# 1. Tạo Database trên MySQL
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS localpress_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+```
 
-# 2. Cấu hình thông tin kết nối trong backend/src/main/resources/application-dev.yml nếu cần đổi password MySQL.
+#### Bước 2: Khởi chạy Backend (Tự động tạo khung 22 bảng vật lý)
+File [`backend/src/main/resources/db/migration/V1__create_tables.sql`](backend/src/main/resources/db/migration/V1__create_tables.sql) là **bản DDL thuần túy (100% cấu trúc, KHÔNG chứa dữ liệu mẫu)**. Khi ứng dụng khởi động, Flyway Migration sẽ tự động tạo hoàn chỉnh 22 bảng và 2 Views.
 
-# 3. Di chuyển vào thư mục backend và khởi chạy (Flyway sẽ tự động chạy migration V1 và V2)
+```bash
+# Di chuyển vào thư mục backend
 cd backend
-./mvnw spring-boot:run
-# Hoặc trên Windows PowerShell:
+
+# Khởi chạy Spring Boot trên Windows PowerShell:
 .\mvnw.cmd spring-boot:run
+
+# Hoặc trên Linux/macOS:
+./mvnw spring-boot:run
 ```
 * API Endpoint: `http://localhost:8080/api/v1`
 * Tài liệu Swagger/OpenAPI: `http://localhost:8080/swagger-ui.html`
+
+#### Bước 3: Nạp dữ liệu mẫu (Insert tay bằng `seed_data.sql`)
+Để nhóm chủ động nạp hoặc xóa dữ liệu test mà không bị can thiệp bởi quá trình khởi động Backend, toàn bộ dữ liệu mẫu đã được tách riêng vào file [`seed_data.sql`](seed_data.sql) ở thư mục gốc.
+
+* **Cách 1 — Dùng lệnh dòng lệnh (Terminal/PowerShell):**
+  ```bash
+  mysql -u root -p localpress_db < seed_data.sql
+  ```
+* **Cách 2 — Dùng giao diện trực quan (MySQL Workbench / DBeaver / Navicat):**
+  1. Mở phần mềm quản lý DB và kết nối vào `localpress_db`.
+  2. Bấm `File` $\rightarrow$ `Open SQL Script...` $\rightarrow$ Chọn file [`seed_data.sql`](seed_data.sql).
+  3. Bấm nút **Execute All / Run Script** (biểu tượng tia sét hoặc `Ctrl + Shift + Enter`).
+
+#### Bảng tài khoản mẫu phục vụ thử nghiệm (Mật khẩu chung: `password123`):
+| Email | Vai trò (`role`) | Người dùng đại diện | Phân hệ phụ trách |
+| :--- | :--- | :--- | :--- |
+| `admin@localpress.vn` | `SYSTEM_ADMIN` | Vũ Quản Trị Hệ Thống | **SV5:** Cấu hình slot, audit log, quản trị |
+| `ketoan@localpress.vn` | `ACCOUNTANT` | Lê Kế Toán (Leader) | **SV4:** Đối soát ngân hàng, duyệt hoàn tiền 4 mắt |
+| `bientap@localpress.vn` | `EDITOR` | Nguyễn Văn Biên Tập | **SV2:** Duyệt bài viết, duyệt banner, duyệt comment |
+| `phongvien@localpress.vn` | `AUTHOR` | Hoàng Minh Phóng Viên | **SV5 & SV2:** Soạn bài viết, quản lý phiên bản |
+| `adv.canghaiphong@gmail.com` | `ADVERTISER` | Đặng Quang Huy (Đình Vũ Port) | **SV1:** Booking quảng cáo, xem báo cáo CTR |
+| `reader.an@gmail.com` | `READER` | Nguyễn Văn An (Độc giả Free) | **SV3:** Đọc tin tức miễn phí, mua lẻ bài điều tra |
+| `reader.mai@gmail.com` | `READER` | Trần Thị Mai (Hội viên VIP) | **SV3:** Đăng nhập 2 thiết bị, đọc không quảng cáo |
+| `kiemduyet@localpress.vn` | `STAFF` | Phạm Kiểm Duyệt CSKH | **SV4 & SV2:** Tiếp nhận khiếu nại, lập đề xuất hoàn tiền |
+
 
 ---
 

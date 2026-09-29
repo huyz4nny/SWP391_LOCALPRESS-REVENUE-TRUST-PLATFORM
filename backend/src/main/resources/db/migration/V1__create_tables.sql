@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS comments (
     status          ENUM('PENDING', 'APPROVED', 'REJECTED', 'HIDDEN')
                     NOT NULL DEFAULT 'PENDING',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_comments_article
         FOREIGN KEY (article_id) REFERENCES articles(article_id)
@@ -217,6 +218,8 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
     name            VARCHAR(120) NOT NULL,
     price           DECIMAL(12,2) NOT NULL,
     duration_days   INT UNSIGNED NOT NULL,
+    has_ad_free     BOOLEAN NOT NULL DEFAULT FALSE,
+    has_audio       BOOLEAN NOT NULL DEFAULT FALSE,
     status          ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
 
     CONSTRAINT uk_subscription_plans_name UNIQUE (name),
@@ -272,6 +275,7 @@ CREATE TABLE IF NOT EXISTS advertisers (
     email               VARCHAR(255) NOT NULL,
     phone               VARCHAR(20) NOT NULL,
     address             VARCHAR(500) NULL,
+    business_license_url VARCHAR(1000) NULL,
     verification_status ENUM('PENDING', 'VERIFIED', 'REJECTED')
                         NOT NULL DEFAULT 'PENDING',
 
@@ -311,6 +315,7 @@ CREATE TABLE IF NOT EXISTS ad_campaigns (
     quoted_amount      DECIMAL(12,2) NOT NULL DEFAULT 0,
     quotation_status   ENUM('PENDING', 'ACCEPTED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
     contract_reference VARCHAR(100) NULL,
+    contract_file_url  VARCHAR(1000) NULL,
     payment_status     ENUM('UNPAID', 'PENDING', 'PAID', 'REFUNDED') NOT NULL DEFAULT 'UNPAID',
     status             ENUM('DRAFT', 'PENDING', 'APPROVED', 'ACTIVE', 'REJECTED', 'COMPLETED', 'SUSPENDED') 
                        NOT NULL DEFAULT 'DRAFT',
@@ -386,8 +391,11 @@ CREATE TABLE IF NOT EXISTS transactions (
     currency                VARCHAR(10) NOT NULL DEFAULT 'VND',
     payment_method          VARCHAR(50) NOT NULL,
     gateway_transaction_id  VARCHAR(255) NULL,
+    bank_code               VARCHAR(20) NULL,
     status                  ENUM('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
     paid_at                 DATETIME NULL,
+    reconciled_at           DATETIME NULL,
+    reconciled_by           BIGINT UNSIGNED NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT uk_transactions_gateway_id UNIQUE (gateway_transaction_id),
@@ -402,6 +410,9 @@ CREATE TABLE IF NOT EXISTS transactions (
         FOREIGN KEY (purchase_id) REFERENCES article_purchases(purchase_id),
     CONSTRAINT fk_transactions_campaign
         FOREIGN KEY (campaign_id) REFERENCES ad_campaigns(campaign_id),
+    CONSTRAINT fk_transactions_reconciler
+        FOREIGN KEY (reconciled_by) REFERENCES users(user_id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT chk_transactions_amount CHECK (amount >= 0),
     CONSTRAINT chk_transactions_targets CHECK (
         (transaction_type = 'SUBSCRIPTION' AND subscription_id IS NOT NULL AND purchase_id IS NULL AND campaign_id IS NULL AND original_transaction_id IS NULL) OR
