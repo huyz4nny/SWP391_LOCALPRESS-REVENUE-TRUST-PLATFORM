@@ -2,7 +2,7 @@
 > **Dự án:** LocalPress — Revenue & Trust Platform (Báo điện tử cấp tỉnh: Doanh thu tự chủ & Kiểm duyệt tin cậy)  
 > **Khóa học:** SWP391 — Học kỳ FALL 2026 — Đại học FPT  
 > **Nhóm thực hiện:** Nhóm 2 (Leader: SV4 — Huy)  
-> **Phiên bản:** 2.0 (Tích hợp danh mục 125 chức năng chuẩn từ `LocalPress_Danh_muc_chuc_nang.xlsx`)
+> **Phiên bản:** 2.1 (Đồng bộ chuẩn hóa theo 77 Use Cases, 48 Màn hình từ `project_tracking_group2.xlsx` và 125 Tiêu chí nghiệp vụ từ `LocalPress_Danh_muc_chuc_nang.docx`)
 
 ---
 
@@ -38,9 +38,17 @@ Hệ thống được thiết kế phục vụ 11 nhóm tác nhân với ranh gi
 
 ---
 
-## 3. DANH MỤC 125 CHỨC NĂNG HỆ THỐNG (THE 125 FUNCTIONAL CATALOGUE)
+## 3. DANH MỤC 125 TIÊU CHÍ NGHIỆP VỤ & ÁNH XẠ 48 MÀN HÌNH / 77 USE CASES
 
-Dự án được chia đều cho 5 sinh viên, mỗi thành viên phụ trách **25 chức năng** (chuẩn hóa theo các mức độ: `[P0]` Cốt lõi, `[P1]` Nâng cấp, `[P2]` Mở rộng):
+Kiến trúc triển khai và mã nguồn hệ thống được tổ chức trực tiếp thành **48 Màn hình / Phân hệ chức năng** và **77 Use Cases (`UC001` - `UC077`)** trong bảng theo dõi [`project_tracking_group2.xlsx`](../project_tracking_group2.xlsx). Danh mục này cụ thể hóa toàn diện **125 tiêu chí nghiệp vụ** trong tài liệu yêu cầu gốc [`LocalPress_Danh_muc_chuc_nang.docx`](../LocalPress_Danh_muc_chuc_nang.docx) (chia đều 25 tiêu chí cho 5 luồng sinh viên, gồm `[P0]` Cốt lõi, `[P1]` Nâng cấp, `[P2]` Mở rộng):
+
+| Sinh viên | Luồng nghiệp vụ | Màn hình (`project_tracking_group2.xlsx`) | Use Cases | 125 Tiêu chí nghiệp vụ (`LocalPress_Danh_muc_chuc_nang.docx`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **SV1 (Tây)** | Doanh nghiệp & Quảng cáo B2B | 10 Màn hình (SRS II.1.1 - II.1.10) | 14 UCs (`UC001` - `UC014`) | 25 tiêu chí (16 P0, 9 P1, 0 P2): Tra cứu slot, booking, upload banner, báo cáo CTR, hồ sơ B2B |
+| **SV2 (Trọng Phan)** | Tòa soạn, Vận hành & Phê duyệt | 10 Màn hình (SRS II.2.1 - II.2.10) | 14 UCs (`UC015` - `UC028`) | 25 tiêu chí (14 P0, 8 P1, 3 P2): Dashboard vận hành, duyệt báo giá/hợp đồng, duyệt banner, duyệt bài, duyệt comment |
+| **SV3 (Hoàng)** | Khách & Độc giả (Reader Experience) | 10 Màn hình (SRS II.3.1 - II.3.10) | 18 UCs (`UC029` - `UC046`) | 25 tiêu chí (18 P0, 6 P1, 1 P2): Đọc Free 100%, preview Paywall, checkout, tủ sách cá nhân, phiên 2 thiết bị |
+| **SV4 (Huy - Leader)** | Kế toán, Thanh toán & Đối soát | 8 Màn hình (SRS II.4.1 - II.4.8) | 14 UCs (`UC047` - `UC060`) | 25 tiêu chí (12 P0, 12 P1, 1 P2): Cổng QR dùng chung, Webhook IPN, hóa đơn VAT, sổ quỹ kép, đối soát, hoàn tiền 4 mắt |
+| **SV5 (Tùng)** | Hệ thống, Paywall, Ad Serving & AI | 10 Màn hình (SRS II.5.1 - II.5.10) | 17 UCs (`UC061` - `UC077`) | 25 tiêu chí (17 P0, 7 P1, 1 P2): CMS soạn bài & version, Paywall Engine, Ad Serving lọc click tặc, AI biên tập, audit log |
 
 ### 3.1. Phân hệ SV1 — Luồng Doanh nghiệp: Đặt mua và Quản lý Quảng cáo (Tây phụ trách)
 *Mục tiêu: Doanh nghiệp tự chủ booking vị trí, biết rõ quyền lợi, quản lý ngân sách và kiểm chứng số liệu minh bạch.*

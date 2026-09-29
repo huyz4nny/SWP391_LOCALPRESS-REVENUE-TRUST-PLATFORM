@@ -15,15 +15,35 @@ LocalPress là giải pháp báo điện tử địa phương (mô hình mẫu: 
 ---
 
 ## 2. PHÂN CÔNG THÀNH VIÊN & LUỒNG NGHIỆP VỤ (TEAM RACI)
-Dự án gồm **5 sinh viên**, mỗi sinh viên làm chủ trọn vẹn 1 luồng nghiệp vụ end-to-end (Frontend + Backend + DB logic) gồm **25 chức năng** (tổng cộng **125 chức năng** trong danh mục chuẩn `LocalPress_Danh_muc_chuc_nang.xlsx`):
+Dự án gồm **5 sinh viên**, mỗi sinh viên làm chủ trọn vẹn 1 luồng nghiệp vụ end-to-end (Frontend + Backend + DB logic). Kiến trúc và tiến độ được quản lý trực tiếp qua **77 Use Cases (`UC001` - `UC077`)** và **48 Màn hình / Phân hệ chức năng** trong bảng theo dõi chính thức [`project_tracking_group2.xlsx`](project_tracking_group2.xlsx), được cụ thể hóa từ **125 tiêu chí nghiệp vụ** trong tài liệu yêu cầu gốc [`LocalPress_Danh_muc_chuc_nang.docx`](LocalPress_Danh_muc_chuc_nang.docx):
 
-| Thành viên | Luồng nghiệp vụ | Phân hệ chính | Phạm vi chức năng (25 CN / người) |
-| :--- | :--- | :--- | :--- |
-| **SV4: Huy (Leader)** | **Luồng Kế toán, Thanh toán & Đối soát** | `finance`, `transactions`, `refund_requests` | 12 P0, 12 P1, 1 P2. Bộ xử lý thanh toán dùng chung, Webhook IPN, hóa đơn/chứng từ, sổ quỹ kép, đối soát ngân hàng, hoàn tiền 4 mắt. |
-| **SV1: Tây** | **Luồng Doanh nghiệp (Advertiser Portal)** | `advertising`, `advertisers`, `ad_campaigns` | 16 P0, 9 P1, 0 P2. Cổng B2B, tra cứu slot trống, gửi booking, upload creative, xem báo cáo hiệu suất CTR, quản lý hồ sơ & chứng từ B2B. |
-| **SV2: Trọng Phan** | **Luồng Tòa soạn, Vận hành & Phê duyệt** | `editorial`, duyệt bài, duyệt ad, duyệt comment | 14 P0, 8 P1, 3 P2. Dashboard kinh doanh tòa soạn, duyệt báo giá/hợp đồng, kiểm duyệt banner, kiểm duyệt bài viết, kiểm duyệt comment, quản lý gói đọc. |
-| **SV3: Hoàng** | **Luồng Khách & Độc giả (Reader Experience)** | `reader`, `articles` (public), `subscriptions` | 18 P0, 6 P1, 1 P2. Đọc báo Free 100%, preview Paywall, giỏ hàng/checkout gói & bài lẻ, tủ sách cá nhân, bookmark/follow, quản lý phiên tối đa 2 thiết bị. |
-| **SV5: Tùng** | **Luồng Hệ thống, Paywall, Ad Serving & AI** | `delivery`, `content` CMS, `administration`, AI | 17 P0, 7 P1, 1 P2. CMS soạn bài & phiên bản, Paywall Engine ở máy chủ, Ad Serving Engine chống gian lận click, cấu hình slot, trợ lý AI biên tập, audit logs. |
+| Thành viên | Luồng nghiệp vụ | Phân hệ chính | Use Cases & Màn hình (`project_tracking_group2.xlsx`) | Đặc tả chi tiết (`LocalPress_Danh_muc_chuc_nang.docx`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **SV4: Huy (Leader)** | **Kế toán, Thanh toán & Đối soát** | `finance`, `transactions`, `refund_requests` | **14 Use Cases (`UC047` - `UC060`)**, **8 Màn hình / Chức năng** (SRS/SDS II.4.1 - II.4.8). Sắp xếp theo: Iter 1 (2), Iter 2 (2), Iter 3 (4). | 25 tiêu chí (12 P0, 12 P1, 1 P2): Bộ xử lý thanh toán dùng chung, Webhook IPN, hóa đơn/chứng từ, sổ quỹ kép, đối soát ngân hàng, hoàn tiền 4 mắt. |
+| **SV1: Tây** | **Doanh nghiệp (Advertiser Portal)** | `advertising`, `advertisers`, `ad_campaigns` | **14 Use Cases (`UC001` - `UC014`)**, **10 Màn hình / Chức năng** (SRS/SDS II.1.1 - II.1.10). Sắp xếp theo: Iter 1 (2), Iter 2 (4), Iter 3 (4). | 25 tiêu chí (16 P0, 9 P1, 0 P2): Cổng B2B, tra cứu slot trống, gửi booking, upload creative, xem báo cáo hiệu suất CTR, hồ sơ & chứng từ B2B. |
+| **SV2: Trọng Phan** | **Tòa soạn, Vận hành & Phê duyệt** | `editorial`, duyệt bài, duyệt ad, duyệt comment | **14 Use Cases (`UC015` - `UC028`)**, **10 Màn hình / Chức năng** (SRS/SDS II.2.1 - II.2.10). Sắp xếp theo: Iter 1 (2), Iter 2 (4), Iter 3 (4). | 25 tiêu chí (14 P0, 8 P1, 3 P2): Dashboard kinh doanh tòa soạn, duyệt báo giá/hợp đồng, kiểm duyệt banner, kiểm duyệt bài viết, kiểm duyệt comment, quản lý gói đọc. |
+| **SV3: Hoàng** | **Khách & Độc giả (Reader Experience)** | `reader`, `articles` (public), `subscriptions` | **18 Use Cases (`UC029` - `UC046`)**, **10 Màn hình / Chức năng** (SRS/SDS II.3.1 - II.3.10). Sắp xếp theo: Iter 1 (3), Iter 2 (4), Iter 3 (3). | 25 tiêu chí (18 P0, 6 P1, 1 P2): Đọc báo Free 100%, preview Paywall, giỏ hàng/checkout gói & bài lẻ, tủ sách cá nhân, bookmark/follow, quản lý 2 thiết bị. |
+| **SV5: Tùng** | **Hệ thống, Paywall, Ad Serving & AI** | `delivery`, `content` CMS, `administration`, AI | **17 Use Cases (`UC061` - `UC077`)**, **10 Màn hình / Chức năng** (SRS/SDS II.5.1 - II.5.10). Sắp xếp theo: Iter 1 (2), Iter 2 (3), Iter 3 (5). | 25 tiêu chí (17 P0, 7 P1, 1 P2): CMS soạn bài & phiên bản, Paywall Engine ở máy chủ, Ad Serving Engine chống gian lận click, cấu hình slot, trợ lý AI biên tập, audit logs. |
+
+### Lộ trình 3 Đợt triển khai theo Activity Flow (Đầu $\rightarrow$ Giữa $\rightarrow$ Cuối quy trình):
+* **Iteration 1 — Đầu quy trình (11 màn hình):** Ingestion, Setup, Master Data, Đọc Free & Soạn bài cơ bản.
+  * SV1: `Company Profile`, `Ad Slot Catalog`
+  * SV2: `Article Review and Publishing`, `Content Policy and Moderation`
+  * SV3: `Homepage and Article Search`, `Article Reader`, `Authentication`
+  * SV4: `Financial Documents and Ledger`, `Manual Bank Transfer Confirmation`
+  * SV5: `Article Editor`, `Article Metadata and Media`
+* **Iteration 2 — Giữa quy trình (17 màn hình):** Giao dịch lõi, Thanh toán QR/IPN, Paywall Server-side, Booking & Duyệt banner.
+  * SV1: `Campaign Booking`, `Quotation Confirmation`, `Advertising Payment`, `Creative Submission and Preview`
+  * SV2: `Pending Booking Queue`, `Advertising Inventory Calendar`, `Quotation Management`, `Creative Review`
+  * SV3: `Premium Checkout`, `Premium Article Reader`, `Personal Bookshelf`, `Comments and Reports`
+  * SV4: `Payment Processing`, `Advertiser Receivables`
+  * SV5: `Article Version History`, `Article Submission and Revision`, `Content Access and Paywall`
+* **Iteration 3 — Cuối quy trình (20 màn hình):** Đối soát, Hoàn tiền 4 mắt, Báo cáo & Dashboard, AI Cố vấn, Ad Serving & Admin.
+  * SV1: `Advertising Dashboard`, `Creative Replacement`, `Requests and Business Notifications`, `Contracts and Documents`
+  * SV2: `Campaign Eligibility Check`, `Campaign Control`, `Advertising Contract Management`, `Business Operation Dashboard`
+  * SV3: `Followed Content`, `Devices and Sessions`, `Subscription, Transactions and Support`
+  * SV4: `Cash Flow Dashboard`, `Payment Reconciliation`, `Refund and Rights Management`, `Financial Reports and Alerts`
+  * SV5: `AI Editorial Assistant`, `Advertising Slot Configuration`, `Advertisement Delivery and Tracking`, `Advertisement URL Monitoring`, `System Administration Console`
 
 ---
 
@@ -49,31 +69,29 @@ Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BU�
 
 ---
 
-## 4. BẢN ĐỒ DỮ LIỆU & 19 BẢNG CƠ SỞ DỮ LIỆU (DATABASE INTEGRITY)
-Hệ thống gồm 19 bảng liên kết chặt chẽ (được cài đặt trong `backend/src/main/resources/db/migration/`):
+## 4. BẢN ĐỒ DỮ LIỆU & 19 THỰC THỂ CƠ SỞ DỮ LIỆU (DATABASE INTEGRITY)
+Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xlsx) theo dõi **19 thực thể cốt lõi**, tương ứng 22 bảng vật lý trong CSDL (cài đặt tại `backend/src/main/resources/db/migration/V1__create_tables.sql`):
 
-1. `users`: Tài khoản định danh dùng chung toàn hệ thống.
+### 19 Thực thể trong Ma trận CRUD (`project_tracking_group2.xlsx`):
+1. `users`: Tài khoản định danh dùng chung toàn hệ thống (kèm quản lý phiên thiết bị `user_devices`).
 2. `categories`: Danh mục tin tức phân cấp cha - con.
-3. `category_follows`: Độc giả theo dõi danh mục.
-4. `tags` & `article_tags`: Gắn nhãn bài viết theo chuyên đề.
-5. `articles`: Thực thể bài viết gốc (lưu slug, access_type FREE/PREMIUM, published_version).
-6. `article_versions`: Toàn văn bài viết, tiêu đề, sapo, phiên bản, trạng thái duyệt.
-7. `comments`: Bình luận độc giả (có trường trạng thái duyệt PENDING, APPROVED, REJECTED).
-8. `saved_articles`: Tủ sách độc giả (Bookmark).
-9. `reading_history`: Lịch sử đọc bài của độc giả.
-10. `user_devices`: Quản lý phiên thiết bị của độc giả (giới hạn tối đa 2 thiết bị đồng thời).
-11. `subscription_plans`: Danh mục gói cước độc giả (tháng, quý, năm, quyền audio, quyền ad-free).
-12. `subscriptions`: Gói cước độc giả đã đăng ký (kèm thời hạn, trạng thái gia hạn).
-13. `article_purchases`: Độc giả mua lẻ từng bài viết Premium.
-14. `advertisers`: Hồ sơ doanh nghiệp quảng cáo B2B.
-15. `ad_slots`: Danh mục vị trí hiển thị banner trên các trang và chuyên mục.
-16. `ad_campaigns`: Chiến dịch quảng cáo của doanh nghiệp (ngày bắt đầu, kết thúc, tổng tiền, trạng thái).
-17. `ad_creatives`: Banner ảnh, URL đích, phiên bản duyệt của chiến dịch.
-18. `ad_stats`: Thống kê lượt hiển thị (impressions), click hợp lệ, click bị lọc.
-19. `transactions`: Đơn hàng thanh toán trung tâm (CHECK constraint chỉ liên kết đúng 1 trong 3 đối tượng: `subscription_id`, `purchase_id`, `campaign_id`).
-20. `refund_requests`: Yêu cầu hoàn tiền theo nguyên tắc 4 mắt.
-21. `notifications`: Trung tâm thông báo người dùng và doanh nghiệp.
-22. `audit_logs`: Nhật ký kiểm toán an ninh hệ thống (ai làm gì, lúc nào, đối tượng nào, lý do).
+3. `category_follows`: Độc giả theo dõi danh mục địa phương.
+4. `articles`: Thực thể bài viết gốc (lưu slug, access_type FREE/PREMIUM, published_version). Kèm bảng phụ `tags` & `article_tags`.
+5. `article_versions`: Toàn văn bài viết, tiêu đề, sapo, số phiên bản, trạng thái duyệt.
+6. `comments`: Bình luận độc giả (trạng thái PENDING, APPROVED, REJECTED).
+7. `saved_articles`: Tủ sách độc giả (Bookmark lưu bài & lịch sử đọc).
+8. `subscription_plans`: Danh mục gói cước độc giả (tháng, quý, năm, quyền audio, ad-free).
+9. `subscriptions`: Gói cước độc giả đã đăng ký (kèm thời hạn, gia hạn tự động).
+10. `article_purchases`: Độc giả mua lẻ từng bài viết Premium.
+11. `advertisers`: Hồ sơ doanh nghiệp quảng cáo B2B.
+12. `ad_slots`: Danh mục vị trí hiển thị banner trên các trang và chuyên mục.
+13. `ad_campaigns`: Chiến dịch quảng cáo B2B (ngày bắt đầu, kết thúc, tổng tiền, trạng thái).
+14. `ad_creatives`: Banner ảnh, URL đích, phiên bản duyệt của chiến dịch.
+15. `ad_stats`: Thống kê lượt hiển thị (impressions), click hợp lệ, click bị lọc gian lận.
+16. `transactions`: Đơn hàng thanh toán trung tâm (CHECK constraint chỉ liên kết đúng 1 trong 3 đối tượng: `subscription_id`, `purchase_id`, `campaign_id`).
+17. `refund_requests`: Yêu cầu hoàn tiền theo nguyên tắc 4 mắt.
+18. `notifications`: Trung tâm thông báo người dùng và doanh nghiệp.
+19. `audit_logs`: Nhật ký kiểm toán an ninh hệ thống (ai làm gì, lúc nào, đối tượng nào, lý do).
 
 ---
 

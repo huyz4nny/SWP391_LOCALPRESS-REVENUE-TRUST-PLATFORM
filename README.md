@@ -3,7 +3,7 @@
 > **Nền tảng báo điện tử địa phương kết hợp Doanh thu tự chủ & Kiểm duyệt tin tức đa tầng**  
 > **Dự án:** SWP391 — Học kỳ FALL 2026 — Đại học FPT  
 > **Nhóm thực hiện:** Nhóm 2 (Leader: SV4 — Huy)  
-> **Phiên bản:** 2.0 (Đồng bộ chuẩn hóa theo Danh mục 125 chức năng & Ngữ cảnh hệ thống)
+> **Phiên bản:** 2.1 (Đồng bộ chuẩn hóa theo 77 Use Cases, 48 Màn hình & Ma trận CRUD 19 bảng từ `project_tracking_group2.xlsx` và Đặc tả 125 tiêu chí từ `LocalPress_Danh_muc_chuc_nang.docx`)
 
 ---
 
@@ -28,32 +28,32 @@ LocalPress là giải pháp chuyển đổi số toàn diện cho cơ quan báo 
 
 ## 2. PHÂN CÔNG THÀNH VIÊN & MA TRẬN TRÁCH NHIỆM (TEAM RACI)
 
-Hệ thống được phân rã thành **5 luồng nghiệp vụ end-to-end**, mỗi sinh viên làm chủ từ Giao diện $\rightarrow$ API Backend $\rightarrow$ Thiết kế CSDL $\rightarrow$ Kiểm thử tự động. Mỗi thành viên sở hữu **25 chức năng** (tổng cộng **125 chức năng**, trong đó có 77 P0, 42 P1, 6 P2):
+Hệ thống được phân rã thành **5 luồng nghiệp vụ end-to-end**, mỗi sinh viên làm chủ từ Giao diện $\rightarrow$ API Backend $\rightarrow$ Thiết kế CSDL $\rightarrow$ Kiểm thử tự động. Kiến trúc và tiến độ dự án được quản lý trực tiếp qua **77 Use Cases (`UC001` - `UC077`)** và **48 Màn hình / Phân hệ chức năng** trong bảng theo dõi chính thức [`project_tracking_group2.xlsx`](project_tracking_group2.xlsx), được cụ thể hóa từ **125 tiêu chí nghiệp vụ** trong tài liệu yêu cầu gốc [`LocalPress_Danh_muc_chuc_nang.docx`](LocalPress_Danh_muc_chuc_nang.docx):
 
 ```mermaid
 flowchart TD
     subgraph SV4["SV4: HUY (LEADER) - FINANCE & PAYMENT"]
-        F4["Luồng Kế toán & Thanh toán (25 CN: 12 P0, 12 P1, 1 P2)"]
+        F4["Luồng Kế toán & Thanh toán (8 Màn hình, 14 UCs: UC047-UC060)"]
         F4_1["Cổng QR, Webhook Idempotent, Sổ quỹ kép, Đối soát, Hoàn tiền 4 mắt"]
     end
 
     subgraph SV1["SV1: TÂY - ADVERTISER PORTAL"]
-        F1["Luồng Doanh nghiệp (25 CN: 16 P0, 9 P1, 0 P2)"]
+        F1["Luồng Doanh nghiệp (10 Màn hình, 14 UCs: UC001-UC014)"]
         F1_1["Booking slot, Upload banner, Báo giá, Báo cáo CTR, Quản lý hồ sơ B2B"]
     end
 
     subgraph SV2["SV2: TRỌNG PHAN - EDITORIAL & OPERATIONS"]
-        F2["Luồng Tòa soạn & Điều hành (25 CN: 14 P0, 8 P1, 3 P2)"]
+        F2["Luồng Tòa soạn & Điều hành (10 Màn hình, 14 UCs: UC015-UC028)"]
         F2_1["Duyệt bài, Duyệt banner, Duyệt comment, Quản lý lịch slot, Dashboard kinh doanh"]
     end
 
     subgraph SV3["SV3: HOÀNG - READER & PAYWALL EXPERIENCE"]
-        F3["Luồng Độc giả & Premium (25 CN: 18 P0, 6 P1, 1 P2)"]
+        F3["Luồng Độc giả & Premium (10 Màn hình, 18 UCs: UC029-UC046)"]
         F3_1["Đọc Free 100%, Paywall Checkout, Tủ sách, Quản lý 2 thiết bị, Audio TTS"]
     end
 
     subgraph SV5["SV5: TÙNG - PLATFORM, SERVING & AI"]
-        F5["Luồng Hệ thống, CMS & AI (25 CN: 17 P0, 7 P1, 1 P2)"]
+        F5["Luồng Hệ thống, CMS & AI (10 Màn hình, 17 UCs: UC061-UC077)"]
         F5_1["CMS soạn bài, Paywall Engine máy chủ, Ad Serving Engine, AI Trợ lý, Audit log"]
     end
 
@@ -68,13 +68,34 @@ flowchart TD
 
 ### Chi tiết phân công 5 sinh viên:
 
-| Phân hệ | Sinh viên phụ trách | Vai trò chính | Phạm vi chức năng cốt lõi (Xem chi tiết tại Excel) |
-| :--- | :--- | :--- | :--- |
-| **SV4** | **Huy (Leader)** | Kế toán, Thanh toán & Đối soát | Bộ xử lý thanh toán dùng chung, Webhook IPN chống xử lý trùng, sinh mã VietQR, hóa đơn VAT, sổ quỹ kép, đối soát sao kê ngân hàng, quy trình hoàn tiền 4 mắt. |
-| **SV1** | **Tây** | Doanh nghiệp & Quảng cáo B2B | Cổng portal cho nhà quảng cáo, tra cứu vị trí trống, nộp booking, upload banner có preview thực tế, báo cáo chỉ số CTR minh bạch, hồ sơ doanh nghiệp. |
-| **SV2** | **Trọng Phan** | Tòa soạn, Kinh doanh & Kiểm duyệt | Back-office điều hành; duyệt báo giá hợp đồng; kiểm duyệt banner quảng cáo; duyệt bài viết xuất bản; duyệt bình luận độc giả; quản lý danh mục gói đọc báo. |
-| **SV3** | **Hoàng** | Khách & Độc giả B2C | Đọc tin tức công khai 100% Free; màn hình preview Paywall; giỏ hàng/checkout bài lẻ & gói; tủ sách cá nhân (lịch sử, bookmark, follow chuyên mục); khống chế phiên 2 thiết bị. |
-| **SV5** | **Tùng** | Hệ thống, Paywall Engine & AI | CMS soạn thảo và quản lý phiên bản bài viết; Paywall Engine ở máy chủ; Ad Serving Engine phân phối banner và lọc click tặc; tích hợp AI tóm tắt/tiêu đề; hạ tầng audit log. |
+| Phân hệ | Sinh viên phụ trách | Vai trò chính | Use Cases & Màn hình (`project_tracking_group2.xlsx`) | Phạm vi tiêu chí nghiệp vụ (`LocalPress_Danh_muc_chuc_nang.docx`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **SV4** | **Huy (Leader)** | Kế toán, Thanh toán & Đối soát | **14 Use Cases (`UC047` - `UC060`)**, **8 Màn hình** (SRS/SDS II.4.1 - II.4.8). Lộ trình: Iter 1 (2), Iter 2 (2), Iter 3 (4). | 25 tiêu chí (12 P0, 12 P1, 1 P2): Bộ xử lý thanh toán dùng chung, Webhook IPN chống trùng, sinh mã VietQR, hóa đơn VAT, sổ quỹ kép, đối soát sao kê ngân hàng, quy trình hoàn tiền 4 mắt. |
+| **SV1** | **Tây** | Doanh nghiệp & Quảng cáo B2B | **14 Use Cases (`UC001` - `UC014`)**, **10 Màn hình** (SRS/SDS II.1.1 - II.1.10). Lộ trình: Iter 1 (2), Iter 2 (4), Iter 3 (4). | 25 tiêu chí (16 P0, 9 P1, 0 P2): Cổng portal cho nhà quảng cáo, tra cứu vị trí trống, nộp booking, upload banner có preview thực tế, báo cáo chỉ số CTR minh bạch, hồ sơ doanh nghiệp. |
+| **SV2** | **Trọng Phan** | Tòa soạn, Kinh doanh & Kiểm duyệt | **14 Use Cases (`UC015` - `UC028`)**, **10 Màn hình** (SRS/SDS II.2.1 - II.2.10). Lộ trình: Iter 1 (2), Iter 2 (4), Iter 3 (4). | 25 tiêu chí (14 P0, 8 P1, 3 P2): Back-office điều hành; duyệt báo giá hợp đồng; kiểm duyệt banner quảng cáo; duyệt bài viết xuất bản; duyệt bình luận độc giả; quản lý danh mục gói đọc báo. |
+| **SV3** | **Hoàng** | Khách & Độc giả B2C | **18 Use Cases (`UC029` - `UC046`)**, **10 Màn hình** (SRS/SDS II.3.1 - II.3.10). Lộ trình: Iter 1 (3), Iter 2 (4), Iter 3 (3). | 25 tiêu chí (18 P0, 6 P1, 1 P2): Đọc tin tức công khai 100% Free; màn hình preview Paywall; giỏ hàng/checkout bài lẻ & gói; tủ sách cá nhân (lịch sử, bookmark, follow chuyên mục); khống chế phiên 2 thiết bị. |
+| **SV5** | **Tùng** | Hệ thống, Paywall Engine & AI | **17 Use Cases (`UC061` - `UC077`)**, **10 Màn hình** (SRS/SDS II.5.1 - II.5.10). Lộ trình: Iter 1 (2), Iter 2 (3), Iter 3 (5). | 25 tiêu chí (17 P0, 7 P1, 1 P2): CMS soạn thảo và quản lý phiên bản bài viết; Paywall Engine ở máy chủ; Ad Serving Engine phân phối banner và lọc click tặc; tích hợp AI tóm tắt/tiêu đề; hạ tầng audit log. |
+
+### Lộ trình 3 Đợt triển khai theo Activity Flow (Đầu $\rightarrow$ Giữa $\rightarrow$ Cuối quy trình):
+
+* **Iteration 1 — Đầu quy trình (11 màn hình):** Ingestion, Setup, Master Data, Đọc Free & Soạn bài cơ bản.
+  * SV1: `Company Profile` (UC002), `Ad Slot Catalog` (UC003)
+  * SV2: `Article Review and Publishing` (UC025), `Content Policy and Moderation` (UC026-UC028)
+  * SV3: `Homepage and Article Search` (UC029-UC030), `Article Reader` (UC031-UC032), `Authentication` (UC033)
+  * SV4: `Financial Documents and Ledger` (UC057-UC058), `Manual Bank Transfer Confirmation` (UC051)
+  * SV5: `Article Editor` (UC061), `Article Metadata and Media` (UC063-UC064)
+* **Iteration 2 — Giữa quy trình (17 màn hình):** Giao dịch lõi, Thanh toán QR/IPN, Paywall Server-side, Booking & Duyệt banner.
+  * SV1: `Campaign Booking` (UC004-UC005), `Quotation Confirmation` (UC006), `Advertising Payment` (UC007), `Creative Submission and Preview` (UC008)
+  * SV2: `Pending Booking Queue` (UC016), `Advertising Inventory Calendar` (UC017), `Quotation Management` (UC018), `Creative Review` (UC020-UC022)
+  * SV3: `Premium Checkout` (UC034-UC035), `Premium Article Reader` (UC036), `Personal Bookshelf` (UC037-UC039), `Comments and Reports` (UC041-UC042)
+  * SV4: `Payment Processing` (UC047-UC050), `Advertiser Receivables` (UC053)
+  * SV5: `Article Version History` (UC062), `Article Submission and Revision` (UC066-UC067), `Content Access and Paywall` (UC068-UC069)
+* **Iteration 3 — Cuối quy trình (20 màn hình):** Đối soát, Hoàn tiền 4 mắt, Báo cáo & Dashboard, AI Cố vấn, Ad Serving & Admin.
+  * SV1: `Advertising Dashboard` (UC001, UC010-UC011), `Creative Replacement` (UC009), `Requests and Business Notifications` (UC013-UC014), `Contracts and Documents` (UC012)
+  * SV2: `Campaign Eligibility Check` (UC023), `Campaign Control` (UC024), `Advertising Contract Management` (UC019), `Business Operation Dashboard` (UC015)
+  * SV3: `Followed Content` (UC040), `Devices and Sessions` (UC043), `Subscription, Transactions and Support` (UC044-UC046)
+  * SV4: `Cash Flow Dashboard` (UC052), `Payment Reconciliation` (UC054), `Refund and Rights Management` (UC055-UC056), `Financial Reports and Alerts` (UC059-UC060)
+  * SV5: `AI Editorial Assistant` (UC065), `Advertising Slot Configuration` (UC070), `Advertisement Delivery and Tracking` (UC071-UC072), `Advertisement URL Monitoring` (UC073), `System Administration Console` (UC074-UC077)
 
 ---
 
@@ -152,17 +173,19 @@ LocalPress/
 │
 ├── AGENTS.md                              # Bản ghi nhớ ngữ cảnh bất biến cho AI Agents
 ├── LOCALPRESS_MASTER_ROADMAP.md           # Lộ trình chi tiết 4 Iteration & Kịch bản phản biện Hội đồng
-└── LocalPress_Danh_muc_chuc_nang.xlsx     # Bảng phân rã 125 chức năng hệ thống (7 sheets chuẩn)
+├── project_tracking_group2.xlsx           # Bảng theo dõi tiến độ chính thức (77 Use Cases, 48 Màn hình & Ma trận CRUD 19 bảng)
+├── LocalPress_Danh_muc_chuc_nang.docx     # Tài liệu yêu cầu nghiệp vụ gốc (125 tiêu chí, 16 quy tắc cốt lõi, 10 kịch bản demo)
+└── LocalPress_Danh_muc_chuc_nang.xlsx     # Bảng phân rã 125 chức năng tham chiếu (7 sheets chuẩn)
 ```
 
 ---
 
-## 5. THIẾT KẾ CƠ SỞ DỮ LIỆU (19 TABLES SCHEMA)
+## 5. THIẾT KẾ CƠ SỞ DỮ LIỆU (19 CORE ENTITIES & 22 DB TABLES)
 
-Cơ sở dữ liệu được tổ chức gồm **19 bảng** đảm bảo chuẩn hóa 3NF và tính toàn vẹn tham chiếu:
-* **Tài khoản & Phân quyền:** `users`, `user_devices`.
+Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xlsx) quản lý **19 thực thể cốt lõi**, tương ứng với 22 bảng vật lý trong CSDL (cài đặt tại `backend/src/main/resources/db/migration/V1__create_tables.sql`):
+* **Tài khoản & Phân quyền:** `users`, `user_devices` (kiểm soát tối đa 2 thiết bị đồng thời).
 * **Nội dung & Biên tập:** `categories`, `category_follows`, `tags`, `article_tags`, `articles`, `article_versions`, `comments`.
-* **Cá nhân hóa Độc giả:** `saved_articles`, `reading_history`, `subscription_plans`, `subscriptions`, `article_purchases`.
+* **Cá nhân hóa Độc giả:** `saved_articles` (Bookmark & Lịch sử đọc), `subscription_plans`, `subscriptions`, `article_purchases`.
 * **Quảng cáo B2B:** `advertisers`, `ad_slots`, `ad_campaigns`, `ad_creatives`, `ad_stats`.
 * **Tài chính & Quản trị:** `transactions` (Ràng buộc CHECK chỉ trỏ về đúng 1 trong 3 đối tượng: gói cước, bài lẻ hoặc chiến dịch), `refund_requests`, `notifications`, `audit_logs`.
 
@@ -229,8 +252,9 @@ Khi lên bảo vệ trước Hội đồng Giám khảo SWP391, nhóm tự tin t
 
 ## 8. TÀI LIỆU QUẢN TRỊ DỰ ÁN & LIÊN KẾT THAM CHIẾU
 
-* 📊 **Danh mục 125 chức năng (Excel 7 sheets):** [LocalPress_Danh_muc_chuc_nang.xlsx](LocalPress_Danh_muc_chuc_nang.xlsx)
+* 📈 **Bảng theo dõi tiến độ Use Case & Ma trận CRUD 19 bảng (Official Tracking):** [project_tracking_group2.xlsx](project_tracking_group2.xlsx)
+* 📄 **Đặc tả danh mục yêu cầu nghiệp vụ gốc (125 tiêu chí & 16 quy tắc):** [LocalPress_Danh_muc_chuc_nang.docx](LocalPress_Danh_muc_chuc_nang.docx)
+* 🤖 **Bộ quy tắc ngữ cảnh bất biến cho AI Agents:** [AGENTS.md](AGENTS.md)
 * 📖 **Đặc tả kiến trúc & Ngữ cảnh hệ thống 360°:** [SYSTEM_CONTEXT_AND_ARCHITECTURE.md](docs/SYSTEM_CONTEXT_AND_ARCHITECTURE.md)
 * 🗺️ **Lộ trình 4 Iteration & Sổ tay phản biện:** [LOCALPRESS_MASTER_ROADMAP.md](LOCALPRESS_MASTER_ROADMAP.md)
-* 🤖 **Bộ quy tắc ngữ cảnh bất biến cho AI Agents:** [AGENTS.md](AGENTS.md)
-* 📈 **Bảng theo dõi tiến độ Use Case & Ma trận CRUD 19 bảng:** [project_tracking_group2.xlsx](project_tracking_group2.xlsx)
+* 📊 **Danh mục 125 chức năng tham chiếu (Excel 7 sheets):** [LocalPress_Danh_muc_chuc_nang.xlsx](LocalPress_Danh_muc_chuc_nang.xlsx)
