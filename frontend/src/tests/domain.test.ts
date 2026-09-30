@@ -243,4 +243,41 @@ describe('LocalPress Core Business Domain Tests', () => {
       })
     })
   })
+
+  describe('6. Granular RBAC & Subsystem Access Control (Frontend Phân quyền)', () => {
+    it('Editor cannot access Finance or Admin subsystems, only Editorial', async () => {
+      const { PERMISSION_CHECKERS } = await import('../app/config')
+
+      expect(PERMISSION_CHECKERS.canAccessEditorial('EDITOR')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessFinance('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.canAccessAdmin('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('EDITOR')).toBe('/backoffice/editorial/articles')
+    })
+
+    it('Accountant / Finance Staff cannot access Editorial or Admin, only Finance', async () => {
+      const { PERMISSION_CHECKERS } = await import('../app/config')
+
+      expect(PERMISSION_CHECKERS.canAccessEditorial('ACCOUNTANT')).toBe(false)
+      expect(PERMISSION_CHECKERS.canAccessFinance('ACCOUNTANT')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessAdmin('ACCOUNTANT')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('ACCOUNTANT')).toBe(true)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('ACCOUNTANT')).toBe('/backoffice/finance')
+
+      // Regular Finance Staff cannot approve refunds (4-eyes principle)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_STAFF')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_MANAGER')).toBe(true)
+    })
+
+    it('System Admin has access across all backoffice subsystems', async () => {
+      const { PERMISSION_CHECKERS } = await import('../app/config')
+
+      expect(PERMISSION_CHECKERS.canAccessEditorial('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessFinance('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessAdmin('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('SYSTEM_ADMIN')).toBe('/backoffice/admin')
+    })
+  })
 })
+
