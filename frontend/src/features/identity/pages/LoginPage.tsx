@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
-import { ROLE_LABELS, UserRole } from '@/app/config'
+import { ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,7 +32,9 @@ export function LoginPage() {
         httpClient.setBasicAuth(email, password)
         const user = await advertisingApi.getMe()
         mockStore.setRealAdvertiser({ ...user, createdAt: new Date().toISOString() })
-        navigate('/advertiser/profile', { replace: true })
+        navigate(PERMISSION_CHECKERS.canAccessBackoffice(user.role)
+          ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)
+          : user.role === 'ADVERTISER' ? '/advertiser/profile' : '/', { replace: true })
       } catch (error) {
         httpClient.clearBasicAuth()
         setLoginError(error instanceof Error ? error.message : 'Không thể đăng nhập doanh nghiệp')
@@ -59,12 +61,8 @@ export function LoginPage() {
     const user = users.find((u) => u.id === userId)
     if (user?.role === 'ADVERTISER') {
       navigate('/advertiser', { replace: true })
-    } else if (['EDITOR', 'REVIEWER'].includes(user?.role || '')) {
-      navigate('/backoffice/editorial', { replace: true })
-    } else if (['FINANCE_STAFF', 'FINANCE_MANAGER'].includes(user?.role || '')) {
-      navigate('/backoffice/finance', { replace: true })
-    } else if (user?.role === 'SYSTEM_ADMIN') {
-      navigate('/backoffice/admin', { replace: true })
+    } else if (user && PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
+      navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
     } else {
       navigate(from === '/login' ? '/' : from, { replace: true })
     }

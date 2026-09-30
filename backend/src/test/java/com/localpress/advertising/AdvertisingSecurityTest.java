@@ -1,6 +1,6 @@
 package com.localpress.advertising;
 
-import com.localpress.shared.security.ApiSecurityConfig;
+import com.localpress.shared.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AdvertisingController.class)
-@Import(ApiSecurityConfig.class)
+@Import(SecurityConfig.class)
 class AdvertisingSecurityTest {
     @Autowired MockMvc mvc;
     @MockBean JdbcTemplate jdbc;
