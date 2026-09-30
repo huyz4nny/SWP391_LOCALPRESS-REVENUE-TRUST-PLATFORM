@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
-import { ROLE_LABELS, UserRole } from '@/app/config'
+import { ROLE_LABELS, UserRole, PERMISSION_CHECKERS } from '@/app/config'
 import { Badge } from '@/components/ui/badge'
 import {
   Newspaper,
@@ -37,15 +37,10 @@ export function BackofficeLayout() {
     return unsub
   }, [])
 
-  const allowedRoles: UserRole[] = [
-    'EDITOR',
-    'REVIEWER',
-    'FINANCE_STAFF',
-    'FINANCE_MANAGER',
-    'SYSTEM_ADMIN',
-  ]
-
-  const isStaff = allowedRoles.includes(currentUser.role)
+  const isStaff = PERMISSION_CHECKERS.canAccessBackoffice(currentUser.role)
+  const canSeeEditorial = PERMISSION_CHECKERS.canAccessEditorial(currentUser.role)
+  const canSeeFinance = PERMISSION_CHECKERS.canAccessFinance(currentUser.role)
+  const canSeeAdmin = PERMISSION_CHECKERS.canAccessAdmin(currentUser.role)
 
   if (!isStaff) {
     return (
@@ -130,8 +125,21 @@ export function BackofficeLayout() {
                 Local<span className="text-red-500">Press</span>
               </span>
               <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                Backoffice Vận Hành & Điều Hành
+                Backoffice
               </span>
+              {canSeeAdmin ? (
+                <span className="text-[10px] bg-purple-900/80 text-purple-200 border border-purple-600 px-2 py-0.5 rounded font-bold uppercase">
+                  Quản trị hệ thống (SV5)
+                </span>
+              ) : canSeeFinance ? (
+                <span className="text-[10px] bg-emerald-900/80 text-emerald-200 border border-emerald-600 px-2 py-0.5 rounded font-bold uppercase">
+                  Tài chính & Đối soát (SV4)
+                </span>
+              ) : (
+                <span className="text-[10px] bg-sky-900/80 text-sky-200 border border-sky-600 px-2 py-0.5 rounded font-bold uppercase">
+                  Tòa soạn & Biên tập (SV2)
+                </span>
+              )}
             </div>
           </div>
 
@@ -153,89 +161,118 @@ export function BackofficeLayout() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-300 shrink-0 p-4 space-y-6 overflow-y-auto">
-          {/* Editorial Section */}
-          <div>
-            <div className="flex items-center space-x-2 text-[11px] font-bold text-sky-400 uppercase tracking-wider mb-2 px-2">
-              <Newspaper className="w-3.5 h-3.5" />
-              <span>Tòa Soạn & Biên Tập (SV2)</span>
+          {/* Phân hệ thông tin vai trò */}
+          <div className="bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/60">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Phân hệ được cấp quyền:
             </div>
-            <div className="space-y-1">
-              {editorialNav.map((item) => {
-                const Icon = item.icon
-                const isActive = location.pathname === item.path
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-sky-600 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
+            {canSeeAdmin ? (
+              <div className="text-xs font-semibold text-purple-300 flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                <span>Toàn quyền Quản trị (Admin)</span>
+              </div>
+            ) : canSeeFinance ? (
+              <div className="text-xs font-semibold text-emerald-300 flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Kế toán & Tài chính (SV4)</span>
+              </div>
+            ) : canSeeEditorial ? (
+              <div className="text-xs font-semibold text-sky-300 flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span>Tòa soạn & Biên tập (SV2)</span>
+              </div>
+            ) : null}
           </div>
 
-          {/* Finance Section */}
-          <div>
-            <div className="flex items-center space-x-2 text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2 px-2">
-              <DollarSign className="w-3.5 h-3.5" />
-              <span>Tài Chính & Đối Soát (SV4)</span>
+          {/* Editorial Section - Chỉ hiện cho Biên tập viên / Reviewer / Phóng viên / Admin */}
+          {canSeeEditorial && (
+            <div>
+              <div className="flex items-center space-x-2 text-[11px] font-bold text-sky-400 uppercase tracking-wider mb-2 px-2">
+                <Newspaper className="w-3.5 h-3.5" />
+                <span>Tòa Soạn & Biên Tập (SV2)</span>
+              </div>
+              <div className="space-y-1">
+                {editorialNav.map((item) => {
+                  const Icon = item.icon
+                  const isActive = location.pathname === item.path
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-sky-600 text-white font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-            <div className="space-y-1">
-              {financeNav.map((item) => {
-                const Icon = item.icon
-                const isActive = location.pathname === item.path
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-emerald-600 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
+          )}
 
-          {/* Admin Section */}
-          <div>
-            <div className="flex items-center space-x-2 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-2 px-2">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Hệ Thống & Giám Sát (SV5)</span>
+          {/* Finance Section - Chỉ hiện cho Kế toán viên / Kế toán trưởng / Admin */}
+          {canSeeFinance && (
+            <div>
+              <div className="flex items-center space-x-2 text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2 px-2">
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Tài Chính & Đối Soát (SV4)</span>
+              </div>
+              <div className="space-y-1">
+                {financeNav.map((item) => {
+                  const Icon = item.icon
+                  const isActive = location.pathname === item.path
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-emerald-600 text-white font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-            <div className="space-y-1">
-              {adminNav.map((item) => {
-                const Icon = item.icon
-                const isActive = location.pathname === item.path
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-purple-600 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                )
-              })}
+          )}
+
+          {/* Admin Section - Chỉ hiện cho Quản trị viên hệ thống */}
+          {canSeeAdmin && (
+            <div>
+              <div className="flex items-center space-x-2 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-2 px-2">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Hệ Thống & Giám Sát (SV5)</span>
+              </div>
+              <div className="space-y-1">
+                {adminNav.map((item) => {
+                  const Icon = item.icon
+                  const isActive = location.pathname === item.path
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-purple-600 text-white font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </aside>
 
         {/* Content View */}
