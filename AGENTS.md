@@ -47,8 +47,8 @@ Dự án gồm **5 sinh viên**, mỗi sinh viên làm chủ trọn vẹn 1 lu�
 
 ---
 
-## 3. 16 QUY TẮC NGHIỆP VỤ BẤT BIẾN (INVARIANT BUSINESS RULES)
-Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BUỘC PHẢI TUÂN THỦ 16 QUY TẮC SAU**:
+## 3. 21 QUY TẮC NGHIỆP VỤ & VẬN HÀNH BẤT BIẾN (INVARIANT RULES)
+Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BUỘC PHẢI TUÂN THỦ 21 QUY TẮC SAU**:
 
 1. **Đọc Free 100% không bắt đăng nhập:** Khách (Guest) đọc toàn bộ bài Free, xem chuyên mục, tìm kiếm và xem bình luận đã duyệt mà không bị ép mở modal login.
 2. **Quyền Premium theo Scope, không dùng biến boolean đơn giản:** Người dùng có thể mua bài lẻ (`article_purchases`) hoặc mua gói theo chuyên mục/toàn trang (`subscriptions`). Không được dùng cờ `is_premium = true` để quyết định tất cả.
@@ -67,6 +67,14 @@ Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BU�
 15. **Quyền độc giả Ad-Free không làm sai lệch số liệu:** Khi độc giả có gói Ad-Free đọc bài, hệ thống không tính lượt đọc này là một slot quảng cáo bị bỏ trống (Unfilled Impression).
 16. **Nhất quán định nghĩa chỉ số:** Số liệu Impressions, Clicks, CTR, MRR, ARR, Doanh thu trên Dashboard doanh nghiệp, Dashboard tòa soạn và Báo cáo xuất file phải khớp 100% về công thức và mốc thời gian.
 17. **Nguyên tắc phân định ranh giới & Code Ownership (Strict Boundary):** Tuyệt đối **KHÔNG ĐƯỢC PHÉP SỬA ĐỔI** code, giao diện, bảng dữ liệu hoặc logic thuộc phân hệ của thành viên khác (`advertising` - SV1, `editorial` - SV2, `reader` - SV3, `delivery`/CMS/AI/`administration` - SV5). Mỗi thành viên chỉ làm đúng phần của mình (SV4 - Huy: Kế toán, Thanh toán & Đối soát trong `com.localpress.finance`, `transactions`, `refund_requests`, tài liệu tài chính). Mọi giao tiếp liên module chỉ đi qua Shared Service Contracts / DTOs / Events dùng chung, không can thiệp trực tiếp vào mã nguồn nội bộ của module khác.
+18. **Phong cách giao tiếp với Leader (Communication Tone):** Trao đổi ngắn gọn, thực tế, đúng phong cách anh em trong đội làm đồ án. Tuyệt đối không dùng icon, emoji màu mè, không văn vở hoa mỹ. Luôn giữ vai trò Technical Lead / Master Reviewer hỗ trợ Leader rà soát code các thành viên để chống conflict và bảo vệ kiến trúc.
+19. **Nguyên tắc "Đọc kỹ AGENTS.md, thiếu thì hỏi xin tài liệu, cấm tự đoán" (Strict Verification):** Trước khi phân tích, viết code hay đánh giá bất kỳ chức năng nào, bắt buộc phải tra cứu kỹ trong `AGENTS.md`, `project_tracking_group2.xlsx` và các tài liệu dự án có sẵn. Nếu phát hiện thiếu thông tin, nghiệp vụ chưa rõ ràng hoặc không có tài liệu đối chiếu, PHẢI chủ động hỏi Leader để xin thêm tài liệu hoặc xác nhận trực tiếp. Tuyệt đối KHÔNG ĐƯỢC TỰ ĐOÁN hay tự bịa nghiệp vụ.
+20. **Quản trị tầng dùng chung & Cấu hình môi trường (Shared & Config Invariants):**
+    - Cấu hình Spring Security chỉ có DUY NHẤT 1 file master là `com.localpress.shared.security.SecurityConfig.java` do Leader SV4 làm chủ. Cấm các nhánh thành viên tự tạo thêm file SecurityConfig riêng để tránh lỗi trùng Bean làm crash server.
+    - Mật khẩu MySQL trong `application-dev.yml` mặc định là `password`. Tuyệt đối không commit mật khẩu MySQL cá nhân lên git làm hỏng môi trường của người khác.
+    - Toàn bộ tài khoản seed data trong `seed_data.sql` có mật khẩu mặc định là `password` (mã băm BCrypt chuẩn).
+    - Ở Frontend, điều hướng sau khi đăng nhập thật bắt buộc dùng `PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)`, tuyệt đối không gán cứng URL sang một phân hệ cụ thể.
+21. **Quy tắc đồng bộ bộ nhớ kép (Dual-Workspace Memory Sync):** Mọi cập nhật tài liệu ngữ cảnh, quy tắc kiến trúc, quy chuẩn code hoặc bài học ghi nhớ mới BẮT BUỘC phải được ghi và đồng bộ song song vào CẢ 2 NƠI: (1) `E:\FPTU\FALL26\SWP391\AGENTS.md` (Repo gốc) và (2) `E:\FPTU\FALL26\SWP391\huyz4nny\AGENTS.md` (Thư mục làm việc của Leader Huy). Tuyệt đối không để lệch thông tin giữa 2 thư mục này.
 
 ---
 

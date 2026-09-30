@@ -7,14 +7,14 @@
 
 -- 1. USERS (Tài khoản người dùng các vai trò)
 INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, role, status) VALUES
-(1, 'admin@localpress.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Vũ Quản Trị Hệ Thống', '0909999999', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120', 'SYSTEM_ADMIN', 'ACTIVE'),
-(2, 'ketoan@localpress.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Lê Kế Toán (SV4 Leader)', '0903456789', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120', 'ACCOUNTANT', 'ACTIVE'),
-(3, 'bientap@localpress.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Nguyễn Văn Biên Tập (SV2)', '0902345678', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120', 'EDITOR', 'ACTIVE'),
-(4, 'phongvien@localpress.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Hoàng Minh Phóng Viên (SV5)', '0901234567', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120', 'AUTHOR', 'ACTIVE'),
-(5, 'adv.canghaiphong@gmail.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Đặng Quang Huy (Logistics SV1)', '0934567890', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120', 'ADVERTISER', 'ACTIVE'),
-(6, 'reader.an@gmail.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Nguyễn Văn An (Độc giả Free SV3)', '0912345678', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120', 'READER', 'ACTIVE'),
-(7, 'reader.mai@gmail.com', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Trần Thị Mai (Độc giả VIP SV3)', '0988776655', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120', 'READER', 'ACTIVE'),
-(8, 'kiemduyet@localpress.vn', '$2a$10$7EqJtq98hPqEX7fNZaFWoO.KjEaQGz1Q8m1uB1Q1F2lMv9vG5eT9a', 'Phạm Kiểm Duyệt Bình Luận', '0907778899', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120', 'STAFF', 'ACTIVE');
+(1, 'admin@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Vũ Quản Trị Hệ Thống', '0909999999', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120', 'SYSTEM_ADMIN', 'ACTIVE'),
+(2, 'ketoan@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Lê Kế Toán (SV4 Leader)', '0903456789', 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120', 'ACCOUNTANT', 'ACTIVE'),
+(3, 'bientap@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Nguyễn Văn Biên Tập (SV2)', '0902345678', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120', 'EDITOR', 'ACTIVE'),
+(4, 'phongvien@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Hoàng Minh Phóng Viên (SV5)', '0901234567', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120', 'AUTHOR', 'ACTIVE'),
+(5, 'adv.canghaiphong@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Đặng Quang Huy (Logistics SV1)', '0934567890', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120', 'ADVERTISER', 'ACTIVE'),
+(6, 'reader.an@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Nguyễn Văn An (Độc giả Free SV3)', '0912345678', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120', 'READER', 'ACTIVE'),
+(7, 'reader.mai@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Thị Mai (Độc giả VIP SV3)', '0988776655', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120', 'READER', 'ACTIVE'),
+(8, 'kiemduyet@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Phạm Kiểm Duyệt Bình Luận', '0907778899', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120', 'STAFF', 'ACTIVE');
 
 -- 1.1 USER DEVICES (Khống chế tối đa 2 thiết bị - Độc giả Mai)
 INSERT INTO user_devices (device_id, user_id, device_name, device_type, device_token, ip_address) VALUES
