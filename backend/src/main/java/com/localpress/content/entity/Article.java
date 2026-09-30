@@ -90,4 +90,30 @@ public class Article {
     public enum Status {
         DRAFT, PENDING, PUBLISHED, REJECTED, ARCHIVED, TAKEN_DOWN
     }
+
+    public void updateDraftMetadata(Long categoryId, String slug) {
+
+        if (status != Status.DRAFT) {
+            throw new IllegalStateException(
+                    "Chỉ được cập nhật metadata bằng thao tác này khi bài đang là bản nháp"
+            );
+        }
+
+        if (categoryId == null || categoryId <= 0) {
+            throw new IllegalArgumentException(
+                    "Mã chuyên mục phải lớn hơn 0"
+            );
+        }
+
+        if (slug == null
+                || slug.length() > 280
+                || !slug.matches("^[a-z0-9]+(?:-[a-z0-9]+)*$")) {
+            throw new IllegalArgumentException(
+                    "Slug không hợp lệ"
+            );
+        }
+
+        this.categoryId = categoryId;
+        this.slug = slug;
+    }
 }

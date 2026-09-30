@@ -1,4 +1,4 @@
-package com.localpress.editorial.dto;
+package com.localpress.content.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

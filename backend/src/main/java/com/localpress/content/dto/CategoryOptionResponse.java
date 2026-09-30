@@ -1,4 +1,4 @@
-package com.localpress.editorial.dto;
+package com.localpress.content.dto;
 
 import com.localpress.content.entity.Category;
 

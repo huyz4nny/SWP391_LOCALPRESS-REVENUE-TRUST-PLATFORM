@@ -6,5 +6,8 @@ import java.util.Optional;
 
 public interface ArticleRepository extends JpaRepository<Article, Long> {
     boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, Long id);
+
     Optional<Article> findByIdAndAuthorId(Long id, Long authorId);
 }
