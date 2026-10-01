@@ -33,14 +33,45 @@ export interface AdSlot {
   name: string
   code: string
   dimensions: string
-  width: number
-  height: number
+  width?: number
+  height?: number
   pricePerDay: number
-  description: string
+  pricingType?: 'CPD' | 'CPM' | 'CPC' | 'FLAT_FEE'
+  deviceType?: 'DESKTOP' | 'MOBILE' | 'TABLET' | 'ALL'
+  description?: string
   locationNote: string
+  categoryName?: string | null
+  inventoryMode?: 'EXCLUSIVE' | 'ROTATING'
   maxCapacity: number
-  currentBookings: number
+  currentBookings?: number
   isActive: boolean
+}
+
+export interface AdvertiserProfile {
+  id: string
+  companyName: string
+  taxCode: string
+  contactPerson: string
+  email: string
+  phone: string
+  address: string
+  businessLicenseUrl: string
+  businessSector: string
+  invoiceName: string
+  invoiceTaxCode: string
+  invoiceAddress: string
+  invoiceEmail: string
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
+}
+
+export type AdvertiserProfileInput = Omit<AdvertiserProfile, 'id' | 'verificationStatus'>
+
+export interface AdvertiserProfileChange {
+  id: string
+  action: 'CREATE' | 'UPDATE'
+  oldValue: AdvertiserProfile | null
+  newValue: AdvertiserProfile
+  createdAt: string
 }
 
 export interface AdCreative {

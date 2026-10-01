@@ -1,6 +1,6 @@
 import { User } from '@/types'
 import { Article, Category, SubscriptionPlan, Comment, ReaderEntitlement } from '@/features/reader/types'
-import { AdSlot, AdBooking, AdCampaign, AdCreative } from '@/features/advertising/types'
+import { AdSlot, AdBooking, AdCampaign, AdCreative, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange } from '@/features/advertising/types'
 import { Order, RefundRequest, ReconciliationPeriod, GeneralLedgerEntry, PaymentAttempt } from '@/features/finance/types'
 import { SystemAuditLog, PaywallSettings, AdDeliveryLiveStatus } from '@/features/administration/types'
 import {
@@ -9,6 +9,7 @@ import {
   SEED_SUBSCRIPTION_PLANS,
   SEED_ARTICLES,
   SEED_AD_SLOTS,
+  SEED_ADVERTISER_PROFILES,
   SEED_AD_BOOKINGS,
   SEED_AD_CAMPAIGNS,
   SEED_ORDERS,
@@ -28,6 +29,8 @@ export interface MockStoreState {
   articles: Article[]
   comments: Comment[]
   adSlots: AdSlot[]
+  advertiserProfiles: Record<string, AdvertiserProfile>
+  advertiserHistory: Record<string, AdvertiserProfileChange[]>
   bookings: AdBooking[]
   campaigns: AdCampaign[]
   orders: Order[]
@@ -215,6 +218,11 @@ function getInitialState(): MockStoreState {
 
       parsed.categories = SEED_CATEGORIES
       parsed.users = SEED_USERS
+      parsed.advertiserProfiles = parsed.advertiserProfiles || structuredClone(SEED_ADVERTISER_PROFILES)
+      parsed.advertiserHistory = parsed.advertiserHistory || {}
+      parsed.users = parsed.users.map((user) => ({
+        ...user, companyName: parsed.advertiserProfiles[user.id]?.companyName || user.companyName,
+      }))
       parsed.subscriptionPlans = SEED_SUBSCRIPTION_PLANS
       parsed.adSlots = SEED_AD_SLOTS
       parsed.bookings = SEED_AD_BOOKINGS
@@ -234,6 +242,8 @@ function getInitialState(): MockStoreState {
     articles: SEED_ARTICLES,
     comments: INITIAL_COMMENTS,
     adSlots: SEED_AD_SLOTS,
+    advertiserProfiles: structuredClone(SEED_ADVERTISER_PROFILES),
+    advertiserHistory: {},
     bookings: SEED_AD_BOOKINGS,
     campaigns: SEED_AD_CAMPAIGNS,
     orders: SEED_ORDERS,
@@ -283,6 +293,8 @@ class MockStore {
       articles: SEED_ARTICLES,
       comments: INITIAL_COMMENTS,
       adSlots: SEED_AD_SLOTS,
+      advertiserProfiles: structuredClone(SEED_ADVERTISER_PROFILES),
+      advertiserHistory: {},
       bookings: SEED_AD_BOOKINGS,
       campaigns: SEED_AD_CAMPAIGNS,
       orders: SEED_ORDERS,
@@ -308,6 +320,65 @@ class MockStore {
       this.state.currentUserId = userId
       this.persist()
     }
+  }
+
+  public setRealAdvertiser(user: User) {
+    this.state.users = [...this.state.users.filter((candidate) => candidate.id !== user.id), user]
+    this.state.currentUserId = user.id
+    this.persist()
+  }
+
+  public updateCurrentCompanyName(companyName: string) {
+    const id = this.getCurrentUser().id
+    this.state.users = this.state.users.map((user) =>
+      user.id === id ? { ...user, companyName } : user)
+    this.persist()
+  }
+
+  public getAdvertiserProfile(): AdvertiserProfile | null {
+    const user = this.getCurrentUser()
+    if (user.role !== 'ADVERTISER') throw new Error('Không có quyền xem hồ sơ doanh nghiệp')
+    return this.state.advertiserProfiles[user.id] || null
+  }
+
+  public getAdvertiserProfileHistory(): AdvertiserProfileChange[] {
+    const user = this.getCurrentUser()
+    if (user.role !== 'ADVERTISER') throw new Error('Không có quyền xem lịch sử hồ sơ')
+    return this.state.advertiserHistory[user.id] || []
+  }
+
+  public saveAdvertiserProfile(input: AdvertiserProfileInput): AdvertiserProfile {
+    const user = this.getCurrentUser()
+    if (user.role !== 'ADVERTISER') throw new Error('Không có quyền sửa hồ sơ doanh nghiệp')
+    if (!input.companyName.trim() || !input.taxCode.trim() || !input.contactPerson.trim() ||
+        !input.email.trim() || !input.phone.trim() || !input.businessSector?.trim() ||
+        !input.invoiceName?.trim() || !input.invoiceTaxCode?.trim() ||
+        !input.invoiceAddress?.trim() || !input.invoiceEmail?.trim())
+      throw new Error('Vui lòng điền các trường bắt buộc')
+    if (Object.entries(this.state.advertiserProfiles).some(([id, profile]) =>
+      id !== user.id && profile.taxCode === input.taxCode.trim())) throw new Error('Mã số thuế đã được sử dụng')
+    const previous = this.state.advertiserProfiles[user.id]
+    const profile: AdvertiserProfile = {
+      ...input,
+      id: previous?.id || user.companyId || user.id,
+      verificationStatus: previous && previous.companyName === input.companyName &&
+        previous.taxCode === input.taxCode && previous.invoiceTaxCode === input.invoiceTaxCode &&
+        previous.businessLicenseUrl === input.businessLicenseUrl ? previous.verificationStatus : 'PENDING',
+    }
+    if (Object.entries(profile).some(([field, value]) => previous?.[field as keyof AdvertiserProfile] !== value)) {
+      this.state.advertiserHistory[user.id] = [{
+        id: `PROFILE-${crypto.randomUUID()}`,
+        action: previous ? 'UPDATE' as const : 'CREATE' as const,
+        oldValue: previous || null,
+        newValue: profile,
+        createdAt: new Date().toISOString(),
+      }, ...(this.state.advertiserHistory[user.id] || [])].slice(0, 20)
+    }
+    this.state.advertiserProfiles[user.id] = profile
+    this.state.users = this.state.users.map((candidate) =>
+      candidate.id === user.id ? { ...candidate, companyName: profile.companyName } : candidate)
+    this.persist()
+    return profile
   }
 
   // --- Audit Logging Helper ---

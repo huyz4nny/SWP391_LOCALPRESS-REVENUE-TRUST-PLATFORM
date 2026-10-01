@@ -214,7 +214,10 @@ npm run dev
 npm run test
 ```
 * Ứng dụng chạy tại: `http://localhost:5173`
-* Tích hợp sẵn thanh chuyển vai trò nhanh (**Role Switcher Bar**) để kiểm thử nhanh giữa 11 vai trò: Guest, Reader, Reader Premium, Advertiser, Staff/Editor, Finance, Admin.
+* **Hệ thống phân quyền độc lập (Granular RBAC):** 
+  * Giao diện và Sidebar tự động phân luồng theo vai trò người dùng (Biên tập viên SV2 chỉ thấy Tòa soạn, Kế toán SV4 chỉ thấy Tài chính & Đối soát, Quản trị viên SV5 quản lý toàn hệ thống).
+  * Bộ bảo vệ đường dẫn [`ProtectedRoute`](frontend/src/components/shared/ProtectedRoute.tsx) tự động ngăn chặn truy cập trái phép với màn hình 403 Forbidden chuẩn chỉnh.
+  * Tích hợp sẵn thanh chuyển vai trò nhanh (**Role Switcher Bar**) ở góc màn hình để kiểm thử nhanh giữa các vai trò trong đồ án.
 
 ### 6.3. Cài đặt & Khởi chạy Cơ sở dữ liệu & Backend (Spring Boot 3)
 
