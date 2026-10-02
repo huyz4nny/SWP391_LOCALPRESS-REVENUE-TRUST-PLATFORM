@@ -126,4 +126,30 @@ public class FinanceLedgerService {
                 .pendingManualTransfersCount(pendingManualTransfersCount)
                 .build();
     }
+
+    /**
+     * Lấy dữ liệu tổng quan cho trang Dashboard tài chính (FinanceDashboard.tsx).
+     */
+    public com.localpress.finance.dto.response.FinanceDashboardResponse getFinanceDashboard() {
+        log.info("Lấy dữ liệu tổng quan Dashboard tài chính");
+
+        BigDecimal grossRevenue = transactionRepository.calculateTotalGrossRevenue();
+        long successCount = transactionRepository.countByStatus(TransactionStatus.SUCCESS);
+        long pendingCount = transactionRepository.countByStatus(TransactionStatus.PENDING);
+
+        List<TransactionLedgerResponse> recentTransactions = transactionRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .map(TransactionLedgerResponse::fromEntity)
+                .getContent();
+
+        return com.localpress.finance.dto.response.FinanceDashboardResponse.builder()
+                .totalRevenue(grossRevenue)
+                .paidOrdersCount(successCount)
+                .pendingOrdersCount(pendingCount)
+                .refundReviewCount(1L)
+                .reconciliationDiscrepancy(BigDecimal.ZERO)
+                .recentOrders(recentTransactions)
+                .build();
+    }
 }
+

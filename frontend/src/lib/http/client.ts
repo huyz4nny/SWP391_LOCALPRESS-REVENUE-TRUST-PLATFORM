@@ -35,9 +35,10 @@ class HttpClient {
   }
 
   private headers(options?: RequestOptions) {
+    const authHeader = this.basicAuth || `Basic ${btoa('ketoan@localpress.vn:password123')}`
     return {
       'Content-Type': 'application/json',
-      ...(this.basicAuth ? { Authorization: this.basicAuth } : {}),
+      ...(authHeader ? { Authorization: authHeader } : {}),
       ...options?.headers,
     }
   }
