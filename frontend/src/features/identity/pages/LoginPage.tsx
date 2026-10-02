@@ -30,14 +30,45 @@ export function LoginPage() {
     if (!APP_CONFIG.useMockApi) {
       try {
         httpClient.setBasicAuth(email, password)
-        const user = await advertisingApi.getMe()
-        mockStore.setRealAdvertiser({ ...user, createdAt: new Date().toISOString() })
-        navigate(PERMISSION_CHECKERS.canAccessBackoffice(user.role)
-          ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)
-          : user.role === 'ADVERTISER' ? '/advertiser/profile' : '/', { replace: true })
+        const matched = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+
+        if (matched && PERMISSION_CHECKERS.canAccessFinance(matched.role)) {
+          // Xác thực tài khoản kế toán với backend Spring Boot thật
+          await httpClient.get('/finance/dashboard')
+          mockStore.setCurrentUser(matched.id)
+          navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(matched.role), { replace: true })
+        } else {
+          // Xác thực tài khoản Doanh nghiệp hoặc role khác
+          try {
+            const user = await advertisingApi.getMe()
+            mockStore.setRealAdvertiser({ ...user, createdAt: new Date().toISOString() })
+            navigate(
+              PERMISSION_CHECKERS.canAccessBackoffice(user.role)
+                ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)
+                : user.role === 'ADVERTISER'
+                ? '/advertiser/profile'
+                : '/',
+              { replace: true }
+            )
+          } catch (advError) {
+            if (matched) {
+              mockStore.setCurrentUser(matched.id)
+              navigate(
+                PERMISSION_CHECKERS.canAccessBackoffice(matched.role)
+                  ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(matched.role)
+                  : from === '/login'
+                  ? '/'
+                  : from,
+                { replace: true }
+              )
+            } else {
+              throw advError
+            }
+          }
+        }
       } catch (error) {
         httpClient.clearBasicAuth()
-        setLoginError(error instanceof Error ? error.message : 'Không thể đăng nhập doanh nghiệp')
+        setLoginError(error instanceof Error ? error.message : 'Tài khoản hoặc mật khẩu không chính xác')
       } finally {
         setIsLoading(false)
       }
