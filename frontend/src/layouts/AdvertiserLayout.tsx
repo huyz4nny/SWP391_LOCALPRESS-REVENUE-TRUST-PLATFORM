@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
+import { APP_CONFIG } from '@/app/config'
+import { httpClient } from '@/lib/http/client'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -29,6 +31,7 @@ export function AdvertiserLayout() {
   }, [])
 
   // Guard: Must have role ADVERTISER, or SYSTEM_ADMIN
+  if (!APP_CONFIG.useMockApi && !httpClient.hasBasicAuth()) return <Navigate to="/login" replace />
   const isAdvertiser = currentUser.role === 'ADVERTISER' || currentUser.role === 'SYSTEM_ADMIN'
 
   if (!isAdvertiser) {
@@ -58,16 +61,17 @@ export function AdvertiserLayout() {
             </Link>
           </div>
         </div>
-        <RoleSwitcherBar />
+        {APP_CONFIG.useMockApi && <RoleSwitcherBar />}
       </div>
     )
   }
 
   const navItems = [
     { label: 'Tổng quan Doanh nghiệp', path: '/advertiser', icon: LayoutDashboard },
+    { label: 'Hồ sơ doanh nghiệp', path: '/advertiser/profile', icon: Building2 },
     { label: 'Đặt vị trí mới (Booking)', path: '/advertiser/bookings/new', icon: PlusCircle, isAction: true },
     { label: 'Danh sách Booking & Báo giá', path: '/advertiser/bookings', icon: CalendarCheck },
-    { label: 'Vị trí quảng cáo & Lịch trống', path: '/advertiser/slots', icon: Building2 },
+    { label: 'Vị trí quảng cáo & Bảng giá', path: '/advertiser/slots', icon: Building2 },
     { label: 'Hóa đơn & Thanh toán B2B', path: '/advertiser/billing', icon: Receipt },
   ]
 
@@ -163,7 +167,7 @@ export function AdvertiserLayout() {
         </div>
       </div>
 
-      <RoleSwitcherBar />
+      {APP_CONFIG.useMockApi && <RoleSwitcherBar />}
     </div>
   )
 }

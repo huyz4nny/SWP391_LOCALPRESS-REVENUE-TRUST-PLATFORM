@@ -10,6 +10,8 @@ interface RequestOptions {
 class HttpClient {
   private baseUrl: string
   private useMock: boolean
+  // ponytail: credentials last only until page reload; use the shared identity session when it is available.
+  private basicAuth = ''
 
   constructor() {
     this.baseUrl = APP_CONFIG.apiBaseUrl
@@ -18,6 +20,27 @@ class HttpClient {
 
   public setUseMock(use: boolean) {
     this.useMock = use
+  }
+
+  public setBasicAuth(email: string, password: string) {
+    this.basicAuth = `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${email}:${password}`)))}`
+  }
+
+  public clearBasicAuth() {
+    this.basicAuth = ''
+  }
+
+  public hasBasicAuth() {
+    return Boolean(this.basicAuth)
+  }
+
+  private headers(options?: RequestOptions) {
+    const authHeader = this.basicAuth || `Basic ${btoa('ketoan@localpress.vn:password123')}`
+    return {
+      'Content-Type': 'application/json',
+      ...(authHeader ? { Authorization: authHeader } : {}),
+      ...options?.headers,
+    }
   }
 
   private buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
@@ -32,15 +55,6 @@ class HttpClient {
     return url.toString()
   }
 
-  private defaultHeaders(options?: RequestOptions): Record<string, string> {
-    const authString = btoa('ketoan@localpress.vn:password123')
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Basic ${authString}`,
-      ...options?.headers,
-    }
-  }
-
   public async get<T>(path: string, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(path, options?.params)
 
@@ -50,7 +64,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: this.defaultHeaders(options),
+      headers: this.headers(options),
     })
 
     if (!response.ok) {
@@ -77,7 +91,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: this.defaultHeaders(options),
+      headers: this.headers(options),
       body: JSON.stringify(body),
     })
 
@@ -105,7 +119,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'PUT',
-      headers: this.defaultHeaders(options),
+      headers: this.headers(options),
       body: JSON.stringify(body),
     })
 
@@ -133,7 +147,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: this.defaultHeaders(options),
+      headers: this.headers(options),
     })
 
     if (!response.ok) {

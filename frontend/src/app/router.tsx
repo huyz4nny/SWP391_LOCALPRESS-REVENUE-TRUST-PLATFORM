@@ -36,6 +36,7 @@ import {
 import {
   AdvertiserDashboard,
   AdSlotsExplorerPage,
+  CompanyProfilePage,
   NewBookingPage,
   BookingListPage,
   BookingDetailPage,
@@ -145,6 +146,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <AdvertiserDashboard /> },
       { path: 'slots', element: <AdSlotsExplorerPage /> },
+      { path: 'profile', element: <CompanyProfilePage /> },
       { path: 'bookings/new', element: <NewBookingPage /> },
       { path: 'bookings', element: <BookingListPage /> },
       { path: 'bookings/:id', element: <BookingDetailPage /> },
