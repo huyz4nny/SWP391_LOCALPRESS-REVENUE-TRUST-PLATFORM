@@ -32,6 +32,15 @@ class HttpClient {
     return url.toString()
   }
 
+  private defaultHeaders(options?: RequestOptions): Record<string, string> {
+    const authString = btoa('ketoan@localpress.vn:password123')
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${authString}`,
+      ...options?.headers,
+    }
+  }
+
   public async get<T>(path: string, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(path, options?.params)
 
@@ -41,10 +50,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: this.defaultHeaders(options),
     })
 
     if (!response.ok) {
@@ -71,10 +77,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: this.defaultHeaders(options),
       body: JSON.stringify(body),
     })
 
@@ -102,10 +105,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: this.defaultHeaders(options),
       body: JSON.stringify(body),
     })
 
@@ -133,10 +133,7 @@ class HttpClient {
 
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: this.defaultHeaders(options),
     })
 
     if (!response.ok) {

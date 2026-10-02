@@ -23,6 +23,7 @@ import {
   History,
   ArrowLeft,
   Lock,
+  LogOut,
 } from 'lucide-react'
 
 export function BackofficeLayout() {
@@ -153,6 +154,17 @@ export function BackofficeLayout() {
               alt=""
               className="w-8 h-8 rounded-full object-cover border border-slate-600"
             />
+            <button
+              onClick={() => {
+                mockStore.setCurrentUser('user-guest')
+                navigate('/login')
+              }}
+              title="Đăng xuất khỏi hệ thống"
+              className="flex items-center space-x-1.5 text-xs text-slate-300 hover:text-red-400 border border-slate-700 hover:border-red-500/50 hover:bg-red-950/20 px-2.5 py-1.5 rounded transition-colors cursor-pointer ml-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline font-medium">Đăng xuất</span>
+            </button>
           </div>
         </div>
       </header>
