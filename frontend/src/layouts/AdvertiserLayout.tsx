@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
+import { APP_CONFIG } from '@/app/config'
+import { httpClient } from '@/lib/http/client'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -13,11 +15,13 @@ import {
   Receipt,
   ArrowLeft,
   ShieldAlert,
+  LogOut,
 } from 'lucide-react'
 
 export function AdvertiserLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -27,6 +31,7 @@ export function AdvertiserLayout() {
   }, [])
 
   // Guard: Must have role ADVERTISER, or SYSTEM_ADMIN
+  if (!APP_CONFIG.useMockApi && !httpClient.hasBasicAuth()) return <Navigate to="/login" replace />
   const isAdvertiser = currentUser.role === 'ADVERTISER' || currentUser.role === 'SYSTEM_ADMIN'
 
   if (!isAdvertiser) {
@@ -56,16 +61,17 @@ export function AdvertiserLayout() {
             </Link>
           </div>
         </div>
-        <RoleSwitcherBar />
+        {APP_CONFIG.useMockApi && <RoleSwitcherBar />}
       </div>
     )
   }
 
   const navItems = [
     { label: 'Tổng quan Doanh nghiệp', path: '/advertiser', icon: LayoutDashboard },
+    { label: 'Hồ sơ doanh nghiệp', path: '/advertiser/profile', icon: Building2 },
     { label: 'Đặt vị trí mới (Booking)', path: '/advertiser/bookings/new', icon: PlusCircle, isAction: true },
     { label: 'Danh sách Booking & Báo giá', path: '/advertiser/bookings', icon: CalendarCheck },
-    { label: 'Vị trí quảng cáo & Lịch trống', path: '/advertiser/slots', icon: Building2 },
+    { label: 'Vị trí quảng cáo & Bảng giá', path: '/advertiser/slots', icon: Building2 },
     { label: 'Hóa đơn & Thanh toán B2B', path: '/advertiser/billing', icon: Receipt },
   ]
 
@@ -106,6 +112,17 @@ export function AdvertiserLayout() {
               alt=""
               className="w-8 h-8 rounded-full object-cover border border-slate-300"
             />
+            <button
+              onClick={() => {
+                mockStore.setCurrentUser('user-guest')
+                navigate('/login')
+              }}
+              title="Đăng xuất"
+              className="flex items-center space-x-1 text-xs text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 rounded px-2.5 py-1.5 transition-colors cursor-pointer ml-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
           </div>
         </div>
       </header>
@@ -150,7 +167,7 @@ export function AdvertiserLayout() {
         </div>
       </div>
 
-      <RoleSwitcherBar />
+      {APP_CONFIG.useMockApi && <RoleSwitcherBar />}
     </div>
   )
 }

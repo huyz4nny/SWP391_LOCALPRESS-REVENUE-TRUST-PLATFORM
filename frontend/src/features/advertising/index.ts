@@ -1,5 +1,6 @@
 export * from './pages/AdvertiserDashboard'
 export * from './pages/AdSlotsExplorerPage'
+export * from './pages/CompanyProfilePage'
 export * from './pages/NewBookingPage'
 export * from './pages/BookingListPage'
 export * from './pages/BookingDetailPage'

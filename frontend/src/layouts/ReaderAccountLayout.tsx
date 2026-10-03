@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ArrowLeft,
   ShieldAlert,
+  LogOut,
 } from 'lucide-react'
 
 export function ReaderAccountLayout() {
@@ -116,6 +117,17 @@ export function ReaderAccountLayout() {
               alt=""
               className="w-7 h-7 rounded-full object-cover border border-stone-300"
             />
+            <button
+              onClick={() => {
+                mockStore.setCurrentUser('user-guest')
+                navigate('/')
+              }}
+              title="Đăng xuất"
+              className="flex items-center space-x-1 text-xs text-stone-500 hover:text-red-600 border border-stone-200 hover:border-red-300 rounded px-2.5 py-1 transition-colors cursor-pointer ml-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
           </div>
         </div>
       </header>
@@ -172,6 +184,18 @@ export function ReaderAccountLayout() {
                     </Link>
                   )
                 })}
+                <div className="pt-2 mt-2 border-t border-stone-100">
+                  <button
+                    onClick={() => {
+                      mockStore.setCurrentUser('user-guest')
+                      navigate('/')
+                    }}
+                    className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs font-medium text-stone-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4 text-stone-400" />
+                    <span>Đăng xuất tài khoản</span>
+                  </button>
+                </div>
               </nav>
             </div>
           </aside>
