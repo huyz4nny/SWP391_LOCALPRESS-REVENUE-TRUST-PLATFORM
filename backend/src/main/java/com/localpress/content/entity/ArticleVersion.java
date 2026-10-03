@@ -93,6 +93,49 @@ public class ArticleVersion {
         return version;
     }
 
+    public void updateDraftCoverImage(String imageUrl, String caption, String altText, String imageSource){
+        if (reviewStatus != ReviewStatus.DRAFT) {
+            throw new IllegalStateException(
+                    "Chỉ được cập nhật ảnh của phiên bản đang là bản nháp"
+            );
+        }
+
+        if(imageUrl == null || imageUrl.isBlank() || imageUrl.length() > 1000){
+            throw new IllegalArgumentException("Đường dẫn ảnh khong hợp lệ");
+        }
+
+        if(altText == null || altText.isBlank() || altText.length() > 300){
+            throw new IllegalArgumentException("Alt text không hợp lệ");
+        }
+
+        if(caption != null && caption.length() > 500){
+            throw new IllegalArgumentException("Chú thích ảnh tối đa 500 ký tự");
+        }
+
+        if(imageSource != null && imageSource.length() > 300){
+            throw new IllegalArgumentException("Nguồn ảnh tối đa 300 ký tự");
+        }
+
+        Map<String, Object> updatedMetadata = metadata == null
+                ? new HashMap<>()
+                : new HashMap<>(metadata);
+
+        putOrRemove(updatedMetadata, "coverCaption", caption);
+        putOrRemove(updatedMetadata, "coverAltText", altText);
+        putOrRemove(updatedMetadata, "coverSource", imageSource);
+
+        this.coverImageUrl = imageUrl;
+        this.metadata = updatedMetadata;
+    }
+
+    private static void putOrRemove(Map<String, Object> target, String key, String value){
+        if(value == null || value.isBlank()){
+            target.remove(key);
+        } else {
+            target.put(key, value.trim());
+        }
+    }
+
     public enum ReviewStatus {
         DRAFT, PENDING, REJECTED, APPROVED
     }
