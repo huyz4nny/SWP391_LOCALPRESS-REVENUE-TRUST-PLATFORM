@@ -27,7 +27,7 @@ public class ImageStorageService {
 
     private final Path imageDirectory;
 
-    public ImageStorageService(@Value("${localpress.storage.image-directory}") String imageDirectory){
+    public ImageStorageService(@Value("${localpress.storage.image-directory:uploads/images}") String imageDirectory){
         this .imageDirectory = Path.of(imageDirectory).toAbsolutePath().normalize();
     }
 
