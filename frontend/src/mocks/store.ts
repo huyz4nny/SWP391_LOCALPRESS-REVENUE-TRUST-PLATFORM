@@ -328,6 +328,10 @@ class MockStore {
     this.persist()
   }
 
+  public setRealUser(user: User) {
+    this.setRealAdvertiser(user)
+  }
+
   public updateCurrentCompanyName(companyName: string) {
     const id = this.getCurrentUser().id
     this.state.users = this.state.users.map((user) =>
