@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { ShieldCheck, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
-import { advertisingApi } from '@/features/advertising/api'
+import { authApi } from '@/features/identity'
 import { httpClient } from '@/lib/http/client'
 
 export function LoginPage() {
@@ -30,41 +30,17 @@ export function LoginPage() {
     if (!APP_CONFIG.useMockApi) {
       try {
         httpClient.setBasicAuth(email, password)
-        const matched = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+        // 1. Gọi endpoint định danh chung /api/v1/auth/me (xác thực bất kỳ role nào từ MySQL)
+        const user = await authApi.getMe()
+        mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
 
-        if (matched && PERMISSION_CHECKERS.canAccessFinance(matched.role)) {
-          // Xác thực tài khoản kế toán với backend Spring Boot thật
-          await httpClient.get('/finance/dashboard')
-          mockStore.setCurrentUser(matched.id)
-          navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(matched.role), { replace: true })
+        // 2. Điều hướng chính xác theo vai trò người dùng (không phân biệt Doanh nghiệp hay Nội bộ)
+        if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
+          navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
+        } else if (user.role === 'ADVERTISER') {
+          navigate('/advertiser/profile', { replace: true })
         } else {
-          // Xác thực tài khoản Doanh nghiệp hoặc role khác
-          try {
-            const user = await advertisingApi.getMe()
-            mockStore.setRealAdvertiser({ ...user, createdAt: new Date().toISOString() })
-            navigate(
-              PERMISSION_CHECKERS.canAccessBackoffice(user.role)
-                ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)
-                : user.role === 'ADVERTISER'
-                ? '/advertiser/profile'
-                : '/',
-              { replace: true }
-            )
-          } catch (advError) {
-            if (matched) {
-              mockStore.setCurrentUser(matched.id)
-              navigate(
-                PERMISSION_CHECKERS.canAccessBackoffice(matched.role)
-                  ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(matched.role)
-                  : from === '/login'
-                  ? '/'
-                  : from,
-                { replace: true }
-              )
-            } else {
-              throw advError
-            }
-          }
+          navigate(from === '/login' ? '/' : from, { replace: true })
         }
       } catch (error) {
         httpClient.clearBasicAuth()
