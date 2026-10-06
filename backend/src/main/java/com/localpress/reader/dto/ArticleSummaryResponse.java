@@ -1,83 +1,40 @@
 package com.localpress.reader.dto;
 
-import java.time.LocalDateTime;
-
 public class ArticleSummaryResponse {
-    private Long articleId;
+    private Long id;
     private String title;
     private String summary;
+    private String accessType;
     private String categoryName;
-    private String accessType; // FREE hoặc PREMIUM
-    private String thumbnailUrl;
-    private LocalDateTime publishedAt;
+    private String publishedAt;
 
-    public ArticleSummaryResponse() {
-    }
+    public ArticleSummaryResponse() {}
 
-    public ArticleSummaryResponse(Long articleId, String title, String summary, String categoryName,
-                                  String accessType, String thumbnailUrl, LocalDateTime publishedAt) {
-        this.articleId = articleId;
+    // Constructor 6 tham số khớp với ReaderArticleServiceImpl
+    public ArticleSummaryResponse(Long id, String title, String summary, String accessType, String categoryName, String publishedAt) {
+        this.id = id;
         this.title = title;
         this.summary = summary;
-        this.categoryName = categoryName;
         this.accessType = accessType;
-        this.thumbnailUrl = thumbnailUrl;
+        this.categoryName = categoryName;
         this.publishedAt = publishedAt;
     }
 
-    public Long getArticleId() {
-        return articleId;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setArticleId(Long articleId) {
-        this.articleId = articleId;
-    }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 
-    public String getTitle() {
-        return title;
-    }
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
 
-    public void setTitle(String title) {
-        this.title = title;
-    }
+    public String getAccessType() { return accessType; }
+    public void setAccessType(String accessType) { this.accessType = accessType; }
 
-    public String getSummary() {
-        return summary;
-    }
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
-    public void setSummary(String summary) {
-        this.summary = summary;
-    }
-
-    public String getCategoryName() {
-        return categoryName;
-    }
-
-    public void setCategoryName(String categoryName) {
-        this.categoryName = categoryName;
-    }
-
-    public String getAccessType() {
-        return accessType;
-    }
-
-    public void setAccessType(String accessType) {
-        this.accessType = accessType;
-    }
-
-    public String getThumbnailUrl() {
-        return thumbnailUrl;
-    }
-
-    public void setThumbnailUrl(String thumbnailUrl) {
-        this.thumbnailUrl = thumbnailUrl;
-    }
-
-    public LocalDateTime getPublishedAt() {
-        return publishedAt;
-    }
-
-    public void setPublishedAt(LocalDateTime publishedAt) {
-        this.publishedAt = publishedAt;
-    }
+    public String getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(String publishedAt) { this.publishedAt = publishedAt; }
 }

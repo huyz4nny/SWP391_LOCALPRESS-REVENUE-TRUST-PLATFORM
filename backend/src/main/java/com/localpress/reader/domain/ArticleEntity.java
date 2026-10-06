@@ -1,27 +1,40 @@
-package com.localpress.reader.dto;
+package com.localpress.reader.domain;
 
-public class ArticleReaderResponse {
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "articles")
+public class ArticleEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "article_id")
     private Long id;
+
+    @Transient
     private String title;
+
+    @Transient
     private String summary;
+
+    @Transient
     private String content;
+
+    @Column(name = "access_type", columnDefinition = "ENUM('FREE', 'PREMIUM')")
     private String accessType;
+
+    @Transient
     private String categoryName;
-    private String publishedAt;
 
-    public ArticleReaderResponse() {}
+    private String status;
 
-    // Constructor 7 tham số khớp với ReaderArticleServiceImpl
-    public ArticleReaderResponse(Long id, String title, String summary, String content, String accessType, String categoryName, String publishedAt) {
-        this.id = id;
-        this.title = title;
-        this.summary = summary;
-        this.content = content;
-        this.accessType = accessType;
-        this.categoryName = categoryName;
-        this.publishedAt = publishedAt;
-    }
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
 
+    public ArticleEntity() {}
+
+    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -40,6 +53,9 @@ public class ArticleReaderResponse {
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
-    public String getPublishedAt() { return publishedAt; }
-    public void setPublishedAt(String publishedAt) { this.publishedAt = publishedAt; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public LocalDateTime getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(LocalDateTime publishedAt) { this.publishedAt = publishedAt; }
 }

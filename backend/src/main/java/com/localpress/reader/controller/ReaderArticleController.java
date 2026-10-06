@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/reader/articles")
+@RequestMapping("/api/v1/articles") // Đã sửa endpoint mở công khai cho Frontend & SecurityConfig
 public class ReaderArticleController {
 
     private final ReaderArticleService readerArticleService;
@@ -18,31 +18,13 @@ public class ReaderArticleController {
         this.readerArticleService = readerArticleService;
     }
 
-    // UC029: Bảng tin bài viết & UC033: Lọc theo danh mục
-    // GET /api/v1/reader/articles hoặc GET /api/v1/reader/articles?category=Kinh tế
     @GetMapping
-    public ResponseEntity<List<ArticleSummaryResponse>> getFeedArticles(
-            @RequestParam(value = "category", required = false) String category) {
-        List<ArticleSummaryResponse> articles = readerArticleService.getFeedArticles(category);
-        return ResponseEntity.ok(articles);
+    public ResponseEntity<List<ArticleSummaryResponse>> getAllArticles() {
+        return ResponseEntity.ok(readerArticleService.getPublishedArticles());
     }
 
-    // UC030: Tìm kiếm bài viết theo từ khóa
-    // GET /api/v1/reader/articles/search?keyword=Kinh tế
-    @GetMapping("/search")
-    public ResponseEntity<List<ArticleSummaryResponse>> searchArticles(
-            @RequestParam("keyword") String keyword) {
-        List<ArticleSummaryResponse> articles = readerArticleService.searchArticles(keyword);
-        return ResponseEntity.ok(articles);
-    }
-
-    // UC031 (FREE) & UC032 (PREMIUM / Paywall Engine)
-    // GET /api/v1/reader/articles/{id}?userId=100
     @GetMapping("/{id}")
-    public ResponseEntity<ArticleReaderResponse> getArticleDetail(
-            @PathVariable("id") Long id,
-            @RequestParam(value = "userId", required = false) Long userId) {
-        ArticleReaderResponse response = readerArticleService.getArticleDetail(id, userId);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ArticleReaderResponse> getArticleDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(readerArticleService.getArticleById(id));
     }
 }
