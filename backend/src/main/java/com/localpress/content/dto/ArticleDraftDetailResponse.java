@@ -3,17 +3,29 @@ package com.localpress.content.dto;
 import com.localpress.content.entity.Article;
 import com.localpress.content.entity.ArticleVersion;
 
-public record ArticleDraftDetailResponse(String id, String categoryId, String slug,
-                                         String status, Integer latestVersion, String title,
-                                         String sapo, String content, String source) {
-    public static ArticleDraftDetailResponse from(Article article, ArticleVersion version) {
-        Object sourceValue = version.getMetadata() == null
-                ? null
-                : version.getMetadata().get("source");
+import java.util.Map;
 
-        String source = sourceValue instanceof String
-                ? (String) sourceValue
-                :null;
+public record ArticleDraftDetailResponse(
+        String id,
+        String categoryId,
+        String slug,
+        String status,
+        Integer latestVersion,
+        String title,
+        String sapo,
+        String content,
+        String source,
+        String coverImageUrl,
+        String coverCaption,
+        String coverAltText,
+        String coverSource
+) {
+
+    public static ArticleDraftDetailResponse from(
+            Article article,
+            ArticleVersion version
+    ) {
+        Map<String, Object> metadata = version.getMetadata();
 
         return new ArticleDraftDetailResponse(
                 article.getId().toString(),
@@ -24,6 +36,20 @@ public record ArticleDraftDetailResponse(String id, String categoryId, String sl
                 version.getTitle(),
                 version.getSapo(),
                 version.getContent(),
-                source);
+                getString(metadata, "source"),
+                version.getCoverImageUrl(),
+                getString(metadata, "coverCaption"),
+                getString(metadata, "coverAltText"),
+                getString(metadata, "coverSource")
+        );
+    }
+
+    private static String getString(
+            Map<String, Object> metadata,
+            String key
+    ) {
+        Object value = metadata == null ? null : metadata.get(key);
+
+        return value instanceof String ? (String) value : null;
     }
 }
