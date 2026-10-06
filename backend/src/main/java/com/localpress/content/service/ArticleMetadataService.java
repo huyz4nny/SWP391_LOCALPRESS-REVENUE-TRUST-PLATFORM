@@ -34,7 +34,7 @@ public class ArticleMetadataService {
         User author = currentUserService.requireCurrentAuthor();
 
         Article article = articleRepository
-                .findByIdAndAuthorId(articleId, author.getId())
+                .findOwnedArticleForUpdate(articleId, author.getId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Không tìm thấy bài viết"
@@ -71,7 +71,7 @@ public class ArticleMetadataService {
         }
 
         ArticleVersion version = articleVersionRepository
-                .findByArticleIdAndVersionNumber(
+                .findVersionForUpdate(
                         article.getId(),
                         article.getLatestVersion()
                 )

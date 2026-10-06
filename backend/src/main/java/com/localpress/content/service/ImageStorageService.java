@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -66,6 +68,44 @@ public class ImageStorageService {
         }
     }
 
+    public void delete(String filename) throws IOException{
+        if(filename == null || !filename.matches(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+                        + "[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.png"
+        )){
+            throw new IllegalArgumentException("Tên ảnh không hợp lệ");
+        }
+
+        Path target = imageDirectory.resolve(filename).normalize();
+
+        if(!target.startsWith(imageDirectory)){
+            throw new IllegalArgumentException("Đường dẫn ảnh không hợp lệ");
+        }
+
+        Files.deleteIfExists(target);
+    }
+
+    public Resource load(String filename){
+        if(filename == null || !filename.matches(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+                        + "[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.png"
+        )){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên file ảnh không hợp lệ");
+        }
+
+        Path target = imageDirectory.resolve(filename).normalize();
+
+        if(!target.startsWith(imageDirectory)){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Đường dẫn ảnh không hợp lệ");
+        }
+
+        if(!Files.isRegularFile(target) || !Files.isReadable(target)){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy ảnh");
+        }
+
+        return new FileSystemResource(target);
+    }
+
     private BufferedImage readImage(MultipartFile file) {
         try(InputStream input = file.getInputStream();
         ImageInputStream imageInput = ImageIO.createImageInputStream(input)){
@@ -83,7 +123,7 @@ public class ImageStorageService {
 
             try{
                 String format = reader.getFormatName();
-                if(!format.equalsIgnoreCase("JPEG") && !format.equalsIgnoreCase("JPNG")){
+                if(!format.equalsIgnoreCase("JPEG") && !format.equalsIgnoreCase("PNG")){
                     throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Chỉ hỗ trợ ảnh JPEG và PNG");
                 }
 

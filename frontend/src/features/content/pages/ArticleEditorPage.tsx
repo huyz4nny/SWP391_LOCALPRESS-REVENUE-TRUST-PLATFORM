@@ -2,6 +2,8 @@ import {useEffect, useState} from 'react'
 import type {FormEvent} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
 import {ArticleMetadataForm} from '../components/ArticleMetadataForm'
+import { ArticleCoverImage } from '../components/ArticleCoverImage'
+import { ArticleCoverImageForm } from '../components/ArticleCoverImageForm'
 
 import {contentApi} from '../api'
 import type {
@@ -290,20 +292,33 @@ export function ArticleEditorPage() {
                 </form>
             )}
             {!loading && draft && activeTab === 'metadata' && (
-            <ArticleMetadataForm
-                key={draft.id}
-                article={draft}
-                categories={categories}
-                onSaved={(updated) => {
-                    setDraft(updated)
+                <div className="space-y-6">
+                    <ArticleMetadataForm
+                        key={draft.id}
+                        article={draft}
+                        categories={categories}
+                        onSaved={(updated) => {
+                            setDraft(updated)
 
-                    setForm((previous) => ({
-                        ...previous,
-                        categoryId: updated.categoryId,
-                    }))
-                }}
-            />
-        )}
+                            setForm((previous) => ({
+                                ...previous,
+                                categoryId: updated.categoryId,
+                            }))
+                        }}
+                    />
+
+                    <ArticleCoverImageForm
+                        key={draft.id}
+                        article={draft}
+                        onSaved={(updated) => setDraft(updated)}
+                    />
+
+                    <ArticleCoverImage
+                        key={`${draft.id}:${draft.coverImageUrl ?? 'no-image'}`}
+                        article={draft}
+                    />
+                </div>
+            )}
         </main>
     )
 }

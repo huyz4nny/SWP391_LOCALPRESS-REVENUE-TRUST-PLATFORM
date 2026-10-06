@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { contentApi } from '../api'
@@ -27,6 +27,15 @@ export function ArticleMetadataForm({
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
     const [message, setMessage] = useState('')
+    const lifecycle = useRef(0)
+
+    useEffect(() => {
+        lifecycle.current += 1
+
+        return () => {
+            lifecycle.current += 1
+        }
+    }, [article.id])
 
     useEffect(() => {
         setCategoryId(article.categoryId)
@@ -38,6 +47,11 @@ export function ArticleMetadataForm({
 
         if (saving) return
 
+        const requestLifecycle = lifecycle.current
+
+        const isCurrent = () =>
+            lifecycle.current === requestLifecycle
+
         setError('')
         setMessage('')
 
@@ -46,28 +60,39 @@ export function ArticleMetadataForm({
         )
 
         if (!selectedCategory || !slug.trim()) {
-            setError('Vui lòng chọn chuyên mục đang hoạt động và nhập slug')
+            setError(
+                'Vui lòng chọn chuyên mục đang hoạt động và nhập slug',
+            )
             return
         }
 
         setSaving(true)
 
         try {
-            const updated = await contentApi.updateMetadata(article.id, {
-                categoryId: Number(categoryId),
-                slug: slug.trim(),
-            })
+            const updated = await contentApi.updateMetadata(
+                article.id,
+                {
+                    categoryId: Number(categoryId),
+                    slug: slug.trim(),
+                },
+            )
+
+            if (!isCurrent()) return
 
             onSaved(updated)
             setMessage('Đã lưu thông tin bài viết')
-        } catch (err) {
+        } catch (error) {
+            if (!isCurrent()) return
+
             setError(
-                err instanceof Error
-                    ? err.message
+                error instanceof Error
+                    ? error.message
                     : 'Không lưu được thông tin bài viết',
             )
         } finally {
-            setSaving(false)
+            if (isCurrent()) {
+                setSaving(false)
+            }
         }
     }
 
