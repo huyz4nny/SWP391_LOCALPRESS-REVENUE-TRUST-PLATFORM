@@ -1,45 +1,27 @@
 package com.localpress.reader.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ArticleReaderResponse {
     private Long id;
     private String title;
+    private String slug;
     private String summary;
     private String content;
-    private String accessType;
+    private String previewContent;
+    private Boolean isPremium;
+    private Boolean isLocked;
+    private String coverImageUrl;
     private String categoryName;
+    private String categorySlug;
     private String publishedAt;
-
-    public ArticleReaderResponse() {}
-
-    // Constructor 7 tham số khớp với ReaderArticleServiceImpl
-    public ArticleReaderResponse(Long id, String title, String summary, String content, String accessType, String categoryName, String publishedAt) {
-        this.id = id;
-        this.title = title;
-        this.summary = summary;
-        this.content = content;
-        this.accessType = accessType;
-        this.categoryName = categoryName;
-        this.publishedAt = publishedAt;
-    }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-
-    public String getSummary() { return summary; }
-    public void setSummary(String summary) { this.summary = summary; }
-
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-
-    public String getAccessType() { return accessType; }
-    public void setAccessType(String accessType) { this.accessType = accessType; }
-
-    public String getCategoryName() { return categoryName; }
-    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
-
-    public String getPublishedAt() { return publishedAt; }
-    public void setPublishedAt(String publishedAt) { this.publishedAt = publishedAt; }
+    private String authorName;
+    private Long viewCount;
 }

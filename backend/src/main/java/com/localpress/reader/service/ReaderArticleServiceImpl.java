@@ -3,75 +3,103 @@ package com.localpress.reader.service;
 import com.localpress.reader.dto.ArticleReaderResponse;
 import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.repository.ArticleProjection;
-import com.localpress.reader.repository.ArticleRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.localpress.reader.repository.ReaderArticleRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ReaderArticleServiceImpl implements ReaderArticleService {
 
-    @Autowired
-    private ArticleRepository articleRepository;
+    private final ReaderArticleRepository readerArticleRepository;
 
     @Override
-    public List<ArticleSummaryResponse> getPublishedArticles() {
-        List<ArticleProjection> projections = articleRepository.findAllPublishedArticles("PUBLISHED");
-        return projections.stream().map(p -> {
-            ArticleSummaryResponse dto = new ArticleSummaryResponse();
-            dto.setId(p.getId());
-            dto.setTitle(p.getTitle());
-            dto.setSummary(p.getSummary());
-            dto.setAccessType(p.getAccessType());
-            dto.setCategoryName(p.getCategoryName());
-            // Ep kieu LocalDateTime sang String
-            dto.setPublishedAt(p.getPublishedAt() != null ? p.getPublishedAt().toString() : null);
-            return dto;
-        }).collect(Collectors.toList());
+    public Page<ArticleSummaryResponse> getArticles(String category, String search, String access, Pageable pageable) {
+        return readerArticleRepository
+                .findAllPublishedArticles(blankToNull(category), blankToNull(search), blankToNull(access), pageable)
+                .map(this::mapToSummary);
     }
 
     @Override
-    public List<ArticleSummaryResponse> getFeedArticles(String category) {
-        List<ArticleProjection> projections = articleRepository.findFeedArticlesByCategory(category);
-        return projections.stream().map(p -> {
-            ArticleSummaryResponse dto = new ArticleSummaryResponse();
-            dto.setId(p.getId());
-            dto.setTitle(p.getTitle());
-            dto.setSummary(p.getSummary());
-            dto.setAccessType(p.getAccessType());
-            dto.setCategoryName(p.getCategoryName());
-            // Ep kieu LocalDateTime sang String
-            dto.setPublishedAt(p.getPublishedAt() != null ? p.getPublishedAt().toString() : null);
-            return dto;
-        }).collect(Collectors.toList());
+    @Transactional
+    public ArticleReaderResponse getArticleBySlug(String slug) {
+        ArticleProjection projection = readerArticleRepository.findPublishedBySlug(slug)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy bài viết hoặc bài chưa được xuất bản"));
+        readerArticleRepository.incrementViewCount(slug);
+        return applyPaywall(mapToDetail(projection), projection.getContent(), projection.getAccessType());
     }
 
-    @Override
-    public ArticleReaderResponse getArticleById(Long id) {
-        ArticleProjection p = articleRepository.findPublishedArticleById(id)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay bai viet voi ID: " + id));
-
-        ArticleReaderResponse response = new ArticleReaderResponse();
-        response.setId(p.getId());
-        response.setTitle(p.getTitle());
-        response.setSummary(p.getSummary());
-        response.setAccessType(p.getAccessType());
-        response.setCategoryName(p.getCategoryName());
-        // Ep kieu LocalDateTime sang String
-        response.setPublishedAt(p.getPublishedAt() != null ? p.getPublishedAt().toString() : null);
-
-        // Ap dung Rule 3 Paywall cho bai viet PREMIUM
-        String rawContent = p.getContent();
-        if ("PREMIUM".equalsIgnoreCase(p.getAccessType()) && rawContent != null) {
-            int cutLength = (int) (rawContent.length() * 0.7); // Lay 70% noi dung
-            String previewContent = rawContent.substring(0, cutLength);
-            response.setContent(previewContent + "\n\n[Dành riêng cho hội viên VIP. Vui lòng nâng cấp tài khoản để đọc tiếp!]");
-        } else {
-            response.setContent(rawContent);
+    static int previewCut(String rawContent) {
+        int cutIndex = (int) Math.floor(rawContent.length() * 0.3d);
+        if (cutIndex <= 0) {
+            return 0;
         }
+        int lastBreak = Math.max(rawContent.lastIndexOf(' ', cutIndex), rawContent.lastIndexOf('\n', cutIndex));
+        if (lastBreak > cutIndex / 2) {
+            return lastBreak;
+        }
+        return cutIndex;
+    }
 
+    private ArticleReaderResponse applyPaywall(ArticleReaderResponse response, String rawContent, String accessType) {
+        boolean premium = "PREMIUM".equalsIgnoreCase(accessType);
+        response.setIsPremium(premium);
+        if (!premium || rawContent == null) {
+            response.setContent(rawContent);
+            response.setPreviewContent(rawContent);
+            response.setIsLocked(false);
+            return response;
+        }
+        response.setPreviewContent(rawContent.substring(0, previewCut(rawContent)));
+        response.setContent(null);
+        response.setIsLocked(true);
         return response;
+    }
+
+    private ArticleSummaryResponse mapToSummary(ArticleProjection projection) {
+        return ArticleSummaryResponse.builder()
+                .id(projection.getId())
+                .title(projection.getTitle())
+                .slug(projection.getSlug())
+                .summary(projection.getSummary())
+                .coverImageUrl(projection.getCoverImageUrl())
+                .categoryName(projection.getCategoryName())
+                .categorySlug(projection.getCategorySlug())
+                .isPremium("PREMIUM".equalsIgnoreCase(projection.getAccessType()))
+                .publishedAt(projection.getPublishedAt() != null ? projection.getPublishedAt().toString() : null)
+                .authorName(projection.getAuthorName())
+                .build();
+    }
+
+    private ArticleReaderResponse mapToDetail(ArticleProjection projection) {
+        ArticleSummaryResponse summary = mapToSummary(projection);
+        return ArticleReaderResponse.builder()
+                .id(summary.getId())
+                .title(summary.getTitle())
+                .slug(summary.getSlug())
+                .summary(summary.getSummary())
+                .coverImageUrl(summary.getCoverImageUrl())
+                .categoryName(summary.getCategoryName())
+                .categorySlug(summary.getCategorySlug())
+                .isPremium(summary.getIsPremium())
+                .publishedAt(summary.getPublishedAt())
+                .authorName(summary.getAuthorName())
+                .viewCount(projection.getViewCount() == null ? 1L : projection.getViewCount() + 1)
+                .build();
+    }
+
+    private String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }
