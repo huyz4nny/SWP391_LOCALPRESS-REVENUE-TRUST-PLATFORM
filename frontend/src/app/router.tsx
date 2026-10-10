@@ -72,6 +72,10 @@ import {
   AuditLogsPage,
 } from '@/features/administration'
 
+import {
+  ArticleEditorPage as ContentArticleEditorPage,
+} from '@/features/content/pages/ArticleEditorPage'
+
 function NotFoundPage() {
   return (
     <div className="max-w-md mx-auto py-20 text-center space-y-4">
@@ -102,6 +106,15 @@ function BackofficeIndexRedirect() {
 }
 
 export const router = createBrowserRouter([
+  {
+    path: '/content/articles/new',
+    element: <ContentArticleEditorPage />,
+  },
+  {
+    path: '/content/articles/:id',
+    element: <ContentArticleEditorPage />,
+  },
+
   // 1. Public Reader Routes
   {
     path: '/',

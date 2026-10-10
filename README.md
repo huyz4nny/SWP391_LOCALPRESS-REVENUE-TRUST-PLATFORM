@@ -126,55 +126,85 @@ flowchart TD
 
 ```text
 LocalPress/
-├── backend/                               # Spring Boot 3 + Java 17/21 + MySQL 8 + Flyway
-│   ├── pom.xml
+├── .agents/                               # Bộ Workspace Skills dành cho AI Agents & Lập trình viên
+│   └── skills/localpress-frontend/        # Quy chuẩn thiết kế Frontend, Catalog UI, 4 Layout & 21 Invariants
+│       ├── SKILL.md                       # Điểm vào chính, runbook 6 bước dựng màn hình & checklist
+│       ├── references/                    # Quy chuẩn design tokens, component patterns, API dual-mode
+│       └── examples/                      # Boilerplate: BackofficeTablePage, ModalForm, PublicArticleCard
+│
+├── backend/                               # Spring Boot 3.4 + Java 17/21 + MySQL 8 + Flyway Migration
+│   ├── pom.xml                            # Quản lý dependencies (Spring Security, JPA, Flyway, MySQL)
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/localpress/
 │       │   │   ├── LocalPressApplication.java
-│       │   │   ├── identity/              # Quản lý người dùng, phân quyền RBAC & thiết bị
-│       │   │   ├── reader/                # Nghiệp vụ tài khoản độc giả & tủ sách
-│       │   │   ├── content/               # Quản lý danh mục & nội dung bài viết
+│       │   │   ├── identity/              # Quản lý tài khoản users, phân quyền RBAC, AuthController
+│       │   │   ├── reader/                # Nghiệp vụ tài khoản độc giả, tủ sách, giỏ hàng
+│       │   │   ├── content/               # CMS soạn bài, bài viết, phiên bản, ảnh bìa, danh mục
 │       │   │   ├── editorial/             # Quy trình biên tập, duyệt bài, duyệt ad, duyệt comment
-│       │   │   ├── advertising/           # Quản lý booking, chiến dịch quảng cáo B2B
-│       │   │   ├── finance/               # Bộ thanh toán dùng chung, IPN, đối soát, sổ quỹ, hoàn tiền
-│       │   │   ├── delivery/              # Paywall Engine máy chủ, Ad Serving Engine & lọc click tặc
+│       │   │   ├── advertising/           # AdvertisingController, hồ sơ B2B, catalog slot quảng cáo
+│       │   │   ├── finance/               # Sổ quỹ kép, xác nhận ủy nhiệm chi, đối soát, hoàn tiền 4 mắt
+│       │   │   ├── delivery/              # Paywall Engine máy chủ, Ad Serving Engine & lọc click gian lận
 │       │   │   ├── administration/        # Quản trị hệ thống, cấu hình slot & audit log
-│       │   │   └── shared/                # Cấu hình CORS, Security, Exception Handler, Response wrapper
+│       │   │   └── shared/
+│       │   │       ├── security/          # Master SecurityConfig.java (Spring Security 6, stateless)
+│       │   │       ├── event/             # Sự kiện dùng chung (PaymentSuccessEvent...)
+│       │   │       └── util/              # Tiện ích dùng chung
 │       │   └── resources/
-│       │       ├── application.yml
-│       │       ├── application-dev.yml
-│       │       └── db/migration/
-│       │           ├── V1__create_tables.sql      # 19 bảng CSDL & ràng buộc quan hệ
-│       │           └── V2__insert_seed_data.sql   # Dữ liệu mẫu chuẩn bối cảnh Hải Phòng
-│       └── test/java/com/localpress/
+│       │       ├── application.yml        # Cấu hình chung Spring Boot
+│       │       ├── application-dev.yml    # Cấu hình MySQL dev (mật khẩu mặc định: password)
+│       │       └── db/
+│       │           ├── migration/
+│       │           │   ├── V1__create_tables.sql      # Khung DDL thuần túy 22 bảng CSDL & quan hệ
+│       │           │   └── V2__advertiser_profile_and_slot_details.sql # Mở rộng hồ sơ B2B & slot
+│       │           └── seed_data.sql                  # Bản sao seed data dự phòng
+│       └── test/java/com/localpress/      # Bộ Unit & Security Integration Tests (Finance, Advertising...)
 │
-├── frontend/                              # React 19 + TypeScript + Vite + Tailwind CSS
+├── frontend/                              # React 19 + TypeScript + Vite 8 + Tailwind CSS 3.4
 │   ├── package.json
-│   ├── vite.config.ts
+│   ├── vite.config.ts                     # Cấu hình dev server & proxy kết nối backend
+│   ├── tailwind.config.js                 # Design tokens (Navy #1e3a8a, Crimson #991b1b, Gold #d97706, Paper #fafaf9)
 │   └── src/
-│       ├── app/                           # App Router, Query Providers & Mock Switcher
-│       ├── layouts/                       # PublicLayout, ReaderLayout, AdvertiserLayout, BackofficeLayout
-│       ├── components/                    # Atomic UI (Shadcn UI style), AdSlotBanner, RoleSwitcherBar
+│       ├── app/                           # config.ts (useMockApi switch), providers.tsx, router.tsx
+│       ├── layouts/                       # 4 Layout: PublicLayout, ReaderAccountLayout, AdvertiserLayout, BackofficeLayout
+│       ├── components/
+│       │   ├── ui/                        # Component nguyên tử: button, badge, card, dialog, input, label
+│       │   └── shared/                    # Dùng chung: StatusBadge (6 domain), EmptyState, ConfirmDialog, ProtectedRoute, RoleSwitcherBar, AdSlotBanner
 │       ├── features/
-│       │   ├── identity/                  # Đăng nhập, Đăng ký, Quên mật khẩu
-│       │   ├── reader/                    # Trang chủ, Chi tiết bài, Paywall Prompt, Tủ sách, Lịch sử
-│       │   ├── advertising/               # Danh mục slot, Booking, Upload creative, Báo cáo CTR
-│       │   ├── editorial/                 # CMS soạn bài, Duyệt bài, Duyệt banner, Duyệt bình luận
-│       │   ├── finance/                   # Dashboard tài chính, Danh sách đơn, Sổ quỹ kép, Hoàn tiền 4 mắt
-│       │   └── administration/            # Quản trị user, Cấu hình Paywall, Giám sát Ad Delivery, Audit log
-│       ├── mocks/                         # Bộ dữ liệu Mock in-memory đồng bộ 100% với Seed SQL
+│       │   ├── identity/                  # Đăng nhập, đăng ký, quên mật khẩu
+│       │   ├── reader/                    # Trang chủ báo Hải Phòng, chi tiết bài, Paywall preview 30%, tủ sách, 2 thiết bị
+│       │   ├── advertising/               # Dashboard B2B, hồ sơ công ty, tra cứu slot, booking, upload banner, báo cáo CTR
+│       │   ├── editorial/                 # Danh sách bài, CMS tòa soạn, duyệt booking, duyệt banner, kiểm duyệt bình luận
+│       │   ├── finance/                   # Dashboard kế toán, danh sách đơn, xác nhận CK ngân hàng, hoàn tiền 4 mắt, đối soát, sổ quỹ
+│       │   ├── content/                   # Soạn thảo bản nháp, tải ảnh bìa, biên tập metadata & tag
+│       │   └── administration/            # Quản trị users, ma trận RBAC, cấu hình Paywall, giám sát ad delivery, audit logs
+│       ├── lib/
+│       │   ├── format/                    # formatCurrency (VND), formatDate, formatDateTime, formatRelativeTime
+│       │   ├── http/                      # httpClient tự động chuyển đổi Mock Store / Spring Boot API
+│       │   └── utils.ts                   # Helper cn (clsx + tailwind-merge)
+│       ├── mocks/
+│       │   ├── data/seed.ts               # Dữ liệu Mock ban đầu đồng bộ 100% với Seed SQL
+│       │   ├── handlers/index.ts          # Mock REST API handlers
+│       │   └── store.ts                   # Reactive Stateful Mock Store (localStorage)
 │       └── tests/
-│           └── domain.test.ts             # 11 Unit/Domain Tests kiểm tra trọn vẹn 16 quy tắc cốt lõi
+│           └── domain.test.ts             # 14 Domain Unit Tests (Vitest) pass 100%
 │
-├── docs/                                  # Tài liệu kỹ thuật, sơ đồ kiến trúc & phân tích
+├── docs/                                  # Hồ sơ tài liệu kỹ thuật, kế hoạch triển khai & sơ đồ
 │   ├── SYSTEM_CONTEXT_AND_ARCHITECTURE.md # Đặc tả ngữ cảnh và kiến trúc hệ thống 360 độ
-│   └── diagrams/                          # Sơ đồ CSDL (LocalPress_DTB.png) và Swimlane SV1, SV3, SV4
+│   ├── LOCALPRESS_CODING_PLAN.md          # Kế hoạch mã hóa chi tiết 5 thành viên (Markdown)
+│   ├── LOCALPRESS_CODING_PLAN.docx        # Kế hoạch mã hóa bản tài liệu chính thức (Word)
+│   └── diagrams/                          # Thư mục sơ đồ thiết kế
+│       ├── LocalPress_DTB.png             # Sơ đồ quan hệ thực thể cơ sở dữ liệu (ERD)
+│       ├── swimlane_sv1.png               # Sơ đồ quy trình luồng Doanh nghiệp B2B (SV1)
+│       ├── swimlane_sv3.png               # Sơ đồ quy trình luồng Độc giả & Paywall (SV3)
+│       ├── swimlane_sv4.png               # Sơ đồ quy trình luồng Kế toán & Đối soát (SV4)
+│       └── coding_plan/                   # Bộ 8 sơ đồ tuần tự (Sequence Diagrams) cho 8 luồng trọng điểm
 │
-├── AGENTS.md                              # Bản ghi nhớ ngữ cảnh bất biến cho AI Agents
-├── LOCALPRESS_MASTER_ROADMAP.md           # Lộ trình chi tiết 4 Iteration & Kịch bản phản biện Hội đồng
-├── project_tracking_group2.xlsx           # Bảng theo dõi tiến độ chính thức (77 Use Cases, 48 Màn hình & Ma trận CRUD 19 bảng)
-├── LocalPress_Danh_muc_chuc_nang.docx     # Tài liệu yêu cầu nghiệp vụ gốc (125 tiêu chí, 16 quy tắc cốt lõi, 10 kịch bản demo)
+├── seed_data.sql                          # Dữ liệu mẫu nạp độc lập cho MySQL (mật khẩu chuẩn: password)
+├── AGENTS.md                              # Bản ghi nhớ ngữ cảnh bất biến, 21 Invariant Rules & Quy chuẩn Frontend Skill
+├── LOCALPRESS_MASTER_ROADMAP.md           # Lộ trình 3 đợt triển khai theo Activity Flow (Iter 1-3) & Kịch bản bảo vệ
+├── project_tracking_group2.xlsx           # Bảng theo dõi 77 Use Cases, 48 Màn hình chức năng & Ma trận CRUD 19 bảng
+├── LocalPress_Danh_muc_chuc_nang.docx     # Tài liệu yêu cầu nghiệp vụ gốc (125 tiêu chí: P0, P1, P2)
 └── LocalPress_Danh_muc_chuc_nang.xlsx     # Bảng phân rã 125 chức năng tham chiếu (7 sheets chuẩn)
 ```
 

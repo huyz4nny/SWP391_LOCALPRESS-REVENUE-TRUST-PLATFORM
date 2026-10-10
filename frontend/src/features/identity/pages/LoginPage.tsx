@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { ShieldCheck, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
-import { advertisingApi } from '@/features/advertising/api'
+import { authApi } from '@/features/identity'
 import { httpClient } from '@/lib/http/client'
 
 export function LoginPage() {
@@ -30,14 +30,21 @@ export function LoginPage() {
     if (!APP_CONFIG.useMockApi) {
       try {
         httpClient.setBasicAuth(email, password)
-        const user = await advertisingApi.getMe()
-        mockStore.setRealAdvertiser({ ...user, createdAt: new Date().toISOString() })
-        navigate(PERMISSION_CHECKERS.canAccessBackoffice(user.role)
-          ? PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)
-          : user.role === 'ADVERTISER' ? '/advertiser/profile' : '/', { replace: true })
+        // 1. Gọi endpoint định danh chung /api/v1/auth/me (xác thực bất kỳ role nào từ MySQL)
+        const user = await authApi.getMe()
+        mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
+
+        // 2. Điều hướng chính xác theo vai trò người dùng (không phân biệt Doanh nghiệp hay Nội bộ)
+        if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
+          navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
+        } else if (user.role === 'ADVERTISER') {
+          navigate('/advertiser/profile', { replace: true })
+        } else {
+          navigate(from === '/login' ? '/' : from, { replace: true })
+        }
       } catch (error) {
         httpClient.clearBasicAuth()
-        setLoginError(error instanceof Error ? error.message : 'Không thể đăng nhập doanh nghiệp')
+        setLoginError(error instanceof Error ? error.message : 'Tài khoản hoặc mật khẩu không chính xác')
       } finally {
         setIsLoading(false)
       }

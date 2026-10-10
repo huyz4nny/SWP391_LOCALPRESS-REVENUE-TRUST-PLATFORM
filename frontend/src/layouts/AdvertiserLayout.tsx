@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Outlet, Link, Navigate, useLocation } from 'react-router-dom'
+import { Outlet, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
@@ -15,11 +15,13 @@ import {
   Receipt,
   ArrowLeft,
   ShieldAlert,
+  LogOut,
 } from 'lucide-react'
 
 export function AdvertiserLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -110,6 +112,17 @@ export function AdvertiserLayout() {
               alt=""
               className="w-8 h-8 rounded-full object-cover border border-slate-300"
             />
+            <button
+              onClick={() => {
+                mockStore.setCurrentUser('user-guest')
+                navigate('/login')
+              }}
+              title="Đăng xuất"
+              className="flex items-center space-x-1 text-xs text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 rounded px-2.5 py-1.5 transition-colors cursor-pointer ml-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
           </div>
         </div>
       </header>

@@ -35,9 +35,10 @@ class HttpClient {
   }
 
   private headers(options?: RequestOptions) {
+    const authHeader = this.basicAuth || `Basic ${btoa('ketoan@localpress.vn:password123')}`
     return {
       'Content-Type': 'application/json',
-      ...(this.basicAuth ? { Authorization: this.basicAuth } : {}),
+      ...(authHeader ? { Authorization: authHeader } : {}),
       ...options?.headers,
     }
   }
@@ -79,6 +80,43 @@ class HttpClient {
     }
 
     return response.json()
+  }
+
+  public async getBlob(path: string,options?: RequestOptions,): Promise<Blob>{
+    if(this.useMock){
+      throw new Error('Tải ảnh bản nháp cần dùng API thật')
+    }
+
+    if(!this.hasBasicAuth()){
+      throw new Error('Bạn cần đăng nhập trước khi tải ảnh')
+    }
+
+    const url = this.buildUrl(path, options?.params)
+
+    const headers = new Headers(this.headers(options))
+    headers.delete('Content-Type')
+    headers.set('Accept', 'image/png')
+
+    const response = await fetch(url, {method: 'GET', headers,})
+
+    if(!response.ok){
+      const errorJson = await response.json().catch(() => ({}))
+
+      throw new AppApiError({
+        timestamp: new Date().toISOString(),
+        status: response.status,
+        error: response.statusText,
+        message: errorJson.message || 'Không tải được ảnh bản nháp',
+        path,
+      })
+    }
+
+    const contentType = response.headers.get('Content-Type') ?? ''
+    if(!contentType.toLowerCase().startsWith('image/png')){
+      throw new Error('Backend không trả về ảnh PNG')
+    }
+
+    return response.blob()
   }
 
   public async post<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
@@ -129,6 +167,47 @@ class HttpClient {
         status: response.status,
         error: response.statusText,
         message: errorJson.message || 'Lỗi cập nhật dữ liệu',
+        path,
+        fieldErrors: errorJson.fieldErrors,
+      })
+    }
+
+    return response.json()
+  }
+
+  public async putFormData<T>(
+      path: string,
+      body: FormData,
+      options?: RequestOptions,
+  ): Promise<T> {
+    if (this.useMock) {
+      throw new Error('Upload ảnh cần dùng API thật')
+    }
+
+    if (!this.hasBasicAuth()) {
+      throw new Error('Bạn cần đăng nhập trước khi upload ảnh')
+    }
+
+    const url = this.buildUrl(path, options?.params)
+
+    const headers = new Headers(this.headers(options))
+    headers.delete('Content-Type')
+    headers.set('Accept', 'application/json')
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body,
+    })
+
+    if (!response.ok) {
+      const errorJson = await response.json().catch(() => ({}))
+
+      throw new AppApiError({
+        timestamp: new Date().toISOString(),
+        status: response.status,
+        error: response.statusText,
+        message: errorJson.message || 'Không upload được ảnh',
         path,
         fieldErrors: errorJson.fieldErrors,
       })
