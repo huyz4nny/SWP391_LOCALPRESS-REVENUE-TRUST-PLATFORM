@@ -116,4 +116,52 @@ public class Article {
         this.categoryId = categoryId;
         this.slug = slug;
     }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+
+    public void approveReview() {
+        if (this.status != Status.PUBLISHED) {
+            this.status = Status.PENDING;
+        }
+    }
+
+    public void rejectReview() {
+        if (this.publishedVersion == null || this.status != Status.PUBLISHED) {
+            this.status = Status.REJECTED;
+        }
+    }
+
+    public void publish(int versionNumber, String accessTypeStr, BigDecimal price) {
+        this.status = Status.PUBLISHED;
+        this.publishedVersion = versionNumber;
+        this.latestVersion = Math.max(this.latestVersion, versionNumber);
+        if (this.publishedAt == null) {
+            this.publishedAt = LocalDateTime.now();
+        }
+        if (accessTypeStr != null && !accessTypeStr.isBlank()) {
+            this.accessType = AccessType.valueOf(accessTypeStr.trim().toUpperCase());
+            if (this.accessType == AccessType.FREE) {
+                this.singlePrice = BigDecimal.ZERO;
+            } else if (price != null) {
+                this.singlePrice = price;
+            } else if (this.singlePrice == null || this.singlePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                this.singlePrice = new BigDecimal("15000.00");
+            }
+        }
+    }
+
+    public void unpublish() {
+        this.status = Status.TAKEN_DOWN;
+    }
+
+    public void updateAccessPolicy(AccessType accessType, BigDecimal singlePrice) {
+        this.accessType = accessType;
+        if (accessType == AccessType.FREE) {
+            this.singlePrice = BigDecimal.ZERO;
+        } else {
+            this.singlePrice = singlePrice;
+        }
+    }
 }
