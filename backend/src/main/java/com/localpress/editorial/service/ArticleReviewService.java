@@ -1,14 +1,19 @@
 package com.localpress.editorial.service;
 
+import com.localpress.content.entity.Article;
+import com.localpress.content.entity.ArticleVersion;
+import com.localpress.content.entity.Category;
+import com.localpress.content.repository.ArticleRepository;
+import com.localpress.content.repository.ArticleVersionRepository;
+import com.localpress.content.repository.CategoryRepository;
 import com.localpress.editorial.dto.EditorialArticleDto;
 import com.localpress.editorial.dto.UpdateArticleStatusRequest;
-import com.localpress.editorial.entity.EditorialArticle;
-import com.localpress.editorial.entity.EditorialArticleVersion;
-import com.localpress.editorial.repository.EditorialArticleRepository;
-import com.localpress.editorial.repository.EditorialArticleVersionRepository;
+import com.localpress.identity.entity.User;
+import com.localpress.identity.repository.UserRepository;
 import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +28,10 @@ import java.util.stream.Collectors;
  * Service xử lý nghiệp vụ Màn hình 1 của SV2 (Trọng Phan):
  * Article Review and Publishing (UC025).
  *
- * Tuân thủ nghiêm ngặt:
- * - Quy tắc 8: Phiên bản hóa bài viết (article_versions).
- * - Ràng buộc toàn vẹn CSDL: chk_articles_price và chk_articles_published_version.
- * - Lưu vết kiểm toán vào bảng audit_logs.
+ * Tích hợp theo đúng phản hồi Code Review của Leader Huy:
+ * - Sử dụng chung thực thể Article và ArticleVersion từ package com.localpress.content.entity (do Tùng SV5 tạo).
+ * - Sử dụng ArticleRepository và ArticleVersionRepository từ com.localpress.content.repository.
+ * - Tuân thủ Quy tắc 8 (Phiên bản hóa bài viết) và Invariant Rules.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,15 +42,18 @@ public class ArticleReviewService {
      */
     private static final Long DEFAULT_EDITOR_USER_ID = 3L;
 
-    private final EditorialArticleRepository articleRepository;
-    private final EditorialArticleVersionRepository versionRepository;
+    private final ArticleRepository articleRepository;
+    private final ArticleVersionRepository versionRepository;
+    private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * Lấy danh sách toàn bộ bài viết trong tòa soạn kèm phiên bản mới nhất và lịch sử phiên bản.
      */
     @Transactional(readOnly = true)
     public List<EditorialArticleDto> getAllArticles() {
-        List<EditorialArticle> articles = articleRepository.findAllByOrderByUpdatedAtDesc();
+        List<Article> articles = articleRepository.findAllByOrderByUpdatedAtDesc();
         return articles.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
@@ -56,7 +64,7 @@ public class ArticleReviewService {
      */
     @Transactional(readOnly = true)
     public EditorialArticleDto getArticleById(Long articleId) {
-        EditorialArticle article = articleRepository.findById(articleId)
+        Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
         return mapToDto(article);
     }
@@ -71,50 +79,40 @@ public class ArticleReviewService {
      */
     @Transactional
     public EditorialArticleDto updateArticleStatus(Long articleId, UpdateArticleStatusRequest request) {
-        EditorialArticle article = articleRepository.findById(articleId)
+        Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
 
-        String oldStatus = article.getStatus();
+        String oldStatus = article.getStatus() != null ? article.getStatus().name() : "DRAFT";
         String targetStatus = request.getStatus() != null ? request.getStatus().trim().toUpperCase() : "";
         String notes = request.getReviewNotes() != null ? request.getReviewNotes().trim() : "";
 
         // Lấy phiên bản mới nhất (latest_version) của bài viết để cập nhật kết quả duyệt
-        Optional<EditorialArticleVersion> latestVersionOpt = versionRepository
-                .findByArticleIdAndVersionNumber(article.getArticleId(), article.getLatestVersion());
+        Optional<ArticleVersion> latestVersionOpt = versionRepository
+                .findByArticleIdAndVersionNumber(article.getId(), article.getLatestVersion());
 
-        EditorialArticleVersion latestVersion = latestVersionOpt.orElseGet(() -> {
-            List<EditorialArticleVersion> allVersions = versionRepository
-                    .findByArticleIdOrderByVersionNumberDesc(article.getArticleId());
+        ArticleVersion latestVersion = latestVersionOpt.orElseGet(() -> {
+            List<ArticleVersion> allVersions = versionRepository
+                    .findByArticleIdOrderByVersionNumberDesc(article.getId());
             if (allVersions.isEmpty()) {
                 throw new AppException("Bài viết chưa có phiên bản nội dung nào trong article_versions", HttpStatus.BAD_REQUEST);
             }
             return allVersions.get(0);
         });
 
-        LocalDateTime now = LocalDateTime.now();
-
         switch (targetStatus) {
             case "IN_REVIEW":
             case "PENDING":
                 // Phóng viên gửi bài chờ biên tập viên duyệt
-                latestVersion.setReviewStatus("PENDING");
-                latestVersion.setSubmittedAt(now);
-                if (!"PUBLISHED".equals(article.getStatus())) {
-                    article.setStatus("PENDING");
+                latestVersion.submitForReview();
+                if (article.getStatus() != Article.Status.PUBLISHED) {
+                    article.setStatus(Article.Status.PENDING);
                 }
                 break;
 
             case "APPROVED":
                 // Bước 1 của SV2: Duyệt nội dung phiên bản mới nhất (chờ bấm Xuất bản)
-                latestVersion.setReviewStatus("APPROVED");
-                latestVersion.setReviewedBy(DEFAULT_EDITOR_USER_ID);
-                latestVersion.setReviewedAt(now);
-                if (!notes.isEmpty()) {
-                    latestVersion.setReviewFeedback(notes);
-                }
-                if (!"PUBLISHED".equals(article.getStatus())) {
-                    article.setStatus("PENDING");
-                }
+                latestVersion.approve(DEFAULT_EDITOR_USER_ID, notes);
+                article.approveReview();
                 break;
 
             case "CHANGES_REQUESTED":
@@ -123,57 +121,22 @@ public class ArticleReviewService {
                 if (notes.isEmpty()) {
                     throw new AppException("Vui lòng nhập ghi chú hướng dẫn sửa bài khi từ chối/yêu cầu chỉnh sửa", HttpStatus.BAD_REQUEST);
                 }
-                latestVersion.setReviewStatus("REJECTED");
-                latestVersion.setReviewedBy(DEFAULT_EDITOR_USER_ID);
-                latestVersion.setReviewedAt(now);
-                latestVersion.setReviewFeedback(notes);
-
-                // Quy tắc 8: Nếu bài viết chưa từng xuất bản thì chuyển sang REJECTED;
-                // nếu đã có bản cũ đang PUBLISHED thì giữ nguyên bản cũ trên trang báo.
-                if (article.getPublishedVersion() == null || !"PUBLISHED".equals(article.getStatus())) {
-                    article.setStatus("REJECTED");
-                }
+                latestVersion.reject(DEFAULT_EDITOR_USER_ID, notes);
+                article.rejectReview();
                 break;
 
             case "PUBLISHED":
                 // Bước 2 của SV2: Xuất bản chính thức lên báo
-                latestVersion.setReviewStatus("APPROVED");
-                latestVersion.setReviewedBy(DEFAULT_EDITOR_USER_ID);
-                if (latestVersion.getReviewedAt() == null) {
-                    latestVersion.setReviewedAt(now);
-                }
-                if (!notes.isEmpty()) {
-                    latestVersion.setReviewFeedback(notes);
-                }
-
-                // Cập nhật chính sách giá nếu có gửi kèm (UC027)
-                if (request.getAccessType() != null) {
-                    String accessType = request.getAccessType().toUpperCase();
-                    article.setAccessType(accessType);
-                    if ("FREE".equals(accessType)) {
-                        article.setSinglePrice(BigDecimal.ZERO);
-                    } else if (request.getSinglePrice() != null) {
-                        article.setSinglePrice(request.getSinglePrice());
-                    } else if (article.getSinglePrice() == null || article.getSinglePrice().compareTo(BigDecimal.ZERO) <= 0) {
-                        article.setSinglePrice(new BigDecimal("15000.00"));
-                    }
-                }
-
-                // Đảm bảo thỏa mãn ràng buộc chk_articles_published_version trong MySQL
-                article.setPublishedVersion(latestVersion.getVersionNumber());
-                article.setLatestVersion(Math.max(article.getLatestVersion(), latestVersion.getVersionNumber()));
-                article.setStatus("PUBLISHED");
-                if (article.getPublishedAt() == null) {
-                    article.setPublishedAt(now);
-                }
+                latestVersion.approve(DEFAULT_EDITOR_USER_ID, notes);
+                article.publish(latestVersion.getVersionNumber(), request.getAccessType(), request.getSinglePrice());
                 break;
 
             case "UNPUBLISHED":
             case "TAKEN_DOWN":
                 // SV2 gỡ bài khỏi trang báo công khai
-                article.setStatus("TAKEN_DOWN");
+                article.unpublish();
                 if (!notes.isEmpty()) {
-                    latestVersion.setReviewFeedback(notes);
+                    latestVersion.reject(DEFAULT_EDITOR_USER_ID, notes);
                 }
                 break;
 
@@ -182,19 +145,25 @@ public class ArticleReviewService {
         }
 
         versionRepository.save(latestVersion);
-        EditorialArticle savedArticle = articleRepository.save(article);
+        Article savedArticle = articleRepository.save(article);
 
         // Ghi vết vào bảng audit_logs
         String oldJson = String.format("{\"status\":\"%s\"}", oldStatus);
         String newJson = String.format("{\"status\":\"%s\",\"uiTarget\":\"%s\",\"version\":%d}",
-                savedArticle.getStatus(), targetStatus, latestVersion.getVersionNumber());
-        articleRepository.insertAuditLog(
-                DEFAULT_EDITOR_USER_ID,
-                "ARTICLE_STATUS_" + targetStatus,
-                savedArticle.getArticleId(),
-                oldJson,
-                newJson
-        );
+                savedArticle.getStatus().name(), targetStatus, latestVersion.getVersionNumber());
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO audit_logs (actor_user_id, action, entity_name, entity_id, old_values_json, new_values_json, created_at) " +
+                            "VALUES (?, ?, 'articles', ?, ?, ?, NOW())",
+                    DEFAULT_EDITOR_USER_ID,
+                    "ARTICLE_STATUS_" + targetStatus,
+                    savedArticle.getId(),
+                    oldJson,
+                    newJson
+            );
+        } catch (Exception ignored) {
+            // Audit log lỗi không được chặn giao dịch nghiệp vụ
+        }
 
         return mapToDto(savedArticle);
     }
@@ -202,14 +171,14 @@ public class ArticleReviewService {
     /**
      * Chuyển đổi từ Entity CSDL sang DTO chuẩn cho Frontend React
      */
-    private EditorialArticleDto mapToDto(EditorialArticle article) {
-        List<EditorialArticleVersion> versions = versionRepository
-                .findByArticleIdOrderByVersionNumberDesc(article.getArticleId());
+    private EditorialArticleDto mapToDto(Article article) {
+        List<ArticleVersion> versions = versionRepository
+                .findByArticleIdOrderByVersionNumberDesc(article.getId());
 
-        EditorialArticleVersion activeVersion = versions.isEmpty() ? null : versions.get(0);
+        ArticleVersion activeVersion = versions.isEmpty() ? null : versions.get(0);
 
         String title = activeVersion != null ? activeVersion.getTitle() : article.getSlug();
-        String summary = activeVersion != null && activeVersion.getSummary() != null ? activeVersion.getSummary() : "";
+        String summary = activeVersion != null && activeVersion.getSapo() != null ? activeVersion.getSapo() : "";
         String content = activeVersion != null && activeVersion.getContent() != null ? activeVersion.getContent() : "";
         String coverImage = activeVersion != null && activeVersion.getCoverImageUrl() != null
                 ? activeVersion.getCoverImageUrl()
@@ -223,14 +192,36 @@ public class ArticleReviewService {
             previewContent = content.substring(0, Math.min(content.length(), cutIndex)) + "...";
         }
 
-        String categoryName = Optional.ofNullable(articleRepository.findCategoryNameById(article.getCategoryId()))
-                .orElse("Thời sự");
-        String categorySlug = Optional.ofNullable(articleRepository.findCategorySlugById(article.getCategoryId()))
-                .orElse("thoi-su");
-        String authorName = Optional.ofNullable(articleRepository.findUserFullNameById(article.getAuthorId()))
-                .orElse("Phóng viên LocalPress");
-        List<String> tags = Optional.ofNullable(articleRepository.findTagNamesByArticleId(article.getArticleId()))
-                .orElse(Collections.emptyList());
+        // Truy vấn tên chuyên mục từ CategoryRepository của Tùng
+        String categoryName = "Thời sự";
+        String categorySlug = "thoi-su";
+        if (article.getCategoryId() != null) {
+            Optional<Category> catOpt = categoryRepository.findById(article.getCategoryId());
+            if (catOpt.isPresent()) {
+                categoryName = catOpt.get().getName();
+                categorySlug = catOpt.get().getSlug();
+            }
+        }
+
+        // Truy vấn tên tác giả từ UserRepository của Huy
+        String authorName = "Phóng viên LocalPress";
+        if (article.getAuthorId() != null) {
+            Optional<User> userOpt = userRepository.findById(article.getAuthorId());
+            if (userOpt.isPresent()) {
+                authorName = userOpt.get().getFullName();
+            }
+        }
+
+        // Truy vấn tag bài viết
+        List<String> tags = Collections.emptyList();
+        try {
+            tags = jdbcTemplate.query(
+                    "SELECT t.name FROM tags t JOIN article_tags at ON t.tag_id = at.tag_id WHERE at.article_id = ?",
+                    (rs, rowNum) -> rs.getString("name"),
+                    article.getId()
+            );
+        } catch (Exception ignored) {
+        }
 
         // Ánh xạ trạng thái từ DB (articles.status + article_versions.review_status) sang trạng thái UI
         String uiStatus = resolveUiStatus(article, activeVersion);
@@ -239,12 +230,12 @@ public class ArticleReviewService {
                 .map(v -> EditorialArticleDto.VersionDto.builder()
                         .versionNumber(v.getVersionNumber())
                         .title(v.getTitle())
-                        .sapo(v.getSummary())
+                        .sapo(v.getSapo())
                         .content(v.getContent())
                         .changelog(v.getReviewFeedback() != null ? v.getReviewFeedback() : "Phiên bản v" + v.getVersionNumber())
-                        .reviewStatus(v.getReviewStatus())
+                        .reviewStatus(v.getReviewStatus() != null ? v.getReviewStatus().name() : "DRAFT")
                         .createdAt(v.getCreatedAt())
-                        .createdBy(Optional.ofNullable(articleRepository.findUserFullNameById(v.getEditedBy())).orElse("Phóng viên"))
+                        .createdBy(resolveUserName(v.getEditedBy()))
                         .build())
                 .collect(Collectors.toList());
 
@@ -252,7 +243,7 @@ public class ArticleReviewService {
         int readTimeMinutes = Math.max(2, (int) Math.ceil(wordCount / 200.0));
 
         return EditorialArticleDto.builder()
-                .id(String.valueOf(article.getArticleId()))
+                .id(String.valueOf(article.getId()))
                 .title(title)
                 .slug(article.getSlug())
                 .sapo(summary)
@@ -265,10 +256,10 @@ public class ArticleReviewService {
                 .categorySlug(categorySlug)
                 .coverImage(coverImage)
                 .tags(tags)
-                .isPremium("PREMIUM".equalsIgnoreCase(article.getAccessType()))
+                .isPremium(Article.AccessType.PREMIUM == article.getAccessType())
                 .price(article.getSinglePrice() != null ? article.getSinglePrice() : BigDecimal.ZERO)
                 .status(uiStatus)
-                .dbStatus(article.getStatus())
+                .dbStatus(article.getStatus() != null ? article.getStatus().name() : "DRAFT")
                 .reviewNotes(reviewFeedback)
                 .views(article.getViewCount() != null ? article.getViewCount() : 0L)
                 .publishedAt(article.getPublishedAt())
@@ -281,6 +272,13 @@ public class ArticleReviewService {
                 .build();
     }
 
+    private String resolveUserName(Long userId) {
+        if (userId == null) return "Phóng viên";
+        return userRepository.findById(userId)
+                .map(User::getFullName)
+                .orElse("Phóng viên");
+    }
+
     /**
      * Chuyển đổi trạng thái giữa DB (articles + article_versions) và UI Frontend:
      * - Nếu bài viết có phiên bản mới nhất đang PENDING duyệt -> hiển thị IN_REVIEW để SV2 thấy nút Duyệt / Yêu cầu sửa.
@@ -289,9 +287,10 @@ public class ArticleReviewService {
      * - Nếu bài đang PUBLISHED (và không có bản mới chờ duyệt) -> hiển thị PUBLISHED.
      * - Nếu bài bị TAKEN_DOWN hoặc ARCHIVED -> hiển thị UNPUBLISHED.
      */
-    private String resolveUiStatus(EditorialArticle article, EditorialArticleVersion latestVersion) {
-        String artStatus = article.getStatus();
-        String verStatus = latestVersion != null ? latestVersion.getReviewStatus() : "DRAFT";
+    private String resolveUiStatus(Article article, ArticleVersion latestVersion) {
+        String artStatus = article.getStatus() != null ? article.getStatus().name() : "DRAFT";
+        String verStatus = latestVersion != null && latestVersion.getReviewStatus() != null
+                ? latestVersion.getReviewStatus().name() : "DRAFT";
 
         if ("TAKEN_DOWN".equals(artStatus) || "ARCHIVED".equals(artStatus)) {
             return "UNPUBLISHED";

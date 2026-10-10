@@ -1,17 +1,10 @@
 import { httpClient } from '@/lib/http/client'
-import { APP_CONFIG } from '@/app/config'
 import { Article, Comment } from '@/features/reader/types'
 import { AdBooking, AdCreative } from '@/features/advertising/types'
 
-const EDITORIAL_API_URL = `${APP_CONFIG.apiBaseUrl}/editorial`
-
 export const editorialApi = {
-  getArticles: async (): Promise<Article[]> => {
-    const res = await fetch(`${EDITORIAL_API_URL}/articles`)
-    if (!res.ok) {
-      throw new Error('Không thể tải danh sách bài viết từ máy chủ Backend (8080)')
-    }
-    return res.json()
+  getArticles: () => {
+    return httpClient.get<Article[]>('/editorial/articles')
   },
 
   createArticle: (data: Partial<Article>) => {
@@ -22,17 +15,8 @@ export const editorialApi = {
     return httpClient.put<Article>(`/editorial/articles/${id}`, { article, changelog })
   },
 
-  updateArticleStatus: async (id: string, status: Article['status'], reviewNotes?: string): Promise<Article> => {
-    const res = await fetch(`${EDITORIAL_API_URL}/articles/${id}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, reviewNotes }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.message || 'Lỗi cập nhật trạng thái bài viết trên Backend')
-    }
-    return res.json()
+  updateArticleStatus: (id: string, status: Article['status'], reviewNotes?: string) => {
+    return httpClient.post<Article>(`/editorial/articles/${id}/status`, { status, reviewNotes })
   },
 
   getBookings: () => {
