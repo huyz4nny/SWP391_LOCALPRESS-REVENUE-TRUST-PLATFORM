@@ -50,9 +50,15 @@ public class SecurityConfig {
                         // 2. Tài nguyên công khai & Tài liệu kỹ thuật
                         .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // 3. API Độc giả & Khách vãng lai đọc Free 100% (Rule 1)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/articles/**", "/api/v1/categories/**",
-                                "/api/v1/comments/**", "/api/v1/subscription-plans/**").permitAll()
+                        // 3. API Độc giả & Khách vãng lai đọc Free 100% (Rule 1) + path Reader SV3
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/reader/articles",
+                                "/api/v1/reader/articles/**",
+                                "/api/v1/articles/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/comments/**",
+                                "/api/v1/subscription-plans/**"
+                        ).permitAll()
 
                         // 4. API Tra cứu vị trí quảng cáo công khai cho Doanh nghiệp (SV1 - UC003)
                         .requestMatchers(HttpMethod.GET, "/api/v1/ad-slots/**").permitAll()
