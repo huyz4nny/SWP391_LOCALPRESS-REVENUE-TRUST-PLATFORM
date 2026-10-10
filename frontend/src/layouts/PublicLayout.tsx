@@ -90,22 +90,35 @@ export function PublicLayout() {
                 </Link>
               </div>
             ) : (
-              <Link
-                to="/account"
-                className="flex items-center space-x-1.5 font-medium text-stone-700 hover:text-stone-950"
-              >
-                <img
-                  src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&auto=format&fit=crop&q=80'}
-                  alt=""
-                  className="w-5 h-5 rounded-full object-cover border border-stone-200"
-                />
-                <span className="font-semibold text-xs">{currentUser.name.split(' ')[0]}</span>
-                {isPremiumUser && (
-                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded">
-                    VIP
-                  </span>
-                )}
-              </Link>
+              <div className="flex items-center space-x-2.5">
+                <Link
+                  to="/account"
+                  className="flex items-center space-x-1.5 font-medium text-stone-700 hover:text-stone-950"
+                >
+                  <img
+                    src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&auto=format&fit=crop&q=80'}
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover border border-stone-200"
+                  />
+                  <span className="font-semibold text-xs">{currentUser.name.split(' ')[0]}</span>
+                  {isPremiumUser && (
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded">
+                      VIP
+                    </span>
+                  )}
+                </Link>
+                <span className="text-stone-300">|</span>
+                <button
+                  onClick={() => {
+                    mockStore.setCurrentUser('user-guest')
+                    navigate('/')
+                  }}
+                  className="text-xs text-stone-400 hover:text-red-600 transition-colors font-medium cursor-pointer"
+                  title="Đăng xuất"
+                >
+                  Đăng xuất
+                </button>
+              </div>
             )}
           </div>
         </div>

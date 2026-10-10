@@ -197,6 +197,34 @@ describe('LocalPress Core Business Domain Tests', () => {
   })
 
   describe('5. Data Ownership & Privacy (Flow 7)', () => {
+    it('keeps each advertiser profile private when users switch', async () => {
+      mockStore.setCurrentUser('user-adv-1')
+      const original = await handleMockRequest('GET', '/advertiser/profile')
+      await handleMockRequest('PUT', '/advertiser/profile', { ...original, companyName: 'Công ty mới' })
+      const ownHistory = await handleMockRequest('GET', '/advertiser/profile/history')
+      expect(ownHistory).toHaveLength(1)
+      expect(ownHistory[0].oldValue.companyName).toBe(original.companyName)
+      expect(ownHistory[0].newValue.companyName).toBe('Công ty mới')
+      await handleMockRequest('PUT', '/advertiser/profile', await handleMockRequest('GET', '/advertiser/profile'))
+      expect(await handleMockRequest('GET', '/advertiser/profile/history')).toHaveLength(1)
+
+      mockStore.setCurrentUser('user-adv-2')
+      expect(await handleMockRequest('GET', '/advertiser/profile/history')).toEqual([])
+      const other = await handleMockRequest('GET', '/advertiser/profile')
+      expect(other.companyName).not.toBe('Công ty mới')
+      await expect(handleMockRequest('PUT', '/advertiser/profile', { ...other, taxCode: original.taxCode }))
+        .rejects.toThrow('Mã số thuế đã được sử dụng')
+
+      mockStore.setCurrentUser('user-adv-1')
+      expect((await handleMockRequest('GET', '/advertiser/profile')).companyName).toBe('Công ty mới')
+      mockStore.setCurrentUser('user-reader-free')
+      await expect(handleMockRequest('GET', '/advertiser/profile')).rejects.toThrow('Không có quyền')
+      await expect(handleMockRequest('GET', '/advertiser/profile/history')).rejects.toThrow('Không có quyền')
+      mockStore.resetToDefaults()
+      mockStore.setCurrentUser('user-adv-1')
+      expect((await handleMockRequest('GET', '/advertiser/profile')).companyName).toBe(original.companyName)
+    })
+
     it('Advertiser A cannot see bookings or private financial records of Advertiser B', async () => {
       mockStore.setCurrentUser('user-adv-1') // Đặng Quang Huy (ADV-001)
       const adv1Bookings = await handleMockRequest('GET', '/advertiser/bookings')
@@ -215,4 +243,41 @@ describe('LocalPress Core Business Domain Tests', () => {
       })
     })
   })
+
+  describe('6. Granular RBAC & Subsystem Access Control (Frontend Phân quyền)', () => {
+    it('Editor cannot access Finance or Admin subsystems, only Editorial', async () => {
+      const { PERMISSION_CHECKERS } = await import('../app/config')
+
+      expect(PERMISSION_CHECKERS.canAccessEditorial('EDITOR')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessFinance('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.canAccessAdmin('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('EDITOR')).toBe('/backoffice/editorial/articles')
+    })
+
+    it('Accountant / Finance Staff cannot access Editorial or Admin, only Finance', async () => {
+      const { PERMISSION_CHECKERS } = await import('../app/config')
+
+      expect(PERMISSION_CHECKERS.canAccessEditorial('ACCOUNTANT')).toBe(false)
+      expect(PERMISSION_CHECKERS.canAccessFinance('ACCOUNTANT')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessAdmin('ACCOUNTANT')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('ACCOUNTANT')).toBe(true)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('ACCOUNTANT')).toBe('/backoffice/finance')
+
+      // Regular Finance Staff cannot approve refunds (4-eyes principle)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_STAFF')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_MANAGER')).toBe(true)
+    })
+
+    it('System Admin has access across all backoffice subsystems', async () => {
+      const { PERMISSION_CHECKERS } = await import('../app/config')
+
+      expect(PERMISSION_CHECKERS.canAccessEditorial('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessFinance('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessAdmin('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('SYSTEM_ADMIN')).toBe('/backoffice/admin')
+    })
+  })
 })
+
