@@ -8,10 +8,13 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ArticleVersionRepository
         extends JpaRepository<ArticleVersion, Long> {
+
+    List<ArticleVersion> findByArticleIdOrderByVersionNumberDesc(Long articleId);
 
     boolean existsByCoverImageUrl(String coverImageUrl);
 

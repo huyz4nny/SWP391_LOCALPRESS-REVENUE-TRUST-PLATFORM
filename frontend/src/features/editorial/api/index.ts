@@ -1,8 +1,11 @@
 import { httpClient } from '@/lib/http/client'
-import { Article, Comment } from '@/features/reader/types'
+import { Article, Comment, SubscriptionPlan } from '@/features/reader/types'
 import { AdBooking, AdCreative } from '@/features/advertising/types'
 
 export const editorialApi = {
+  // ==========================================
+  // UC025: Article Review & Publishing
+  // ==========================================
   getArticles: () => {
     return httpClient.get<Article[]>('/editorial/articles')
   },
@@ -19,6 +22,46 @@ export const editorialApi = {
     return httpClient.post<Article>(`/editorial/articles/${id}/status`, { status, reviewNotes })
   },
 
+  // ==========================================
+  // UC026: Comment Moderation
+  // ==========================================
+  getComments: (status?: string) => {
+    return httpClient.get<Comment[]>('/editorial/comments', { params: { status } })
+  },
+
+  moderateComment: (id: string, status: 'APPROVED' | 'REJECTED' | 'HIDDEN', reason?: string) => {
+    return httpClient.post<Comment>(`/editorial/comments/${id}/moderate`, { status, reason })
+  },
+
+  // ==========================================
+  // UC027: Content Policy (Free / Premium & Price)
+  // ==========================================
+  updateArticlePolicy: (id: string, accessType: 'FREE' | 'PREMIUM', singlePrice?: number) => {
+    return httpClient.put<Article>(`/editorial/articles/${id}/policy`, { accessType, singlePrice })
+  },
+
+  // ==========================================
+  // UC028: Subscription Plans Management
+  // ==========================================
+  getSubscriptionPlans: () => {
+    return httpClient.get<SubscriptionPlan[]>('/editorial/subscription-plans')
+  },
+
+  createSubscriptionPlan: (data: Partial<SubscriptionPlan>) => {
+    return httpClient.post<SubscriptionPlan>('/editorial/subscription-plans', data)
+  },
+
+  updateSubscriptionPlan: (id: string, data: Partial<SubscriptionPlan>) => {
+    return httpClient.put<SubscriptionPlan>(`/editorial/subscription-plans/${id}`, data)
+  },
+
+  toggleSubscriptionPlanStatus: (id: string) => {
+    return httpClient.post<SubscriptionPlan>(`/editorial/subscription-plans/${id}/toggle-status`)
+  },
+
+  // ==========================================
+  // Advertising (Iteration 2)
+  // ==========================================
   getBookings: () => {
     return httpClient.get<AdBooking[]>('/editorial/bookings')
   },
@@ -29,14 +72,6 @@ export const editorialApi = {
 
   reviewCreative: (id: string, approved: boolean, notes: string) => {
     return httpClient.post<AdCreative>(`/editorial/creatives/${id}/review-creative`, { approved, notes })
-  },
-
-  getComments: () => {
-    return httpClient.get<Comment[]>('/editorial/comments')
-  },
-
-  moderateComment: (id: string, status: 'APPROVED' | 'REJECTED') => {
-    return httpClient.post<Comment>(`/editorial/comments/${id}/moderate-comment`, { status })
   },
 
   getAiSuggestions: (topic: string) => {
