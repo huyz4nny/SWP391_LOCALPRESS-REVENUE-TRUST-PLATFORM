@@ -88,7 +88,7 @@ export function ArticleDetailPage() {
     )
   }
 
-  const isUnlocked = !article.isPremium || !!article.content
+  const isUnlocked = !(article.isLocked ?? (article.isPremium && !article.content))
 
   return (
     <div className="max-w-7xl mx-auto">

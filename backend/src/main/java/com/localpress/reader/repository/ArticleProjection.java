@@ -1,5 +1,6 @@
 package com.localpress.reader.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public interface ArticleProjection {
@@ -15,4 +16,5 @@ public interface ArticleProjection {
     LocalDateTime getPublishedAt();
     String getAuthorName();
     Long getViewCount();
+    BigDecimal getSinglePrice();
 }

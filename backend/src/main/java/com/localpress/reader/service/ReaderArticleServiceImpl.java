@@ -76,6 +76,8 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
                 .isPremium("PREMIUM".equalsIgnoreCase(projection.getAccessType()))
                 .publishedAt(projection.getPublishedAt() != null ? projection.getPublishedAt().toString() : null)
                 .authorName(projection.getAuthorName())
+                .viewCount(projection.getViewCount() == null ? 0L : projection.getViewCount())
+                .price(projection.getSinglePrice())
                 .build();
     }
 
@@ -93,6 +95,7 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
                 .publishedAt(summary.getPublishedAt())
                 .authorName(summary.getAuthorName())
                 .viewCount(projection.getViewCount() == null ? 1L : projection.getViewCount() + 1)
+                .price(summary.getPrice())
                 .build();
     }
 

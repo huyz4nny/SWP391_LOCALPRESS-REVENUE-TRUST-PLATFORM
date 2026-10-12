@@ -17,7 +17,8 @@ public interface ReaderArticleRepository extends JpaRepository<ArticleEntity, Lo
     @Query(value = """
         SELECT a.article_id AS id, v.title AS title, a.slug AS slug, v.summary AS summary,
                v.cover_image_url AS coverImageUrl, c.name AS categoryName, c.slug AS categorySlug,
-               a.access_type AS accessType, a.published_at AS publishedAt, u.full_name AS authorName
+               a.access_type AS accessType, a.published_at AS publishedAt, u.full_name AS authorName,
+               a.view_count AS viewCount, a.single_price AS singlePrice
         FROM articles a
         JOIN article_versions v ON a.article_id = v.article_id AND a.published_version = v.version_number
         LEFT JOIN categories c ON a.category_id = c.category_id
@@ -49,7 +50,8 @@ public interface ReaderArticleRepository extends JpaRepository<ArticleEntity, Lo
         SELECT a.article_id AS id, v.title AS title, a.slug AS slug, v.summary AS summary,
                v.content AS content, v.cover_image_url AS coverImageUrl,
                c.name AS categoryName, c.slug AS categorySlug, a.access_type AS accessType,
-               a.published_at AS publishedAt, u.full_name AS authorName, a.view_count AS viewCount
+               a.published_at AS publishedAt, u.full_name AS authorName, a.view_count AS viewCount,
+               a.single_price AS singlePrice
         FROM articles a
         JOIN article_versions v ON a.article_id = v.article_id AND a.published_version = v.version_number
         LEFT JOIN categories c ON a.category_id = c.category_id

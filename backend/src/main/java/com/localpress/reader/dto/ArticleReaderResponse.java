@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,4 +26,5 @@ public class ArticleReaderResponse {
     private String publishedAt;
     private String authorName;
     private Long viewCount;
+    private BigDecimal price;
 }

@@ -32,6 +32,7 @@ export interface Article {
   coverImage: string
   tags: string[]
   isPremium: boolean
+  isLocked?: boolean
   price: number // Single article price if premium (e.g. 15.000 VND)
   status: ArticleStatus
   reviewNotes?: string

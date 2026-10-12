@@ -79,6 +79,51 @@ class ReaderArticleServiceTest {
                 () -> readerArticleService.getArticleBySlug("khong-co"));
 
         assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
+        assertEquals("Không tìm thấy bài viết hoặc bài chưa được xuất bản", error.getReason());
+        verify(readerArticleRepository, org.mockito.Mockito.never()).incrementViewCount(any());
+    }
+
+    @Test
+    void premiumPreviewNeverExceedsThirtyPercentAndHidesTheTail() {
+        String tail = "PHAN_BI_KHOA_TUYET_DOI_KHONG_DUOC_LO";
+        String full = "Mot hai ba bon nam sau bay tam chin muoi ".repeat(8) + tail;
+        ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        when(projection.getContent()).thenReturn(full);
+        when(readerArticleRepository.findPublishedBySlug("bai-vip-dai")).thenReturn(Optional.of(projection));
+
+        ArticleReaderResponse response = readerArticleService.getArticleBySlug("bai-vip-dai");
+
+        assertTrue(response.getIsLocked());
+        assertNull(response.getContent());
+        assertTrue(response.getPreviewContent().length() <= (int) Math.floor(full.length() * 0.3d));
+        assertFalse(response.getPreviewContent().contains(tail));
+        assertTrue(full.startsWith(response.getPreviewContent()));
+    }
+
+    @Test
+    void blankSearchAndCategoryAreNormalizedToNull() {
+        when(readerArticleRepository.findAllPublishedArticles(isNull(), isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        readerArticleService.getArticles("  ", "", null, Pageable.unpaged());
+
+        verify(readerArticleRepository).findAllPublishedArticles(isNull(), isNull(), isNull(), any(Pageable.class));
+    }
+
+    @Test
+    void premiumListItemIsMarkedPremiumWithoutAnyBody() {
+        ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        when(projection.getViewCount()).thenReturn(3420L);
+        when(readerArticleRepository.findAllPublishedArticles(isNull(), isNull(), eq("PREMIUM"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(projection)));
+
+        ArticleSummaryResponse row = readerArticleService.getArticles(null, null, "PREMIUM", Pageable.unpaged())
+                .getContent().get(0);
+
+        assertTrue(row.getIsPremium());
+        assertEquals(3420L, row.getViewCount());
     }
 
     @Test
