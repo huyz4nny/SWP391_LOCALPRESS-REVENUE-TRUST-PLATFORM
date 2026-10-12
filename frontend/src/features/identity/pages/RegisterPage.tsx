@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { mockStore } from '@/mocks/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { CheckCircle2 } from 'lucide-react'
+import { authApi } from '../api'
+import { AppApiError } from '@/lib/http/errors'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -15,28 +16,53 @@ export function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [fieldErrors, setFieldErrors] =
+      useState<Record<string, string>>({})
+  const [registeredEmail, setRegisteredEmail] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (isSubmitting) return
+
+    setSubmitError('')
+    setFieldErrors({})
+
     if (password !== confirmPassword) {
-      alert('Mật khẩu xác nhận không khớp!')
+      setFieldErrors({
+        confirmPassword: 'Mật khẩu xác nhận không khớp',
+      })
       return
     }
 
-    // Create user in mock store
-    const newUser = {
-      id: `user-${Date.now()}`,
-      name,
-      email,
-      phone,
-      role: 'READER' as const,
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-      isActive: true,
+    setIsSubmitting(true)
+
+    try {
+      const response = await authApi.register({
+        fullName: name.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim() || undefined,
+      })
+
+      setRegisteredEmail(response.email)
+      setPassword('')
+      setConfirmPassword('')
+      setIsSuccess(true)
+    } catch (error: unknown) {
+      if (error instanceof AppApiError) {
+        setSubmitError(error.message)
+        setFieldErrors(error.fieldErrors ?? {})
+      } else {
+        setSubmitError(
+            'Không thể gửi yêu cầu đăng ký. Vui lòng thử lại.',
+        )
+      }
+    } finally {
+      setIsSubmitting(false)
     }
-    mockStore.getState().users.push(newUser)
-    mockStore.setCurrentUser(newUser.id)
-    setIsSuccess(true)
   }
 
   if (isSuccess) {
@@ -47,10 +73,11 @@ export function RegisterPage() {
         </div>
         <h2 className="text-2xl font-bold text-stone-900 mb-2">Đăng ký thành công!</h2>
         <p className="text-sm text-stone-600 mb-6">
-          Chào mừng <strong>{name}</strong> đã gia nhập cộng đồng độc giả LocalPress. Bạn hiện có thể đánh dấu bài viết, bình luận và mua các ấn phẩm đặc biệt.
+          Tài khoản <strong>{registeredEmail}</strong> đã được tạo.
+          Tài khoản đã được kích hoạt. Bạn có thể đăng nhập ngay.
         </p>
         <Button onClick={() => navigate('/')} className="w-full">
-          Bắt đầu đọc báo ngay
+          Về trang chủ
         </Button>
       </div>
     )

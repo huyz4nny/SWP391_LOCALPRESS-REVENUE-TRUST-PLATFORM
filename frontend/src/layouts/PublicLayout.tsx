@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Building2,
 } from 'lucide-react'
+import { logout } from '@/features/identity/authSession'
 
 export function PublicLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
@@ -109,10 +110,10 @@ export function PublicLayout() {
                 </Link>
                 <span className="text-stone-300">|</span>
                 <button
-                  onClick={() => {
-                    mockStore.setCurrentUser('user-guest')
-                    navigate('/')
-                  }}
+                    onClick={() => {
+                      logout()
+                      navigate('/')
+                    }}
                   className="text-xs text-stone-400 hover:text-red-600 transition-colors font-medium cursor-pointer"
                   title="Đăng xuất"
                 >
