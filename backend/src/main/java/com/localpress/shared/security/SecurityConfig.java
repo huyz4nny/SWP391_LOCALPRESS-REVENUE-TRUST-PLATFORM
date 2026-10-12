@@ -64,8 +64,8 @@ public class SecurityConfig {
                         // 6. Phân hệ B2B Quảng cáo (SV1 - Tây)
                         .requestMatchers("/api/v1/advertiser/**").hasAnyRole("ADVERTISER", "SYSTEM_ADMIN")
 
-                        // 7. Phân hệ Tòa soạn & Biên tập (SV2 - Trọng Phan)
-                        .requestMatchers("/api/v1/editorial/**").hasAnyRole("EDITOR", "STAFF", "SYSTEM_ADMIN")
+                        // 7. Phân hệ Tòa soạn & Biên tập (SV2 - Trọng Phan, SV5 - Phóng viên CMS)
+                        .requestMatchers("/api/v1/editorial/**").hasAnyRole("EDITOR", "AUTHOR", "STAFF", "SYSTEM_ADMIN")
 
                         // 8. Phân hệ Kế toán, Thanh toán & Đối soát (SV4 - Huy Leader)
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
