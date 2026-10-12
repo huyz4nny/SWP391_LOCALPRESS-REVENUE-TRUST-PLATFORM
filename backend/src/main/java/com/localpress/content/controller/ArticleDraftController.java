@@ -23,7 +23,7 @@ public class ArticleDraftController {
         return ArticleDraftResponse.from(article);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ArticleDraftDetailResponse getDraft(@PathVariable("id") Long articleId) {
         return articleDraftService.getDraft(articleId);
     }
