@@ -139,4 +139,25 @@ public class ArticleVersion {
     public enum ReviewStatus {
         DRAFT, PENDING, REJECTED, APPROVED
     }
+
+    public void submitForReview() {
+        this.reviewStatus = ReviewStatus.PENDING;
+        this.submittedAt = LocalDateTime.now();
+    }
+
+    public void approve(Long reviewerId, String notes) {
+        this.reviewStatus = ReviewStatus.APPROVED;
+        this.reviewedBy = reviewerId;
+        this.reviewedAt = LocalDateTime.now();
+        if (notes != null && !notes.isBlank()) {
+            this.reviewFeedback = notes.trim();
+        }
+    }
+
+    public void reject(Long reviewerId, String notes) {
+        this.reviewStatus = ReviewStatus.REJECTED;
+        this.reviewedBy = reviewerId;
+        this.reviewedAt = LocalDateTime.now();
+        this.reviewFeedback = notes != null ? notes.trim() : null;
+    }
 }
