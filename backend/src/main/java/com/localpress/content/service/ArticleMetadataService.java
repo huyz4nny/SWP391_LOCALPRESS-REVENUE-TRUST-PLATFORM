@@ -31,7 +31,7 @@ public class ArticleMetadataService {
             Long articleId,
             UpdateArticleMetadataRequest request
     ) {
-        User author = currentUserService.requireCurrentAuthor();
+        User author = currentUserService.requireCurrentEditor();
 
         Article article = articleRepository
                 .findOwnedArticleForUpdate(articleId, author.getId())

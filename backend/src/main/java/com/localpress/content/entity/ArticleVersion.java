@@ -128,6 +128,23 @@ public class ArticleVersion {
         this.metadata = updatedMetadata;
     }
 
+    public void updateDraftPresentation(String coverImage, java.util.List<String> tags) {
+        if (reviewStatus != ReviewStatus.DRAFT) {
+            throw new IllegalStateException("Chỉ được cập nhật metadata của phiên bản nháp");
+        }
+        if (coverImage != null) {
+            if (coverImage.length() > 1000) {
+                throw new IllegalArgumentException("URL ảnh tối đa 1000 ký tự");
+            }
+            this.coverImageUrl = coverImage.isBlank() ? null : coverImage.trim();
+        }
+        if (tags != null) {
+            Map<String, Object> updated = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
+            updated.put("tags", java.util.List.copyOf(tags));
+            this.metadata = updated;
+        }
+    }
+
     private static void putOrRemove(Map<String, Object> target, String key, String value){
         if(value == null || value.isBlank()){
             target.remove(key);

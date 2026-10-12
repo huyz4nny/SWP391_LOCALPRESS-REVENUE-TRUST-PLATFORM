@@ -37,7 +37,7 @@ public class ArticleMediaService {
 
     @Transactional
     public String uploadCoverImage(Long articleId, MultipartFile file, @NotNull @Valid CoverImageInfoRequest request) {
-        User author = currentUserService.requireCurrentAuthor();
+        User author = currentUserService.requireCurrentEditor();
 
         Article article = articleRepository.findOwnedArticleForUpdate(articleId, author.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy bài viết"));
@@ -90,7 +90,7 @@ public class ArticleMediaService {
             Long articleId,
             @NotNull @Valid CoverImageInfoRequest request
     ) {
-        User author = currentUserService.requireCurrentAuthor();
+        User author = currentUserService.requireCurrentEditor();
 
         Article article = articleRepository
                 .findOwnedArticleForUpdate(articleId, author.getId())
@@ -146,7 +146,7 @@ public class ArticleMediaService {
 
     @Transactional(readOnly = true)
     public Resource getCoverImage(String filename) {
-        User author = currentUserService.requireCurrentAuthor();
+        User author = currentUserService.requireCurrentEditor();
 
         String imageUrl = "/api/v1/content/images/" + filename;
 

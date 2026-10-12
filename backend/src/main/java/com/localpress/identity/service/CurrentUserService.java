@@ -18,7 +18,7 @@ public class CurrentUserService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public User requireCurrentAuthor() {
+    public User requireCurrentEditor() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if(authentication == null
                 || !authentication.isAuthenticated()
@@ -35,7 +35,7 @@ public class CurrentUserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản đang bị khóa");
         }
 
-        if(user.getRole() != User.Role.AUTHOR){
+        if (user.getRole() != User.Role.EDITOR) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền viết bài");
         }
 

@@ -95,7 +95,7 @@ function NotFoundPage() {
 }
 
 // Role permission groups for backoffice routing
-const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'AUTHOR', 'SYSTEM_ADMIN']
+const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
 const FINANCE_ROLES: UserRole[] = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN']
 const ADMIN_ROLES: UserRole[] = ['SYSTEM_ADMIN']
 
@@ -176,7 +176,7 @@ export const router = createBrowserRouter([
       // Điều hướng tự động về phân hệ đúng thẩm quyền của vai trò hiện tại
       { index: true, element: <BackofficeIndexRedirect /> },
 
-      // Tòa Soạn & Biên Tập (SV2: Editor / Reviewer / Author / Admin)
+      // Tòa Soạn & Biên Tập (SV2: Editor / Reviewer / Admin)
       {
         path: 'editorial',
         element: (

@@ -177,10 +177,16 @@ class HttpClient {
         return response.json()
     }
 
-    public async putFormData<T>(
-        path: string,
-        body: FormData,
-        options?: RequestOptions,
+    public async postFormData<T>(path: string, body: FormData, options?: RequestOptions): Promise<T> {
+        return this.sendFormData<T>('POST', path, body, options)
+    }
+
+    public async putFormData<T>(path: string, body: FormData, options?: RequestOptions): Promise<T> {
+        return this.sendFormData<T>('PUT', path, body, options)
+    }
+
+    private async sendFormData<T>(
+        method: 'POST' | 'PUT', path: string, body: FormData, options?: RequestOptions,
     ): Promise<T> {
         if (this.useMock) {
             throw new Error('Upload ảnh cần dùng API thật')
@@ -197,7 +203,7 @@ class HttpClient {
         headers.set('Accept', 'application/json')
 
         const response = await fetch(url, {
-            method: 'PUT',
+            method,
             headers,
             body,
         })

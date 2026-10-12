@@ -27,7 +27,7 @@ public class ArticleDraftService {
 
     @Transactional
     public Article createDraft(CreateArticleDraftRequest request) {
-        User author = currentUserService.requireCurrentAuthor();
+        User author = currentUserService.requireCurrentEditor();
 
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chuyên mục không tồn tại"));
@@ -61,7 +61,7 @@ public class ArticleDraftService {
 
     @Transactional(readOnly = true)
     public ArticleDraftDetailResponse getDraft(Long articleId){
-        User author = currentUserService.requireCurrentAuthor();
+        User author = currentUserService.requireCurrentEditor();
 
         Article article = articleRepository.findByIdAndAuthorId(articleId, author.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy bài viết"));

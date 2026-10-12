@@ -83,6 +83,17 @@ public class Article {
         this.latestVersion = versionNumber;
     }
 
+    public void configureDraftAccess(boolean premium, BigDecimal price) {
+        if (status != Status.DRAFT) {
+            throw new IllegalStateException("Chỉ được thay đổi cấu hình bản nháp");
+        }
+        if (premium && (price == null || price.signum() <= 0)) {
+            throw new IllegalArgumentException("Bài Premium cần giá lớn hơn 0");
+        }
+        this.accessType = premium ? AccessType.PREMIUM : AccessType.FREE;
+        this.singlePrice = premium ? price : BigDecimal.ZERO;
+    }
+
     public enum AccessType {
         FREE, PREMIUM
     }

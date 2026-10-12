@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface ArticleRepository extends JpaRepository<Article, Long> {
+    java.util.List<Article> findByAuthorIdAndStatusOrderByIdDesc(Long authorId, Article.Status status);
+
     boolean existsBySlug(String slug);
 
     boolean existsBySlugAndIdNot(String slug, Long id);
