@@ -198,7 +198,7 @@ export function ArticleListPage() {
                     </Link>
 
                     {/* Reviewer / Admin Workflow Actions */}
-                    {art.status === 'IN_REVIEW' && (
+                    {(art.status === 'IN_REVIEW' || art.status === 'CHANGES_REQUESTED') && (
                       <>
                         <button
                           onClick={() => handleOpenReview(art, 'APPROVE')}
@@ -206,16 +206,18 @@ export function ArticleListPage() {
                         >
                           Duyệt
                         </button>
-                        <button
-                          onClick={() => handleOpenReview(art, 'REJECT')}
-                          className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
-                        >
-                          Yêu cầu sửa
-                        </button>
+                        {art.status === 'IN_REVIEW' && (
+                          <button
+                            onClick={() => handleOpenReview(art, 'REJECT')}
+                            className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
+                          >
+                            Yêu cầu sửa
+                          </button>
+                        )}
                       </>
                     )}
 
-                    {art.status === 'APPROVED' && (
+                    {(art.status === 'APPROVED' || art.status === 'UNPUBLISHED') && (
                       <button
                         onClick={() => handleOpenReview(art, 'PUBLISH')}
                         className="px-2 py-1 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold cursor-pointer"
@@ -256,13 +258,36 @@ export function ArticleListPage() {
           }
         >
           <div className="space-y-4 text-xs">
-            <p className="text-slate-600">
-              Bài viết: <strong>{reviewArticle.title}</strong> (Tác giả: {reviewArticle.authorName})
-            </p>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>Tác giả: <strong>{reviewArticle.authorName}</strong></span>
+                <span>Phiên bản: <strong>v{reviewArticle.currentVersion || 1}</strong> • {reviewArticle.categoryName}</span>
+              </div>
+              <h4 className="font-serif font-bold text-slate-900 text-sm">
+                {reviewArticle.title}
+              </h4>
+              <p className="font-medium text-slate-700 italic">
+                {reviewArticle.sapo}
+              </p>
+              <div className="text-slate-600 pt-2 border-t border-slate-200 whitespace-pre-line">
+                {reviewArticle.content}
+              </div>
+              {reviewArticle.versions && reviewArticle.versions.length > 0 && (
+                <div className="pt-2 border-t border-slate-200 space-y-1">
+                  <span className="font-semibold text-slate-700 block">Lịch sử phiên bản ({reviewArticle.versions.length}):</span>
+                  {reviewArticle.versions.map((ver) => (
+                    <div key={ver.versionNumber} className="text-[11px] text-slate-500 flex justify-between bg-white px-2 py-1 rounded border border-slate-100">
+                      <span><strong>v{ver.versionNumber}:</strong> {ver.title}</span>
+                      <span className="text-slate-400 ml-2 shrink-0">{ver.changelog || 'Bản thảo'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div>
               <Label htmlFor="reviewNote">
-                {reviewAction === 'REJECT' ? 'Nêu chi tiết yêu cầu phóng viên bổ sung/sửa đổi' : 'Ghi chú kiểm duyệt (tùy chọn)'}
+                {reviewAction === 'REJECT' ? 'Nêu chi tiết yêu cầu phóng viên bổ sung/sửa đổi' : 'Ghi chú kiểm duyệt lưu vào MySQL (tùy chọn)'}
               </Label>
               <Textarea
                 id="reviewNote"
