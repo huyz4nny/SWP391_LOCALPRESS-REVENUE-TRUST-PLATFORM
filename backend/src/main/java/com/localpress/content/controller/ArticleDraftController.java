@@ -16,6 +16,11 @@ import com.localpress.content.dto.ArticleDraftDetailResponse;
 public class ArticleDraftController {
     private final ArticleDraftService articleDraftService;
 
+    @GetMapping("/mine")
+    public java.util.List<com.localpress.content.dto.MyArticleResponse> getMyArticles() {
+        return articleDraftService.getMyArticles();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ArticleDraftResponse createDraft(@Valid @RequestBody CreateArticleDraftRequest request) {
@@ -23,7 +28,7 @@ public class ArticleDraftController {
         return ArticleDraftResponse.from(article);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ArticleDraftDetailResponse getDraft(@PathVariable("id") Long articleId) {
         return articleDraftService.getDraft(articleId);
     }

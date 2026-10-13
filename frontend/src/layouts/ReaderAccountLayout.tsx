@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   LogOut,
 } from 'lucide-react'
+import { logout } from '@/features/identity/authSession'
 
 export function ReaderAccountLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
@@ -118,10 +119,10 @@ export function ReaderAccountLayout() {
               className="w-7 h-7 rounded-full object-cover border border-stone-300"
             />
             <button
-              onClick={() => {
-                mockStore.setCurrentUser('user-guest')
-                navigate('/')
-              }}
+                onClick={() => {
+                  logout()
+                  navigate('/')
+                }}
               title="Đăng xuất"
               className="flex items-center space-x-1 text-xs text-stone-500 hover:text-red-600 border border-stone-200 hover:border-red-300 rounded px-2.5 py-1 transition-colors cursor-pointer ml-1"
             >
@@ -186,10 +187,10 @@ export function ReaderAccountLayout() {
                 })}
                 <div className="pt-2 mt-2 border-t border-stone-100">
                   <button
-                    onClick={() => {
-                      mockStore.setCurrentUser('user-guest')
-                      navigate('/')
-                    }}
+                      onClick={() => {
+                        logout()
+                        navigate('/')
+                      }}
                     className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs font-medium text-stone-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4 text-stone-400" />

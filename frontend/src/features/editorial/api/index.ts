@@ -1,11 +1,48 @@
 import { httpClient } from '@/lib/http/client'
-import { Article, Comment, SubscriptionPlan } from '@/features/reader/types'
+import {
+  Article,
+  Category,
+  Comment,
+  SubscriptionPlan,
+} from '@/features/reader/types'
 import { AdBooking, AdCreative } from '@/features/advertising/types'
+import type { CoverImageInfoRequest } from '@/features/content/types'
+
+export type EditorialCategoryOption = Pick<Category, 'id' | 'name' | 'slug'> & { apiId?: string }
+
+function coverUploadBody(partName: 'article' | 'request', payload: unknown, file: File, info: CoverImageInfoRequest): FormData {
+  const body = new FormData()
+  body.append(partName, new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+  body.append('file', file)
+  body.append('info', new Blob([JSON.stringify(info)], { type: 'application/json' }))
+  return body
+}
+
+export type ArticleListItem = Pick<Article,
+  'id' | 'title' | 'authorId' | 'authorName' | 'categoryName' | 'isPremium'
+  | 'status' | 'currentVersion' | 'updatedAt' | 'reviewNotes'> & Partial<Pick<Article, 'sapo' | 'content' | 'versions'>>
 
 export const editorialApi = {
-  // ==========================================
-  // UC025: Article Review & Publishing
-  // ==========================================
+  getMyArticles: () => httpClient.get<ArticleListItem[]>('/articles/mine'),
+  createArticleWithCover: (article: Partial<Article>, file: File, info: CoverImageInfoRequest) =>
+    httpClient.postFormData<Article>('/editorial/articles', coverUploadBody('article', article, file, info)),
+
+  updateArticleWithCover: (id: string, article: Partial<Article>, file: File, info: CoverImageInfoRequest, changelog?: string) =>
+    httpClient.putFormData<Article>(`/editorial/articles/${encodeURIComponent(id)}`,
+      coverUploadBody('request', { article, changelog }, file, info)),
+  getArticle: (id: string) => {
+    return httpClient.get<Article>(`/editorial/articles/${encodeURIComponent(id)}`)
+  },
+
+  getCategories: async (): Promise<EditorialCategoryOption[]> => {
+    const categories = await httpClient.get<EditorialCategoryOption[]>('/categories')
+    return categories.map((category) => ({
+      id: `cat-${category.slug}`,
+      apiId: category.id,
+      name: category.name,
+      slug: category.slug,
+    }))
+  },
   getArticles: () => {
     return httpClient.get<Article[]>('/editorial/articles')
   },
@@ -14,8 +51,8 @@ export const editorialApi = {
     return httpClient.post<Article>('/editorial/articles', data)
   },
 
-  updateArticle: (id: string, article: Partial<Article>, changelog?: string) => {
-    return httpClient.put<Article>(`/editorial/articles/${id}`, { article, changelog })
+  updateArticle: (id: string, article: Partial<Article>, changelog?: string, imageInfo?: CoverImageInfoRequest) => {
+    return httpClient.put<Article>(`/editorial/articles/${id}`, { article, changelog, imageInfo })
   },
 
   updateArticleStatus: (id: string, status: Article['status'], reviewNotes?: string) => {

@@ -10,6 +10,7 @@ import { ShieldCheck, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
 import { authApi } from '@/features/identity'
 import { httpClient } from '@/lib/http/client'
+import { AppApiError } from '@/lib/http/errors'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -25,14 +26,17 @@ export function LoginPage() {
 
   const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading) return
     setIsLoading(true)
     setLoginError('')
     if (!APP_CONFIG.useMockApi) {
       try {
-        httpClient.setBasicAuth(email, password)
+        const normalizedEmail = email.trim().toLowerCase()
+        httpClient.setBasicAuth(normalizedEmail, password)
         // 1. Gọi endpoint định danh chung /api/v1/auth/me (xác thực bất kỳ role nào từ MySQL)
         const user = await authApi.getMe()
         mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
+        setPassword('')
 
         // 2. Điều hướng chính xác theo vai trò người dùng (không phân biệt Doanh nghiệp hay Nội bộ)
         if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
@@ -42,9 +46,25 @@ export function LoginPage() {
         } else {
           navigate(from === '/login' ? '/' : from, { replace: true })
         }
-      } catch (error) {
+      } catch (error: unknown) {
         httpClient.clearBasicAuth()
-        setLoginError(error instanceof Error ? error.message : 'Tài khoản hoặc mật khẩu không chính xác')
+        mockStore.setCurrentUser('user-guest')
+
+        if (error instanceof AppApiError) {
+          if (error.status === 401) {
+            setLoginError(
+                'Email hoặc mật khẩu không chính xác, hoặc tài khoản đã bị khóa.',
+            )
+          } else if (error.status === 403) {
+            setLoginError('Bạn không có quyền truy cập chức năng này.')
+          } else {
+            setLoginError('Không thể đăng nhập. Vui lòng thử lại sau.')
+          }
+        } else {
+          setLoginError(
+              'Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối và thử lại.',
+          )
+        }
       } finally {
         setIsLoading(false)
       }
