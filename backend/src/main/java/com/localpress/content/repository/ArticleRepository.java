@@ -10,7 +10,15 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ArticleRepository extends JpaRepository<Article, Long> {
+
+    List<Article> findByAuthorIdAndStatusOrderByIdDesc(
+            Long authorId, Article.Status status
+    );
+
     List<Article> findAllByOrderByUpdatedAtDesc();
+
+
+    java.util.List<Article> findByAuthorIdOrderByUpdatedAtDesc(Long authorId);
 
     boolean existsBySlug(String slug);
 

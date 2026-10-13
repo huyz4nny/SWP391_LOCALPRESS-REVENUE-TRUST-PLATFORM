@@ -192,7 +192,7 @@ Kiến trúc triển khai và mã nguồn hệ thống được tổ chức tr�
 13. **[P0] SV5_13: Quản lý cây danh mục & Thẻ bài viết (Taxonomy & Tags).** Quản lý chuyên mục phân cấp cha - con; tạo slug đường dẫn chuẩn SEO; quản lý các thẻ tag chủ đề nóng.
 14. **[P0] SV5_14: Quy trình gửi duyệt & Phê duyệt bài viết nhiều bước.** Trạng thái bài: `DRAFT` $\rightarrow$ `PENDING` $\rightarrow$ `APPROVED` $\rightarrow$ `PUBLISHED` $\rightarrow$ `ARCHIVED`.
 15. **[P0] SV5_15: Thư viện quản lý tệp tin truyền thông (Media Assets Library).** Quản lý hình ảnh, banner; tối ưu hóa dung lượng ảnh tự động; gắn thẻ bản quyền và alt-text mô tả ảnh.
-16. **[P0] SV5_16: Quản trị người dùng & Phân quyền RBAC.** Tạo tài khoản, gán vai trò (`READER`, `AUTHOR`, `EDITOR`, `STAFF`, `ADVERTISER`, `SYSTEM_ADMIN`); khóa tài khoản khi có vi phạm.
+16. **[P0] SV5_16: Quản trị người dùng & Phân quyền RBAC.** Tạo tài khoản, gán vai trò (`READER`, `EDITOR`, `STAFF`, `ADVERTISER`, `SYSTEM_ADMIN`); khóa tài khoản khi có vi phạm.
 17. **[P0] SV5_17: Động cơ lựa chọn quảng cáo tối ưu (Ad Selection Engine).** Thuật toán tìm kiếm banner phù hợp nhất theo slot, thời gian thực, trạng thái duyệt và ngân sách còn lại; tự động hiển thị banner mặc định của tòa soạn nếu slot trống.
 18. **[P0] SV5_18: Thu thập & Tổng hợp sự kiện Impression/Click.** API nhận sự kiện hiển thị và click; lưu vào bảng `ad_stats`; cung cấp dữ liệu báo cáo thống nhất cho cả doanh nghiệp và tòa soạn.
 19. **[P1] SV5_19: Giám sát URL đích của quảng cáo sau khi duyệt.** Tự động kiểm tra định kỳ liên kết đích của banner; nếu link bị chết (404/500) hoặc chuyển hướng sang web độc hại thì tạm dừng và cảnh báo.

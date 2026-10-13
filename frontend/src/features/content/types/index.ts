@@ -31,6 +31,9 @@ export interface ArticleDraftDetailResponse
     coverCaption: string | null
     coverAltText: string | null
     coverSource: string | null
+    isPremium: boolean
+    price: number
+    tags: string[]
 }
 
 export interface UpdateArticleMetadataRequest {

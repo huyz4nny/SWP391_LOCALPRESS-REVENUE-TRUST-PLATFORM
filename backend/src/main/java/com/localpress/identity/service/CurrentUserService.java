@@ -35,7 +35,9 @@ public class CurrentUserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản đang bị khóa");
         }
 
-        if(user.getRole() != User.Role.AUTHOR){
+        if (user.getRole() != User.Role.AUTHOR
+                && user.getRole() != User.Role.EDITOR
+                && user.getRole() != User.Role.SYSTEM_ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền viết bài");
         }
 

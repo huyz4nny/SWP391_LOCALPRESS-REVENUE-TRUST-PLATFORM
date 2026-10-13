@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Article, Category, ArticleVersion } from '@/features/reader/types'
-import { editorialApi } from '../api'
+import { Article, ArticleVersion } from '@/features/reader/types'
+import { editorialApi, type EditorialCategoryOption } from '../api'
+import { contentApi } from '@/features/content/api'
 import { mockStore } from '@/mocks/store'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -26,11 +27,19 @@ export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const isEditing = !!id && id !== 'new'
+  const isAuthor = mockStore.getCurrentUser().role === 'AUTHOR'
 
   const [title, setTitle] = useState('')
   const [sapo, setSapo] = useState('')
   const [content, setContent] = useState('')
   const [coverImage, setCoverImage] = useState('')
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverCaption, setCoverCaption] = useState('')
+  const [coverAltText, setCoverAltText] = useState('')
+  const [coverSource, setCoverSource] = useState('')
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [coverError, setCoverError] = useState('')
+  const coverFileInput = useRef<HTMLInputElement>(null)
   const [categoryId, setCategoryId] = useState('cat-thoi-su')
   const [tags, setTags] = useState('Hải Phòng, Thời sự')
   const [isPremium, setIsPremium] = useState(false)
@@ -39,8 +48,9 @@ export function ArticleEditorPage() {
   const [status, setStatus] = useState<Article['status']>('DRAFT')
   const [versions, setVersions] = useState<ArticleVersion[]>([])
 
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<EditorialCategoryOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   // AI Modal
@@ -53,34 +63,141 @@ export function ArticleEditorPage() {
   const [showVersionDrawer, setShowVersionDrawer] = useState(false)
 
   useEffect(() => {
-    setCategories(mockStore.getState().categories)
-    if (isEditing) {
-      loadArticle(id)
-    }
-  }, [id])
+    let active = true
 
-  const loadArticle = async (articleId: string) => {
-    try {
+    const loadData = async () => {
       setLoading(true)
-      const art = mockStore.getState().articles.find((a) => a.id === articleId)
-      if (art) {
-        setTitle(art.title)
-        setSapo(art.sapo)
-        setContent(art.content || art.previewContent || '')
-        setCoverImage(art.coverImage)
-        setCategoryId(art.categoryId)
-        setTags(art.tags.join(', '))
-        setIsPremium(art.isPremium)
-        setPrice(art.price || 15000)
-        setStatus(art.status)
-        setVersions(art.versions || [])
+      setLoadError('')
+      setCategories([])
+      setTitle('')
+      setSapo('')
+      setContent('')
+      setCoverImage('')
+      setCoverFile(null)
+      setCoverCaption('')
+      setCoverAltText('')
+      setCoverSource('')
+      setCoverError('')
+      if (coverFileInput.current) coverFileInput.current.value = ''
+      setCategoryId('')
+      setTags('Hải Phòng, Thời sự')
+      setIsPremium(false)
+      setPrice(15000)
+      setChangelog('')
+      setStatus('DRAFT')
+      setVersions([])
+
+      try {
+        const [categoryOptions, article] = await Promise.all([
+          editorialApi.getCategories(),
+          isEditing && id
+            ? (isAuthor ? contentApi.getDraft(id).then((draft) => ({
+                title: draft.title,
+                sapo: draft.sapo,
+                content: draft.content,
+                coverImage: draft.coverImageUrl,
+                coverCaption: draft.coverCaption,
+                coverAltText: draft.coverAltText,
+                coverSource: draft.coverSource,
+                categoryId: draft.categoryId,
+                tags: draft.tags,
+                isPremium: draft.isPremium,
+                price: draft.price,
+                status: draft.status,
+                versions: [] as ArticleVersion[],
+              })) : editorialApi.getArticle(id))
+            : Promise.resolve(null),
+        ])
+
+        if (!active) return
+
+        setCategories(categoryOptions)
+        if (article) {
+          setTitle(article.title)
+          setSapo(article.sapo ?? '')
+          setContent(article.content ?? '')
+          setCoverImage(article.coverImage ?? '')
+          setCoverCaption(article.coverCaption ?? '')
+          setCoverAltText(article.coverAltText ?? '')
+          setCoverSource(article.coverSource ?? '')
+          setCategoryId(isAuthor
+            ? categoryOptions.find((category) => category.apiId === article.categoryId)?.id ?? ''
+            : article.categoryId)
+          setTags((article.tags ?? []).join(', '))
+          setIsPremium(article.isPremium)
+          setPrice(article.price || 15000)
+          setStatus(article.status)
+          setVersions(article.versions ?? [])
+        } else {
+          setCategoryId(
+            categoryOptions.find((category) => category.id === 'cat-thoi-su')?.id
+              ?? categoryOptions[0]?.id
+              ?? '',
+          )
+        }
+      } catch (error: unknown) {
+        if (!active) return
+        setLoadError(error instanceof Error ? error.message : 'Không tải được dữ liệu bài viết')
+      } finally {
+        if (active) setLoading(false)
       }
-    } finally {
-      setLoading(false)
     }
+
+    void loadData()
+    return () => { active = false }
+  }, [id, isEditing, isAuthor])
+
+  useEffect(() => {
+    let active = true
+    let objectUrl: string | null = null
+    setCoverPreview(null)
+
+    if (coverFile) {
+      objectUrl = URL.createObjectURL(coverFile)
+      setCoverPreview(objectUrl)
+    } else if (coverImage.startsWith('/api/v1/content/images/')) {
+      void contentApi.getCoverImage(coverImage).then((blob) => {
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
+        setCoverPreview(objectUrl)
+      }).catch((error: unknown) => {
+        if (active) setCoverError(error instanceof Error ? error.message : 'Không tải được ảnh bìa')
+      })
+    } else {
+      setCoverPreview(coverImage || null)
+    }
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [coverFile, coverImage])
+
+  const handleChooseCover = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    setCoverError('')
+    if (file && ((file.type && !['image/jpeg', 'image/png'].includes(file.type)) || file.size > 5 * 1024 * 1024)) {
+      event.target.value = ''
+      setCoverFile(null)
+      setCoverError('Vui lòng chọn JPEG hoặc PNG, tối đa 5 MB')
+      return
+    }
+    setCoverFile(file)
   }
 
   const handleSave = async (submitForReview: boolean = false) => {
+    if (isSaving || loading) return
+    setCoverError('')
+    const hasStoredCover = coverImage.startsWith('/api/v1/content/images/')
+    if ((coverFile || hasStoredCover) && !coverAltText.trim()) {
+      setCoverError('Vui lòng nhập văn bản thay thế cho ảnh')
+      return
+    }
+    const imageInfo = {
+      caption: coverCaption.trim() || null,
+      altText: coverAltText.trim(),
+      imageSource: coverSource.trim() || null,
+    }
     if (!title.trim()) {
       alert('Vui lòng nhập tiêu đề bài viết')
       return
@@ -107,9 +224,16 @@ export function ArticleEditorPage() {
       }
 
       if (isEditing) {
-        await editorialApi.updateArticle(id, articlePayload, changelog || (submitForReview ? 'Nộp duyệt bài viết' : 'Cập nhật bản thảo'))
+        const notes = changelog || (submitForReview ? 'Nộp duyệt bài viết' : 'Cập nhật bản thảo')
+        if (coverFile) {
+          await editorialApi.updateArticleWithCover(id, articlePayload, coverFile, imageInfo, notes)
+        } else {
+          await editorialApi.updateArticle(id, articlePayload, notes, hasStoredCover ? imageInfo : undefined)
+        }
       } else {
-        const created = await editorialApi.createArticle(articlePayload)
+        const created = coverFile
+          ? await editorialApi.createArticleWithCover(articlePayload, coverFile, imageInfo)
+          : await editorialApi.createArticle(articlePayload)
         if (submitForReview) {
           await editorialApi.updateArticleStatus(created.id, 'IN_REVIEW', 'Gửi duyệt lần đầu')
         }
@@ -152,6 +276,13 @@ export function ArticleEditorPage() {
 
   if (loading) {
     return <div className="py-12 text-center animate-pulse">Đang tải bài viết...</div>
+  }
+
+  if (loadError) {
+    return <div className="space-y-3 max-w-5xl mx-auto">
+      <p role="alert" className="text-red-600">{loadError}</p>
+      <Link to="/backoffice/editorial/articles" className="text-sky-700 underline">Về danh sách bài viết</Link>
+    </div>
   }
 
   return (
@@ -322,14 +453,56 @@ export function ArticleEditorPage() {
                 <Input
                   id="cover"
                   value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
+                  onChange={(e) => { setCoverImage(e.target.value); setCoverError('') }}
                   placeholder="https://images.unsplash..."
+                  disabled={Boolean(coverFile) || isSaving}
                 />
-                {coverImage && (
-                  <div className="mt-2 rounded overflow-hidden border border-slate-200">
-                    <img src={coverImage} alt="Cover preview" className="w-full h-28 object-cover" />
+                <Label htmlFor="coverFile" className="mt-3 block">Hoặc chọn ảnh từ máy</Label>
+                <Input
+                  ref={coverFileInput}
+                  id="coverFile"
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={handleChooseCover}
+                  disabled={isSaving}
+                />
+                <p className="mt-1 text-stone-500">JPEG hoặc PNG, tối đa 5 MB và 4096 × 4096.</p>
+                {coverFile && (
+                  <div className="mt-2 space-y-2">
+                    <p className="break-all">Đã chọn: {coverFile.name}</p>
+                    <Button type="button" size="sm" variant="outline" disabled={isSaving} onClick={() => {
+                      setCoverFile(null)
+                      setCoverError('')
+                      if (coverFileInput.current) coverFileInput.current.value = ''
+                    }}>Bỏ chọn ảnh</Button>
+                    <p className="text-stone-500">Ảnh sẽ được tải lên khi bạn lưu bản nháp.</p>
                   </div>
                 )}
+                {coverPreview && (
+                  <div className="mt-2 rounded overflow-hidden border border-slate-200">
+                    <img src={coverPreview} alt={coverAltText || 'Xem trước ảnh bìa'} className="w-full h-28 object-cover" />
+                  </div>
+                )}
+                {(coverFile || coverImage.startsWith('/api/v1/content/images/')) && (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <Label htmlFor="coverAltText" required>Văn bản thay thế</Label>
+                      <Input id="coverAltText" value={coverAltText} maxLength={300}
+                        onChange={(event) => setCoverAltText(event.target.value)} disabled={isSaving} />
+                    </div>
+                    <div>
+                      <Label htmlFor="coverCaption">Chú thích ảnh</Label>
+                      <Input id="coverCaption" value={coverCaption} maxLength={500}
+                        onChange={(event) => setCoverCaption(event.target.value)} disabled={isSaving} />
+                    </div>
+                    <div>
+                      <Label htmlFor="coverSource">Nguồn ảnh</Label>
+                      <Input id="coverSource" value={coverSource} maxLength={300}
+                        onChange={(event) => setCoverSource(event.target.value)} disabled={isSaving} />
+                    </div>
+                  </div>
+                )}
+                {coverError && <p role="alert" className="mt-2 text-red-700">{coverError}</p>}
               </div>
 
               <div>

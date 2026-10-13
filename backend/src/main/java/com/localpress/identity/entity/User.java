@@ -25,6 +25,9 @@ public class User {
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role;
@@ -38,6 +41,26 @@ public class User {
 
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
+
+    public static User createReader(
+            String fullName,
+            String email,
+            String passwordHash,
+            String phone
+    ) {
+        User user = new User();
+
+        user.fullName = fullName;
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.phone = phone;
+
+        user.role = Role.READER;
+        user.status = Status.ACTIVE;
+        user.failedAttempts = 0;
+
+        return user;
+    }
 
     public enum Role {
         READER,

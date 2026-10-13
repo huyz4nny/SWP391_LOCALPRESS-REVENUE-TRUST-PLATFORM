@@ -18,7 +18,10 @@ public record ArticleDraftDetailResponse(
         String coverImageUrl,
         String coverCaption,
         String coverAltText,
-        String coverSource
+        String coverSource,
+        boolean isPremium,
+        java.math.BigDecimal price,
+        java.util.List<String> tags
 ) {
 
     public static ArticleDraftDetailResponse from(
@@ -40,8 +43,17 @@ public record ArticleDraftDetailResponse(
                 version.getCoverImageUrl(),
                 getString(metadata, "coverCaption"),
                 getString(metadata, "coverAltText"),
-                getString(metadata, "coverSource")
+                getString(metadata, "coverSource"),
+                article.getAccessType() == Article.AccessType.PREMIUM,
+                article.getSinglePrice(),
+                getTags(metadata)
         );
+    }
+
+    private static java.util.List<String> getTags(Map<String, Object> metadata) {
+        Object tags = metadata == null ? null : metadata.get("tags");
+        if (!(tags instanceof java.util.List<?> values)) return java.util.List.of();
+        return values.stream().filter(String.class::isInstance).map(String.class::cast).toList();
     }
 
     private static String getString(

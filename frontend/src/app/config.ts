@@ -18,8 +18,8 @@ export type UserRole =
   | 'GUEST'
   | 'READER'
   | 'ADVERTISER'
-  | 'AUTHOR'          // Phóng viên / Tác giả viết bài (SV5 & SV2)
-  | 'EDITOR'          // Biên tập viên duyệt bài, duyệt banner (SV2)
+  | 'AUTHOR'          // Phóng viên soạn bài (SV5)
+  | 'EDITOR'          // Biên tập và duyệt nội dung (SV2)
   | 'REVIEWER'        // Thư ký tòa soạn / Kiểm duyệt viên
   | 'STAFF'           // Nhân viên vận hành / CSKH (SV4 & SV2)
   | 'ACCOUNTANT'       // Kế toán viên & Đối soát ngân hàng (SV4)
@@ -31,7 +31,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   GUEST: 'Khách vãng lai',
   READER: 'Độc giả (Reader - SV3)',
   ADVERTISER: 'Nhà quảng cáo (Advertiser B2B - SV1)',
-  AUTHOR: 'Phóng viên / Tác giả (Author - SV5/SV2)',
+  AUTHOR: 'Phóng viên (Author - SV5)',
   EDITOR: 'Biên tập viên tòa soạn (Editor - SV2)',
   REVIEWER: 'Thư ký tòa soạn (Reviewer - SV2)',
   STAFF: 'Nhân viên vận hành (Staff - SV4/SV2)',
@@ -45,8 +45,11 @@ export const ROLE_LABELS: Record<UserRole, string> = {
  * Phân quyền module chức năng (RBAC Granular Permission Checkers)
  */
 export const PERMISSION_CHECKERS = {
+  canComposeArticles: (role: UserRole): boolean =>
+    ['AUTHOR', 'EDITOR', 'SYSTEM_ADMIN'].includes(role),
+
   canAccessEditorial: (role: UserRole): boolean =>
-    ['EDITOR', 'REVIEWER', 'AUTHOR', 'SYSTEM_ADMIN'].includes(role),
+    ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN'].includes(role),
 
   canAccessFinance: (role: UserRole): boolean =>
     ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN'].includes(role),
@@ -55,7 +58,7 @@ export const PERMISSION_CHECKERS = {
     role === 'SYSTEM_ADMIN',
 
   canAccessBackoffice: (role: UserRole): boolean =>
-    ['EDITOR', 'REVIEWER', 'AUTHOR', 'ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN'].includes(role),
+    ['AUTHOR', 'EDITOR', 'REVIEWER', 'ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN'].includes(role),
 
   canApproveRefunds: (role: UserRole): boolean =>
     ['FINANCE_MANAGER', 'ACCOUNTANT', 'SYSTEM_ADMIN'].includes(role),
@@ -64,7 +67,10 @@ export const PERMISSION_CHECKERS = {
     ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN'].includes(role),
 
   getDefaultBackofficeRoute: (role: UserRole): string => {
-    if (['EDITOR', 'REVIEWER', 'AUTHOR'].includes(role)) {
+    if (role === 'AUTHOR') {
+      return '/backoffice/editorial/articles'
+    }
+    if (['EDITOR', 'REVIEWER'].includes(role)) {
       return '/backoffice/editorial/articles'
     }
     if (['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF'].includes(role)) {

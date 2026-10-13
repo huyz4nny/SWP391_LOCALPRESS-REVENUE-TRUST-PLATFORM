@@ -30,6 +30,9 @@ export interface Article {
   categoryName: string
   categorySlug: string
   coverImage: string
+  coverCaption?: string | null
+  coverAltText?: string | null
+  coverSource?: string | null
   tags: string[]
   isPremium: boolean
   isLocked?: boolean

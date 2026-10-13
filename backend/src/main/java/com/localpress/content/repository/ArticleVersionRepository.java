@@ -15,7 +15,7 @@ public interface ArticleVersionRepository
         extends JpaRepository<ArticleVersion, Long> {
 
     List<ArticleVersion> findByArticleIdOrderByVersionNumberDesc(Long articleId);
-
+  
     boolean existsByCoverImageUrl(String coverImageUrl);
 
     Optional<ArticleVersion> findByArticleIdAndVersionNumber(
