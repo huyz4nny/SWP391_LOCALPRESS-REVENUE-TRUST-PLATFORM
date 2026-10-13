@@ -2,8 +2,13 @@
 -- LocalPress Database Seed Data - V2__insert_seed_data.sql
 -- Bối cảnh: Báo điện tử địa phương TP. Hải Phòng
 -- Tương thích 100% với V1__create_tables.sql & Frontend React
--- Password chung cho mọi tài khoản: password123
+-- Password chung cho mọi tài khoản: password
 -- ====================================================================
+
+USE localpress_db;
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. USERS (Tài khoản người dùng các vai trò)
 INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, role, status) VALUES
@@ -160,3 +165,5 @@ INSERT INTO transactions (transaction_id, user_id, campaign_id, transaction_type
 -- 15. REFUND REQUESTS (Dữ liệu mẫu cho SV4 demo luồng Hoàn tiền 4 mắt)
 INSERT INTO refund_requests (refund_id, transaction_id, user_id, refund_amount, reason, evidence_url, status, proposed_by, reviewed_by, review_notes) VALUES
 (1, 2, 6, 25000.00, 'Độc giả chuyển khoản trùng 2 lần khi mua bài lẻ', 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600', 'PENDING', 2, NULL, 'Kế toán viên Lê Kế Toán đã kiểm tra số dư và lập phiếu');
+
+SET FOREIGN_KEY_CHECKS = 1;
