@@ -95,6 +95,8 @@ function NotFoundPage() {
 }
 
 // Role permission groups for backoffice routing
+const ARTICLE_LIST_ROLES: UserRole[] = ['AUTHOR', 'EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
+const ARTICLE_WRITING_ROLES: UserRole[] = ['AUTHOR', 'EDITOR', 'SYSTEM_ADMIN']
 const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
 const FINANCE_ROLES: UserRole[] = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN']
 const ADMIN_ROLES: UserRole[] = ['SYSTEM_ADMIN']
@@ -180,7 +182,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_LIST_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <ArticleListPage />
           </ProtectedRoute>
         ),
@@ -188,7 +190,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial/articles',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_LIST_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <ArticleListPage />
           </ProtectedRoute>
         ),
@@ -196,7 +198,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial/articles/new',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_WRITING_ROLES} subsystemName="Soạn bài (SV5)">
             <ArticleEditorPage />
           </ProtectedRoute>
         ),
@@ -204,7 +206,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial/articles/:id/edit',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_WRITING_ROLES} subsystemName="Soạn bài (SV5)">
             <ArticleEditorPage />
           </ProtectedRoute>
         ),

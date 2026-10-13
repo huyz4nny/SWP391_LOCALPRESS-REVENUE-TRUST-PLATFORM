@@ -64,6 +64,7 @@ public class User {
 
     public enum Role {
         READER,
+        AUTHOR,
         EDITOR,
         STAFF,
         ACCOUNTANT,

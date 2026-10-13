@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Article, ArticleVersion } from '@/features/reader/types'
 import { editorialApi, type EditorialCategoryOption } from '../api'
 import { contentApi } from '@/features/content/api'
+import { mockStore } from '@/mocks/store'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/input'
@@ -26,6 +27,7 @@ export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const isEditing = !!id && id !== 'new'
+  const isAuthor = mockStore.getCurrentUser().role === 'AUTHOR'
 
   const [title, setTitle] = useState('')
   const [sapo, setSapo] = useState('')
@@ -48,6 +50,7 @@ export function ArticleEditorPage() {
 
   const [categories, setCategories] = useState<EditorialCategoryOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   // AI Modal
@@ -64,6 +67,7 @@ export function ArticleEditorPage() {
 
     const loadData = async () => {
       setLoading(true)
+      setLoadError('')
       setCategories([])
       setTitle('')
       setSapo('')
@@ -86,7 +90,23 @@ export function ArticleEditorPage() {
       try {
         const [categoryOptions, article] = await Promise.all([
           editorialApi.getCategories(),
-          isEditing && id ? editorialApi.getArticle(id) : Promise.resolve(null),
+          isEditing && id
+            ? (isAuthor ? contentApi.getDraft(id).then((draft) => ({
+                title: draft.title,
+                sapo: draft.sapo,
+                content: draft.content,
+                coverImage: draft.coverImageUrl,
+                coverCaption: draft.coverCaption,
+                coverAltText: draft.coverAltText,
+                coverSource: draft.coverSource,
+                categoryId: draft.categoryId,
+                tags: draft.tags,
+                isPremium: draft.isPremium,
+                price: draft.price,
+                status: draft.status,
+                versions: [] as ArticleVersion[],
+              })) : editorialApi.getArticle(id))
+            : Promise.resolve(null),
         ])
 
         if (!active) return
@@ -100,7 +120,9 @@ export function ArticleEditorPage() {
           setCoverCaption(article.coverCaption ?? '')
           setCoverAltText(article.coverAltText ?? '')
           setCoverSource(article.coverSource ?? '')
-          setCategoryId(article.categoryId)
+          setCategoryId(isAuthor
+            ? categoryOptions.find((category) => category.apiId === article.categoryId)?.id ?? ''
+            : article.categoryId)
           setTags((article.tags ?? []).join(', '))
           setIsPremium(article.isPremium)
           setPrice(article.price || 15000)
@@ -115,7 +137,7 @@ export function ArticleEditorPage() {
         }
       } catch (error: unknown) {
         if (!active) return
-        alert(error instanceof Error ? error.message : 'Không tải được dữ liệu bài viết')
+        setLoadError(error instanceof Error ? error.message : 'Không tải được dữ liệu bài viết')
       } finally {
         if (active) setLoading(false)
       }
@@ -123,7 +145,7 @@ export function ArticleEditorPage() {
 
     void loadData()
     return () => { active = false }
-  }, [id, isEditing])
+  }, [id, isEditing, isAuthor])
 
   useEffect(() => {
     let active = true
@@ -254,6 +276,13 @@ export function ArticleEditorPage() {
 
   if (loading) {
     return <div className="py-12 text-center animate-pulse">Đang tải bài viết...</div>
+  }
+
+  if (loadError) {
+    return <div className="space-y-3 max-w-5xl mx-auto">
+      <p role="alert" className="text-red-600">{loadError}</p>
+      <Link to="/backoffice/editorial/articles" className="text-sky-700 underline">Về danh sách bài viết</Link>
+    </div>
   }
 
   return (

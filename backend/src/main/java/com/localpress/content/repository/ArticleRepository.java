@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface ArticleRepository extends JpaRepository<Article, Long> {
     java.util.List<Article> findByAuthorIdAndStatusOrderByIdDesc(Long authorId, Article.Status status);
 
+    java.util.List<Article> findByAuthorIdOrderByUpdatedAtDesc(Long authorId);
+
     boolean existsBySlug(String slug);
 
     boolean existsBySlugAndIdNot(String slug, Long id);

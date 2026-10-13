@@ -3,7 +3,7 @@ import { Article, Category, Comment } from '@/features/reader/types'
 import { AdBooking, AdCreative } from '@/features/advertising/types'
 import type { CoverImageInfoRequest } from '@/features/content/types'
 
-export type EditorialCategoryOption = Pick<Category, 'id' | 'name' | 'slug'>
+export type EditorialCategoryOption = Pick<Category, 'id' | 'name' | 'slug'> & { apiId?: string }
 
 function coverUploadBody(partName: 'article' | 'request', payload: unknown, file: File, info: CoverImageInfoRequest): FormData {
   const body = new FormData()
@@ -13,7 +13,12 @@ function coverUploadBody(partName: 'article' | 'request', payload: unknown, file
   return body
 }
 
+export type ArticleListItem = Pick<Article,
+  'id' | 'title' | 'authorId' | 'authorName' | 'categoryName' | 'isPremium'
+  | 'status' | 'currentVersion' | 'updatedAt' | 'reviewNotes'>
+
 export const editorialApi = {
+  getMyArticles: () => httpClient.get<ArticleListItem[]>('/articles/mine'),
   createArticleWithCover: (article: Partial<Article>, file: File, info: CoverImageInfoRequest) =>
     httpClient.postFormData<Article>('/editorial/articles', coverUploadBody('article', article, file, info)),
 
@@ -28,6 +33,7 @@ export const editorialApi = {
     const categories = await httpClient.get<EditorialCategoryOption[]>('/categories')
     return categories.map((category) => ({
       id: `cat-${category.slug}`,
+      apiId: category.id,
       name: category.name,
       slug: category.slug,
     }))

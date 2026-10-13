@@ -16,6 +16,11 @@ import com.localpress.content.dto.ArticleDraftDetailResponse;
 public class ArticleDraftController {
     private final ArticleDraftService articleDraftService;
 
+    @GetMapping("/mine")
+    public java.util.List<com.localpress.content.dto.MyArticleResponse> getMyArticles() {
+        return articleDraftService.getMyArticles();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ArticleDraftResponse createDraft(@Valid @RequestBody CreateArticleDraftRequest request) {

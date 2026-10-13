@@ -40,6 +40,7 @@ export function BackofficeLayout() {
 
   const isStaff = PERMISSION_CHECKERS.canAccessBackoffice(currentUser.role)
   const canSeeEditorial = PERMISSION_CHECKERS.canAccessEditorial(currentUser.role)
+    || PERMISSION_CHECKERS.canComposeArticles(currentUser.role)
   const canSeeFinance = PERMISSION_CHECKERS.canAccessFinance(currentUser.role)
   const canSeeAdmin = PERMISSION_CHECKERS.canAccessAdmin(currentUser.role)
 
@@ -85,7 +86,7 @@ export function BackofficeLayout() {
 
   // Navigation structure categorized by business flows
   const editorialNav = [
-    { label: 'Danh sách bài viết', path: '/backoffice/editorial/articles', icon: FileText },
+    { label: currentUser.role === 'AUTHOR' ? 'Bài viết của tôi' : 'Danh sách bài viết', path: '/backoffice/editorial/articles', icon: FileText },
     { label: 'Soạn thảo bài mới', path: '/backoffice/editorial/articles/new', icon: PlusCircle },
     { label: 'Xử lý Booking quảng cáo', path: '/backoffice/editorial/bookings', icon: Calendar },
     { label: 'Duyệt Banner Creative', path: '/backoffice/editorial/creatives', icon: ImageIcon },
@@ -204,7 +205,8 @@ export function BackofficeLayout() {
                 <span>Tòa Soạn & Biên Tập (SV2)</span>
               </div>
               <div className="space-y-1">
-                {editorialNav.map((item) => {
+                {editorialNav.filter((item) => currentUser.role !== 'AUTHOR'
+                  || ['/backoffice/editorial/articles', '/backoffice/editorial/articles/new'].includes(item.path)).map((item) => {
                   const Icon = item.icon
                   const isActive = location.pathname === item.path
                   return (

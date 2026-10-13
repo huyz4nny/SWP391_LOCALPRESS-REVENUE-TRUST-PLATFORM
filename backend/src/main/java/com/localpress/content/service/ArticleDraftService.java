@@ -27,7 +27,7 @@ public class ArticleDraftService {
 
     @Transactional
     public Article createDraft(CreateArticleDraftRequest request) {
-        User author = currentUserService.requireCurrentEditor();
+        User author = currentUserService.requireCurrentAuthor();
 
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chuyên mục không tồn tại"));
@@ -60,8 +60,32 @@ public class ArticleDraftService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.List<com.localpress.content.dto.MyArticleResponse> getMyArticles() {
+        User author = currentUserService.requireCurrentAuthor();
+        return articleRepository.findByAuthorIdOrderByUpdatedAtDesc(author.getId()).stream()
+                .map(article -> {
+                    ArticleVersion version = articleVersionRepository
+                            .findByArticleIdAndVersionNumber(article.getId(), article.getLatestVersion())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                                    "Không tìm thấy phiên bản mới nhất của bài viết"));
+                    String categoryName = categoryRepository.findById(article.getCategoryId())
+                            .map(Category::getName).orElse("");
+                    String status = switch (article.getStatus()) {
+                        case PENDING -> "IN_REVIEW";
+                        case REJECTED -> "CHANGES_REQUESTED";
+                        case ARCHIVED, TAKEN_DOWN -> "UNPUBLISHED";
+                        default -> article.getStatus().name();
+                    };
+                    return new com.localpress.content.dto.MyArticleResponse(
+                            article.getId().toString(), version.getTitle(), author.getId().toString(),
+                            author.getFullName(), categoryName, article.getAccessType() == Article.AccessType.PREMIUM,
+                            status, article.getLatestVersion(), article.getUpdatedAt(), null);
+                }).toList();
+    }
+
+    @Transactional(readOnly = true)
     public ArticleDraftDetailResponse getDraft(Long articleId){
-        User author = currentUserService.requireCurrentEditor();
+        User author = currentUserService.requireCurrentAuthor();
 
         Article article = articleRepository.findByIdAndAuthorId(articleId, author.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy bài viết"));

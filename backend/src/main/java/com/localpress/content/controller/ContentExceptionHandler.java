@@ -14,8 +14,7 @@ import java.util.Map;
 @RestControllerAdvice(assignableTypes = {
         ArticleDraftController.class,
         ArticleMetadataController.class,
-        ArticleMediaController.class,
-        EditorialArticleCompatibilityController.class
+        ArticleMediaController.class
 })
 public class ContentExceptionHandler {
     public record ContentErrorResponse(

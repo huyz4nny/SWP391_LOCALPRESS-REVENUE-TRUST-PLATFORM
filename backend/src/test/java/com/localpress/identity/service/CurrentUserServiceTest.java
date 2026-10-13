@@ -5,6 +5,8 @@ import com.localpress.identity.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -50,18 +52,22 @@ class CurrentUserServiceTest {
         SecurityContextHolder.clearContext();
     }
 
-    @Test
-    void activeEditorCanUseCms() {
-        User editor = editor();
-        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(editor));
+    @ParameterizedTest
+    @EnumSource(value = User.Role.class, names = {"AUTHOR", "EDITOR", "SYSTEM_ADMIN"})
+    void activeWritingRoleCanUseCms(User.Role role) {
+        User user = editor();
+        ReflectionTestUtils.setField(user, "role", role);
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
 
-        assertSame(editor, currentUserService.requireCurrentEditor());
+        assertSame(user, currentUserService.requireCurrentAuthor());
     }
 
-    @Test
-    void readerCannotUseCmsEvenWithEditorAuthorityInContext() {
-        User reader = User.createReader("Reader", EMAIL, "unused", null);
-        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(reader));
+    @ParameterizedTest
+    @EnumSource(value = User.Role.class, names = {"READER", "STAFF", "ACCOUNTANT", "ADVERTISER"})
+    void otherRoleCannotUseCmsEvenWithEditorAuthorityInContext(User.Role role) {
+        User user = User.createReader("User", EMAIL, "unused", null);
+        ReflectionTestUtils.setField(user, "role", role);
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
 
         assertForbidden();
     }
@@ -91,7 +97,7 @@ class CurrentUserServiceTest {
                         List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
 
         ResponseStatusException exception = assertThrows(
-                ResponseStatusException.class, currentUserService::requireCurrentEditor);
+                ResponseStatusException.class, currentUserService::requireCurrentAuthor);
         assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
         verifyNoInteractions(userRepository);
     }
@@ -104,7 +110,7 @@ class CurrentUserServiceTest {
 
     private void assertForbidden() {
         ResponseStatusException exception = assertThrows(
-                ResponseStatusException.class, currentUserService::requireCurrentEditor);
+                ResponseStatusException.class, currentUserService::requireCurrentAuthor);
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
     }
 }
