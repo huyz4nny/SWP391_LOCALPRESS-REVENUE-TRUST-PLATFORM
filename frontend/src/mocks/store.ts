@@ -1,6 +1,8 @@
 import { User } from '@/types'
 import { Article, Category, SubscriptionPlan, Comment, ReaderEntitlement } from '@/features/reader/types'
 import { AdSlot, AdBooking, AdCampaign, AdCreative, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange } from '@/features/advertising/types'
+import { companyProfileSchema } from '@/features/advertising/schemas/companyProfile'
+import { bookingSchema, getBookingDays } from '@/features/advertising/schemas/booking'
 import { Order, RefundRequest, ReconciliationPeriod, GeneralLedgerEntry, PaymentAttempt } from '@/features/finance/types'
 import { SystemAuditLog, PaywallSettings, AdDeliveryLiveStatus } from '@/features/administration/types'
 import {
@@ -351,14 +353,12 @@ class MockStore {
     return this.state.advertiserHistory[user.id] || []
   }
 
-  public saveAdvertiserProfile(input: AdvertiserProfileInput): AdvertiserProfile {
+  public saveAdvertiserProfile(data: AdvertiserProfileInput): AdvertiserProfile {
     const user = this.getCurrentUser()
     if (user.role !== 'ADVERTISER') throw new Error('Không có quyền sửa hồ sơ doanh nghiệp')
-    if (!input.companyName.trim() || !input.taxCode.trim() || !input.contactPerson.trim() ||
-        !input.email.trim() || !input.phone.trim() || !input.businessSector?.trim() ||
-        !input.invoiceName?.trim() || !input.invoiceTaxCode?.trim() ||
-        !input.invoiceAddress?.trim() || !input.invoiceEmail?.trim())
-      throw new Error('Vui lòng điền các trường bắt buộc')
+    const parsed = companyProfileSchema.safeParse(data)
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+    const input = parsed.data
     if (Object.entries(this.state.advertiserProfiles).some(([id, profile]) =>
       id !== user.id && profile.taxCode === input.taxCode.trim())) throw new Error('Mã số thuế đã được sử dụng')
     const previous = this.state.advertiserProfiles[user.id]
@@ -816,26 +816,31 @@ class MockStore {
     contactPhone: string
     contactEmail: string
   }): AdBooking {
+    const parsed = bookingSchema.safeParse(data)
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+    const input = parsed.data
     const slot = this.state.adSlots.find((s) => s.id === data.slotId)
-    if (!slot) throw new Error('Không tìm thấy vị trí quảng cáo')
+    if (!slot?.isActive) throw new Error('Không tìm thấy vị trí quảng cáo đang hoạt động')
 
     const currentUser = this.getCurrentUser()
-    const standardPrice = slot.pricePerDay * data.daysCount
+    const daysCount = getBookingDays(input.startDate, input.endDate)
+    if (!daysCount) throw new Error('Khoảng ngày booking không còn hợp lệ, vui lòng chọn lại')
+    const standardPrice = slot.pricePerDay * daysCount
     const finalPrice = standardPrice
 
     const newBooking: AdBooking = {
       id: `BK-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       advertiserId: currentUser.id,
-      companyName: data.companyName || currentUser.companyName || 'Doanh nghiệp đối tác',
-      contactPerson: data.contactPerson || currentUser.name,
-      contactPhone: data.contactPhone || currentUser.phone || '0900000000',
-      contactEmail: data.contactEmail || currentUser.email,
+      companyName: input.companyName,
+      contactPerson: input.contactPerson,
+      contactPhone: input.contactPhone,
+      contactEmail: input.contactEmail,
       slotId: slot.id,
       slotName: slot.name,
       slotCode: slot.code,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      daysCount: data.daysCount,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      daysCount,
       standardPrice,
       finalPrice,
       bookingStatus: 'SUBMITTED', // Awaiting quote

@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { advertisingApi } from '../api'
 import { AdvertiserProfile, AdvertiserProfileChange, AdvertiserProfileInput } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { mockStore } from '@/mocks/store'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { formatDateTime } from '@/lib/format'
+import { AppApiError } from '@/lib/http/errors'
+import { companyProfileSchema } from '../schemas/companyProfile'
 
 const emptyProfile: AdvertiserProfileInput = {
   companyName: '', taxCode: '', contactPerson: '', email: '', phone: '', address: '', businessLicenseUrl: '',
@@ -20,21 +26,34 @@ const historyFields = [
 ] as const
 
 export function CompanyProfilePage() {
-  const [profile, setProfile] = useState<AdvertiserProfileInput>(emptyProfile)
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<AdvertiserProfileInput>({
+    resolver: zodResolver(companyProfileSchema),
+    defaultValues: emptyProfile,
+    mode: 'onTouched',
+  })
   const [status, setStatus] = useState<AdvertiserProfile['verificationStatus'] | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [history, setHistory] = useState<AdvertiserProfileChange[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyError, setHistoryError] = useState('')
+
+  const loadHistory = useCallback(() => advertisingApi.getProfileHistory()
+    .then(setHistory)
+    .catch((error) => {
+      setHistoryError(error instanceof Error ? error.message : 'Không tải được lịch sử thay đổi')
+    })
+    .finally(() => setHistoryLoading(false)), [])
 
   useEffect(() => {
     advertisingApi.getProfile()
       .then((data) => {
         if (data) {
-          setProfile({ ...data, businessSector: data.businessSector || '',
+          reset({ ...data, address: data.address || '', businessLicenseUrl: data.businessLicenseUrl || '',
+            businessSector: data.businessSector || '',
             invoiceName: data.invoiceName || data.companyName,
             invoiceTaxCode: data.invoiceTaxCode || data.taxCode,
-            invoiceAddress: data.invoiceAddress || data.address,
+            invoiceAddress: data.invoiceAddress || data.address || '',
             invoiceEmail: data.invoiceEmail || data.email })
           setStatus(data.verificationStatus)
         }
@@ -43,27 +62,29 @@ export function CompanyProfilePage() {
         if (error.status !== 404) setMessage(error.message || 'Không tải được hồ sơ doanh nghiệp')
       })
       .finally(() => setLoading(false))
-    advertisingApi.getProfileHistory().then(setHistory).catch(() => {})
-  }, [])
+    void loadHistory()
+  }, [reset, loadHistory])
 
-  const change = (field: keyof AdvertiserProfileInput, value: string) =>
-    setProfile((current) => ({ ...current, [field]: value }))
-
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setSaving(true)
+  const save = async (profile: AdvertiserProfileInput) => {
     setMessage('')
     try {
       const updated = await advertisingApi.saveProfile(profile)
-      setProfile(updated)
+      reset(updated)
       setStatus(updated.verificationStatus)
-      advertisingApi.getProfileHistory().then(setHistory).catch(() => {})
       mockStore.updateCurrentCompanyName(updated.companyName)
       setMessage('Đã lưu hồ sơ doanh nghiệp')
+      setHistoryLoading(true)
+      setHistoryError('')
+      await loadHistory()
     } catch (error) {
+      if (error instanceof AppApiError && error.fieldErrors) {
+        for (const [field, message] of Object.entries(error.fieldErrors)) {
+          if (field in companyProfileSchema.shape) {
+            setError(field as keyof AdvertiserProfileInput, { type: 'server', message })
+          }
+        }
+      }
       setMessage(error instanceof Error ? error.message : 'Không lưu được hồ sơ')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -76,7 +97,8 @@ export function CompanyProfilePage() {
         <p className="mt-1 text-sm text-slate-500">Thông tin pháp nhân và liên hệ dùng cho quảng cáo.</p>
         {status && <p className="mt-2 text-xs text-slate-600">Trạng thái xác minh: {status}</p>}
       </div>
-      <form onSubmit={save} className="space-y-4">
+      <form onSubmit={handleSubmit(save)} noValidate className="space-y-4">
+        <fieldset disabled={isSubmitting} className="space-y-4">
         {([
           ['companyName', 'Tên doanh nghiệp', 'text'],
           ['taxCode', 'Mã số thuế', 'text'],
@@ -93,8 +115,8 @@ export function CompanyProfilePage() {
         ] as const).map(([field, label, type]) => (
           <div key={field}>
             <Label htmlFor={field} required={field !== 'address' && field !== 'businessLicenseUrl'}>{label}</Label>
-            <Input id={field} type={type} value={profile[field] || ''}
-              onChange={(event) => change(field, event.target.value)}
+            <Input id={field} type={type} {...register(field)}
+              error={errors[field]?.message} aria-invalid={Boolean(errors[field])}
               required={field !== 'address' && field !== 'businessLicenseUrl'}
               maxLength={{ companyName: 255, taxCode: 50, businessSector: 150,
                 contactPerson: 150, email: 255, phone: 20, address: 500,
@@ -102,15 +124,25 @@ export function CompanyProfilePage() {
                 invoiceAddress: 500, invoiceEmail: 255 }[field]} />
           </div>
         ))}
+        </fieldset>
         {message && <p role="status" className="text-sm text-slate-700">{message}</p>}
-        <Button type="submit" isLoading={saving}>Lưu hồ sơ</Button>
+        <Button type="submit" isLoading={isSubmitting}>Lưu hồ sơ</Button>
       </form>
       <section aria-label="Lịch sử thay đổi hồ sơ" className="space-y-3 border-t pt-5">
         <h2 className="font-semibold text-slate-900">Lịch sử thay đổi</h2>
-        {history.length === 0 && <p className="text-sm text-slate-500">Chưa có thay đổi nào được ghi nhận.</p>}
-        {history.map((entry) => (
+        {historyLoading && <p role="status" className="text-sm text-slate-500">Đang tải lịch sử...</p>}
+        {historyError && <div role="alert" className="space-y-2 text-sm text-red-700">
+          <p>Không tải được lịch sử thay đổi: {historyError}</p>
+          <Button type="button" variant="outline" onClick={() => {
+            setHistoryLoading(true)
+            setHistoryError('')
+            void loadHistory()
+          }}>Thử lại</Button>
+        </div>}
+        {!historyLoading && !historyError && history.length === 0 && <EmptyState title="Chưa có thay đổi nào được ghi nhận" />}
+        {!historyLoading && !historyError && history.map((entry) => (
           <div key={entry.id} className="rounded border border-slate-200 p-3 text-sm">
-            <p className="font-medium">{entry.action === 'CREATE' ? 'Tạo hồ sơ' : 'Cập nhật hồ sơ'} · {new Date(entry.createdAt).toLocaleString('vi-VN')}</p>
+            <p className="font-medium">{entry.action === 'CREATE' ? 'Tạo hồ sơ' : 'Cập nhật hồ sơ'} · {formatDateTime(entry.createdAt)}</p>
             <ul className="mt-1 space-y-1 text-slate-600">
               {historyFields.filter(([field]) => entry.oldValue?.[field] !== entry.newValue[field]).map(([field, label]) => (
                 <li key={field}>{label}: {entry.oldValue ? `${entry.oldValue[field] || '—'} → ` : ''}{entry.newValue[field] || '—'}</li>

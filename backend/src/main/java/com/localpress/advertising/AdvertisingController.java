@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -28,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -54,15 +56,15 @@ public class AdvertisingController {
     public record ProfileInput(@NotBlank @Size(max = 255) String companyName,
                                @NotBlank @Size(max = 50) String taxCode,
                                @NotBlank @Size(max = 150) String contactPerson,
-                               @NotBlank @Email @Size(max = 255) String email,
-                               @NotBlank @Size(max = 20) String phone,
+                               @NotBlank @Email(message = "Email liên hệ không hợp lệ") @Size(max = 255) String email,
+                               @NotBlank @Pattern(regexp = "0[35789][0-9]{8}", message = "Số di động Việt Nam phải có 10 chữ số, bắt đầu bằng 03, 05, 07, 08 hoặc 09") String phone,
                                @Size(max = 500) String address,
                                @Size(max = 1000) @Pattern(regexp = "^$|https?://.+") String businessLicenseUrl,
                                @NotBlank @Size(max = 150) String businessSector,
                                @NotBlank @Size(max = 255) String invoiceName,
                                @NotBlank @Size(max = 50) String invoiceTaxCode,
                                @NotBlank @Size(max = 500) String invoiceAddress,
-                               @NotBlank @Email @Size(max = 255) String invoiceEmail) {}
+                               @NotBlank @Email(message = "Email nhận hóa đơn không hợp lệ") @Size(max = 255) String invoiceEmail) {}
 
     public record ProfileChange(String id, String action, JsonNode oldValue,
                                 JsonNode newValue, LocalDateTime createdAt) {}
@@ -182,5 +184,14 @@ public class AdvertisingController {
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CONFLICT)
     public Map<String, String> duplicateTaxCode() {
         return Map.of("message", "Mã số thuế đã được sử dụng");
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, Object> invalidProfile(MethodArgumentNotValidException error) {
+        return Map.of("message", "Thông tin hồ sơ không hợp lệ", "fieldErrors",
+                error.getBindingResult().getFieldErrors().stream().collect(Collectors.toMap(
+                        field -> field.getField(), field -> Objects.toString(field.getDefaultMessage(), "Dữ liệu không hợp lệ"),
+                        (first, duplicate) -> first)));
     }
 }

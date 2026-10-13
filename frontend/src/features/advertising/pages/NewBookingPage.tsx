@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AdSlot } from '../types'
 import { advertisingApi } from '../api'
@@ -8,58 +10,53 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
-import { Calendar, Building2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { bookingSchema, BookingInput, getBookingDays, getBookingToday } from '../schemas/booking'
 
 export function NewBookingPage() {
   const [searchParams] = useSearchParams()
-  const defaultSlotId = searchParams.get('slotId') || 'slot-top-leaderboard'
+  const defaultSlotId = searchParams.get('slotId') || ''
   const navigate = useNavigate()
   const currentUser = mockStore.getCurrentUser()
 
   const [slots, setSlots] = useState<AdSlot[]>([])
-  const [slotId, setSlotId] = useState(defaultSlotId)
-  const [startDate, setStartDate] = useState('2026-10-01')
-  const [endDate, setEndDate] = useState('2026-10-15')
-  const [companyName, setCompanyName] = useState(currentUser.companyName || '')
-  const [contactPerson, setContactPerson] = useState(currentUser.name || '')
-  const [contactPhone, setContactPhone] = useState(currentUser.phone || '0912345678')
-  const [contactEmail, setContactEmail] = useState(currentUser.email || '')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [requestError, setRequestError] = useState('')
+  const [slotsError, setSlotsError] = useState('')
+  const today = getBookingToday()
+  const { register, control, handleSubmit, setError, trigger, formState: { errors, isSubmitting } } = useForm<BookingInput>({
+    resolver: zodResolver(bookingSchema),
+    mode: 'onTouched',
+    defaultValues: {
+      slotId: defaultSlotId, startDate: today, endDate: today,
+      companyName: currentUser.companyName || '', contactPerson: currentUser.name || '',
+      contactPhone: currentUser.phone || '', contactEmail: currentUser.email || '',
+    },
+  })
+  const [slotId, startDate, endDate] = useWatch({ control, name: ['slotId', 'startDate', 'endDate'] })
 
   useEffect(() => {
     advertisingApi.getSlots().then(setSlots)
+      .catch((error) => setSlotsError(error instanceof Error ? error.message : 'Không tải được vị trí quảng cáo'))
   }, [])
 
-  // Calculate days
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  const diffTime = Math.max(0, end.getTime() - start.getTime())
-  const daysCount = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1)
+  const daysCount = getBookingDays(startDate, endDate)
 
   const selectedSlot = slots.find((s) => s.id === slotId)
   const estimatedPrice = selectedSlot ? selectedSlot.pricePerDay * daysCount : 0
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!slotId) return
-
-    setIsSubmitting(true)
+  const submit = async (values: BookingInput) => {
+    setRequestError('')
+    if (!selectedSlot?.isActive) {
+      setError('slotId', { message: 'Vui lòng chọn vị trí quảng cáo đang hoạt động' })
+      return
+    }
     try {
       const booking = await advertisingApi.createBooking({
-        slotId,
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
-        daysCount,
-        companyName,
-        contactPerson,
-        contactPhone,
-        contactEmail,
+        ...values,
+        daysCount: getBookingDays(values.startDate, values.endDate),
       })
       navigate(`/advertiser/bookings/${booking.id}`)
-    } catch (err: any) {
-      alert(err.message || 'Lỗi gửi yêu cầu booking')
-    } finally {
-      setIsSubmitting(false)
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Lỗi gửi yêu cầu booking')
     }
   }
 
@@ -74,7 +71,8 @@ export function NewBookingPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit(submit)} noValidate className="space-y-6">
+        <fieldset disabled={isSubmitting} className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">1. Vị trí & Lịch phát dự kiến</CardTitle>
@@ -84,16 +82,20 @@ export function NewBookingPage() {
               <Label htmlFor="slot" required>Chọn vị trí quảng cáo</Label>
               <select
                 id="slot"
-                value={slotId}
-                onChange={(e) => setSlotId(e.target.value)}
+                {...register('slotId')}
+                aria-invalid={Boolean(errors.slotId)}
+                required
                 className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-xs font-medium focus:ring-2 focus:ring-primary-900"
               >
-                {slots.map((s) => (
+                <option value="">Chọn vị trí quảng cáo</option>
+                {slots.filter((slot) => slot.isActive).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.dimensions}) — {formatCurrency(s.pricePerDay)}/ngày
                   </option>
                 ))}
               </select>
+              {errors.slotId && <p className="mt-1 text-xs text-red-600">{errors.slotId.message}</p>}
+              {slotsError && <p role="alert" className="mt-1 text-xs text-red-600">{slotsError}</p>}
               {selectedSlot && (
                 <p className="mt-1 text-[11px] text-slate-500">
                   {selectedSlot.description} • {selectedSlot.locationNote}
@@ -107,8 +109,10 @@ export function NewBookingPage() {
                 <Input
                   id="start"
                   type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  min={today}
+                  {...register('startDate', { onChange: () => { void trigger('endDate') } })}
+                  error={errors.startDate?.message}
+                  aria-invalid={Boolean(errors.startDate)}
                   required
                 />
               </div>
@@ -117,23 +121,26 @@ export function NewBookingPage() {
                 <Input
                   id="end"
                   type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate && startDate > today ? startDate : today}
+                  {...register('endDate')}
+                  error={errors.endDate?.message}
+                  aria-invalid={Boolean(errors.endDate)}
                   required
                 />
               </div>
             </div>
 
             {/* Price Preview Banner */}
+            <p className="text-[11px] text-slate-500">Lịch được tính theo giờ Việt Nam (UTC+7).</p>
             <div className="p-4 bg-primary-50/50 rounded-xl border border-primary-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] text-slate-500 block">Thời lượng chiến dịch:</span>
-                <span className="text-sm font-bold text-slate-900">{daysCount} ngày phát liên tục</span>
+                <span className="text-sm font-bold text-slate-900">{daysCount ? `${daysCount} ngày phát liên tục` : 'Chọn khoảng ngày hợp lệ'}</span>
               </div>
               <div className="text-right">
                 <span className="text-[11px] text-slate-500 block">Dự toán kinh phí chuẩn:</span>
                 <span className="text-lg font-black text-primary-950">
-                  {formatCurrency(estimatedPrice)}
+                  {daysCount && selectedSlot ? formatCurrency(estimatedPrice) : '—'}
                 </span>
               </div>
             </div>
@@ -149,8 +156,10 @@ export function NewBookingPage() {
               <Label htmlFor="companyName" required>Tên công ty / Tổ chức đặt quảng cáo</Label>
               <Input
                 id="companyName"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                {...register('companyName')}
+                error={errors.companyName?.message}
+                aria-invalid={Boolean(errors.companyName)}
+                maxLength={255}
                 required
               />
             </div>
@@ -160,8 +169,10 @@ export function NewBookingPage() {
                 <Label htmlFor="contactPerson" required>Người liên hệ</Label>
                 <Input
                   id="contactPerson"
-                  value={contactPerson}
-                  onChange={(e) => setContactPerson(e.target.value)}
+                  {...register('contactPerson')}
+                  error={errors.contactPerson?.message}
+                  aria-invalid={Boolean(errors.contactPerson)}
+                  maxLength={150}
                   required
                 />
               </div>
@@ -169,8 +180,12 @@ export function NewBookingPage() {
                 <Label htmlFor="contactPhone" required>Điện thoại liên hệ</Label>
                 <Input
                   id="contactPhone"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
+                  type="tel"
+                  inputMode="numeric"
+                  {...register('contactPhone')}
+                  error={errors.contactPhone?.message}
+                  aria-invalid={Boolean(errors.contactPhone)}
+                  maxLength={20}
                   required
                 />
               </div>
@@ -179,19 +194,23 @@ export function NewBookingPage() {
                 <Input
                   id="contactEmail"
                   type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
+                  {...register('contactEmail')}
+                  error={errors.contactEmail?.message}
+                  aria-invalid={Boolean(errors.contactEmail)}
+                  maxLength={255}
                   required
                 />
               </div>
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex-col items-stretch gap-3">
+            {requestError && <p role="alert" className="text-sm text-red-700">{requestError}</p>}
             <Button type="submit" className="w-full font-bold" isLoading={isSubmitting}>
               Gửi yêu cầu Booking tới Ban Quảng Cáo Tòa Soạn
             </Button>
           </CardFooter>
         </Card>
+        </fieldset>
       </form>
     </div>
   )
