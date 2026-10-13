@@ -20,7 +20,7 @@ function coverUploadBody(partName: 'article' | 'request', payload: unknown, file
 
 export type ArticleListItem = Pick<Article,
   'id' | 'title' | 'authorId' | 'authorName' | 'categoryName' | 'isPremium'
-  | 'status' | 'currentVersion' | 'updatedAt' | 'reviewNotes'>
+  | 'status' | 'currentVersion' | 'updatedAt' | 'reviewNotes'> & Partial<Pick<Article, 'sapo' | 'content' | 'versions'>>
 
 export const editorialApi = {
   getMyArticles: () => httpClient.get<ArticleListItem[]>('/articles/mine'),
