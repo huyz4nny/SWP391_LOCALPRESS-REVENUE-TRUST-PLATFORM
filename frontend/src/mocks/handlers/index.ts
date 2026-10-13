@@ -20,6 +20,25 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   if (pathname === '/auth/me') {
     return currentUser
   }
+  if (pathname === '/auth/register' && method === 'POST') {
+    const newUser = {
+      id: `user-reader-${Date.now()}`,
+      email: body.email,
+      name: body.fullName || 'Độc giả mới',
+      phone: body.phone,
+      role: 'READER' as const,
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    }
+    mockStore.getState().users.push(newUser)
+    return {
+      id: newUser.id,
+      email: newUser.email,
+      role: 'READER',
+      status: 'ACTIVE',
+    }
+  }
   if (pathname === '/auth/switch-user' && method === 'POST') {
     mockStore.setCurrentUser(body.userId)
     return mockStore.getCurrentUser()

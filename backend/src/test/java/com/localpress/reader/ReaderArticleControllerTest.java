@@ -101,7 +101,6 @@ class ReaderArticleControllerTest {
      * nên Spring ném IllegalStateException "Ambiguous handler methods mapped" với mọi slug.
      * Chỉ bật lại test này sau khi SV5 đổi mapping thành "/{id:\\d+}" (đã báo Leader/Tùng).
      */
-    @Disabled("Chờ SV5 đổi GET /api/v1/articles/{id} thành /{id:\\d+} - xem comment PR #8")
     @Test
     void realCmsControllerDoesNotClashWithReaderSlugRoute() throws Exception {
         ArticleDraftService draftService = mock(ArticleDraftService.class);
