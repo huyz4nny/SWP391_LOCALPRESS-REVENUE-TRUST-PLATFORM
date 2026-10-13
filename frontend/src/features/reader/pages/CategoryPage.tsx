@@ -4,6 +4,7 @@ import { Article, Category } from '../types'
 import { readerApi } from '../api'
 import { ArticleCard } from '../components/ArticleCard'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { mockStore } from '@/mocks/store'
 import { ChevronRight, Filter } from 'lucide-react'
 
@@ -12,36 +13,38 @@ export function CategoryPage() {
   const [articles, setArticles] = useState<Article[]>([])
   const [category, setCategory] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<'all' | 'free' | 'premium'>('all')
 
   const entitlements = mockStore.getEntitlements(mockStore.getCurrentUser().id)
 
   useEffect(() => {
-    if (slug) loadCategoryArticles(slug)
-  }, [slug])
+    if (slug) loadCategoryArticles(slug, filterType)
+  }, [slug, filterType])
 
-  const loadCategoryArticles = async (categorySlug: string) => {
+  const loadCategoryArticles = async (categorySlug: string, accessFilter: 'all' | 'free' | 'premium') => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [artData, catData] = await Promise.all([
-        readerApi.getArticles({ category: categorySlug }),
+        readerApi.getArticles({
+          category: categorySlug,
+          isPremium: accessFilter === 'all' ? undefined : accessFilter === 'premium',
+        }),
         readerApi.getCategories(),
       ])
       setArticles(artData)
       const foundCat = catData.find((c) => c.slug === categorySlug)
       setCategory(foundCat || null)
     } catch (err) {
-      console.error(err)
+      setLoadError(err instanceof Error ? err.message : 'Không tải được chuyên mục. Vui lòng thử lại.')
+      setArticles([])
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredArticles = articles.filter((a) => {
-    if (filterType === 'free') return !a.isPremium
-    if (filterType === 'premium') return a.isPremium
-    return true
-  })
+  const filteredArticles = articles
 
   return (
     <div className="space-y-6">
@@ -78,7 +81,7 @@ export function CategoryPage() {
                 : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
             }`}
           >
-            Tất cả ({articles.length})
+            Tất cả
           </button>
           <button
             onClick={() => setFilterType('free')}
@@ -88,7 +91,7 @@ export function CategoryPage() {
                 : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
             }`}
           >
-            Tin tức Miễn phí ({articles.filter((a) => !a.isPremium).length})
+            Tin tức Miễn phí
           </button>
           <button
             onClick={() => setFilterType('premium')}
@@ -98,7 +101,7 @@ export function CategoryPage() {
                 : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            👑 Premium ({articles.filter((a) => a.isPremium).length})
+            Premium
           </button>
         </div>
       </div>
@@ -111,6 +114,13 @@ export function CategoryPage() {
               <div className="h-40 bg-stone-200 rounded-lg" />
               <div className="h-40 bg-stone-200 rounded-lg" />
             </div>
+          ) : loadError ? (
+            <EmptyState
+              title="Không tải được chuyên mục"
+              description={loadError}
+              actionLabel="Thử lại"
+              onAction={() => slug && loadCategoryArticles(slug, filterType)}
+            />
           ) : filteredArticles.length === 0 ? (
             <div className="bg-white rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-500">
               Không có bài viết nào thuộc chuyên mục này với bộ lọc hiện tại.
