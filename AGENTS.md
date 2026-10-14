@@ -76,7 +76,7 @@ Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BU�
 20. **Quản trị tầng dùng chung & Cấu hình môi trường (Shared & Config Invariants):**
     - Cấu hình Spring Security chỉ có DUY NHẤT 1 file master là `com.localpress.shared.security.SecurityConfig.java` do Leader SV4 làm chủ. Cấm các nhánh thành viên tự tạo thêm file SecurityConfig riêng để tránh lỗi trùng Bean làm crash server.
     - Mật khẩu MySQL trong `application-dev.yml` mặc định là `password`. Tuyệt đối không commit mật khẩu MySQL cá nhân lên git làm hỏng môi trường của người khác.
-    - Toàn bộ tài khoản seed data trong `seed_data.sql` có mật khẩu mặc định là `password` (mã băm BCrypt chuẩn).
+    - Toàn bộ tài khoản seed data trong `seed_data.sql` có mật khẩu mặc định là `password` hoặc `password123` (`SecurityConfig` hỗ trợ linh hoạt cả 2).
     - Ở Frontend, điều hướng sau khi đăng nhập thật bắt buộc dùng `PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)`, tuyệt đối không gán cứng URL sang một phân hệ cụ thể.
 21. **Quy tắc đồng bộ bộ nhớ kép (Dual-Workspace Memory Sync):** Mọi cập nhật tài liệu ngữ cảnh, quy tắc kiến trúc, quy chuẩn code hoặc bài học ghi nhớ mới BẮT BUỘC phải được ghi và đồng bộ song song vào CẢ 2 NƠI: (1) `E:\FPTU\FALL26\SWP391\AGENTS.md` (Repo gốc) và (2) `E:\FPTU\FALL26\SWP391\huyz4nny\AGENTS.md` (Thư mục làm việc của Leader Huy). Tuyệt đối không để lệch thông tin giữa 2 thư mục này.
 

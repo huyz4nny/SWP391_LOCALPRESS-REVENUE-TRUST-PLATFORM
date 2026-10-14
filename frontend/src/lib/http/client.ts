@@ -55,6 +55,30 @@ class HttpClient {
     return url.toString()
   }
 
+  private extractErrorMessage(status: number, errorJson?: any, fallback: string = 'Lỗi kết nối máy chủ backend'): string {
+    if (errorJson?.message) {
+      return errorJson.message
+    }
+    switch (status) {
+      case 400:
+        return 'Dữ liệu yêu cầu không hợp lệ'
+      case 401:
+        return 'Tài khoản hoặc mật khẩu không chính xác'
+      case 403:
+        return 'Bạn không có quyền thực hiện thao tác này'
+      case 404:
+        return 'Không tìm thấy tài nguyên yêu cầu'
+      case 409:
+        return 'Dữ liệu bị xung đột hoặc đã tồn tại'
+      case 500:
+      case 502:
+      case 503:
+        return 'Máy chủ backend gặp sự cố nội bộ'
+      default:
+        return fallback
+    }
+  }
+
   public async get<T>(path: string, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(path, options?.params)
 
@@ -73,7 +97,7 @@ class HttpClient {
         timestamp: new Date().toISOString(),
         status: response.status,
         error: response.statusText,
-        message: errorJson.message || 'Lỗi kết nối máy chủ backend',
+        message: this.extractErrorMessage(response.status, errorJson, 'Lỗi kết nối máy chủ backend'),
         path,
         fieldErrors: errorJson.fieldErrors,
       })
@@ -101,7 +125,7 @@ class HttpClient {
         timestamp: new Date().toISOString(),
         status: response.status,
         error: response.statusText,
-        message: errorJson.message || 'Lỗi gửi dữ liệu lên máy chủ',
+        message: this.extractErrorMessage(response.status, errorJson, 'Lỗi gửi dữ liệu lên máy chủ'),
         path,
         fieldErrors: errorJson.fieldErrors,
       })
@@ -129,7 +153,7 @@ class HttpClient {
         timestamp: new Date().toISOString(),
         status: response.status,
         error: response.statusText,
-        message: errorJson.message || 'Lỗi cập nhật dữ liệu',
+        message: this.extractErrorMessage(response.status, errorJson, 'Lỗi cập nhật dữ liệu'),
         path,
         fieldErrors: errorJson.fieldErrors,
       })
@@ -156,7 +180,7 @@ class HttpClient {
         timestamp: new Date().toISOString(),
         status: response.status,
         error: response.statusText,
-        message: errorJson.message || 'Lỗi xóa dữ liệu',
+        message: this.extractErrorMessage(response.status, errorJson, 'Lỗi xóa dữ liệu'),
         path,
       })
     }

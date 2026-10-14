@@ -2,7 +2,7 @@
 -- LocalPress Database Seed Data - V2__insert_seed_data.sql
 -- Bối cảnh: Báo điện tử địa phương TP. Hải Phòng
 -- Tương thích 100% với V1__create_tables.sql & Frontend React
--- Password chung cho mọi tài khoản: password
+-- Password chung cho mọi tài khoản: password hoặc password123
 -- ====================================================================
 
 USE localpress_db;
