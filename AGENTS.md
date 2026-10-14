@@ -156,3 +156,12 @@ Toàn bộ mã nguồn giao diện (Frontend) của 5 thành viên được đ�
    - Form nhập liệu dùng `react-hook-form` kết hợp `zod` schema hiển thị lỗi tiếng Việt.
    - API client đặt tại `src/features/<module>/api/index.ts` hỗ trợ song song Mock Store (`mockStore`) và Backend Spring Boot qua `APP_CONFIG.useMockApi`.
 5. **Mẫu tham chiếu nhanh:** Xem chi tiết tại `.agents/skills/localpress-frontend/references/` và các code mẫu trong `.agents/skills/localpress-frontend/examples/`.
+
+---
+
+## 8. CẨM NANG REVIEW & PHÒNG THI (`iter-review`)
+Toàn bộ kịch bản Review cá nhân 1-1 trên lớp với Giảng viên được hệ thống hóa qua **Workspace Skill `iter-review`** (đặt tại `.agents/skills/iter-review/SKILL.md`). Skill này cung cấp:
+1. **Bảng Mapping toàn diện:** Tra cứu tức thì từ Use Case (`UC001` - `UC077`) sang URL Route ("mở link nào"), Frontend Page/Component, Backend Controller/Service, và Bảng CSDL.
+2. **Kịch bản điều hướng theo vai trò:** Trình tự demo từng bước trên giao diện (Kế toán SV4 duyệt chuyển khoản & kiểm soát sổ cái, Doanh nghiệp SV1 đặt vị trí, Độc giả SV3 đọc báo Free/Paywall, CMS SV5 soạn bài).
+3. **Cẩm nang sửa code logic (Live-coding):** Vị trí chính xác từng file và cách sửa nhanh khi giảng viên yêu cầu sửa tại chỗ (validate dữ liệu, lưu lý do từ chối, kiểm soát quy tắc 4 mắt, lọc sổ quỹ theo khoảng tiền, format hiển thị).
+

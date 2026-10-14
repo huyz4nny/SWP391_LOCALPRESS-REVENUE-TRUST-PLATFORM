@@ -199,6 +199,24 @@ public class Transaction {
     }
 
     /**
+     * Xác nhận thanh toán tự động qua cổng thanh toán / Webhook IPN (UC049).
+     */
+    public void markPaidByGateway(String gatewayTxId, String bankCode) {
+        if (this.status == TransactionStatus.SUCCESS) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        this.status = TransactionStatus.SUCCESS;
+        this.paidAt = now;
+        if (gatewayTxId != null && !gatewayTxId.isBlank() && this.gatewayTransactionId == null) {
+            this.gatewayTransactionId = gatewayTxId.trim();
+        }
+        if (bankCode != null && !bankCode.isBlank()) {
+            this.bankCode = bankCode.trim().toUpperCase();
+        }
+    }
+
+    /**
      * Lấy ID đối tượng nghiệp vụ được thanh toán tương ứng.
      */
     public Long resolveTargetId() {

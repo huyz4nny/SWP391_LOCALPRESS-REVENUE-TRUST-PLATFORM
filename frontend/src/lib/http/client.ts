@@ -187,6 +187,59 @@ class HttpClient {
 
     return response.json()
   }
+
+  public async getBlob(path: string, options?: RequestOptions): Promise<Blob> {
+    const url = this.buildUrl(path, options?.params)
+    const authHeader = this.basicAuth || `Basic ${btoa('ketoan@localpress.vn:password123')}`
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(authHeader ? { Authorization: authHeader } : {}),
+        ...options?.headers,
+      },
+    })
+
+    if (!response.ok) {
+      throw new AppApiError({
+        timestamp: new Date().toISOString(),
+        status: response.status,
+        error: response.statusText,
+        message: this.extractErrorMessage(response.status, undefined, 'Lỗi tải tệp tin'),
+        path,
+      })
+    }
+
+    return response.blob()
+  }
+
+  public async putFormData<T>(path: string, body: FormData, options?: RequestOptions): Promise<T> {
+    const url = this.buildUrl(path, options?.params)
+    const authHeader = this.basicAuth || `Basic ${btoa('ketoan@localpress.vn:password123')}`
+    const headers: Record<string, string> = {
+      ...(authHeader ? { Authorization: authHeader } : {}),
+      ...options?.headers,
+    }
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body,
+    })
+
+    if (!response.ok) {
+      const errorJson = await response.json().catch(() => ({}))
+      throw new AppApiError({
+        timestamp: new Date().toISOString(),
+        status: response.status,
+        error: response.statusText,
+        message: this.extractErrorMessage(response.status, errorJson, 'Lỗi tải lên tệp tin'),
+        path,
+        fieldErrors: errorJson.fieldErrors,
+      })
+    }
+
+    return response.json()
+  }
 }
 
 export const httpClient = new HttpClient()

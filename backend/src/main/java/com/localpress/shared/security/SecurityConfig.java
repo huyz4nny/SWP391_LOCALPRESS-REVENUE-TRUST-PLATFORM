@@ -68,6 +68,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/editorial/**").hasAnyRole("EDITOR", "AUTHOR", "STAFF", "SYSTEM_ADMIN")
 
                         // 8. Phân hệ Kế toán, Thanh toán & Đối soát (SV4 - Huy Leader)
+                        // Cho phép độc giả / doanh nghiệp đã đăng nhập tạo đơn và tra cứu trạng thái đơn hàng của mình
+                        .requestMatchers(HttpMethod.POST, "/api/v1/finance/orders", "/api/v1/finance/checkout", "/api/v1/finance/orders/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/finance/orders/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)
