@@ -76,7 +76,7 @@ Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BU�
 20. **Quản trị tầng dùng chung & Cấu hình môi trường (Shared & Config Invariants):**
     - Cấu hình Spring Security chỉ có DUY NHẤT 1 file master là `com.localpress.shared.security.SecurityConfig.java` do Leader SV4 làm chủ. Cấm các nhánh thành viên tự tạo thêm file SecurityConfig riêng để tránh lỗi trùng Bean làm crash server.
     - Mật khẩu MySQL trong `application-dev.yml` mặc định là `password`. Tuyệt đối không commit mật khẩu MySQL cá nhân lên git làm hỏng môi trường của người khác.
-    - Toàn bộ tài khoản seed data trong `seed_data.sql` có mật khẩu mặc định là `password` (mã băm BCrypt chuẩn).
+    - Toàn bộ tài khoản seed data trong `seed_data.sql` có mật khẩu mặc định là `password` hoặc `password123` (`SecurityConfig` hỗ trợ linh hoạt cả 2).
     - Ở Frontend, điều hướng sau khi đăng nhập thật bắt buộc dùng `PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)`, tuyệt đối không gán cứng URL sang một phân hệ cụ thể.
 21. **Quy tắc đồng bộ bộ nhớ kép (Dual-Workspace Memory Sync):** Mọi cập nhật tài liệu ngữ cảnh, quy tắc kiến trúc, quy chuẩn code hoặc bài học ghi nhớ mới BẮT BUỘC phải được ghi và đồng bộ song song vào CẢ 2 NƠI: (1) `E:\FPTU\FALL26\SWP391\AGENTS.md` (Repo gốc) và (2) `E:\FPTU\FALL26\SWP391\huyz4nny\AGENTS.md` (Thư mục làm việc của Leader Huy). Tuyệt đối không để lệch thông tin giữa 2 thư mục này.
 
@@ -156,3 +156,12 @@ Toàn bộ mã nguồn giao diện (Frontend) của 5 thành viên được đ�
    - Form nhập liệu dùng `react-hook-form` kết hợp `zod` schema hiển thị lỗi tiếng Việt.
    - API client đặt tại `src/features/<module>/api/index.ts` hỗ trợ song song Mock Store (`mockStore`) và Backend Spring Boot qua `APP_CONFIG.useMockApi`.
 5. **Mẫu tham chiếu nhanh:** Xem chi tiết tại `.agents/skills/localpress-frontend/references/` và các code mẫu trong `.agents/skills/localpress-frontend/examples/`.
+
+---
+
+## 8. CẨM NANG REVIEW & PHÒNG THI (`iter-review`)
+Toàn bộ kịch bản Review cá nhân 1-1 trên lớp với Giảng viên được hệ thống hóa qua **Workspace Skill `iter-review`** (đặt tại `.agents/skills/iter-review/SKILL.md`). Skill này cung cấp:
+1. **Bảng Mapping toàn diện:** Tra cứu tức thì từ Use Case (`UC001` - `UC077`) sang URL Route ("mở link nào"), Frontend Page/Component, Backend Controller/Service, và Bảng CSDL.
+2. **Kịch bản điều hướng theo vai trò:** Trình tự demo từng bước trên giao diện (Kế toán SV4 duyệt chuyển khoản & kiểm soát sổ cái, Doanh nghiệp SV1 đặt vị trí, Độc giả SV3 đọc báo Free/Paywall, CMS SV5 soạn bài).
+3. **Cẩm nang sửa code logic (Live-coding):** Vị trí chính xác từng file và cách sửa nhanh khi giảng viên yêu cầu sửa tại chỗ (validate dữ liệu, lưu lý do từ chối, kiểm soát quy tắc 4 mắt, lọc sổ quỹ theo khoảng tiền, format hiển thị).
+

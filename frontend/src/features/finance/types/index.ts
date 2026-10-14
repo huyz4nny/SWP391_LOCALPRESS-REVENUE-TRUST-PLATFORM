@@ -1,6 +1,6 @@
 export type OrderType = 'SUBSCRIPTION' | 'ARTICLE_PURCHASE' | 'AD_CAMPAIGN'
 
-export type PaymentMethod = 'VIETQR' | 'BANK_TRANSFER' | 'VNPAY' | 'MOMO'
+export type PaymentMethod = 'SEPAY' | 'VIETQR' | 'BANK_TRANSFER' | 'MANUAL_BANK_TRANSFER' | 'VNPAY' | 'MOMO'
 
 export type OrderPaymentStatus =
   | 'PENDING'
@@ -48,12 +48,14 @@ export interface Order {
 }
 
 export type RefundStatus =
+  | 'PENDING'
   | 'REQUESTED'
   | 'UNDER_REVIEW'
   | 'APPROVED'
   | 'REJECTED'
   | 'PROCESSING'
   | 'SUCCEEDED'
+  | 'COMPLETED'
   | 'FAILED'
 
 export interface RefundRequest {

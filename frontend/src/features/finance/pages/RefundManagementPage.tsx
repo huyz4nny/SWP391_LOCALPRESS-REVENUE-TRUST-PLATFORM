@@ -178,7 +178,7 @@ export function RefundManagementPage() {
                       <StatusBadge type="refund" status={r.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {r.status === 'UNDER_REVIEW' ? (
+                      {r.status === 'UNDER_REVIEW' || r.status === 'PENDING' ? (
                         <Button
                           size="sm"
                           onClick={() => {
