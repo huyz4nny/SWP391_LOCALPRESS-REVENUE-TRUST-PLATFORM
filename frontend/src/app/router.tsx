@@ -72,6 +72,10 @@ import {
   AuditLogsPage,
 } from '@/features/administration'
 
+import {
+  ArticleEditorPage as ContentArticleEditorPage,
+} from '@/features/content/pages/ArticleEditorPage'
+
 function NotFoundPage() {
   return (
     <div className="max-w-md mx-auto py-20 text-center space-y-4">
@@ -91,7 +95,9 @@ function NotFoundPage() {
 }
 
 // Role permission groups for backoffice routing
-const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'AUTHOR', 'SYSTEM_ADMIN']
+const ARTICLE_LIST_ROLES: UserRole[] = ['AUTHOR', 'EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
+const ARTICLE_WRITING_ROLES: UserRole[] = ['AUTHOR', 'EDITOR', 'SYSTEM_ADMIN']
+const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
 const FINANCE_ROLES: UserRole[] = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN']
 const ADMIN_ROLES: UserRole[] = ['SYSTEM_ADMIN']
 
@@ -102,6 +108,15 @@ function BackofficeIndexRedirect() {
 }
 
 export const router = createBrowserRouter([
+  {
+    path: '/content/articles/new',
+    element: <ContentArticleEditorPage />,
+  },
+  {
+    path: '/content/articles/:id',
+    element: <ContentArticleEditorPage />,
+  },
+
   // 1. Public Reader Routes
   {
     path: '/',
@@ -163,11 +178,11 @@ export const router = createBrowserRouter([
       // Điều hướng tự động về phân hệ đúng thẩm quyền của vai trò hiện tại
       { index: true, element: <BackofficeIndexRedirect /> },
 
-      // Tòa Soạn & Biên Tập (SV2: Editor / Reviewer / Author / Admin)
+      // Tòa Soạn & Biên Tập (SV2: Editor / Reviewer / Admin)
       {
         path: 'editorial',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_LIST_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <ArticleListPage />
           </ProtectedRoute>
         ),
@@ -175,7 +190,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial/articles',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_LIST_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <ArticleListPage />
           </ProtectedRoute>
         ),
@@ -183,7 +198,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial/articles/new',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_WRITING_ROLES} subsystemName="Soạn bài (SV5)">
             <ArticleEditorPage />
           </ProtectedRoute>
         ),
@@ -191,7 +206,7 @@ export const router = createBrowserRouter([
       {
         path: 'editorial/articles/:id/edit',
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={ARTICLE_WRITING_ROLES} subsystemName="Soạn bài (SV5)">
             <ArticleEditorPage />
           </ProtectedRoute>
         ),

@@ -5,6 +5,7 @@ import { readerApi } from '../api'
 import { mockStore } from '@/mocks/store'
 import { ArticleCard, getCategoryBadgeStyle } from '../components/ArticleCard'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
+import { EmptyState } from '@/components/shared/EmptyState'
 import {
   Crown,
   TrendingUp,
@@ -22,6 +23,7 @@ export function HomePage() {
   const [articles, setArticles] = useState<Article[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [entitlements, setEntitlements] = useState(mockStore.getEntitlements(mockStore.getCurrentUser().id))
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false)
@@ -37,6 +39,7 @@ export function HomePage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [artData, catData] = await Promise.all([
         readerApi.getArticles(),
         readerApi.getCategories(),
@@ -44,7 +47,9 @@ export function HomePage() {
       setArticles(artData)
       setCategories(catData)
     } catch (err) {
-      console.error(err)
+      setLoadError(err instanceof Error ? err.message : 'Không tải được trang chủ. Vui lòng thử lại.')
+      setArticles([])
+      setCategories([])
     } finally {
       setLoading(false)
     }
@@ -78,6 +83,17 @@ export function HomePage() {
           <div className="h-64 bg-stone-200 rounded-xl" />
         </div>
       </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <EmptyState
+        title="Không tải được tin bài"
+        description={loadError}
+        actionLabel="Thử lại"
+        onAction={() => loadData()}
+      />
     )
   }
 

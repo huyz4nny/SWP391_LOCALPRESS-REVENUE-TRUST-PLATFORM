@@ -34,3 +34,4 @@ localpress:
     env: ${SEPAY_ENV:production}
     bank-code: ${SEPAY_BANK_CODE:VCB}
     account-name: ${SEPAY_ACCOUNT_NAME:NGUYEN VAN QUANG HUY}
+

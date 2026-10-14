@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Article, ArticleStatus } from '@/features/reader/types'
-import { editorialApi } from '../api'
+import { editorialApi, type ArticleListItem } from '../api'
+import { PERMISSION_CHECKERS } from '@/app/config'
 import { mockStore } from '@/mocks/store'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -25,41 +26,49 @@ import {
 export function ArticleListPage() {
   const navigate = useNavigate()
   const currentUser = mockStore.getCurrentUser()
+  const isAuthor = currentUser.role === 'AUTHOR'
+  const canReview = PERMISSION_CHECKERS.canPublishArticles(currentUser.role)
   const isReviewer = currentUser.role === 'REVIEWER' || currentUser.role === 'SYSTEM_ADMIN'
 
-  const [articles, setArticles] = useState<Article[]>([])
+  const [articles, setArticles] = useState<ArticleListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [search, setSearch] = useState('')
 
   // Review modal
-  const [reviewArticle, setReviewArticle] = useState<Article | null>(null)
+  const [reviewArticle, setReviewArticle] = useState<ArticleListItem | null>(null)
   const [reviewAction, setReviewAction] = useState<'APPROVE' | 'REJECT' | 'PUBLISH' | 'UNPUBLISH'>('APPROVE')
   const [reviewNotes, setReviewNotes] = useState('')
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
   useEffect(() => {
     loadArticles()
-  }, [])
+  }, [currentUser.id, currentUser.role])
 
   const loadArticles = async () => {
     try {
       setLoading(true)
-      const data = await editorialApi.getArticles()
-      setArticles(data)
+      setLoadError('')
+      const data = isAuthor ? await editorialApi.getMyArticles() : await editorialApi.getArticles()
+      setArticles(isAuthor ? data.filter((article) => article.authorId === currentUser.id) : data)
+    } catch (error: unknown) {
+      setArticles([])
+      setLoadError(error instanceof Error ? error.message : 'Không tải được danh sách bài viết')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleOpenReview = (art: Article, action: 'APPROVE' | 'REJECT' | 'PUBLISH' | 'UNPUBLISH') => {
+  const handleOpenReview = (art: ArticleListItem, action: 'APPROVE' | 'REJECT' | 'PUBLISH' | 'UNPUBLISH') => {
+    if (!canReview) return
     setReviewArticle(art)
     setReviewAction(action)
     setReviewNotes('')
   }
 
   const handleExecuteReview = async () => {
-    if (!reviewArticle) return
+    if (!canReview || !reviewArticle) return
     setIsSubmittingReview(true)
 
     try {
@@ -90,7 +99,7 @@ export function ArticleListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Quản lý Bài viết & Tòa soạn
+            {isAuthor ? 'Bài viết của tôi' : 'Quản lý Bài viết & Tòa soạn'}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             Quy trình xuất bản: Bản nháp → Chờ duyệt → Cần sửa / Đã duyệt → Xuất bản lên báo
@@ -104,6 +113,8 @@ export function ArticleListPage() {
           </Button>
         </Link>
       </div>
+
+      {loadError && <p role="alert" className="text-sm text-red-600">{loadError}</p>}
 
       {/* Filter Toolbar */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -159,12 +170,16 @@ export function ArticleListPage() {
               {filteredArticles.map((art) => (
                 <tr key={art.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-4 py-3 max-w-sm">
-                    <Link
-                      to={`/backoffice/editorial/articles/${art.id}/edit`}
-                      className="font-serif font-bold text-slate-900 hover:text-sky-700 line-clamp-2"
-                    >
-                      {art.title}
-                    </Link>
+                    {isAuthor && art.status !== 'DRAFT' ? (
+                      <span className="font-serif font-bold text-slate-900 line-clamp-2">{art.title}</span>
+                    ) : (
+                      <Link
+                        to={`/backoffice/editorial/articles/${art.id}/edit`}
+                        className="font-serif font-bold text-slate-900 hover:text-sky-700 line-clamp-2"
+                      >
+                        {art.title}
+                      </Link>
+                    )}
                     <span className="text-[10px] text-slate-400 mt-0.5 block">
                       Cập nhật: {formatDateTime(art.updatedAt)}
                     </span>
@@ -190,15 +205,18 @@ export function ArticleListPage() {
                     <StatusBadge type="article" status={art.status} />
                   </td>
                   <td className="px-4 py-3 text-right space-x-1 shrink-0">
-                    <Link
-                      to={`/backoffice/editorial/articles/${art.id}/edit`}
-                      className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
-                    >
-                      <Edit className="w-3 h-3 mr-1" /> Sửa
-                    </Link>
+                    {(!isAuthor || art.status === 'DRAFT') && (
+                      <Link
+                        to={`/backoffice/editorial/articles/${art.id}/edit`}
+                        className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
+                      >
+                        <Edit className="w-3 h-3 mr-1" /> Sửa
+                      </Link>
+                    )}
 
                     {/* Reviewer / Admin Workflow Actions */}
-                    {art.status === 'IN_REVIEW' && (
+{canReview &&
+  (art.status === 'IN_REVIEW' || art.status === 'CHANGES_REQUESTED') && (
                       <>
                         <button
                           onClick={() => handleOpenReview(art, 'APPROVE')}
@@ -206,16 +224,19 @@ export function ArticleListPage() {
                         >
                           Duyệt
                         </button>
-                        <button
-                          onClick={() => handleOpenReview(art, 'REJECT')}
-                          className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
-                        >
-                          Yêu cầu sửa
-                        </button>
+                        {art.status === 'IN_REVIEW' && (
+                          <button
+                            onClick={() => handleOpenReview(art, 'REJECT')}
+                            className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
+                          >
+                            Yêu cầu sửa
+                          </button>
+                        )}
                       </>
                     )}
 
-                    {art.status === 'APPROVED' && (
+{canReview &&
+  (art.status === 'APPROVED' || art.status === 'UNPUBLISHED') && (
                       <button
                         onClick={() => handleOpenReview(art, 'PUBLISH')}
                         className="px-2 py-1 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold cursor-pointer"
@@ -224,7 +245,7 @@ export function ArticleListPage() {
                       </button>
                     )}
 
-                    {art.status === 'PUBLISHED' && (
+                    {canReview && art.status === 'PUBLISHED' && (
                       <button
                         onClick={() => handleOpenReview(art, 'UNPUBLISH')}
                         className="px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold cursor-pointer"
@@ -256,13 +277,36 @@ export function ArticleListPage() {
           }
         >
           <div className="space-y-4 text-xs">
-            <p className="text-slate-600">
-              Bài viết: <strong>{reviewArticle.title}</strong> (Tác giả: {reviewArticle.authorName})
-            </p>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>Tác giả: <strong>{reviewArticle.authorName}</strong></span>
+                <span>Phiên bản: <strong>v{reviewArticle.currentVersion || 1}</strong> • {reviewArticle.categoryName}</span>
+              </div>
+              <h4 className="font-serif font-bold text-slate-900 text-sm">
+                {reviewArticle.title}
+              </h4>
+              <p className="font-medium text-slate-700 italic">
+                {reviewArticle.sapo}
+              </p>
+              <div className="text-slate-600 pt-2 border-t border-slate-200 whitespace-pre-line">
+                {reviewArticle.content}
+              </div>
+              {reviewArticle.versions && reviewArticle.versions.length > 0 && (
+                <div className="pt-2 border-t border-slate-200 space-y-1">
+                  <span className="font-semibold text-slate-700 block">Lịch sử phiên bản ({reviewArticle.versions.length}):</span>
+                  {reviewArticle.versions.map((ver) => (
+                    <div key={ver.versionNumber} className="text-[11px] text-slate-500 flex justify-between bg-white px-2 py-1 rounded border border-slate-100">
+                      <span><strong>v{ver.versionNumber}:</strong> {ver.title}</span>
+                      <span className="text-slate-400 ml-2 shrink-0">{ver.changelog || 'Bản thảo'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div>
               <Label htmlFor="reviewNote">
-                {reviewAction === 'REJECT' ? 'Nêu chi tiết yêu cầu phóng viên bổ sung/sửa đổi' : 'Ghi chú kiểm duyệt (tùy chọn)'}
+                {reviewAction === 'REJECT' ? 'Nêu chi tiết yêu cầu phóng viên bổ sung/sửa đổi' : 'Ghi chú kiểm duyệt lưu vào MySQL (tùy chọn)'}
               </Label>
               <Textarea
                 id="reviewNote"

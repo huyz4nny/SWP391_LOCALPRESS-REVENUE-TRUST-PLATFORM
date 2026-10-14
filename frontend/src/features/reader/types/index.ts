@@ -30,8 +30,12 @@ export interface Article {
   categoryName: string
   categorySlug: string
   coverImage: string
+  coverCaption?: string | null
+  coverAltText?: string | null
+  coverSource?: string | null
   tags: string[]
   isPremium: boolean
+  isLocked?: boolean
   price: number // Single article price if premium (e.g. 15.000 VND)
   status: ArticleStatus
   reviewNotes?: string
