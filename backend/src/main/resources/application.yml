@@ -14,7 +14,7 @@ server:
 
 localpress:
   google:
-    client-id: ${GOOGLE_CLIENT_ID:}
+    client-id: ${GOOGLE_CLIENT_ID:847537323970-evboogid431elvcatmp52ii98jtec0ke.apps.googleusercontent.com}
   jwt:
     # Empty in local development: generate an ephemeral key at startup.
     # Deployment must supply a random secret of at least 32 UTF-8 bytes.
