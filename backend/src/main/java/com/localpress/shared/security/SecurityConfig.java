@@ -1,6 +1,9 @@
 package com.localpress.shared.security;
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
+import com.localpress.identity.service.JwtTokenService;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -38,7 +41,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JdbcTemplate jdbc) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -58,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/ad-slots/**").permitAll()
 
                         // 5. Cổng xác thực & Webhook IPN cổng thanh toán (SV4 - Rule 4, 5)
+                        .requestMatchers("/api/v1/auth/me").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/finance/webhook/**").permitAll()
 
@@ -77,7 +81,15 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .httpBasic(Customizer.withDefaults())
+                .addFilterBefore(new JwtAuthenticationFilter(tokens, jdbc), UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    @Bean
+    public JwtTokenService jwtTokenService(
+            @Value("${localpress.jwt.secret:}") String secret,
+            @Value("${localpress.jwt.expiration-ms:3600000}") long expirationMs) {
+        return new JwtTokenService(secret, expirationMs);
     }
 
     @Bean

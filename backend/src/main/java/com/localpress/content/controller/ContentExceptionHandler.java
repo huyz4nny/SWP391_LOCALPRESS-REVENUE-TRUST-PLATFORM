@@ -13,6 +13,7 @@ import java.util.Map;
 
 @RestControllerAdvice(assignableTypes = {
         ArticleDraftController.class,
+        ArticleDraftSaveController.class,
         ArticleMetadataController.class,
         ArticleMediaController.class
 })

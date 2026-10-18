@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Article, ArticleVersion } from '@/features/reader/types'
 import { editorialApi, type EditorialCategoryOption } from '../api'
 import { contentApi } from '@/features/content/api'
+import { APP_CONFIG } from '@/app/config'
 import { mockStore } from '@/mocks/store'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -91,7 +92,7 @@ export function ArticleEditorPage() {
         const [categoryOptions, article] = await Promise.all([
           editorialApi.getCategories(),
           isEditing && id
-            ? (isAuthor ? contentApi.getDraft(id).then((draft) => ({
+            ? (!APP_CONFIG.useMockApi ? contentApi.getDraft(id).then((draft) => ({
                 title: draft.title,
                 sapo: draft.sapo,
                 content: draft.content,
@@ -120,7 +121,7 @@ export function ArticleEditorPage() {
           setCoverCaption(article.coverCaption ?? '')
           setCoverAltText(article.coverAltText ?? '')
           setCoverSource(article.coverSource ?? '')
-          setCategoryId(isAuthor
+          setCategoryId(!APP_CONFIG.useMockApi
             ? categoryOptions.find((category) => category.apiId === article.categoryId)?.id ?? ''
             : article.categoryId)
           setTags((article.tags ?? []).join(', '))
@@ -203,10 +204,32 @@ export function ArticleEditorPage() {
       return
     }
 
+    if (!APP_CONFIG.useMockApi && submitForReview) {
+      alert('Hãy lưu bản nháp trước. Luồng gửi duyệt cần API riêng của quy trình kiểm duyệt.')
+      return
+    }
     setIsSaving(true)
     try {
       const selectedCat = categories.find((c) => c.id === categoryId)
       const tagsArray = tags.split(',').map((t) => t.trim()).filter(Boolean)
+      if (!APP_CONFIG.useMockApi) {
+        const numericCategoryId = Number(selectedCat?.apiId)
+        if (!Number.isSafeInteger(numericCategoryId) || numericCategoryId <= 0) {
+          throw new Error('Vui lòng chọn chuyên mục hợp lệ')
+        }
+        await contentApi.saveDraft(isEditing ? id : undefined, {
+          categoryId: numericCategoryId,
+          title, sapo, content,
+          coverImageUrl: coverImage,
+          tags: tagsArray,
+          isPremium,
+          price: isPremium ? price : 0,
+          changelog,
+          imageInfo: !coverFile && hasStoredCover ? imageInfo : undefined,
+        }, coverFile, imageInfo)
+        navigate('/backoffice/editorial/articles')
+        return
+      }
 
       const articlePayload: Partial<Article> = {
         title,

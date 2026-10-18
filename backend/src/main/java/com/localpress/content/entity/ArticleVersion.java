@@ -128,6 +128,20 @@ public class ArticleVersion {
         this.metadata = updatedMetadata;
     }
 
+    public void updateDraftContent(String title, String sapo, String content, String changelog) {
+        if (reviewStatus != ReviewStatus.DRAFT) {
+            throw new IllegalStateException("Chỉ được sửa nội dung phiên bản nháp");
+        }
+        this.title = title.trim();
+        this.sapo = sapo;
+        this.content = content;
+        if (changelog != null) {
+            Map<String, Object> updated = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
+            putOrRemove(updated, "changelog", changelog);
+            this.metadata = updated;
+        }
+    }
+
     public void updateDraftPresentation(String coverImage, java.util.List<String> tags) {
         if (reviewStatus != ReviewStatus.DRAFT) {
             throw new IllegalStateException("Chỉ được cập nhật metadata của phiên bản nháp");

@@ -2,6 +2,7 @@ import { httpClient } from '@/lib/http/client'
 
 import type {
     CategoryOption,
+    SaveArticleDraftRequest,
     CreateArticleDraftRequest,
     ArticleDraftResponse,
     ArticleDraftDetailResponse,
@@ -11,6 +12,18 @@ import type {
 } from '../types'
 
 export const contentApi = {
+    saveDraft(id: string | undefined, request: SaveArticleDraftRequest,
+              file?: File | null, info?: CoverImageInfoRequest): Promise<ArticleDraftDetailResponse> {
+        const path = id ? `/articles/${encodeURIComponent(id)}` : '/articles/drafts'
+        if (file) {
+            const body = new FormData()
+            body.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }))
+            body.append('file', file)
+            body.append('info', new Blob([JSON.stringify(info)], { type: 'application/json' }))
+            return id ? httpClient.putFormData(path, body) : httpClient.postFormData(path, body)
+        }
+        return id ? httpClient.put(path, request) : httpClient.post(path, request)
+    },
     getCategories(): Promise<CategoryOption[]> {
         return httpClient.get<CategoryOption[]>('/categories')
     },

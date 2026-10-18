@@ -12,6 +12,19 @@ export interface CreateArticleDraftRequest {
     source?: string | null
 }
 
+export interface SaveArticleDraftRequest {
+    categoryId: number
+    title: string
+    sapo: string
+    content: string
+    coverImageUrl: string
+    tags: string[]
+    isPremium: boolean
+    price: number
+    changelog?: string
+    imageInfo?: CoverImageInfoRequest
+}
+
 export interface ArticleDraftResponse {
     id: string
     slug: string
