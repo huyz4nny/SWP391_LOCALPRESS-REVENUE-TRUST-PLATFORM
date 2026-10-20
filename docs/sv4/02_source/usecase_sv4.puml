@@ -1,0 +1,132 @@
+@startuml usecase_sv4
+title LocalPress — Finance, Payment and Accounting (SV4, UC047 - UC060)
+
+left to right direction
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam nodesep 14
+skinparam ranksep 90
+
+skinparam rectangle {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+    BorderThickness 1.5
+    FontColor black
+    FontStyle bold
+    FontSize 14
+}
+skinparam actor {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+    FontColor black
+    FontSize 11
+}
+skinparam usecase {
+    BackgroundColor white
+    BorderColor #000000
+    BorderThickness 1
+    FontColor black
+    FontSize 11
+}
+skinparam arrow {
+    Color #000000
+    FontColor #000000
+    FontSize 10
+}
+
+' Actors Left
+actor "CUSTOMER\nReader / Advertiser" as Customer
+actor "ACCOUNTANT\nFinance Staff" as Accountant
+actor "CHIEF ACCOUNTANT\nApprover (2nd eye)" as Chief
+
+' System Boundary
+rectangle "LocalPress System" {
+
+    ' Customer payment
+    usecase "Create Payment Transaction\nUC047" as UC047
+    usecase "Generate SePay QR Code" as GenQR
+    usecase "Pay With Wallet" as PayWallet
+    usecase "Top Up Wallet" as TopUp
+    usecase "Check Payment Status\nUC050" as UC050
+
+    ' Gateway
+    usecase "Handle Payment Webhook\nUC049" as UC049
+    usecase "Verify Payment Result\nUC048" as UC048
+
+    ' Complaint (replaces manual transfer approval)
+    usecase "Handle Unrecorded Payment Complaint\nUC051" as UC051
+    usecase "Match Bank Statement" as MatchStmt
+
+    ' Ledger & documents
+    usecase "View Financial Ledger\nUC058" as UC058
+    usecase "Generate Financial Documents\nUC057" as UC057
+
+    ' Receivables, reconciliation, dashboard
+    usecase "Manage Advertiser Receivables\nUC053" as UC053
+    usecase "Reconcile Payment Mismatch\nUC054" as UC054
+    usecase "View Cash Flow Dashboard\nUC052" as UC052
+    usecase "Export Financial Report\nUC059" as UC059
+    usecase "View Financial Alerts\nUC060" as UC060
+
+    ' Refund
+    usecase "Process Refund Request\nUC055" as UC055
+    usecase "Adjust Reading or Campaign Rights\nUC056" as UC056
+}
+
+' Actors Right
+actor "Payment Gateway\nSePay" as Gateway
+actor "Bank Partner\nBank Statement" as Bank
+actor "SV1 / SV3 Modules\nPaymentSuccessEvent\nRefundCompletedEvent" as Modules
+
+' Customer associations
+Customer -- UC047
+Customer -- TopUp
+Customer -- UC050
+Customer -- UC051
+
+' Accountant associations
+Accountant -- UC051
+Accountant -- UC058
+Accountant -- UC057
+Accountant -- UC053
+Accountant -- UC054
+Accountant -- UC055
+Accountant -- UC052
+Accountant -- UC060
+
+' Chief Accountant associations
+Chief -- UC055
+Chief -- UC052
+Chief -- UC059
+
+' Gateway, bank, modules (right side)
+UC049 -- Gateway
+MatchStmt -- Bank
+UC049 -- Modules
+UC056 -- Modules
+
+' Include relationships
+UC047 ..> GenQR : <<include>>
+TopUp ..> UC047 : <<include>>
+UC049 ..> UC048 : <<include>>
+UC051 ..> MatchStmt : <<include>>
+UC051 ..> UC049 : <<include>>
+UC054 ..> MatchStmt : <<include>>
+UC055 ..> UC056 : <<include>>
+
+' Extend relationships
+PayWallet ..> UC047 : <<extend>>
+UC057 ..> UC058 : <<extend>>
+UC059 ..> UC052 : <<extend>>
+
+note bottom of "LocalPress System"
+Solid lines: actor associations · Dashed arrows: include / extend relationships
+UC051 replaces "Confirm Manual Bank Transfer": the customer submits a complaint, the accountant matches the bank statement,
+then records it through the same idempotent webhook logic (UC049) - there is no manual "mark as PAID".
+UC055 Four-Eyes: proposer (Accountant) and approver (Chief Accountant) are the logged-in users and must differ.
+UC055 refund of a wallet-paid order is credited back to the wallet; TOPUP / REFUND transactions cannot be refunded.
+UC056 (Rule 17): SV4 never updates SV1 / SV3 tables; it publishes RefundCompletedEvent and their listeners adjust rights.
+end note
+
+@enduml

@@ -4,6 +4,7 @@ import { SEED_SUBSCRIPTION_PLANS } from '@/mocks/data/seed'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { httpClient } from '@/lib/http/client'
+import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
 import { Crown, Check, Sparkles, HelpCircle, ShieldCheck, Zap } from 'lucide-react'
 
@@ -28,7 +29,7 @@ export function PremiumPlansPage() {
         amount: plan.price,
         paymentMethod: 'VIETQR',
       })
-      navigate(`/checkout/${order.id}`)
+      navigate(paymentPath(order), { state: { returnUrl: '/account/subscription' } })
     } catch (err) {
       console.error(err)
     } finally {

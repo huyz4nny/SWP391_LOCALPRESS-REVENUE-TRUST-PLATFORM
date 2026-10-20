@@ -9,9 +9,11 @@ import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
+import com.localpress.shared.event.RefundCompletedEvent;
 import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,9 @@ import java.util.List;
  * Tuân thủ bất biến:
  * 1. Rule 11 (Refund Cap): Tổng số tiền hoàn qua các đợt không vượt quá số tiền thực thu.
  * 2. Four-Eyes Principle: Người đề xuất != Người phê duyệt.
- * 3. UC056: Tự động thu hồi quyền đọc bài/hủy gói cước/dừng chiến dịch quảng cáo khi hoàn tiền.
+ * 3. UC056 theo Rule 17: SV4 chỉ xử lý tiền (bút toán REFUND, hoàn ví) rồi phát RefundCompletedEvent.
+ *    Thu hồi quyền đọc / hủy gói (SV3) và dừng chiến dịch (SV1) do module sở hữu tự làm qua @EventListener,
+ *    SV4 không sửa bảng article_purchases / subscriptions / ad_campaigns.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +42,8 @@ public class RefundManagementService {
     private final RefundRequestRepository refundRequestRepository;
     private final TransactionRepository transactionRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final WalletService walletService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * UC055: Lấy danh sách tất cả các yêu cầu hoàn tiền.
@@ -123,6 +129,13 @@ public class RefundManagementService {
 
         Transaction originalTx = transactionRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng #" + request.getOrderId(), HttpStatus.NOT_FOUND));
+
+        if (originalTx.getTransactionType() == TransactionType.REFUND || originalTx.getTransactionType() == TransactionType.TOPUP) {
+            throw new AppException(
+                    "Không thể hoàn tiền cho giao dịch loại " + originalTx.getTransactionType() + " (chỉ hoàn đơn mua bài, gói hoặc quảng cáo)",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
 
         if (originalTx.getStatus() != TransactionStatus.SUCCESS) {
             throw new AppException(
@@ -234,18 +247,31 @@ public class RefundManagementService {
                     .reconciledBy(reviewerUserId)
                     .build();
 
-            transactionRepository.save(refundTx);
+            Transaction savedRefundTx = transactionRepository.save(refundTx);
+
+            // Đơn đã trả bằng Ví LocalPress: tiền hoàn trả lại vào ví (idempotent theo UNIQUE(transaction_id, direction)).
+            // Đơn trả qua QR SePay: tiền chuyển trả khách ngoài hệ thống, chỉ ghi bút toán đảo.
+            if ("WALLET".equals(originalTx.getPaymentMethod())) {
+                walletService.credit(savedRefundTx, refund.getRefundAmount(),
+                        "Hoàn tiền đơn " + originalTx.getGatewayTransactionId() + " (yêu cầu #" + refund.getRefundId() + ")");
+            }
 
             // 2. Cập nhật trạng thái đơn gốc sang REFUNDED nếu đã hoàn toàn bộ
             BigDecimal totalRefunded = refundRequestRepository.sumCommittedRefundsByTransactionId(originalTx.getTransactionId(), null);
-            if (totalRefunded != null && totalRefunded.compareTo(originalTx.getAmount()) >= 0) {
+            if (totalRefunded == null) {
+                totalRefunded = refund.getRefundAmount();
+            }
+            boolean fullRefund = totalRefunded.compareTo(originalTx.getAmount()) >= 0;
+            if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);
                 transactionRepository.save(originalTx);
             }
 
-            // 3. UC056: Tự động thu hồi quyền lợi (Điều chỉnh quyền độc giả hoặc chiến dịch quảng cáo)
-            adjustRightsAfterRefund(originalTx);
-            log.info("Đã hoàn tất hoàn tiền #{} và thu hồi quyền lợi của đơn #{}", refundId, originalTx.getTransactionId());
+            // 3. UC056 (Rule 17): phát sự kiện, module SV1 / SV3 tự điều chỉnh quyền của đối tượng mình sở hữu
+            RefundCompletedEvent event = buildRefundEvent(refund, originalTx, savedRefundTx, totalRefunded, fullRefund, now);
+            eventPublisher.publishEvent(event);
+            log.info("Đã hoàn tất hoàn tiền #{} cho đơn #{}, phát RefundCompletedEvent {}#{} (fullRefund={})",
+                    refundId, originalTx.getTransactionId(), event.getTransactionType(), event.getTargetId(), fullRefund);
         }
 
         return RefundDetailResponse.builder()
@@ -261,21 +287,40 @@ public class RefundManagementService {
     }
 
     /**
-     * UC056: Logic nghiệp vụ thu hồi quyền lợi tương ứng với từng loại đơn hàng.
+     * UC056: Đóng gói thông tin cho module sở hữu đối tượng. Loại đơn suy từ khóa ngoại đang có
+     * (purchase / subscription / campaign) để vẫn đúng với dữ liệu cũ chưa ghi transaction_type.
      */
-    private void adjustRightsAfterRefund(Transaction tx) {
-        if (tx.getPurchaseId() != null) {
-            // Mua lẻ bài viết: Thu hồi quyền truy cập (REVOKED)
-            jdbcTemplate.update("UPDATE article_purchases SET access_status = 'REVOKED' WHERE purchase_id = ?", tx.getPurchaseId());
-            log.info("UC056: Đã thu hồi quyền đọc bài viết của purchase_id #{}", tx.getPurchaseId());
-        } else if (tx.getSubscriptionId() != null) {
-            // Gói cước độc giả: Hủy gói cước (CANCELLED)
-            jdbcTemplate.update("UPDATE subscriptions SET status = 'CANCELLED' WHERE subscription_id = ?", tx.getSubscriptionId());
-            log.info("UC056: Đã hủy gói cước độc giả của subscription_id #{}", tx.getSubscriptionId());
-        } else if (tx.getCampaignId() != null) {
-            // Chiến dịch quảng cáo: Tạm dừng phân phối khẩn cấp (SUSPENDED)
-            jdbcTemplate.update("UPDATE ad_campaigns SET status = 'SUSPENDED' WHERE campaign_id = ?", tx.getCampaignId());
-            log.info("UC056: Đã tạm dừng phân phối quảng cáo của campaign_id #{}", tx.getCampaignId());
+    private RefundCompletedEvent buildRefundEvent(RefundRequest refund, Transaction originalTx, Transaction refundTx,
+                                                  BigDecimal totalRefunded, boolean fullRefund, LocalDateTime now) {
+        String type;
+        Long targetId;
+        if (originalTx.getPurchaseId() != null) {
+            type = TransactionType.ARTICLE.name();
+            targetId = originalTx.getPurchaseId();
+        } else if (originalTx.getSubscriptionId() != null) {
+            type = TransactionType.SUBSCRIPTION.name();
+            targetId = originalTx.getSubscriptionId();
+        } else if (originalTx.getCampaignId() != null) {
+            type = TransactionType.AD.name();
+            targetId = originalTx.getCampaignId();
+        } else {
+            type = originalTx.getTransactionType() != null ? originalTx.getTransactionType().name() : null;
+            targetId = null;
         }
+        return RefundCompletedEvent.builder()
+                .refundId(refund.getRefundId())
+                .originalTransactionId(originalTx.getTransactionId())
+                .refundTransactionId(refundTx != null ? refundTx.getTransactionId() : null)
+                .userId(originalTx.getUserId())
+                .transactionType(type)
+                .targetId(targetId)
+                .refundAmount(refund.getRefundAmount())
+                .totalRefunded(totalRefunded)
+                .originalAmount(originalTx.getAmount())
+                .fullRefund(fullRefund)
+                .paymentMethod(originalTx.getPaymentMethod())
+                .reason(refund.getReason())
+                .refundedAt(now)
+                .build();
     }
 }

@@ -64,6 +64,12 @@ public class CreateOrderRequest {
     private String description;
 
     /**
+     * Tên đối tượng được thanh toán (tên bài viết / gói / chiến dịch) do module nguồn gửi sang,
+     * dùng làm mô tả mặc định trên trang thanh toán khi không có description.
+     */
+    private String targetTitle;
+
+    /**
      * URL chuyển hướng trên trình duyệt khi thanh toán thành công.
      */
     private String successUrl;

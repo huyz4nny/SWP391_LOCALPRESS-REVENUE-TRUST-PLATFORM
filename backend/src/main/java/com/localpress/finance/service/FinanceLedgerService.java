@@ -6,6 +6,8 @@ import com.localpress.finance.dto.response.TransactionDetailResponse;
 import com.localpress.finance.dto.response.TransactionLedgerResponse;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
+import com.localpress.finance.model.RefundStatus;
+import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ import java.util.List;
 public class FinanceLedgerService {
 
     private final TransactionRepository transactionRepository;
+    private final RefundRequestRepository refundRequestRepository;
 
     /**
      * Danh sách phương thức thanh toán chuyển khoản thủ công.
@@ -133,7 +136,9 @@ public class FinanceLedgerService {
     public com.localpress.finance.dto.response.FinanceDashboardResponse getFinanceDashboard() {
         log.info("Lấy dữ liệu tổng quan Dashboard tài chính");
 
-        BigDecimal grossRevenue = transactionRepository.calculateTotalGrossRevenue();
+        // "Doanh thu thực thu" = doanh thu thuần, cùng công thức với sổ quỹ (Rule 16): gộp - tiền đã hoàn
+        BigDecimal netRevenue = transactionRepository.calculateTotalGrossRevenue()
+                .subtract(transactionRepository.calculateTotalRefundedAmount());
         long successCount = transactionRepository.countByStatus(TransactionStatus.SUCCESS);
         long pendingCount = transactionRepository.countByStatus(TransactionStatus.PENDING);
 
@@ -143,10 +148,10 @@ public class FinanceLedgerService {
                 .getContent();
 
         return com.localpress.finance.dto.response.FinanceDashboardResponse.builder()
-                .totalRevenue(grossRevenue)
+                .totalRevenue(netRevenue)
                 .paidOrdersCount(successCount)
                 .pendingOrdersCount(pendingCount)
-                .refundReviewCount(1L)
+                .refundReviewCount(refundRequestRepository.countByStatus(RefundStatus.PENDING))
                 .reconciliationDiscrepancy(BigDecimal.ZERO)
                 .recentOrders(recentTransactions)
                 .build();

@@ -1,0 +1,96 @@
+@startuml erd_sv4_db_changes_vi
+title Thay đổi CSDL SV4 - V3 (Ví & Nạp tiền) và V4 (Khiếu nại thanh toán)
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor white
+    BorderColor #000000
+    HeaderBackgroundColor #66BBE2
+    ArrowColor #000000
+}
+hide circle
+hide methods
+
+legend top left
+  <b>Chú thích</b>
+  <back:#C8E6C9> MỚI </back> bảng / cột mới
+  <back:#FFF3C4> SỬA </back> enum / ràng buộc bị sửa
+  nền trắng = có sẵn, không đổi
+endlegend
+
+entity "users (có sẵn)" as users {
+  * user_id : BIGINT UNSIGNED <<PK>>
+  --
+  email, role, status ...
+}
+
+entity "transactions (có sẵn, sửa ở V3)" as tx {
+  * transaction_id : BIGINT UNSIGNED <<PK>>
+  --
+  * user_id : <<FK users>>
+  subscription_id / purchase_id / campaign_id / original_transaction_id
+  <back:#FFF3C4>transaction_type : ENUM(SUBSCRIPTION, ARTICLE, AD, REFUND, <b>TOPUP</b>)</back>
+  amount : DECIMAL(12,2)
+  payment_method : VARCHAR(50)  -- SEPAY | <b>WALLET</b>
+  gateway_transaction_id : VARCHAR(255) <<UNIQUE>>  -- mã đơn LP...
+  <back:#C8E6C9>description : VARCHAR(255) NULL  -- tên bài / gói / chiến dịch</back>
+  status : ENUM(PENDING, SUCCESS, FAILED, REFUNDED)
+  paid_at, created_at
+  <back:#C8E6C9>expires_at : DATETIME NULL  -- hạn QR / giữ chỗ (15 phút)</back>
+  --
+  <back:#FFF3C4>CHECK chk_transactions_targets: TOPUP không gắn đối tượng</back>
+}
+
+entity "wallets (MỚI - V3)" as wallets #C8E6C9 {
+  * wallet_id : BIGINT UNSIGNED <<PK>>
+  --
+  * user_id : <<FK users>> <<UNIQUE>>  -- mỗi user 1 ví
+  * balance : DECIMAL(14,2) = 0
+  created_at, updated_at
+  --
+  CHECK chk_wallets_balance: balance >= 0
+}
+
+entity "wallet_entries (MỚI - V3)" as entries #C8E6C9 {
+  * entry_id : BIGINT UNSIGNED <<PK>>
+  --
+  * wallet_id : <<FK wallets>>
+  * transaction_id : <<FK transactions>>
+  * direction : ENUM(CREDIT, DEBIT)  -- cộng / trừ
+  * amount : DECIMAL(14,2) > 0
+  * balance_after : DECIMAL(14,2)  -- số dư sau biến động
+  reason : VARCHAR(255)
+  created_at
+  --
+  UNIQUE (transaction_id, direction)  -- chống cộng / trừ trùng
+}
+
+entity "payment_complaints (MỚI - V4)" as complaints #C8E6C9 {
+  * complaint_id : BIGINT UNSIGNED <<PK>>
+  --
+  * user_id : <<FK users>>  -- khách gửi
+  order_code : VARCHAR(255) NULL  -- = transactions.gateway_transaction_id
+  * amount : DECIMAL(12,2) > 0
+  * transferred_at : DATETIME
+  * bank_reference : VARCHAR(100) <<UNIQUE>>  -- mã GD ngân hàng
+  note : VARCHAR(500)
+  * status : ENUM(OPEN, RESOLVED, REJECTED)
+  resolution : VARCHAR(50)  -- kết quả ghi nhận
+  resolution_note : VARCHAR(500)  -- lý do từ chối
+  resolved_by : <<FK users>> NULL  -- kế toán xử lý
+  resolved_at, created_at
+}
+
+users ||--o{ tx : "thanh toán"
+users ||--o| wallets : "sở hữu"
+wallets ||--o{ entries : "lịch sử số dư"
+tx ||--o{ entries : "tối đa 1 CREDIT + 1 DEBIT"
+users ||--o{ complaints : "gửi"
+users |o--o{ complaints : "xử lý (kế toán)"
+complaints }o..o| tx : "order_code (liên kết logic)"
+
+@enduml

@@ -7,9 +7,12 @@ import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.TransactionRepository;
+import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.SePayService;
+import com.localpress.finance.service.WalletService;
 import com.localpress.shared.event.PaymentSuccessEvent;
+import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -29,18 +33,25 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * ==============================================================================
- * TEST: BỘ XỬ LÝ THANH TOÁN TỰ ĐỘNG & WEBHOOK SEPAY (SV4 - ITERATION 2)
+ * TEST: BỘ XỬ LÝ THANH TOÁN, VÍ & WEBHOOK SEPAY (SV4)
  * ==============================================================================
  */
 @ExtendWith(MockitoExtension.class)
 class PaymentProcessingServiceTest {
 
+    private static final String ORDER_CODE = "LP2610141200ABCD";
+
     @Mock
     private TransactionRepository transactionRepository;
+
+    @Mock
+    private WalletService walletService;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -51,133 +62,249 @@ class PaymentProcessingServiceTest {
     @InjectMocks
     private PaymentProcessingService paymentProcessingService;
 
+    private final FinanceCurrentUser.Principal reader = new FinanceCurrentUser.Principal(7L, "READER");
+    private final FinanceCurrentUser.Principal otherReader = new FinanceCurrentUser.Principal(8L, "READER");
+
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(sePayService, "merchantId", "SP-LIVE-NV598A56");
-        ReflectionTestUtils.setField(sePayService, "secretKey", "spsk_live_zE8upevaCPoKZApG6tynwKDQAaRnuknP");
-        ReflectionTestUtils.setField(sePayService, "env", "production");
+        ReflectionTestUtils.setField(sePayService, "merchantId", "SP-TEST");
+        ReflectionTestUtils.setField(sePayService, "secretKey", "test-secret");
+        ReflectionTestUtils.setField(sePayService, "webhookApiKey", "test-webhook-key");
+        ReflectionTestUtils.setField(sePayService, "env", "sandbox");
         ReflectionTestUtils.setField(sePayService, "bankCode", "VCB");
-        ReflectionTestUtils.setField(sePayService, "accountName", "NGUYEN VAN QUANG HUY");
+        ReflectionTestUtils.setField(sePayService, "bankShortName", "vietcombank");
+        ReflectionTestUtils.setField(sePayService, "accountNumber", "9981");
+        ReflectionTestUtils.setField(sePayService, "accountName", "LOCALPRESS TEST");
+    }
+
+    private Transaction pending(TransactionType type, String amount) {
+        Transaction.TransactionBuilder b = Transaction.builder()
+                .transactionId(88L)
+                .userId(7L)
+                .transactionType(type)
+                .amount(new BigDecimal(amount))
+                .currency("VND")
+                .paymentMethod("SEPAY")
+                .gatewayTransactionId(ORDER_CODE)
+                .status(TransactionStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusMinutes(15));
+        switch (type) {
+            case SUBSCRIPTION -> b.subscriptionId(2L);
+            case ARTICLE -> b.purchaseId(3L);
+            case AD -> b.campaignId(4L);
+            default -> { }
+        }
+        return b.build();
+    }
+
+    private SepayIpnRequest ipn(String amount) {
+        return SepayIpnRequest.builder()
+                .content("LOCALPRESS " + ORDER_CODE)
+                .amount(new BigDecimal(amount))
+                .referenceCode("FT123")
+                .build();
+    }
+
+    private void stubLockedOrder(Transaction tx) {
+        when(transactionRepository.findByGatewayTransactionIdForUpdate(ORDER_CODE)).thenReturn(Optional.of(tx));
+    }
+
+    private void stubSaveEcho() {
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
+            Transaction t = inv.getArgument(0);
+            if (t.getTransactionId() == null) t.setTransactionId(999L);
+            return t;
+        });
     }
 
     @Test
-    @DisplayName("UC047: Tạo đơn hàng thanh toán thành công, có chữ ký số HMAC-SHA256")
-    void testCreateOrder_Success() {
-        // Arrange
+    @DisplayName("UC047: Tạo đơn trả về QR theo cấu hình ngân hàng, hạn 15 phút, mô tả lấy từ targetTitle")
+    void createOrder_returnsPaymentView() {
+        stubSaveEcho();
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .orderType("SUBSCRIPTION")
                 .targetId(1L)
                 .amount(new BigDecimal("150000"))
-                .paymentMethod("SEPAY")
-                .description("Mua goi doc bao 1 thang")
-                .successUrl("https://localpress.vn/checkout/success")
+                .targetTitle("Gói tháng")
                 .build();
 
-        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
-            Transaction tx = invocation.getArgument(0);
-            tx.setTransactionId(101L);
-            tx.setCreatedAt(LocalDateTime.now());
-            return tx;
-        });
-
-        // Act
         OrderCreateResponse response = paymentProcessingService.createOrder(7L, request);
 
-        // Assert
-        assertNotNull(response);
-        assertEquals(101L, response.getTransactionId());
         assertTrue(response.getOrderCode().startsWith("LP"));
-        assertEquals(new BigDecimal("150000"), response.getAmount());
+        assertEquals("SUBSCRIPTION", response.getOrderType());
+        assertEquals("Gói tháng", response.getDescription());
         assertEquals("PENDING", response.getStatus());
-        assertEquals("https://pay.sepay.vn/v1/checkout/init", response.getCheckoutUrl());
-        assertNotNull(response.getCheckoutFields());
+        assertEquals(response.getOrderCode(), response.getTransferContent());
+        assertTrue(response.getQrCodeUrl().contains("vietcombank-9981"));
+        assertNotNull(response.getExpiresAt());
         assertTrue(response.getCheckoutFields().containsKey("signature"));
-        assertNotNull(response.getQrCodeUrl());
-
-        verify(transactionRepository, times(1)).save(any(Transaction.class));
     }
 
     @Test
-    @DisplayName("UC049: Webhook IPN từ SePay xử lý thành công và phát tán PaymentSuccessEvent")
-    void testProcessSepayIpn_Success() {
-        // Arrange
-        String orderCode = "LP2610141200ABCD";
-        Transaction pendingTx = Transaction.builder()
-                .transactionId(88L)
-                .userId(7L)
-                .subscriptionId(2L)
-                .transactionType(TransactionType.SUBSCRIPTION)
-                .amount(new BigDecimal("50000"))
-                .currency("VND")
-                .paymentMethod("SEPAY")
-                .gatewayTransactionId(orderCode)
-                .status(TransactionStatus.PENDING)
-                .build();
+    @DisplayName("Nạp ví: số tiền ngoài hạn mức bị từ chối")
+    void createTopUp_rejectsOutOfRange() {
+        AppException ex = assertThrows(AppException.class,
+                () -> paymentProcessingService.createTopUp(7L, new BigDecimal("5000")));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        verify(transactionRepository, never()).save(any());
+    }
 
-        when(transactionRepository.findByGatewayTransactionId(orderCode))
-                .thenReturn(Optional.of(pendingTx));
-        when(transactionRepository.save(any(Transaction.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+    @Test
+    @DisplayName("UC049: Webhook đủ tiền -> SUCCESS và phát PaymentSuccessEvent")
+    void ipn_fullAmount_success() {
+        Transaction tx = pending(TransactionType.SUBSCRIPTION, "50000");
+        stubLockedOrder(tx);
+        stubSaveEcho();
 
-        SepayIpnRequest ipnRequest = SepayIpnRequest.builder()
-                .notificationType("ORDER_PAID")
-                .order(new SepayIpnRequest.OrderData(
-                        "uuid-123", "order-123", orderCode, "CAPTURED",
-                        new BigDecimal("50000"), "VND", "Thanh toan don " + orderCode
-                ))
-                .build();
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("50000"));
 
-        // Act
-        Map<String, Object> result = paymentProcessingService.processSepayIpn("spsk_live_...", ipnRequest);
-
-        // Assert
-        assertTrue((Boolean) result.get("success"));
         assertEquals("SUCCESS", result.get("status"));
-        assertEquals(TransactionStatus.SUCCESS, pendingTx.getStatus());
-        assertNotNull(pendingTx.getPaidAt());
-
+        assertEquals(TransactionStatus.SUCCESS, tx.getStatus());
         ArgumentCaptor<PaymentSuccessEvent> captor = ArgumentCaptor.forClass(PaymentSuccessEvent.class);
-        verify(eventPublisher, times(1)).publishEvent(captor.capture());
-        PaymentSuccessEvent event = captor.getValue();
-        assertEquals(88L, event.getTransactionId());
-        assertEquals(7L, event.getUserId());
-        assertEquals(2L, event.getTargetId());
-        assertEquals("SUBSCRIPTION", event.getTransactionType());
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertEquals(2L, captor.getValue().getTargetId());
+        verify(walletService, never()).credit(any(), any(), anyString());
     }
 
     @Test
-    @DisplayName("UC049 (Rule 5): Webhook gửi lại lần 2 không cộng trùng (Idempotent)")
-    void testProcessSepayIpn_IdempotentDuplicate() {
-        // Arrange
-        String orderCode = "LP2610141200ABCD";
-        Transaction alreadyPaidTx = Transaction.builder()
-                .transactionId(88L)
-                .userId(7L)
-                .subscriptionId(2L)
-                .transactionType(TransactionType.SUBSCRIPTION)
-                .amount(new BigDecimal("50000"))
-                .status(TransactionStatus.SUCCESS)
-                .paidAt(LocalDateTime.now())
-                .gatewayTransactionId(orderCode)
-                .build();
+    @DisplayName("UC049 (Rule 5): Webhook lặp lại -> ALREADY_PROCESSED, không lưu, không bắn event")
+    void ipn_duplicate_isIdempotent() {
+        Transaction tx = pending(TransactionType.SUBSCRIPTION, "50000");
+        tx.setStatus(TransactionStatus.SUCCESS);
+        stubLockedOrder(tx);
 
-        when(transactionRepository.findByGatewayTransactionId(orderCode))
-                .thenReturn(Optional.of(alreadyPaidTx));
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("50000"));
 
-        SepayIpnRequest ipnRequest = SepayIpnRequest.builder()
-                .content("Thanh toan " + orderCode)
-                .amount(new BigDecimal("50000"))
-                .build();
-
-        // Act
-        Map<String, Object> result = paymentProcessingService.processSepayIpn(null, ipnRequest);
-
-        // Assert
-        assertTrue((Boolean) result.get("success"));
         assertEquals("ALREADY_PROCESSED", result.get("status"));
+        verify(transactionRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
 
-        // Tuyệt đối không lưu lại hoặc bắn sự kiện lần 2
-        verify(transactionRepository, never()).save(any(Transaction.class));
-        verify(eventPublisher, never()).publishEvent(any(PaymentSuccessEvent.class));
+    @Test
+    @DisplayName("Webhook đơn không tồn tại -> ORDER_NOT_FOUND, không ghi gì")
+    void ipn_unknownOrder() {
+        when(transactionRepository.findByGatewayTransactionIdForUpdate(ORDER_CODE)).thenReturn(Optional.empty());
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("50000"));
+
+        assertEquals("ORDER_NOT_FOUND", result.get("status"));
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Nạp ví: webhook cộng đúng số tiền thực nhận vào ví")
+    void ipn_topUp_creditsWallet() {
+        Transaction tx = pending(TransactionType.TOPUP, "100000");
+        stubLockedOrder(tx);
+        stubSaveEcho();
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("100000"));
+
+        assertEquals("SUCCESS", result.get("status"));
+        verify(walletService).credit(eq(tx), eq(new BigDecimal("100000")), anyString());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Rule 6: Booking quảng cáo quá hạn giữ chỗ -> không cấp quyền, tiền vào ví")
+    void ipn_lateAdPayment_creditsWallet() {
+        Transaction tx = pending(TransactionType.AD, "2000000");
+        tx.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        stubLockedOrder(tx);
+        stubSaveEcho();
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("2000000"));
+
+        assertEquals("LATE_PAYMENT_CREDITED_TO_WALLET", result.get("status"));
+        assertEquals(TransactionStatus.FAILED, tx.getStatus());
+        verify(walletService).credit(argThat(t -> (ORDER_CODE + "-LATE").equals(t.getGatewayTransactionId())),
+                eq(new BigDecimal("2000000")), anyString());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Chuyển thiếu -> đơn vẫn PENDING, số tiền đã nhận vào ví")
+    void ipn_underpaid_creditsWallet() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        stubLockedOrder(tx);
+        stubSaveEcho();
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("10000"));
+
+        assertEquals("UNDERPAID_CREDITED_TO_WALLET", result.get("status"));
+        assertEquals(TransactionStatus.PENDING, tx.getStatus());
+        verify(walletService).credit(any(), eq(new BigDecimal("10000")), anyString());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Chuyển thừa -> đơn SUCCESS, phần dư vào ví")
+    void ipn_overpaid_creditsExcess() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        stubLockedOrder(tx);
+        stubSaveEcho();
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("20000"));
+
+        assertEquals("SUCCESS", result.get("status"));
+        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
+        verify(walletService).credit(any(), eq(new BigDecimal("5000")), anyString());
+    }
+
+    @Test
+    @DisplayName("Trả bằng ví: trừ ví, đơn SUCCESS, phát event với paymentMethod WALLET")
+    void payWithWallet_success() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        stubLockedOrder(tx);
+        stubSaveEcho();
+
+        paymentProcessingService.payWithWallet(reader, ORDER_CODE);
+
+        verify(walletService).debit(eq(tx), eq(new BigDecimal("15000")), anyString());
+        assertEquals(TransactionStatus.SUCCESS, tx.getStatus());
+        assertEquals("WALLET", tx.getPaymentMethod());
+        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
+    }
+
+    @Test
+    @DisplayName("Trả bằng ví: số dư không đủ -> 402, đơn giữ PENDING, không bắn event")
+    void payWithWallet_insufficientBalance() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        stubLockedOrder(tx);
+        doThrow(new AppException("Số dư ví không đủ", HttpStatus.PAYMENT_REQUIRED))
+                .when(walletService).debit(any(), any(), anyString());
+
+        AppException ex = assertThrows(AppException.class, () -> paymentProcessingService.payWithWallet(reader, ORDER_CODE));
+
+        assertEquals(HttpStatus.PAYMENT_REQUIRED, ex.getStatus());
+        assertEquals(TransactionStatus.PENDING, tx.getStatus());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Rule 14: Người khác đoán đúng mã đơn -> 403 khi xem và khi trả bằng ví")
+    void otherUser_forbidden() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(tx));
+        stubLockedOrder(tx);
+
+        AppException view = assertThrows(AppException.class,
+                () -> paymentProcessingService.getPaymentView(otherReader, ORDER_CODE));
+        AppException pay = assertThrows(AppException.class,
+                () -> paymentProcessingService.payWithWallet(otherReader, ORDER_CODE));
+
+        assertEquals(HttpStatus.FORBIDDEN, view.getStatus());
+        assertEquals(HttpStatus.FORBIDDEN, pay.getStatus());
+        verify(walletService, never()).debit(any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Webhook: chỉ chấp nhận đúng API key, có hoặc không tiền tố Apikey")
+    void verifyWebhookKey() {
+        assertTrue(sePayService.verifyIpnSecretKey("Apikey test-webhook-key"));
+        assertTrue(sePayService.verifyIpnSecretKey("test-webhook-key"));
+        assertFalse(sePayService.verifyIpnSecretKey("Apikey wrong"));
+        assertFalse(sePayService.verifyIpnSecretKey(null));
     }
 }

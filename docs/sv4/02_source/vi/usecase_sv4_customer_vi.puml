@@ -1,0 +1,86 @@
+@startuml usecase_sv4_customer_vi
+title LocalPress — Thanh toán và Ví của Khách hàng (SV4)
+
+left to right direction
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam actor {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+}
+skinparam usecase {
+    BackgroundColor white
+    BorderColor #000000
+}
+skinparam rectangle {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+    BorderThickness 1.5
+    FontStyle bold
+    FontSize 13
+}
+skinparam arrow {
+    Color #000000
+    FontSize 10
+}
+
+actor "ĐỘC GIẢ" as Reader
+actor "DOANH NGHIỆP" as Advertiser
+
+rectangle "Hệ thống LocalPress - /payment/:orderCode, /wallet" {
+    usecase "Tạo giao dịch thanh toán\nUC047" as UC047
+    usecase "Sinh mã QR SePay\n(nội dung = mã đơn, 15 phút)" as GenQR
+    usecase "Thanh toán bằng ví" as PayWallet
+    usecase "Nạp tiền vào ví\n(10 nghìn - 50 triệu)" as TopUp
+    usecase "Kiểm tra trạng thái thanh toán\nUC050" as UC050
+    usecase "Xem lịch sử ví" as WalletHist
+    usecase "Gửi khiếu nại thanh toán\n(UC051 phía khách)" as SubmitCmp
+    usecase "Thanh toán công nợ quảng cáo\nUC053" as UC053
+    usecase "Xử lý webhook thanh toán\nUC049" as UC049
+    usecase "Xác minh kết quả thanh toán\nUC048" as UC048
+}
+
+actor "Cổng thanh toán\nSePay" as SePay
+actor "Module SV1 / SV3\nPaymentSuccessEvent" as Events
+
+Reader -- UC047
+Reader -- TopUp
+Reader -- UC050
+Reader -- WalletHist
+Reader -- SubmitCmp
+Advertiser -- UC047
+Advertiser -- TopUp
+Advertiser -- UC050
+Advertiser -- WalletHist
+Advertiser -- SubmitCmp
+Advertiser -- UC053
+
+UC049 -- SePay
+UC049 -- Events
+
+UC047 ..> GenQR : <<include>>
+PayWallet ..> UC047 : <<extend>>\nchọn trả bằng ví
+TopUp ..> UC047 : <<include>>\nloại TOPUP
+TopUp ..> PayWallet : <<extend>>\nví không đủ tiền
+UC053 ..> UC047 : <<include>>\nloại AD
+UC049 ..> UC048 : <<include>>
+UC050 ..> UC049 : <<include>>\ntrạng thái do webhook đặt
+SubmitCmp ..> UC050 : <<extend>>\nquá 15 phút vẫn PENDING
+
+note right of UC049
+Bắt buộc Authorization: Apikey (sai -> 401).
+Gửi lại -> ALREADY_PROCESSED (Rule 5).
+Thiếu / thừa / quảng cáo trả muộn -> cộng ví (Rule 6).
+SUCCESS -> PaymentSuccessEvent cấp quyền (Rule 4).
+end note
+
+note right of PayWallet
+Khóa dòng đơn và dòng ví.
+402 thiếu tiền, 403 đơn của người khác (Rule 14),
+410 đơn đã hết hạn.
+end note
+
+@enduml

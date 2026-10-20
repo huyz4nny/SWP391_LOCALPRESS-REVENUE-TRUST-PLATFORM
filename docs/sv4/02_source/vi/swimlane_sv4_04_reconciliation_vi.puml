@@ -1,0 +1,90 @@
+@startuml swimlane_sv4_04_reconciliation_vi
+title SV4-04 Đối soát ngân hàng (UC054) và Công nợ doanh nghiệp (UC053)
+
+scale max 4000 width
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowColor #000000
+skinparam conditionStyle InsideDiamond
+skinparam roundCorner 0
+skinparam swimlane {
+  BorderColor #000000
+  TitleBackgroundColor #66BBE2
+  TitleFontStyle bold
+}
+skinparam activity {
+  BackgroundColor white
+  BorderColor #000000
+  DiamondBackgroundColor #FFF8DC
+  DiamondBorderColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFFE0
+  BorderColor #999999
+}
+
+|Kế toán|
+|Hệ thống LocalPress|
+|Sao kê ngân hàng|
+|Kế toán trưởng|
+
+|Kế toán|
+start
+:Mở /backoffice/finance/reconciliation;
+|Hệ thống LocalPress|
+:Tổng hệ thống trong tháng: SUCCESS,
+bỏ REFUND và đơn trả bằng ví;
+|Sao kê ngân hàng|
+:Tổng cổng thanh toán / sao kê;
+note right
+Demo: tổng sao kê = tổng hệ thống,
+danh sách chênh lệch là dữ liệu mẫu
+end note
+|Hệ thống LocalPress|
+:Liệt kê chênh lệch, trạng thái kỳ
+OPEN / RECONCILED / CLOSED;
+|Kế toán|
+while (Còn mục UNRESOLVED\nvà kỳ chưa chốt?) is (còn)
+  :Xử lý: khiếu nại (UC051),
+hoàn tiền (UC055) hoặc giải trình;
+  :Nhập ghi chú xử lý;
+  |Hệ thống LocalPress|
+  :Đánh dấu RESOLVED
+(ai, lúc nào, ghi chú);
+  |Kế toán|
+endwhile (hết)
+:Xem công nợ doanh nghiệp (UC053);
+note right
+Mới có API /finance/receivables,
+chưa có màn hình
+end note
+|Hệ thống LocalPress|
+switch (Nhóm nợ từng chiến dịch?)
+case (đã trả đủ)
+  :PAID_IN_FULL;
+case (chưa tới ngày kết thúc)
+  :IN_TERM;
+case (quá ngày kết thúc)
+  :OVERDUE + số ngày quá hạn,
+cảnh báo DEBT_OVERDUE (UC060);
+endswitch
+|Kế toán|
+:Bấm "Chốt kỳ";
+if (Là Kế toán trưởng?) then (không)
+  |Kế toán|
+  :Bị chặn: chỉ Kế toán trưởng được chốt;
+else (đúng)
+  |Kế toán trưởng|
+  :Xác nhận chốt kỳ
+(cảnh báo nếu còn chênh lệch);
+  |Hệ thống LocalPress|
+  :Kỳ CLOSED,
+khóa xử lý chênh lệch;
+endif
+|Kế toán|
+:Xem trạng thái kỳ đối soát;
+stop
+
+@enduml

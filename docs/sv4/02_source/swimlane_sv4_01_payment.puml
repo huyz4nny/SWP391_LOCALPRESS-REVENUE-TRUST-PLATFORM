@@ -1,0 +1,144 @@
+@startuml swimlane_sv4_01_payment
+title SV4-01 Shared Payment Page /payment/:orderCode (UC047 - UC050)
+
+scale max 4000 width
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowColor #000000
+skinparam conditionStyle InsideDiamond
+skinparam roundCorner 0
+skinparam swimlane {
+  BorderColor #000000
+  TitleBackgroundColor #66BBE2
+  TitleFontStyle bold
+}
+skinparam activity {
+  BackgroundColor white
+  BorderColor #000000
+  DiamondBackgroundColor #FFF8DC
+  DiamondBorderColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFFE0
+  BorderColor #999999
+}
+
+|Customer|
+|Payment Page|
+|LocalPress Backend|
+|SePay / Bank|
+|SV1 / SV3 Modules|
+
+|Customer|
+start
+:Click Buy in the source module
+(article / plan / booking);
+|SV1 / SV3 Modules|
+:Create pending record
+(purchase / subscription / campaign);
+|LocalPress Backend|
+:Create PENDING order (UC047)
+code LP..., expires in 15 min;
+note right
+POST /api/v1/finance/orders
+user from login session,
+not from X-User-Id
+end note
+|Payment Page|
+if (Logged in?) then (yes)
+else (no)
+  |Customer|
+  :Log in, return to this page;
+endif
+|LocalPress Backend|
+:Load order by code (UC050);
+switch (Order state?)
+case (not the owner)
+  :403 Forbidden (Rule 14);
+case (already SUCCESS)
+  |Payment Page|
+  :Show "Paid" result;
+case (expired / FAILED)
+  |Payment Page|
+  :Show "Code expired": create new order,
+check wallet or file complaint;
+case (PENDING, in time)
+  |Payment Page|
+  :Show order, wallet balance,
+QR code and countdown;
+  note right
+  Top-up order: QR only,
+no wallet option (SV4-02)
+  end note
+  |Customer|
+  if (Pay with?) then (LocalPress Wallet)
+    |Payment Page|
+    if (Balance >= amount?) then (no)
+      :Show "Top up to pay": customer tops up
+the shortfall (SV4-02), then comes back;
+    else (yes)
+      |LocalPress Backend|
+      :pay-with-wallet:
+lock order + wallet,
+re-check owner,
+expiry, balance;
+      if (All valid?) then (yes)
+        :Debit wallet, order SUCCESS
+(method WALLET);
+      else (no)
+        :402 / 403 / 410,
+rollback, order
+stays PENDING;
+      endif
+    endif
+  else (SePay QR)
+    |Customer|
+    :Transfer, content = order code;
+    |SePay / Bank|
+    :Send IPN webhook;
+    |LocalPress Backend|
+    switch (Webhook result (UC048, UC049)?)
+    case (wrong key /\nno order /\nalready paid)
+      :Nothing recorded:
+401 wrong key,
+ORDER_NOT_FOUND
+(-> complaint),
+ALREADY_PROCESSED;
+    case (ad hold\nexpired /\norder closed)
+      :Order FAILED, money to
+wallet "-LATE" (Rule 6);
+    case (underpaid)
+      :Money to wallet "-PART",
+order stays PENDING;
+    case (full / overpaid)
+      :Order SUCCESS, excess
+to wallet "-EXCESS";
+    endswitch
+  endif
+  |Payment Page|
+  :Poll status every 3 s or
+"I have paid, check again" (UC050);
+  |LocalPress Backend|
+  if (Order SUCCESS?) then (yes)
+    :Publish PaymentSuccessEvent
+(transaction = ledger line);
+    |SV1 / SV3 Modules|
+    :@EventListener: grant reading
+rights / activate ad;
+    note right
+    Not in code yet:
+SV1 / SV3 must write it
+    end note
+  else (no)
+    |Payment Page|
+    :Keep waiting until paid
+or the code expires;
+  endif
+endswitch
+|Customer|
+:See payment result;
+stop
+
+@enduml
