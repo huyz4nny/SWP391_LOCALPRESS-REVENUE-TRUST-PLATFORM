@@ -1,0 +1,100 @@
+@startuml usecase_sv4_backoffice
+title LocalPress — Accounting Back Office (SV4)
+
+left to right direction
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam actor {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+}
+skinparam usecase {
+    BackgroundColor white
+    BorderColor #000000
+}
+skinparam rectangle {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+    BorderThickness 1.5
+    FontStyle bold
+    FontSize 13
+}
+skinparam arrow {
+    Color #000000
+    FontSize 10
+}
+
+actor "ACCOUNTANT\nFinance Staff" as Accountant
+actor "CHIEF ACCOUNTANT\nApprover (2nd eye)" as Manager
+Manager -|> Accountant
+
+rectangle "LocalPress System - /backoffice/finance" {
+    rectangle "Iteration 1" #DDEFF8 {
+        usecase "Handle Unrecorded Payment Complaint\nUC051" as UC051
+        usecase "Record To Order\n(reuses UC049 webhook logic)" as RecordOrder
+        usecase "Credit To Wallet\n(TOPUP CMP-bankTxId)" as CreditWallet
+        usecase "Reject With Reason" as RejectCmp
+        usecase "View Financial Ledger\nUC058" as UC058
+        usecase "Generate Financial Documents\nUC057" as UC057
+    }
+    rectangle "Iteration 2" #DDEFF8 {
+        usecase "Manage Advertiser Receivables\nUC053" as UC053
+    }
+    rectangle "Iteration 3" #DDEFF8 {
+        usecase "Reconcile Payment Mismatch\nUC054" as UC054
+        usecase "Close Reconciliation Period" as CloseRec
+        usecase "Process Refund Request\nUC055" as UC055
+        usecase "Adjust Reading or Campaign Rights\nUC056" as UC056
+        usecase "View Cash Flow Dashboard\nUC052" as UC052
+        usecase "Export Financial Report\nUC059" as UC059
+        usecase "View Financial Alerts\nUC060" as UC060
+    }
+    usecase "Match Bank Statement" as MatchStmt
+}
+
+actor "Bank Partner\nBank Statement" as Bank
+actor "SV1 / SV3 Modules\nRefundCompletedEvent" as Events
+
+Accountant -- UC051
+Accountant -- UC058
+Accountant -- UC057
+Accountant -- UC053
+Accountant -- UC054
+Accountant -- UC055
+Accountant -- UC052
+Accountant -- UC059
+Accountant -- UC060
+Manager -- CloseRec
+
+MatchStmt -- Bank
+UC056 -- Events
+
+UC051 ..> MatchStmt : <<include>>
+RecordOrder ..> UC051 : <<extend>>\nmoney found, order known
+CreditWallet ..> UC051 : <<extend>>\nmoney found, no open order
+RejectCmp ..> UC051 : <<extend>>\nmoney not on statement
+UC057 ..> UC058 : <<extend>>\nSUCCESS transaction only
+UC054 ..> MatchStmt : <<include>>
+CloseRec ..> UC054 : <<extend>>
+UC055 ..> UC056 : <<include>>
+UC059 ..> UC052 : <<extend>>
+
+note right of UC055
+Four-Eyes: 1st eye (Accountant) proposes, 2nd eye (Chief Accountant) approves.
+Both taken from the login session; same person -> HTTP 403.
+Refund cap Rule 11: PENDING + APPROVED + COMPLETED <= paid amount, else 400.
+Only SUCCESS orders; TOPUP / REFUND cannot be refunded (400).
+Order paid with wallet -> refund credited back to the wallet; SePay QR -> paid back outside.
+UC056 (Rule 17): SV4 publishes RefundCompletedEvent; SV1 / SV3 listeners adjust their own rights.
+end note
+
+note right of UC051
+No manual "mark as PAID" any more.
+409 duplicate bank tx id / closed complaint, 403 foreign order,
+400 reject without reason.
+end note
+
+@enduml

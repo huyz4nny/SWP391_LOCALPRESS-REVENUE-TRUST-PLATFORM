@@ -4,6 +4,7 @@ import { AdBooking, AdCampaign, AdCreative } from '../types'
 import { advertisingApi } from '../api'
 import { mockStore } from '@/mocks/store'
 import { httpClient } from '@/lib/http/client'
+import { paymentPath } from '@/features/finance/api/payment'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -86,7 +87,7 @@ export function BookingDetailPage() {
         amount: booking.finalPrice,
         paymentMethod: 'BANK_TRANSFER',
       })
-      navigate(`/checkout/${order.id}`)
+      navigate(paymentPath(order), { state: { returnUrl: `/advertiser/bookings/${booking.id}` } })
     } catch (err: any) {
       alert(err.message || 'Lỗi chuyển hướng thanh toán')
     }

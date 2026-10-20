@@ -1,0 +1,96 @@
+@startuml erd_sv4_db_changes
+title SV4 Database Changes - V3 (Wallet & Top-up) and V4 (Payment Complaints)
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam class {
+    BackgroundColor white
+    BorderColor #000000
+    HeaderBackgroundColor #66BBE2
+    ArrowColor #000000
+}
+hide circle
+hide methods
+
+legend top left
+  <b>Legend</b>
+  <back:#C8E6C9> NEW </back> new table / new column
+  <back:#FFF3C4> CHANGED </back> modified enum / constraint
+  white = existing, unchanged
+endlegend
+
+entity "users (existing)" as users {
+  * user_id : BIGINT UNSIGNED <<PK>>
+  --
+  email, role, status ...
+}
+
+entity "transactions (existing, changed in V3)" as tx {
+  * transaction_id : BIGINT UNSIGNED <<PK>>
+  --
+  * user_id : <<FK users>>
+  subscription_id / purchase_id / campaign_id / original_transaction_id
+  <back:#FFF3C4>transaction_type : ENUM(SUBSCRIPTION, ARTICLE, AD, REFUND, <b>TOPUP</b>)</back>
+  amount : DECIMAL(12,2)
+  payment_method : VARCHAR(50)  -- SEPAY | <b>WALLET</b>
+  gateway_transaction_id : VARCHAR(255) <<UNIQUE>>  -- orderCode LP...
+  <back:#C8E6C9>description : VARCHAR(255) NULL</back>
+  status : ENUM(PENDING, SUCCESS, FAILED, REFUNDED)
+  paid_at, created_at
+  <back:#C8E6C9>expires_at : DATETIME NULL  -- QR / hold expiry (15 min)</back>
+  --
+  <back:#FFF3C4>CHECK chk_transactions_targets: TOPUP has no target</back>
+}
+
+entity "wallets (NEW - V3)" as wallets #C8E6C9 {
+  * wallet_id : BIGINT UNSIGNED <<PK>>
+  --
+  * user_id : <<FK users>> <<UNIQUE>>
+  * balance : DECIMAL(14,2) = 0
+  created_at, updated_at
+  --
+  CHECK chk_wallets_balance: balance >= 0
+}
+
+entity "wallet_entries (NEW - V3)" as entries #C8E6C9 {
+  * entry_id : BIGINT UNSIGNED <<PK>>
+  --
+  * wallet_id : <<FK wallets>>
+  * transaction_id : <<FK transactions>>
+  * direction : ENUM(CREDIT, DEBIT)
+  * amount : DECIMAL(14,2) > 0
+  * balance_after : DECIMAL(14,2)
+  reason : VARCHAR(255)
+  created_at
+  --
+  UNIQUE (transaction_id, direction)
+}
+
+entity "payment_complaints (NEW - V4)" as complaints #C8E6C9 {
+  * complaint_id : BIGINT UNSIGNED <<PK>>
+  --
+  * user_id : <<FK users>>
+  order_code : VARCHAR(255) NULL  -- = transactions.gateway_transaction_id
+  * amount : DECIMAL(12,2) > 0
+  * transferred_at : DATETIME
+  * bank_reference : VARCHAR(100) <<UNIQUE>>
+  note : VARCHAR(500)
+  * status : ENUM(OPEN, RESOLVED, REJECTED)
+  resolution : VARCHAR(50)
+  resolution_note : VARCHAR(500)
+  resolved_by : <<FK users>> NULL
+  resolved_at, created_at
+}
+
+users ||--o{ tx : pays
+users ||--o| wallets : owns
+wallets ||--o{ entries : "balance history"
+tx ||--o{ entries : "1 CREDIT and/or 1 DEBIT"
+users ||--o{ complaints : submits
+users |o--o{ complaints : "resolves (accountant)"
+complaints }o..o| tx : "order_code (logical link)"
+
+@enduml

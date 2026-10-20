@@ -21,6 +21,8 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
 
     List<RefundRequest> findByStatusOrderByCreatedAtDesc(String status);
 
+    long countByStatus(com.localpress.finance.model.RefundStatus status);
+
     /**
      * Rule 11 (Refund Cap): Tính tổng tiền đã hoàn hoặc đang chờ duyệt của một giao dịch
      * để đảm bảo không hoàn vượt quá số tiền thực thu của đơn gốc.

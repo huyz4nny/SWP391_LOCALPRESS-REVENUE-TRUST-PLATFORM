@@ -37,4 +37,10 @@ public class OrderStatusResponse {
     private LocalDateTime paidAt;
 
     private LocalDateTime createdAt;
+
+    private String orderType;
+
+    private LocalDateTime expiresAt;
+
+    private boolean expired;
 }

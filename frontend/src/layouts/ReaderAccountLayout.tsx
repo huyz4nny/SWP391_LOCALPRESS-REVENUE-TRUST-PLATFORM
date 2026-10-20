@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
+import { WalletBalanceButton } from '@/components/shared/WalletBalanceButton'
 import { Badge } from '@/components/ui/badge'
 import {
   User as UserIcon,
@@ -113,6 +114,7 @@ export function ReaderAccountLayout() {
                 Nâng cấp VIP
               </Link>
             )}
+            <WalletBalanceButton />
             <img
               src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&auto=format&fit=crop&q=80'}
               alt=""

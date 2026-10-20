@@ -67,3 +67,6 @@ desktop.ini
 __pycache__/
 *.pyc
 /huyz4nny/
+
+# --- SePay / payment secrets (SV4) ---
+backend/config/application-secrets.yml

@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
+import { WalletBalanceButton } from '@/components/shared/WalletBalanceButton'
 import {
   Search,
   Crown,
@@ -92,6 +93,7 @@ export function PublicLayout() {
               </div>
             ) : (
               <div className="flex items-center space-x-2.5">
+                <WalletBalanceButton />
                 <Link
                   to="/account"
                   className="flex items-center space-x-1.5 font-medium text-stone-700 hover:text-stone-950"

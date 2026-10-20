@@ -1,0 +1,75 @@
+@startuml swimlane_sv4_06_reports
+title SV4-06 Dashboard, Ledger, Documents, Reports, Alerts (UC052, UC057 - UC060)
+
+scale max 4000 width
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowColor #000000
+skinparam conditionStyle InsideDiamond
+skinparam roundCorner 0
+skinparam swimlane {
+  BorderColor #000000
+  TitleBackgroundColor #66BBE2
+  TitleFontStyle bold
+}
+skinparam activity {
+  BackgroundColor white
+  BorderColor #000000
+  DiamondBackgroundColor #FFF8DC
+  DiamondBorderColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFFE0
+  BorderColor #999999
+}
+
+|Accountant|
+|LocalPress Backend|
+|Chief Accountant|
+
+|Accountant|
+start
+:Log in to finance back office;
+|LocalPress Backend|
+:Cash flow dashboard (UC052): revenue = SUCCESS
+excluding REFUND and TOPUP, order counts;
+|Accountant|
+:Open ledger (UC058): filter by status,
+type, method, date, keyword;
+|LocalPress Backend|
+:Summary: gross, refunded, net;
+|Accountant|
+:Open an order detail;
+if (Order PAID (SUCCESS)?) then (yes)
+  :Print invoice / document (UC057)
+or propose refund (SV4-05);
+else (no)
+  :No invoice button
+(PENDING / FAILED / REFUNDED);
+endif
+|LocalPress Backend|
+:Alerts (UC060): refunds PENDING,
+complaints OPEN, overdue ad debt;
+note right
+API /finance/alerts only, no screen yet
+end note
+|Accountant|
+if (Any alert?) then (yes)
+  :Open the linked queue
+(refunds / complaints / orders);
+else (no)
+  :Nothing pending;
+endif
+:Export CSV report (UC059):
+all transactions, UTF-8 for Excel;
+note right
+API only; fromDate / toDate
+not applied yet
+end note
+|Chief Accountant|
+:Review reports;
+stop
+
+@enduml

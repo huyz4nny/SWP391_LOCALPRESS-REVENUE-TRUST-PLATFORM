@@ -122,3 +122,86 @@ export interface GeneralLedgerEntry {
   amount: number
   createdBy: string
 }
+
+// =============================================================================
+// TRANG THANH TOÁN CHUNG /payment/:orderCode & VÍ LOCALPRESS (SV4)
+// =============================================================================
+
+/** Loại đơn theo backend (transactions.transaction_type) */
+export type PaymentOrderType = 'SUBSCRIPTION' | 'ARTICLE' | 'AD' | 'TOPUP'
+
+export interface PaymentOrderView {
+  transactionId: string
+  orderCode: string
+  orderType: PaymentOrderType
+  targetId?: string
+  description?: string
+  amount: number
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
+  isPaid: boolean
+  expired: boolean
+  paymentMethod?: string
+  qrCodeUrl?: string
+  bankCode?: string
+  accountNumber?: string
+  accountName?: string
+  transferContent: string
+  createdAt?: string
+  expiresAt?: string
+  paidAt?: string
+}
+
+export interface PaymentStatusView {
+  orderCode: string
+  status: PaymentOrderView['status']
+  isPaid: boolean
+  expired: boolean
+  paymentMethod?: string
+}
+
+export interface WalletEntry {
+  entryId: string
+  transactionId: string
+  direction: 'CREDIT' | 'DEBIT'
+  amount: number
+  balanceAfter: number
+  reason?: string
+  createdAt: string
+}
+
+export interface WalletInfo {
+  balance: number
+  entries: WalletEntry[]
+}
+
+/** Kết quả webhook (thật hoặc giả lập) để hiển thị cho người demo */
+export interface IpnResult {
+  success: boolean
+  status: string
+  orderCode?: string
+  message: string
+}
+
+/** Khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" (UC051) */
+export interface PaymentComplaint {
+  complaintId: string
+  userId: string
+  orderCode?: string
+  amount: number
+  transferredAt: string
+  bankReference: string
+  note?: string
+  status: 'OPEN' | 'RESOLVED' | 'REJECTED'
+  resolution?: string
+  resolutionNote?: string
+  resolvedAt?: string
+  createdAt: string
+}
+
+export interface CreateComplaintInput {
+  orderCode?: string
+  amount: number
+  transferredAt: string
+  bankReference: string
+  note?: string
+}

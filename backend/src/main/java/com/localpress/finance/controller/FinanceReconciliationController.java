@@ -2,6 +2,7 @@ package com.localpress.finance.controller;
 
 import com.localpress.finance.dto.request.ResolveDiscrepancyRequest;
 import com.localpress.finance.dto.response.ReconciliationPeriodResponse;
+import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.FinanceReconciliationService;
 import com.localpress.shared.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 public class FinanceReconciliationController {
 
     private final FinanceReconciliationService financeReconciliationService;
+    private final FinanceCurrentUser currentUser;
 
     /**
      * UC054: Lấy báo cáo kỳ đối soát ngân hàng hiện tại.
@@ -40,9 +42,9 @@ public class FinanceReconciliationController {
      */
     @PostMapping("/resolve")
     public ResponseEntity<ApiResponse<ReconciliationPeriodResponse>> resolveDiscrepancy(
-            @RequestHeader(value = "X-User-Id", defaultValue = "2") Long accountantId,
             @Valid @RequestBody ResolveDiscrepancyRequest request
     ) {
+        Long accountantId = currentUser.require().userId();
         log.info("API POST /api/v1/finance/reconciliation/resolve - Giải quyết sai lệch {}", request.getDiscrepancyId());
         ReconciliationPeriodResponse response = financeReconciliationService.resolveDiscrepancy(request, accountantId);
         return ResponseEntity.ok(ApiResponse.ok("Đã xử lý chênh lệch thành công", response));
@@ -52,9 +54,8 @@ public class FinanceReconciliationController {
      * UC054: Khóa chốt kỳ đối soát tài chính tháng.
      */
     @PostMapping("/close")
-    public ResponseEntity<ApiResponse<ReconciliationPeriodResponse>> closePeriod(
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long managerId
-    ) {
+    public ResponseEntity<ApiResponse<ReconciliationPeriodResponse>> closePeriod() {
+        Long managerId = currentUser.require().userId();
         log.info("API POST /api/v1/finance/reconciliation/close - Đóng kỳ đối soát");
         ReconciliationPeriodResponse response = financeReconciliationService.closePeriod(managerId);
         return ResponseEntity.ok(ApiResponse.ok("Kỳ đối soát đã được đóng thành công", response));

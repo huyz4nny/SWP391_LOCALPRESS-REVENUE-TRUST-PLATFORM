@@ -4,6 +4,7 @@ import { mockStore } from '@/mocks/store'
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
+import { WalletBalanceButton } from '@/components/shared/WalletBalanceButton'
 import { Badge } from '@/components/ui/badge'
 import {
   Building2,
@@ -103,6 +104,7 @@ export function AdvertiserLayout() {
           </div>
 
           <div className="flex items-center space-x-3">
+            <WalletBalanceButton />
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-slate-800">{currentUser.name}</div>
               <div className="text-[11px] text-slate-500">{currentUser.email}</div>
