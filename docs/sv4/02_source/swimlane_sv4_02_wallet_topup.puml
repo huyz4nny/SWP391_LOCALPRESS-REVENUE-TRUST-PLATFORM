@@ -1,0 +1,93 @@
+@startuml swimlane_sv4_02_wallet_topup
+title SV4-02 Top Up LocalPress Wallet via SePay QR\n<size:11>Top-up money is a liability to the customer, not revenue (Rule 16)</size>
+
+scale max 4000 width
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowColor #000000
+skinparam conditionStyle InsideDiamond
+skinparam roundCorner 0
+skinparam swimlane {
+  BorderColor #000000
+  TitleBackgroundColor #66BBE2
+  TitleFontStyle bold
+}
+skinparam activity {
+  BackgroundColor white
+  BorderColor #000000
+  DiamondBackgroundColor #FFF8DC
+  DiamondBorderColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFFE0
+  BorderColor #999999
+}
+
+|Customer|
+|Payment Page|
+|LocalPress Backend|
+|SePay / Bank|
+
+|Customer|
+start
+:Click "Top Up" in the header
+or "Top up to pay" on payment page;
+|Payment Page|
+if (Logged in?) then (yes)
+else (no)
+  |Customer|
+  :Log in, return to /wallet/topup;
+endif
+|Payment Page|
+:Pick a preset (50k - 1M)
+or enter an amount;
+if (10,000 - 50,000,000 VND,
+multiple of 1,000?) then (invalid)
+  |Payment Page|
+  :Show validation error;
+else (valid)
+  |LocalPress Backend|
+  :Re-check limits, create TOPUP
+order PENDING (15 min);
+  note right
+  Out of range or decimal -> 400
+  end note
+  |Payment Page|
+  :Open /payment/:orderCode
+(QR only, no wallet option);
+  |Customer|
+  :Scan QR and transfer;
+  |SePay / Bank|
+  :Send IPN webhook;
+  |LocalPress Backend|
+  switch (Webhook result?)
+  case (wrong API key)
+    :401, wallet unchanged;
+  case (already SUCCESS)
+    :ALREADY_PROCESSED
+no second credit (Rule 5);
+  case (first time)
+    :TOPUP SUCCESS, credit the amount
+actually received (even after QR expiry),
+wallet_entries CREDIT;
+    note right
+    UNIQUE(transaction_id, direction)
+    blocks a second credit
+    end note
+  endswitch
+  |Payment Page|
+  if (Polling: order SUCCESS?) then (yes)
+    :Show new balance, back to /wallet
+or to the order being paid;
+  else (no)
+    :Keep waiting; after 15 min
+show "Create new top-up code";
+  endif
+endif
+|Customer|
+:See wallet balance and history;
+stop
+
+@enduml

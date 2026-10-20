@@ -114,6 +114,12 @@ public class Transaction {
     private String bankCode;
 
     /**
+     * Mô tả ngắn hiển thị trên trang thanh toán (vd: tên bài viết, tên gói, tên chiến dịch).
+     */
+    @Column(name = "description", length = 255)
+    private String description;
+
+    /**
      * Trạng thái giao dịch hiện tại: PENDING, SUCCESS, FAILED, REFUNDED.
      */
     @Enumerated(EnumType.STRING)
@@ -146,57 +152,15 @@ public class Transaction {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    /**
+     * Hạn hiệu lực mã QR / giữ chỗ của đơn. Webhook về sau mốc này là "tiền về muộn" (Rule 6).
+     */
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     // =========================================================================
     // CÁC HÀM NGHIỆP VỤ MIỀN (DOMAIN BUSINESS LOGIC ENCAPSULATION)
     // =========================================================================
-
-    /**
-     * Xác nhận giao dịch chuyển khoản thủ công thành công (UC051).
-     *
-     * @param accountantUserId      ID Kế toán viên bấm duyệt.
-     * @param bankReferenceCode     Mã bút toán chuyển khoản ngân hàng do Kế toán kiểm tra.
-     * @param actualBankCode        Mã ngân hàng (nếu có cập nhật thêm).
-     */
-    public void confirmManualTransfer(Long accountantUserId, String bankReferenceCode, String actualBankCode) {
-        if (this.status != TransactionStatus.PENDING) {
-            throw new AppException(
-                    "Giao dịch #" + this.transactionId + " không ở trạng thái chờ duyệt (Hiện tại: " + this.status + ")",
-                    HttpStatus.CONFLICT
-            );
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        this.status = TransactionStatus.SUCCESS;
-        this.paidAt = now;
-        this.reconciledAt = now;
-        this.reconciledBy = accountantUserId;
-
-        if (bankReferenceCode != null && !bankReferenceCode.isBlank()) {
-            this.gatewayTransactionId = bankReferenceCode.trim();
-        }
-        if (actualBankCode != null && !actualBankCode.isBlank()) {
-            this.bankCode = actualBankCode.trim().toUpperCase();
-        }
-    }
-
-    /**
-     * Từ chối xác nhận giao dịch chuyển khoản thủ công (UC051) do sai cú pháp hoặc chưa thấy tiền về.
-     *
-     * @param accountantUserId  ID Kế toán viên bấm từ chối.
-     */
-    public void rejectManualTransfer(Long accountantUserId) {
-        if (this.status != TransactionStatus.PENDING) {
-            throw new AppException(
-                    "Chỉ có thể từ chối giao dịch đang ở trạng thái PENDING (Hiện tại: " + this.status + ")",
-                    HttpStatus.CONFLICT
-            );
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        this.status = TransactionStatus.FAILED;
-        this.reconciledAt = now;
-        this.reconciledBy = accountantUserId;
-    }
 
     /**
      * Xác nhận thanh toán tự động qua cổng thanh toán / Webhook IPN (UC049).
@@ -217,6 +181,37 @@ public class Transaction {
     }
 
     /**
+     * Đơn đã quá hạn thanh toán (dùng cho nhánh tiền về muộn).
+     */
+    public boolean isExpired(LocalDateTime now) {
+        return this.expiresAt != null && now.isAfter(this.expiresAt);
+    }
+
+    /**
+     * Thanh toán đơn hàng bằng số dư Ví LocalPress (tiền đã được trừ ví trong cùng transaction DB).
+     */
+    public void markPaidByWallet() {
+        if (this.status != TransactionStatus.PENDING) {
+            throw new AppException(
+                    "Đơn " + this.gatewayTransactionId + " không ở trạng thái chờ thanh toán (Hiện tại: " + this.status + ")",
+                    HttpStatus.CONFLICT
+            );
+        }
+        this.status = TransactionStatus.SUCCESS;
+        this.paidAt = LocalDateTime.now();
+        this.paymentMethod = "WALLET";
+    }
+
+    /**
+     * Đánh dấu đơn hết hạn khi tiền về muộn và đã được chuyển vào ví thay vì cấp quyền.
+     */
+    public void markExpired() {
+        if (this.status == TransactionStatus.PENDING) {
+            this.status = TransactionStatus.FAILED;
+        }
+    }
+
+    /**
      * Lấy ID đối tượng nghiệp vụ được thanh toán tương ứng.
      */
     public Long resolveTargetId() {
@@ -226,6 +221,7 @@ public class Transaction {
             case ARTICLE -> this.purchaseId;
             case AD -> this.campaignId;
             case REFUND -> this.originalTransactionId;
+            case TOPUP -> null;
         };
     }
 }

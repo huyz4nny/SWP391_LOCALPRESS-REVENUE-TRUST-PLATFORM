@@ -114,16 +114,16 @@ public class FinanceReportController {
             ));
         }
 
-        // 2. Cảnh báo giao dịch chuyển khoản thủ công đang chờ đối soát
-        String pendingTransferSql = "SELECT COUNT(*) FROM transactions WHERE status = 'PENDING' AND payment_method = 'MANUAL_BANK_TRANSFER'";
-        Integer pendingTransfers = jdbcTemplate.queryForObject(pendingTransferSql, Integer.class);
-        if (pendingTransfers != null && pendingTransfers > 0) {
+        // 2. Cảnh báo khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" đang chờ đối soát sao kê (UC051)
+        String openComplaintSql = "SELECT COUNT(*) FROM payment_complaints WHERE status = 'OPEN'";
+        Integer openComplaints = jdbcTemplate.queryForObject(openComplaintSql, Integer.class);
+        if (openComplaints != null && openComplaints > 0) {
             alerts.add(Map.of(
-                    "type", "MANUAL_TRANSFER_WAITING",
+                    "type", "COMPLAINT_OPEN",
                     "severity", "MEDIUM",
-                    "title", "Đơn chuyển khoản thủ công cần xác nhận",
-                    "message", "Có " + pendingTransfers + " đơn chuyển khoản ngân hàng đang chờ Kế toán đối chiếu tiền vào tài khoản.",
-                    "actionUrl", "/backoffice/finance/orders"
+                    "title", "Khiếu nại thanh toán chờ đối soát",
+                    "message", "Có " + openComplaints + " khiếu nại khách đã chuyển tiền nhưng chưa được ghi nhận, cần đối chiếu sao kê.",
+                    "actionUrl", "/backoffice/finance/complaints"
             ));
         }
 

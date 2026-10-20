@@ -111,22 +111,6 @@ export const financeApi = {
     }
   },
 
-  verifyBankTransfer: async (orderId: string) => {
-    const res = await httpClient.post<any>(`/finance/manual-transfers/${orderId}/confirm`, {
-      bankReferenceCode: `CONFIRM-TX-${orderId}`,
-      bankCode: 'VCB',
-      note: 'Xác nhận chuyển khoản từ Backoffice',
-    })
-    return res?.data || res
-  },
-
-  rejectBankTransfer: async (orderId: string, rejectionReason: string) => {
-    const res = await httpClient.post<any>(`/finance/manual-transfers/${orderId}/reject`, {
-      rejectionReason: rejectionReason || 'Không tìm thấy thông tin chuyển khoản khớp',
-    })
-    return res?.data || res
-  },
-
   getRefunds: async (): Promise<RefundRequest[]> => {
     const res = await httpClient.get<any>('/finance/refunds')
     const list = res?.data || (Array.isArray(res) ? res : [])
@@ -215,3 +199,5 @@ export const financeApi = {
     return res?.data || res
   },
 }
+
+export * from './payment'

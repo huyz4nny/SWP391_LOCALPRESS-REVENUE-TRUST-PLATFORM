@@ -5,7 +5,9 @@ import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -33,6 +35,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * Tra cứu giao dịch theo mã bút toán ngân hàng / mã gateway (chống trùng lặp Idempotency).
      */
     Optional<Transaction> findByGatewayTransactionId(String gatewayTransactionId);
+
+    /**
+     * Khóa dòng đơn hàng (SELECT ... FOR UPDATE) khi xử lý webhook / trả bằng ví,
+     * để webhook bắn đồng thời hoặc khách bấm "Trả bằng ví" 2 lần không xử lý trùng 1 đơn.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Transaction t WHERE t.gatewayTransactionId = :code")
+    Optional<Transaction> findByGatewayTransactionIdForUpdate(@Param("code") String code);
+
+    boolean existsByGatewayTransactionId(String gatewayTransactionId);
 
     /**
      * UC050: Lấy danh sách giao dịch chuyển khoản thủ công đang ở trạng thái PENDING để Kế toán đối soát.
@@ -71,13 +83,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     );
 
     /**
-     * UC049: Tính tổng số tiền thu về thành công (không tính các giao dịch hoàn tiền).
+     * UC049: Tổng doanh thu gộp = mọi đơn đã thu tiền, kể cả đơn sau đó bị hoàn hết (REFUNDED).
+     * Tiền hoàn được trừ riêng 1 lần qua calculateTotalRefundedAmount (doanh thu thuần = gộp - hoàn).
+     * Không tính TOPUP (tiền nạp ví là công nợ, Rule 16) và không tính chính bút toán REFUND.
      */
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
         FROM Transaction t
-        WHERE t.status = 'SUCCESS'
-          AND t.transactionType != 'REFUND'
+        WHERE t.status IN ('SUCCESS', 'REFUNDED')
+          AND t.transactionType NOT IN ('REFUND', 'TOPUP')
     """)
     BigDecimal calculateTotalGrossRevenue();
 

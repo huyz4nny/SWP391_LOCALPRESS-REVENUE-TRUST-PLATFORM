@@ -3,6 +3,7 @@ package com.localpress.finance.controller;
 import com.localpress.finance.dto.request.ProposeRefundRequest;
 import com.localpress.finance.dto.request.ReviewRefundRequest;
 import com.localpress.finance.dto.response.RefundDetailResponse;
+import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.RefundManagementService;
 import com.localpress.shared.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -27,6 +28,7 @@ import java.util.List;
 public class RefundManagementController {
 
     private final RefundManagementService refundManagementService;
+    private final FinanceCurrentUser currentUser;
 
     /**
      * UC055: Lấy danh sách yêu cầu hoàn tiền.
@@ -42,10 +44,9 @@ public class RefundManagementController {
      * UC055: Nhân viên / Kế toán lập đề xuất hoàn tiền (Mắt 1 & 2).
      */
     @PostMapping("/propose")
-    public ResponseEntity<ApiResponse<RefundDetailResponse>> proposeRefund(
-            @RequestHeader(value = "X-User-Id", defaultValue = "2") Long proposerUserId,
-            @Valid @RequestBody ProposeRefundRequest request
-    ) {
+    public ResponseEntity<ApiResponse<RefundDetailResponse>> proposeRefund(@Valid @RequestBody ProposeRefundRequest request) {
+        // Người đề xuất lấy từ phiên đăng nhập; nếu tin header client gửi thì 1 người tự đóng cả 2 vai, mất ý nghĩa 4 mắt
+        Long proposerUserId = currentUser.require().userId();
         log.info("API POST /api/v1/finance/refunds/propose - Proposer #{}, đơn: {}, số tiền: {}",
                 proposerUserId, request.getOrderId(), request.getRefundAmount());
 
@@ -59,9 +60,9 @@ public class RefundManagementController {
     @PostMapping("/{id}/review-refund")
     public ResponseEntity<ApiResponse<RefundDetailResponse>> reviewRefund(
             @PathVariable Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long reviewerUserId,
             @Valid @RequestBody ReviewRefundRequest request
     ) {
+        Long reviewerUserId = currentUser.require().userId();
         log.info("API POST /api/v1/finance/refunds/{}/review-refund - Reviewer #{}, duyệt: {}",
                 id, reviewerUserId, request.isApproved());
 

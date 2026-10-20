@@ -76,6 +76,7 @@ Bất kỳ mã nguồn hoặc cấu trúc API nào được tạo ra **BẮT BU�
 20. **Quản trị tầng dùng chung & Cấu hình môi trường (Shared & Config Invariants):**
     - Cấu hình Spring Security chỉ có DUY NHẤT 1 file master là `com.localpress.shared.security.SecurityConfig.java` do Leader SV4 làm chủ. Cấm các nhánh thành viên tự tạo thêm file SecurityConfig riêng để tránh lỗi trùng Bean làm crash server.
     - Mật khẩu MySQL trong `application-dev.yml` mặc định là `password`. Tuyệt đối không commit mật khẩu MySQL cá nhân lên git làm hỏng môi trường của người khác.
+    - Khóa cổng thanh toán (SePay merchant id, secret key, webhook API key, số tài khoản) KHÔNG được ghi trong `application-dev.yml` hay bất kỳ file nào lên GitHub. Đặt ở `backend/config/application-secrets.yml` (đã `.gitignore`, mẫu: `application-secrets.example.yml`) hoặc biến môi trường `SEPAY_*`.
     - Toàn bộ tài khoản seed data trong `seed_data.sql` có mật khẩu mặc định là `password` hoặc `password123` (`SecurityConfig` hỗ trợ linh hoạt cả 2).
     - Ở Frontend, điều hướng sau khi đăng nhập thật bắt buộc dùng `PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role)`, tuyệt đối không gán cứng URL sang một phân hệ cụ thể.
 21. **Quy tắc đồng bộ bộ nhớ kép (Dual-Workspace Memory Sync):** Mọi cập nhật tài liệu ngữ cảnh, quy tắc kiến trúc, quy chuẩn code hoặc bài học ghi nhớ mới BẮT BUỘC phải được ghi và đồng bộ song song vào CẢ 2 NƠI: (1) `E:\FPTU\FALL26\SWP391\AGENTS.md` (Repo gốc) và (2) `E:\FPTU\FALL26\SWP391\huyz4nny\AGENTS.md` (Thư mục làm việc của Leader Huy). Tuyệt đối không để lệch thông tin giữa 2 thư mục này.
@@ -106,12 +107,24 @@ Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xl
 18. `notifications`: Trung tâm thông báo người dùng và doanh nghiệp.
 19. `audit_logs`: Nhật ký kiểm toán an ninh hệ thống (ai làm gì, lúc nào, đối tượng nào, lý do).
 
+### Bảng mở rộng của SV4 (Ví LocalPress, `V3__wallet_and_topup.sql`):
+- `wallets`: Số dư ví của từng user (UNIQUE `user_id`, CHECK `balance >= 0`).
+- `wallet_entries`: Sổ chi tiết ví (CREDIT/DEBIT), UNIQUE(`transaction_id`, `direction`) chống cộng/trừ trùng khi webhook gửi lại.
+- `transactions` thêm loại `TOPUP` (nạp ví, không gắn đối tượng nào), cột `description`, `expires_at` (hạn mã QR 15 phút), `payment_method = 'WALLET'` khi trả bằng số dư.
+- `payment_complaints` (`V4__payment_complaints.sql`): Khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" (UC051), UNIQUE `bank_reference` (1 lần chuyển chỉ khiếu nại 1 lần).
+- Nạp ví là **công nợ phải trả khách, không phải doanh thu**. Doanh thu chỉ ghi nhận khi khách tiêu ví hoặc trả QR cho đơn hàng (Rule 16). Tiền nạp không rút ra ngân hàng.
+
 ---
 
 ## 5. HỢP ĐỒNG GIAO TIẾP DÙNG CHUNG (SHARED SERVICE CONTRACTS)
 1. **Thanh toán tập trung (`com.localpress.finance`):**
-   - API: `POST /api/v1/finance/orders` tạo đơn thanh toán dùng chung cho cả Mua báo (SV3) và Quảng cáo (SV1).
-   - Webhook: `POST /api/v1/finance/webhook/{gateway}` xử lý IPN Idempotent, phát event `PaymentSuccessEvent`.
+   - API: `POST /api/v1/finance/orders` tạo đơn thanh toán dùng chung cho cả Mua báo (SV3) và Quảng cáo (SV1). User lấy từ phiên đăng nhập, không nhận header `X-User-Id`.
+   - **Trang thanh toán chung:** tạo đơn xong, module nguồn BẮT BUỘC `navigate(paymentPath(response), { state: { returnUrl } })` (`@/features/finance/api/payment`) sang `/payment/:orderCode` của SV4. Không module nào tự làm trang QR/checkout riêng. Trang có 2 phương thức: Ví LocalPress hoặc QR SePay (polling trạng thái 3 giây/lần).
+   - Ví: `GET /api/v1/finance/wallet/me`, `POST /api/v1/finance/wallet/topups`, `POST /api/v1/finance/orders/code/{code}/pay-with-wallet`. Header có `WalletBalanceButton` (số dư + Nạp tiền) -> `/wallet/topup` -> `/payment/:orderCode`.
+   - Webhook: `POST /api/v1/finance/webhook/sepay` (header `Authorization: Apikey <key>`, sai khóa trả 401) xử lý IPN Idempotent, phát event `PaymentSuccessEvent`. Tiền về muộn (booking quảng cáo quá hạn giữ chỗ), chuyển thiếu, chuyển thừa đều được cộng vào ví, không bao giờ treo tiền khách.
+   - **Không có duyệt chuyển khoản thủ công.** Kế toán không được tự đánh dấu đơn PAID. Khách đã chuyển tiền mà không được ghi nhận thì gửi khiếu nại ở `/wallet/complaints` (`POST /api/v1/finance/complaints`); kế toán đối chiếu sao kê tại `/backoffice/finance/complaints` rồi Ghi nhận vào đơn (chạy lại đúng hàm xử lý webhook, idempotent), Cộng vào ví, hoặc Từ chối có lý do. UC051 / màn hình II.4.2 được dùng cho luồng này.
+   - SV1/SV3 tự viết `@EventListener PaymentSuccessEvent` trong module của mình để kích hoạt campaign / mở khóa bài / kích hoạt gói. `targetId` phải là id bản ghi thật (`purchase_id`, `subscription_id`, `campaign_id`) do module nguồn tạo ở trạng thái chờ trước khi gọi tạo đơn.
+   - **Hoàn tiền (UC055 -> UC056):** Kế toán trưởng duyệt hoàn xong, SV4 chỉ ghi bút toán `REFUND` (đơn trả bằng ví thì hoàn lại vào ví) rồi phát `RefundCompletedEvent` (`com.localpress.shared.event`: `transactionType`, `targetId`, `refundAmount`, `fullRefund`...). SV4 KHÔNG sửa bảng `article_purchases` / `subscriptions` / `ad_campaigns` (Rule 17). SV3 tự viết `@EventListener RefundCompletedEvent` để thu hồi bài / gói, SV1 để tạm dừng chiến dịch; quy định: **hoàn toàn bộ thì thu hồi quyền, hoàn một phần thì khách giữ quyền** (listener chỉ thu hồi khi `shouldRevokeRights()` = `fullRefund` = true).
 2. **Cổng bảo vệ nội dung (`com.localpress.delivery` & `reader`):**
    - Kiểm tra: `PaywallEngine.checkAccess(userId, articleId)` trước khi trả dữ liệu bài viết.
 3. **Phê duyệt quảng cáo (`com.localpress.advertising` & `editorial`):**
@@ -124,7 +137,7 @@ Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xl
 ## 6. SỔ TAY DEMO BẢO VỆ ĐỒ ÁN (10 DEFENSE SCENARIOS)
 Khi bảo vệ trước Hội đồng FPT, hãy tự tin thực hiện 10 kịch bản demo:
 1. Mở cửa sổ ẩn danh (Guest) đọc bài Free bình thường; mở bài Premium chỉ thấy tóm tắt 30%, bấm F12 không thấy full text trong HTML.
-2. Reader mua bài lẻ 15.000 ₫ $\rightarrow$ Quét mã QR thanh toán $\rightarrow$ Backend nhận Webhook mở khóa ngay; bắn lại Webhook lần 2 hệ thống báo `ALREADY_PROCESSED` không cộng trùng.
+2. Reader mua bài lẻ 15.000 ₫ $\rightarrow$ Chuyển sang trang thanh toán chung `/payment/:orderCode` $\rightarrow$ Quét mã QR SePay (hoặc trả bằng Ví LocalPress) $\rightarrow$ Backend nhận Webhook mở khóa ngay; bắn lại Webhook lần 2 hệ thống báo `ALREADY_PROCESSED` không cộng trùng. Biến thể: nạp ví từ nút "Nạp tiền" trên header, chuyển thiếu thì tiền vào ví, đơn vẫn chờ.
 3. Mở 2 trình duyệt cho 2 doanh nghiệp cùng lúc chọn 1 slot độc quyền cùng ngày $\rightarrow$ Chỉ 1 doanh nghiệp đặt thành công, người thứ hai nhận thông báo slot vừa được giữ chỗ.
 4. Doanh nghiệp thay đổi ảnh banner đang chạy $\rightarrow$ Giao diện độc giả vẫn hiện ảnh cũ cho đến khi Ban biên tập (SV2) bấm "Duyệt bản mới".
 5. Ban biên tập bấm "Tạm dừng khẩn cấp" một banner $\rightarrow$ Ngay lập tức trang chủ không còn hiển thị banner đó.
@@ -160,8 +173,11 @@ Toàn bộ mã nguồn giao diện (Frontend) của 5 thành viên được đ�
 ---
 
 ## 8. CẨM NANG REVIEW & PHÒNG THI (`iter-review`)
+> Tài liệu SV4 (swimlane, use case, thay đổi DB) nằm ở `docs/sv4/` (`01_output` = file dùng để nộp/review, `02_source` = PlantUML, `03_tools` = script render).
 Toàn bộ kịch bản Review cá nhân 1-1 trên lớp với Giảng viên được hệ thống hóa qua **Workspace Skill `iter-review`** (đặt tại `.agents/skills/iter-review/SKILL.md`). Skill này cung cấp:
 1. **Bảng Mapping toàn diện:** Tra cứu tức thì từ Use Case (`UC001` - `UC077`) sang URL Route ("mở link nào"), Frontend Page/Component, Backend Controller/Service, và Bảng CSDL.
 2. **Kịch bản điều hướng theo vai trò:** Trình tự demo từng bước trên giao diện (Kế toán SV4 duyệt chuyển khoản & kiểm soát sổ cái, Doanh nghiệp SV1 đặt vị trí, Độc giả SV3 đọc báo Free/Paywall, CMS SV5 soạn bài).
 3. **Cẩm nang sửa code logic (Live-coding):** Vị trí chính xác từng file và cách sửa nhanh khi giảng viên yêu cầu sửa tại chỗ (validate dữ liệu, lưu lý do từ chối, kiểm soát quy tắc 4 mắt, lọc sổ quỹ theo khoảng tiền, format hiển thị).
+4. **Chiến thuật Honeypot Baiting (Gài bẫy có chủ đích):** Kỹ thuật chủ động hé lộ điểm nghi vấn có tính toán (không dùng OCR đọc bill, quy tắc 4 mắt, scalar foreign key `Long userId`, decoupled domain events) để dẫn dắt giảng viên hỏi trúng vào thế mạnh kiến trúc và ghi điểm phản biện tối đa.
+5. **Khung Review Màn hình Toàn diện (Full-Screen Breakdown):** Phương pháp mổ xẻ 3 lớp kiến trúc của bất kỳ màn hình nào: (1) Khung Layout ngoài cùng (`BackofficeLayout.tsx`), (2) Chi tiết nội dung trang bên trong (`OrderListPage.tsx`), (3) Trace đường đi của code khi click từng nút cụ thể (Chi tiết, Duyệt PAID, In hóa đơn UC057).
 

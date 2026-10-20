@@ -24,19 +24,31 @@ import java.util.*;
 @Slf4j
 public class SePayService {
 
-    @Value("${localpress.sepay.merchant-id:SP-LIVE-NV598A56}")
+    // Khóa bí mật không có giá trị mặc định trong code: cấp qua biến môi trường / application-*.yml.
+    @Value("${localpress.sepay.merchant-id:}")
     private String merchantId;
 
-    @Value("${localpress.sepay.secret-key:spsk_live_zE8upevaCPoKZApG6tynwKDQAaRnuknP}")
+    @Value("${localpress.sepay.secret-key:}")
     private String secretKey;
 
-    @Value("${localpress.sepay.env:production}")
+    // API Key cấu hình ở mục Webhook trên dashboard SePay, SePay gửi lại qua header "Authorization: Apikey <key>"
+    @Value("${localpress.sepay.webhook-api-key:}")
+    private String webhookApiKey;
+
+    @Value("${localpress.sepay.env:sandbox}")
     private String env;
 
     @Value("${localpress.sepay.bank-code:VCB}")
     private String bankCode;
 
-    @Value("${localpress.sepay.account-name:NGUYEN VAN QUANG HUY}")
+    // Tên ngân hàng theo chuẩn img.vietqr.io (vd: vietcombank, mbbank, bidv)
+    @Value("${localpress.sepay.bank-short-name:vietcombank}")
+    private String bankShortName;
+
+    @Value("${localpress.sepay.account-number:}")
+    private String accountNumber;
+
+    @Value("${localpress.sepay.account-name:}")
     private String accountName;
 
     private static final List<String> SIGNED_FIELD_NAMES = List.of(
@@ -146,28 +158,46 @@ public class SePayService {
         try {
             String encodedDesc = URLEncoder.encode(orderCode, StandardCharsets.UTF_8);
             String encodedName = URLEncoder.encode(accountName, StandardCharsets.UTF_8);
-            // Dùng chuẩn VietQR QuickLink (hỗ trợ Vietcombank Napas 24/7)
+            // Dùng chuẩn VietQR QuickLink, ngân hàng & số tài khoản lấy từ cấu hình localpress.sepay.*
             return String.format(
-                    "https://img.vietqr.io/image/vietcombank-9981-compact2.png?amount=%d&addInfo=%s&accountName=%s",
-                    amount.longValue(), encodedDesc, encodedName
+                    "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d&addInfo=%s&accountName=%s",
+                    bankShortName, accountNumber, amount.longValue(), encodedDesc, encodedName
             );
         } catch (Exception e) {
             log.warn("Không thể encode URL VietQR: {}", e.getMessage());
-            return "https://img.vietqr.io/image/vietcombank-9981-compact2.png?amount=" + amount.longValue();
+            return String.format("https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d",
+                    bankShortName, accountNumber, amount.longValue());
         }
     }
 
+    public String getBankCode() {
+        return bankCode;
+    }
+
+    public String getAccountNumber() {
+        return accountNumber;
+    }
+
+    public String getAccountName() {
+        return accountName;
+    }
+
     /**
-     * Xác thực khóa bí mật từ Header IPN (X-Secret-Key hoặc Bearer token).
+     * Xác thực khóa từ Header IPN ("Authorization: Apikey <key>", "Bearer <key>" hoặc X-Secret-Key).
+     * So sánh constant-time để không lộ khóa qua thời gian phản hồi. Chưa cấu hình khóa thì từ chối hết.
      */
     public boolean verifyIpnSecretKey(String headerSecretKey) {
         if (headerSecretKey == null || headerSecretKey.isBlank()) {
             return false;
         }
-        // Xóa tiền tố Bearer hoặc Apikey nếu có
-        String cleanKey = headerSecretKey.replace("Bearer ", "")
-                .replace("Apikey ", "")
-                .trim();
-        return secretKey.equalsIgnoreCase(cleanKey);
+        String expected = webhookApiKey != null && !webhookApiKey.isBlank() ? webhookApiKey : secretKey;
+        if (expected == null || expected.isBlank()) {
+            log.error("Chưa cấu hình localpress.sepay.webhook-api-key, từ chối mọi webhook.");
+            return false;
+        }
+        String cleanKey = headerSecretKey.replaceFirst("(?i)^(Bearer|Apikey)\\s+", "").trim();
+        return java.security.MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                cleanKey.getBytes(StandardCharsets.UTF_8));
     }
 }

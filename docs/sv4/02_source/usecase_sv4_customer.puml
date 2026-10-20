@@ -1,0 +1,86 @@
+@startuml usecase_sv4_customer
+title LocalPress — Customer Payment and Wallet (SV4)
+
+left to right direction
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam actor {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+}
+skinparam usecase {
+    BackgroundColor white
+    BorderColor #000000
+}
+skinparam rectangle {
+    BackgroundColor #66BBE2
+    BorderColor #000000
+    BorderThickness 1.5
+    FontStyle bold
+    FontSize 13
+}
+skinparam arrow {
+    Color #000000
+    FontSize 10
+}
+
+actor "READER" as Reader
+actor "ADVERTISER" as Advertiser
+
+rectangle "LocalPress System - /payment/:orderCode, /wallet" {
+    usecase "Create Payment Transaction\nUC047" as UC047
+    usecase "Generate SePay QR Code\n(content = orderCode, 15 min)" as GenQR
+    usecase "Pay With Wallet" as PayWallet
+    usecase "Top Up Wallet\n(10k - 50M VND)" as TopUp
+    usecase "Check Payment Status\nUC050" as UC050
+    usecase "View Wallet History" as WalletHist
+    usecase "Submit Payment Complaint\n(UC051 customer side)" as SubmitCmp
+    usecase "Pay Advertiser Receivable\nUC053" as UC053
+    usecase "Handle Payment Webhook\nUC049" as UC049
+    usecase "Verify Payment Result\nUC048" as UC048
+}
+
+actor "Payment Gateway\nSePay" as SePay
+actor "SV1 / SV3 Modules\nPaymentSuccessEvent" as Events
+
+Reader -- UC047
+Reader -- TopUp
+Reader -- UC050
+Reader -- WalletHist
+Reader -- SubmitCmp
+Advertiser -- UC047
+Advertiser -- TopUp
+Advertiser -- UC050
+Advertiser -- WalletHist
+Advertiser -- SubmitCmp
+Advertiser -- UC053
+
+UC049 -- SePay
+UC049 -- Events
+
+UC047 ..> GenQR : <<include>>
+PayWallet ..> UC047 : <<extend>>\nmethod = Wallet
+TopUp ..> UC047 : <<include>>\ntype = TOPUP
+TopUp ..> PayWallet : <<extend>>\nbalance too low
+UC053 ..> UC047 : <<include>>\ntype = AD
+UC049 ..> UC048 : <<include>>
+UC050 ..> UC049 : <<include>>\nstatus set by webhook
+SubmitCmp ..> UC050 : <<extend>>\nstill PENDING after 15 min
+
+note right of UC049
+Authorization: Apikey (401 INVALID_SIGNATURE).
+Replay -> ALREADY_PROCESSED (Rule 5).
+Underpaid / overpaid / late AD -> wallet (Rule 6).
+SUCCESS -> PaymentSuccessEvent grants rights (Rule 4).
+end note
+
+note right of PayWallet
+Pessimistic lock on order + wallet rows.
+402 balance too low, 403 other user's order (Rule 14),
+410 order expired.
+end note
+
+@enduml

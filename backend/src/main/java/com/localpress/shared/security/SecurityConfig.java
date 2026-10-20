@@ -71,6 +71,10 @@ public class SecurityConfig {
                         // Cho phép độc giả / doanh nghiệp đã đăng nhập tạo đơn và tra cứu trạng thái đơn hàng của mình
                         .requestMatchers(HttpMethod.POST, "/api/v1/finance/orders", "/api/v1/finance/checkout", "/api/v1/finance/orders/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/orders/**").authenticated()
+                        // Ví LocalPress: mọi user đã đăng nhập xem ví và nạp tiền của chính mình
+                        .requestMatchers("/api/v1/finance/wallet/**").authenticated()
+                        // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
+                        .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)

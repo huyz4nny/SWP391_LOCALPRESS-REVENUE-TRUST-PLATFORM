@@ -1,0 +1,112 @@
+@startuml swimlane_sv4_00_overview
+title SV4-00 Overview: Payment, Complaint and Refund\n<size:11>Summary only - every branch is detailed in SV4-01 .. SV4-06</size>
+
+scale max 4000 width
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ArrowColor #000000
+skinparam conditionStyle InsideDiamond
+skinparam roundCorner 0
+skinparam swimlane {
+  BorderColor #000000
+  TitleBackgroundColor #66BBE2
+  TitleFontStyle bold
+}
+skinparam activity {
+  BackgroundColor white
+  BorderColor #000000
+  DiamondBackgroundColor #FFF8DC
+  DiamondBorderColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFFE0
+  BorderColor #999999
+}
+
+|Customer|
+|LocalPress Backend|
+|SePay / Bank|
+|Accountant|
+|Chief Accountant|
+
+|Customer|
+start
+:Choose article / plan / booking
+or click "Top Up";
+|LocalPress Backend|
+:Create PENDING order (UC047)
+expires in 15 min;
+|Customer|
+:Open shared payment page
+/payment/:orderCode;
+if (Pay with?) then (LocalPress Wallet)
+  if (Enough balance?) then (yes)
+  else (no)
+    :Top up the shortfall
+(SePay QR, see SV4-02);
+  endif
+  |LocalPress Backend|
+  :Debit wallet, order SUCCESS;
+else (SePay QR)
+  |Customer|
+  :Scan QR and transfer;
+  |SePay / Bank|
+  :Send IPN webhook;
+  |LocalPress Backend|
+  switch (Webhook result\n(UC048, UC049)?)
+  case (full / overpaid)
+    :Order SUCCESS
+(excess to wallet);
+  case (underpaid / late)
+    :Money to wallet,
+order not completed;
+  case (top-up order)
+    :Credit wallet;
+  endswitch
+endif
+|Customer|
+if (Transferred > 15 min
+but not recorded?) then (yes)
+  :Submit complaint (UC051);
+  |Accountant|
+  :Match bank statement (SV4-03);
+  if (Money found?) then (yes)
+    |LocalPress Backend|
+    :Record to order
+or credit wallet;
+  else (no)
+    |Accountant|
+    :Reject with reason;
+  endif
+else (no)
+  |Customer|
+  :Payment recorded normally;
+endif
+|Accountant|
+if (Refund requested
+(via support)?) then (no)
+  |Customer|
+  :Keep purchased rights;
+else (yes)
+  |Accountant|
+  :1st eye: propose refund (UC055)
+within cap (Rule 11);
+  |Chief Accountant|
+  if (2nd eye
+approves?) then (yes)
+    |LocalPress Backend|
+    :REFUND transaction, publish
+event: SV1 / SV3 revoke rights;
+  else (no)
+    |Chief Accountant|
+    :REJECTED,
+customer keeps rights;
+  endif
+endif
+|Customer|
+:Receive final result;
+stop
+
+@enduml

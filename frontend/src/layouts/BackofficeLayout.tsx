@@ -95,7 +95,8 @@ export function BackofficeLayout() {
 
   const financeNav = [
     { label: 'Tổng quan tài chính', path: '/backoffice/finance', icon: CreditCard },
-    { label: 'Đơn hàng & Xác nhận CK', path: '/backoffice/finance/orders', icon: DollarSign },
+    { label: 'Đơn hàng thanh toán', path: '/backoffice/finance/orders', icon: DollarSign },
+    { label: 'Khiếu nại thanh toán', path: '/backoffice/finance/complaints', icon: MessageSquare },
     { label: 'Quản lý Hoàn tiền (Refund)', path: '/backoffice/finance/refunds', icon: RotateCcw },
     { label: 'Đối soát kỳ & Chênh lệch', path: '/backoffice/finance/reconciliation', icon: Scale },
     { label: 'Sổ cái & Bút toán kế toán', path: '/backoffice/finance/ledger', icon: BookMarked },

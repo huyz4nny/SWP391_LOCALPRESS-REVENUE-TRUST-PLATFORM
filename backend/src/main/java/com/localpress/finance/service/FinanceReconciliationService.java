@@ -49,8 +49,12 @@ public class FinanceReconciliationService {
         LocalDate startDate = now.withDayOfMonth(1);
         LocalDate endDate = now.withDayOfMonth(now.lengthOfMonth());
 
-        // 1. Tính tổng doanh thu hệ thống đã ghi nhận SUCCESS
-        String sumSql = "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE status = 'SUCCESS'";
+        // 1. Tổng tiền thực vào tài khoản ngân hàng theo hệ thống (đối chiếu với sao kê):
+        //    gồm cả tiền nạp ví (TOPUP), bỏ đơn trả bằng ví (tiền đã vào ngân hàng lúc nạp) và bút toán hoàn.
+        String sumSql = """
+            SELECT COALESCE(SUM(amount), 0) FROM transactions
+            WHERE status = 'SUCCESS' AND transaction_type <> 'REFUND' AND payment_method <> 'WALLET'
+        """;
         BigDecimal systemRevenue = jdbcTemplate.queryForObject(sumSql, BigDecimal.class);
         if (systemRevenue == null) systemRevenue = BigDecimal.ZERO;
 

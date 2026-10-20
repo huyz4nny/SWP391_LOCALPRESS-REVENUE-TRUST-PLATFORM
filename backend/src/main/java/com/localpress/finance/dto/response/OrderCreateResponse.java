@@ -57,4 +57,29 @@ public class OrderCreateResponse {
     private String qrCodeUrl;
 
     private LocalDateTime createdAt;
+
+    // --- Dữ liệu hiển thị trên trang thanh toán chung /payment/:orderCode ---
+
+    /** SUBSCRIPTION | ARTICLE | AD | TOPUP */
+    private String orderType;
+
+    private Long targetId;
+
+    private boolean isPaid;
+
+    private boolean expired;
+
+    private LocalDateTime paidAt;
+
+    /** Hạn hiệu lực mã QR, Frontend dùng để đếm ngược. */
+    private LocalDateTime expiresAt;
+
+    /** Thông tin chuyển khoản (lấy từ cấu hình localpress.sepay.*), nội dung CK bắt buộc = orderCode. */
+    private String bankCode;
+
+    private String accountNumber;
+
+    private String accountName;
+
+    private String transferContent;
 }
