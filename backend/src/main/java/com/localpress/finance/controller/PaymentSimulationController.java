@@ -4,6 +4,8 @@ import com.localpress.finance.dto.request.SepayIpnRequest;
 import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
+import com.localpress.finance.service.SepayGatewayService;
+import com.localpress.finance.model.SepayWebhookLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -31,6 +33,7 @@ public class PaymentSimulationController {
 
     private final PaymentProcessingService paymentProcessingService;
     private final FinanceCurrentUser currentUser;
+    private final SepayGatewayService sepayGatewayService;
 
     @PostMapping("/simulate-ipn")
     public ResponseEntity<Map<String, Object>> simulateIpn(
@@ -51,10 +54,16 @@ public class PaymentSimulationController {
         SepayIpnRequest ipn = SepayIpnRequest.builder()
                 .gateway("Vietcombank")
                 .transferType("in")
+                .code(orderCode)
                 .content("LOCALPRESS " + orderCode)
                 .amount(amount)
                 .referenceCode(reference)
                 .build();
-        return ResponseEntity.ok(paymentProcessingService.processSepayIpn(ipn));
+        // Đi qua đúng cổng nhận tiền như webhook thật, ghi log nguồn SIMULATION để không lẫn với tiền thật
+        SepayGatewayService.Outcome outcome = sepayGatewayService.receive(
+                SepayWebhookLog.Source.SIMULATION, ipn, "{\"simulated\":true,\"orderCode\":\"" + orderCode
+                        + "\",\"amount\":" + amount.toPlainString() + ",\"referenceCode\":\"" + reference + "\"}",
+                true, "localhost");
+        return ResponseEntity.ok(outcome.body());
     }
 }

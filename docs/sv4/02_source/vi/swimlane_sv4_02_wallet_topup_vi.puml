@@ -33,7 +33,8 @@ skinparam note {
 |Khách hàng|
 start
 :Bấm "Nạp tiền" trên header
-hoặc "Nạp thêm để thanh toán";
+(nạp tự do; nạp bù cho đơn
+do SV4-01 tạo);
 |Trang thanh toán|
 if (Đã đăng nhập?) then (rồi)
 else (chưa)
@@ -74,7 +75,9 @@ thực nhận (kể cả sau hạn QR),
 ghi wallet_entries CREDIT;
     note right
     UNIQUE(transaction_id, direction)
-    chặn cộng 2 lần
+    chặn cộng 2 lần.
+Nạp bù (topup_for_order):
+sau đó tự trả đơn (SV4-01)
     end note
   endswitch
   |Trang thanh toán|

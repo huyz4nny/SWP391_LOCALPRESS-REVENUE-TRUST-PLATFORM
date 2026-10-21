@@ -70,3 +70,6 @@ __pycache__/
 
 # --- SePay / payment secrets (SV4) ---
 backend/config/application-secrets.yml
+
+# --- taste-skill working files ---
+frontend/.taste-skill/

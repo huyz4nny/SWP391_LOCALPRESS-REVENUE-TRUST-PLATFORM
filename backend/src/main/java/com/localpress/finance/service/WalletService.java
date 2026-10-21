@@ -61,6 +61,15 @@ public class WalletService {
         return apply(tx, amount, WalletEntry.Direction.DEBIT, reason);
     }
 
+    /**
+     * Khóa dòng ví (tạo nếu chưa có) rồi trả số dư. Dùng trước khi tự trừ ví trong luồng webhook:
+     * kiểm tra đủ tiền trước để không ném 402 làm rollback cả giao dịch nạp tiền.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public BigDecimal lockedBalance(Long userId) {
+        return lockOrCreate(userId).getBalance();
+    }
+
     private WalletEntry apply(Transaction tx, BigDecimal amount, WalletEntry.Direction direction, String reason) {
         Wallet wallet = lockOrCreate(tx.getUserId());
 

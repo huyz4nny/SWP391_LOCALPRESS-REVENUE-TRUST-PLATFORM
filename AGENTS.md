@@ -19,7 +19,7 @@ Dự án gồm **5 sinh viên**, mỗi sinh viên làm chủ trọn vẹn 1 lu�
 
 | Thành viên | Luồng nghiệp vụ | Phân hệ chính | Use Cases & Màn hình (`project_tracking_group2.xlsx`) | Đặc tả chi tiết (`LocalPress_Danh_muc_chuc_nang.docx`) |
 | :--- | :--- | :--- | :--- | :--- |
-| **SV4: Huy (Leader)** | **Kế toán, Thanh toán & Đối soát** | `finance`, `transactions`, `refund_requests` | **14 Use Cases (`UC047` - `UC060`)**, **8 Màn hình / Chức năng** (SRS/SDS II.4.1 - II.4.8). Sắp xếp theo: Iter 1 (2), Iter 2 (2), Iter 3 (4). | 25 tiêu chí (12 P0, 12 P1, 1 P2): Bộ xử lý thanh toán dùng chung, Webhook IPN, hóa đơn/chứng từ, sổ quỹ kép, đối soát ngân hàng, hoàn tiền 4 mắt. |
+| **SV4: Huy (Leader)** | **Kế toán, Thanh toán & Đối soát** | `finance`, `transactions`, `refund_requests` | **14 Use Cases (`UC047` - `UC060`)**, **12 Màn hình / Chức năng** (SRS/SDS II.4.1 - II.4.12) theo tracking riêng `docs/sv4/01_output/TRACKING_SV4.xlsx`, sắp theo hành trình của tiền. Sắp xếp theo: Iter 1 (3), Iter 2 (4), Iter 3 (5). | 25 tiêu chí (12 P0, 12 P1, 1 P2): Bộ xử lý thanh toán dùng chung, Webhook IPN, hóa đơn/chứng từ, sổ quỹ kép, đối soát ngân hàng, hoàn tiền 4 mắt. |
 | **SV1: Tây** | **Doanh nghiệp (Advertiser Portal)** | `advertising`, `advertisers`, `ad_campaigns` | **14 Use Cases (`UC001` - `UC014`)**, **10 Màn hình / Chức năng** (SRS/SDS II.1.1 - II.1.10). Sắp xếp theo: Iter 1 (2), Iter 2 (4), Iter 3 (4). | 25 tiêu chí (16 P0, 9 P1, 0 P2): Cổng B2B, tra cứu slot trống, gửi booking, upload creative, xem báo cáo hiệu suất CTR, hồ sơ & chứng từ B2B. |
 | **SV2: Trọng Phan** | **Tòa soạn, Vận hành & Phê duyệt** | `editorial`, duyệt bài, duyệt ad, duyệt comment | **14 Use Cases (`UC015` - `UC028`)**, **10 Màn hình / Chức năng** (SRS/SDS II.2.1 - II.2.10). Sắp xếp theo: Iter 1 (2), Iter 2 (4), Iter 3 (4). | 25 tiêu chí (14 P0, 8 P1, 3 P2): Dashboard kinh doanh tòa soạn, duyệt báo giá/hợp đồng, kiểm duyệt banner, kiểm duyệt bài viết, kiểm duyệt comment, quản lý gói đọc. |
 | **SV3: Hoàng** | **Khách & Độc giả (Reader Experience)** | `reader`, `articles` (public), `subscriptions` | **18 Use Cases (`UC029` - `UC046`)**, **10 Màn hình / Chức năng** (SRS/SDS II.3.1 - II.3.10). Sắp xếp theo: Iter 1 (3), Iter 2 (4), Iter 3 (3). | 25 tiêu chí (18 P0, 6 P1, 1 P2): Đọc báo Free 100%, preview Paywall, giỏ hàng/checkout gói & bài lẻ, tủ sách cá nhân, bookmark/follow, quản lý 2 thiết bị. |
@@ -30,19 +30,19 @@ Dự án gồm **5 sinh viên**, mỗi sinh viên làm chủ trọn vẹn 1 lu�
   * SV1: `Company Profile`, `Ad Slot Catalog`
   * SV2: `Article Review and Publishing`, `Content Policy and Moderation`
   * SV3: `Homepage and Article Search`, `Article Reader`, `Authentication`
-  * SV4: `Financial Documents and Ledger`, `Manual Bank Transfer Confirmation`
+  * SV4: `Payment Checkout`, `LocalPress Wallet and Top-up`, `SePay Webhook and Payment Log` (UC047 - UC050; tiền vào là điểm đầu của luồng SV4)
   * SV5: `Article Editor`, `Article Metadata and Media`
 * **Iteration 2 — Giữa quy trình (17 màn hình):** Giao dịch lõi, Thanh toán QR/IPN, Paywall Server-side, Booking & Duyệt banner.
   * SV1: `Campaign Booking`, `Quotation Confirmation`, `Advertising Payment`, `Creative Submission and Preview`
   * SV2: `Pending Booking Queue`, `Advertising Inventory Calendar`, `Quotation Management`, `Creative Review`
   * SV3: `Premium Checkout`, `Premium Article Reader`, `Personal Bookshelf`, `Comments and Reports`
-  * SV4: `Payment Processing`, `Advertiser Receivables`
+  * SV4: `Payment Complaint (Customer)`, `Payment Complaint Queue`, `Payment Orders and Financial Documents`, `Financial Ledger` (UC051, UC057, UC058)
   * SV5: `Article Version History`, `Article Submission and Revision`, `Content Access and Paywall`
 * **Iteration 3 — Cuối quy trình (20 màn hình):** Đối soát, Hoàn tiền 4 mắt, Báo cáo & Dashboard, AI Cố vấn, Ad Serving & Admin.
   * SV1: `Advertising Dashboard`, `Creative Replacement`, `Requests and Business Notifications`, `Contracts and Documents`
   * SV2: `Campaign Eligibility Check`, `Campaign Control`, `Advertising Contract Management`, `Business Operation Dashboard`
   * SV3: `Followed Content`, `Devices and Sessions`, `Subscription, Transactions and Support`
-  * SV4: `Cash Flow Dashboard`, `Payment Reconciliation`, `Refund and Rights Management`, `Financial Reports and Alerts`
+  * SV4: `Cash Flow Dashboard`, `Advertiser Receivables`, `Payment Reconciliation`, `Refund and Rights Management`, `Financial Reports and Alerts`
   * SV5: `AI Editorial Assistant`, `Advertising Slot Configuration`, `Advertisement Delivery and Tracking`, `Advertisement URL Monitoring`, `System Administration Console`
 
 ---
@@ -112,6 +112,8 @@ Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xl
 - `wallet_entries`: Sổ chi tiết ví (CREDIT/DEBIT), UNIQUE(`transaction_id`, `direction`) chống cộng/trừ trùng khi webhook gửi lại.
 - `transactions` thêm loại `TOPUP` (nạp ví, không gắn đối tượng nào), cột `description`, `expires_at` (hạn mã QR 15 phút), `payment_method = 'WALLET'` khi trả bằng số dư.
 - `payment_complaints` (`V4__payment_complaints.sql`): Khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" (UC051), UNIQUE `bank_reference` (1 lần chuyển chỉ khiếu nại 1 lần).
+- `transactions.topup_for_order` (`V6__topup_for_order.sql`): đơn TOPUP nạp bù ghi mã đơn cần tự trả khi tiền về.
+- `sepay_webhook_logs` (`V5__sepay_webhook_logs.sql`): nhật ký mọi khoản tiền SePay báo về (nguồn WEBHOOK / API_SYNC / SIMULATION) kèm payload gốc, UNIQUE `sepay_id` chống xử lý trùng.
 - Nạp ví là **công nợ phải trả khách, không phải doanh thu**. Doanh thu chỉ ghi nhận khi khách tiêu ví hoặc trả QR cho đơn hàng (Rule 16). Tiền nạp không rút ra ngân hàng.
 
 ---
@@ -119,9 +121,9 @@ Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xl
 ## 5. HỢP ĐỒNG GIAO TIẾP DÙNG CHUNG (SHARED SERVICE CONTRACTS)
 1. **Thanh toán tập trung (`com.localpress.finance`):**
    - API: `POST /api/v1/finance/orders` tạo đơn thanh toán dùng chung cho cả Mua báo (SV3) và Quảng cáo (SV1). User lấy từ phiên đăng nhập, không nhận header `X-User-Id`.
-   - **Trang thanh toán chung:** tạo đơn xong, module nguồn BẮT BUỘC `navigate(paymentPath(response), { state: { returnUrl } })` (`@/features/finance/api/payment`) sang `/payment/:orderCode` của SV4. Không module nào tự làm trang QR/checkout riêng. Trang có 2 phương thức: Ví LocalPress hoặc QR SePay (polling trạng thái 3 giây/lần).
+   - **Trang thanh toán chung:** tạo đơn xong, module nguồn BẮT BUỘC `navigate(paymentPath(response), { state: { returnUrl } })` (`@/features/finance/api/payment`) sang `/payment/:orderCode` của SV4. Không module nào tự làm trang QR/checkout riêng. **Mọi đơn mua (bài, gói, quảng cáo) đều trả bằng Ví LocalPress** (từ 22/10/2026): ví đủ thì 1 nút trừ ví; ví thiếu thì trang tự tạo mã QR nạp bù đúng phần còn thiếu (`POST /api/v1/finance/orders/code/{code}/shortfall-topup`, đơn TOPUP có `topup_for_order`), SePay báo tiền nạp về thì backend tự trừ ví trả đơn (`tryAutoPay`). Trang hỏi trạng thái 3 giây/lần. Tiền chuyển thẳng vào mã đơn (cách cũ, khiếu nại) vẫn được xử lý.
    - Ví: `GET /api/v1/finance/wallet/me`, `POST /api/v1/finance/wallet/topups`, `POST /api/v1/finance/orders/code/{code}/pay-with-wallet`. Header có `WalletBalanceButton` (số dư + Nạp tiền) -> `/wallet/topup` -> `/payment/:orderCode`.
-   - Webhook: `POST /api/v1/finance/webhook/sepay` (header `Authorization: Apikey <key>`, sai khóa trả 401) xử lý IPN Idempotent, phát event `PaymentSuccessEvent`. Tiền về muộn (booking quảng cáo quá hạn giữ chỗ), chuyển thiếu, chuyển thừa đều được cộng vào ví, không bao giờ treo tiền khách.
+   - Webhook: `POST /api/v1/finance/webhook/sepay` (header `Authorization: Apikey <key>`, sai khóa trả 401) xử lý IPN Idempotent, phát event `PaymentSuccessEvent`. Payload thật của SePay là camelCase (`id`, `transferAmount`, `transferType`, `referenceCode`, `code`); mọi đường tiền vào (webhook, đồng bộ API SePay, giả lập dev) đi qua `SepayGatewayService.receive`, ghi `sepay_webhook_logs`, xử lý xong luôn trả `200 {"success": true}` để SePay không gửi lại. Máy local nhận webhook qua `backend/scripts/sepay-tunnel.ps1` (Cloudflare Quick Tunnel, chỉ dùng khi dev, URL đổi mỗi lần chạy; deploy thật thì dùng tên miền). Đã test tiền thật 22/10/2026: TPBank → SePay → webhook → ví. SePay chỉ gửi webhook cho giao dịch xảy ra sau khi webhook được tạo; không có tunnel thì `localpress.sepay.api-token` cho phép hỏi API SePay (`POST /finance/sepay/sync`, `POST /finance/orders/code/{code}/check-sepay`). Tiền về muộn (booking quảng cáo quá hạn giữ chỗ), chuyển thiếu, chuyển thừa đều được cộng vào ví, không bao giờ treo tiền khách.
    - **Không có duyệt chuyển khoản thủ công.** Kế toán không được tự đánh dấu đơn PAID. Khách đã chuyển tiền mà không được ghi nhận thì gửi khiếu nại ở `/wallet/complaints` (`POST /api/v1/finance/complaints`); kế toán đối chiếu sao kê tại `/backoffice/finance/complaints` rồi Ghi nhận vào đơn (chạy lại đúng hàm xử lý webhook, idempotent), Cộng vào ví, hoặc Từ chối có lý do. UC051 / màn hình II.4.2 được dùng cho luồng này.
    - SV1/SV3 tự viết `@EventListener PaymentSuccessEvent` trong module của mình để kích hoạt campaign / mở khóa bài / kích hoạt gói. `targetId` phải là id bản ghi thật (`purchase_id`, `subscription_id`, `campaign_id`) do module nguồn tạo ở trạng thái chờ trước khi gọi tạo đơn.
    - **Hoàn tiền (UC055 -> UC056):** Kế toán trưởng duyệt hoàn xong, SV4 chỉ ghi bút toán `REFUND` (đơn trả bằng ví thì hoàn lại vào ví) rồi phát `RefundCompletedEvent` (`com.localpress.shared.event`: `transactionType`, `targetId`, `refundAmount`, `fullRefund`...). SV4 KHÔNG sửa bảng `article_purchases` / `subscriptions` / `ad_campaigns` (Rule 17). SV3 tự viết `@EventListener RefundCompletedEvent` để thu hồi bài / gói, SV1 để tạm dừng chiến dịch; quy định: **hoàn toàn bộ thì thu hồi quyền, hoàn một phần thì khách giữ quyền** (listener chỉ thu hồi khi `shouldRevokeRights()` = `fullRefund` = true).
@@ -169,10 +171,13 @@ Toàn bộ mã nguồn giao diện (Frontend) của 5 thành viên được đ�
    - Form nhập liệu dùng `react-hook-form` kết hợp `zod` schema hiển thị lỗi tiếng Việt.
    - API client đặt tại `src/features/<module>/api/index.ts` hỗ trợ song song Mock Store (`mockStore`) và Backend Spring Boot qua `APP_CONFIG.useMockApi`.
 5. **Mẫu tham chiếu nhanh:** Xem chi tiết tại `.agents/skills/localpress-frontend/references/` và các code mẫu trong `.agents/skills/localpress-frontend/examples/`.
+6. **Skill thẩm mỹ `taste-skill`** (`.agents/skills/taste-skill/`, nguồn github.com/leonxlnx/taste-skill): màn hình backoffice/kế toán theo `references/app-screens.md`, style `achromatic-ledger` (giữ màu & phông brand ở mục 1). Token dùng chung nằm ở `tailwind.config.js`: `slate` là xám trung tính, không shadow cho vật đứng yên (chỉ `shadow-lg/xl/2xl` cho dialog, menu), bo góc 8px panel / 6px control, `bg-ground` là nền backoffice. Không gradient, không icon trong ô màu trên KPI, không nhãn chữ hoa giãn chữ, số tiền canh phải bằng `num`/`tabular-nums`. Kiểm tra bằng `node .agents/skills/taste-skill/scripts/lint.mjs --app <thư mục>`. Primitive kế toán: `src/features/finance/components/LedgerUI.tsx`.
+7. **Dark mode toàn site:** class `dark` trên `<html>` (nút `components/shared/ThemeToggle.tsx` có ở cả 4 layout, script chống nháy trong `index.html`). `slate`/`stone`/`ground`/`positive`/`negative` là biến CSS; ghi đè `bg-white`, nền nhạt và chữ màu đậm cho dark nằm trong khối THEME của `styles/globals.css`, sinh bởi `frontend/scripts/gen_theme_css.py` (sửa màu ở script rồi chạy lại, không sửa tay khối THEME). Trang mới không cần viết `dark:` nếu dùng `slate-*`, `bg-white`, `bg-ground`.
 
 ---
 
 ## 8. CẨM NANG REVIEW & PHÒNG THI (`iter-review`)
+> Cẩm nang review Iter 1-2 của SV4 (từng màn hình, từng nút → code → DB, bài sửa tại chỗ): `docs/sv4/01_output/REVIEW_ITER_1_2.md`; ảnh theo luồng: `docs/sv4/01_output/screenshots/`.
 > Tài liệu SV4 (swimlane, use case, thay đổi DB) nằm ở `docs/sv4/` (`01_output` = file dùng để nộp/review, `02_source` = PlantUML, `03_tools` = script render).
 Toàn bộ kịch bản Review cá nhân 1-1 trên lớp với Giảng viên được hệ thống hóa qua **Workspace Skill `iter-review`** (đặt tại `.agents/skills/iter-review/SKILL.md`). Skill này cung cấp:
 1. **Bảng Mapping toàn diện:** Tra cứu tức thì từ Use Case (`UC001` - `UC077`) sang URL Route ("mở link nào"), Frontend Page/Component, Backend Controller/Service, và Bảng CSDL.

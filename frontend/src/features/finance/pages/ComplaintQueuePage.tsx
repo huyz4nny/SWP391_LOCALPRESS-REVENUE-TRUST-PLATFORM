@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle2, Clock, Wallet, XCircle } from 'lucide-react'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { complaintApi } from '../api/payment'
 import type { PaymentComplaint } from '../types'
+import { PageHeader, Panel, Segmented, Notice, tableCls } from '../components/LedgerUI'
 
 /**
  * ==============================================================================
@@ -29,24 +27,17 @@ const RESOLUTION_LABELS: Record<string, string> = {
 }
 
 export function ComplaintStatusBadge({ status }: { status: PaymentComplaint['status'] }) {
-  if (status === 'OPEN')
-    return (
-      <Badge variant="warning">
-        <Clock className="w-3 h-3 mr-1" /> Chờ đối soát
-      </Badge>
-    )
-  if (status === 'RESOLVED')
-    return (
-      <Badge variant="success">
-        <CheckCircle2 className="w-3 h-3 mr-1" /> Đã ghi nhận
-      </Badge>
-    )
-  return (
-    <Badge variant="destructive">
-      <XCircle className="w-3 h-3 mr-1" /> Từ chối
-    </Badge>
-  )
+  if (status === 'OPEN') return <Badge variant="warning">Chờ đối soát</Badge>
+  if (status === 'RESOLVED') return <Badge variant="success">Đã ghi nhận</Badge>
+  return <Badge variant="destructive">Từ chối</Badge>
 }
+
+const FILTERS: { value: PaymentComplaint['status'] | undefined; label: string }[] = [
+  { value: 'OPEN', label: 'Chờ đối soát' },
+  { value: 'RESOLVED', label: 'Đã ghi nhận' },
+  { value: 'REJECTED', label: 'Từ chối' },
+  { value: undefined, label: 'Tất cả' },
+]
 
 export function ComplaintQueuePage() {
   const [filter, setFilter] = useState<PaymentComplaint['status'] | undefined>('OPEN')
@@ -76,77 +67,72 @@ export function ComplaintQueuePage() {
     }
   }
 
+  const total = items.reduce((acc, c) => acc + c.amount, 0)
+
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Khiếu nại thanh toán chưa ghi nhận (UC051)</h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Đối chiếu sao kê ngân hàng theo mã giao dịch và số tiền trước khi ghi nhận. Ghi nhận vào đơn đi qua đúng luồng
-          xử lý webhook, nên webhook thật về sau sẽ không cộng trùng.
-        </p>
+    <div>
+      <PageHeader
+        title="Khiếu nại thanh toán"
+        sub="Khách báo đã chuyển tiền nhưng chưa được ghi nhận. Tìm đúng mã giao dịch và số tiền trên sao kê trước khi ghi nhận; ghi nhận vào đơn chạy lại luồng webhook nên không cộng trùng."
+      />
+
+      <div className="mb-3">
+        <Segmented label="Lọc khiếu nại" value={filter} onChange={setFilter} options={FILTERS} />
       </div>
 
-      <div className="flex gap-2">
-        {([['OPEN', 'Chờ đối soát'], ['RESOLVED', 'Đã ghi nhận'], ['REJECTED', 'Từ chối'], [undefined, 'Tất cả']] as const).map(
-          ([value, label]) => (
-            <Button key={label} size="sm" variant={filter === value ? 'primary' : 'outline'} onClick={() => setFilter(value)}>
-              {label}
-            </Button>
-          )
-        )}
-      </div>
+      {error && <div className="mb-3"><Notice tone="error">{error}</Notice></div>}
 
-      {error && <div className="text-sm text-crimson bg-red-50 border border-red-200 rounded p-3">{error}</div>}
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{items.length} khiếu nại</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {items.length === 0 ? (
-            <EmptyState title="Không có khiếu nại nào" description="Mọi khoản tiền đã được webhook SePay ghi nhận tự động." />
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-slate-500 border-b border-slate-200">
-                  <th className="py-2">#</th>
-                  <th className="py-2">Khách / Đơn</th>
-                  <th className="py-2">Mã GD ngân hàng</th>
-                  <th className="py-2 text-right">Số tiền</th>
-                  <th className="py-2">Chuyển lúc</th>
-                  <th className="py-2">Trạng thái</th>
-                  <th className="py-2 text-right">Thao tác</th>
+      <Panel
+        title={<span className="num">{items.length} khiếu nại</span>}
+        aside={items.length > 0 && <span>Tổng <span className="font-semibold text-slate-900 num">{formatCurrency(total)}</span></span>}
+        bodyClassName="px-0 pb-1"
+      >
+        {items.length === 0 ? (
+          <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">
+            {filter === 'OPEN' ? 'Không có khiếu nại nào chờ đối soát. Mọi khoản tiền đã được webhook SePay ghi nhận.' : 'Không có khiếu nại nào.'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className={tableCls.table}>
+              <thead className={tableCls.thead}>
+                <tr>
+                  <th className={tableCls.th}>Khiếu nại</th>
+                  <th className={tableCls.th}>Mã GD ngân hàng</th>
+                  <th className={tableCls.th}>Chuyển lúc</th>
+                  <th className={tableCls.th}>Trạng thái</th>
+                  <th className={tableCls.thNum}>Số tiền</th>
+                  <th className={tableCls.th}><span className="sr-only">Thao tác</span></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((c) => (
-                  <tr key={c.complaintId} className="border-b border-slate-100 align-top">
-                    <td className="py-2 font-semibold">{c.complaintId}</td>
-                    <td className="py-2">
-                      <div>User #{c.userId}</div>
-                      <div className="font-mono text-slate-500">{c.orderCode || 'Không có mã đơn'}</div>
-                      {c.note && <div className="text-slate-500 italic">{c.note}</div>}
+                  <tr key={c.complaintId} className={`${tableCls.tr} align-top`}>
+                    <td className={`${tableCls.td} align-top`}>
+                      <div className="text-slate-900">#{c.complaintId} · khách #{c.userId}</div>
+                      <div className="font-mono text-xs text-slate-500">{c.orderCode || 'Không có mã đơn'}</div>
+                      {c.note && <div className="mt-0.5 max-w-[260px] text-xs text-slate-500">{c.note}</div>}
                     </td>
-                    <td className="py-2 font-mono font-bold">{c.bankReference}</td>
-                    <td className="py-2 text-right font-bold">{formatCurrency(c.amount)}</td>
-                    <td className="py-2">{formatDateTime(c.transferredAt)}</td>
-                    <td className="py-2 space-y-1">
+                    <td className={`${tableCls.td} align-top`}><span className={tableCls.code}>{c.bankReference}</span></td>
+                    <td className={`${tableCls.td} whitespace-nowrap align-top num`}>{formatDateTime(c.transferredAt)}</td>
+                    <td className={`${tableCls.td} align-top`}>
                       <ComplaintStatusBadge status={c.status} />
-                      {c.resolution && <div className="text-slate-500">{RESOLUTION_LABELS[c.resolution] ?? c.resolution}</div>}
-                      {c.status === 'REJECTED' && c.resolutionNote && <div className="text-crimson">{c.resolutionNote}</div>}
+                      {c.resolution && <div className="mt-1 text-xs text-slate-500">{RESOLUTION_LABELS[c.resolution] ?? c.resolution}</div>}
+                      {c.status === 'REJECTED' && c.resolutionNote && <div className="mt-1 max-w-[220px] text-xs text-[#831c1e]">{c.resolutionNote}</div>}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className={`${tableCls.tdNum} align-top font-semibold`}>{formatCurrency(c.amount)}</td>
+                    <td className={`${tableCls.td} align-top text-right`}>
                       {c.status === 'OPEN' &&
                         (rejecting === c.complaintId ? (
-                          <div className="space-y-1.5 min-w-[220px]">
+                          <div className="ml-auto w-60 space-y-1.5">
                             <Input
-                              placeholder="Lý do (khách sẽ thấy)"
+                              placeholder="Lý do từ chối, khách sẽ thấy"
                               value={reason}
                               onChange={(e) => setReason(e.target.value)}
-                              className="h-8 text-xs"
+                              className="h-8 text-[13px]"
+                              autoFocus
                             />
-                            <div className="flex justify-end gap-1">
-                              <Button size="sm" variant="outline" onClick={() => setRejecting(null)}>
+                            <div className="flex justify-end gap-1.5">
+                              <Button size="sm" variant="ghost" onClick={() => setRejecting(null)}>
                                 Hủy
                               </Button>
                               <Button
@@ -157,15 +143,15 @@ export function ComplaintQueuePage() {
                                   run(c.complaintId, () => complaintApi.reject(c.complaintId, reason)).then(() => setRejecting(null))
                                 }
                               >
-                                Xác nhận từ chối
+                                Từ chối
                               </Button>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-col items-end gap-1">
+                          <div className="flex justify-end gap-1.5">
                             {c.orderCode && (
                               <Button size="sm" disabled={busyId === c.complaintId} onClick={() => setConfirm({ c, target: 'ORDER' })}>
-                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Ghi nhận vào đơn
+                                Ghi nhận vào đơn
                               </Button>
                             )}
                             <Button
@@ -174,12 +160,12 @@ export function ComplaintQueuePage() {
                               disabled={busyId === c.complaintId}
                               onClick={() => setConfirm({ c, target: 'WALLET' })}
                             >
-                              <Wallet className="w-3.5 h-3.5 mr-1" /> Cộng vào ví
+                              Cộng vào ví
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="text-crimson"
+                              className="text-negative hover:text-negative"
                               onClick={() => {
                                 setReason('')
                                 setRejecting(c.complaintId)
@@ -194,9 +180,9 @@ export function ComplaintQueuePage() {
                 ))}
               </tbody>
             </table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </Panel>
 
       {confirm && (
         <ConfirmDialog

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
 import { WalletBalanceButton } from '@/components/shared/WalletBalanceButton'
 import {
@@ -66,6 +67,7 @@ export function PublicLayout() {
 
           {/* Phải: Liên kết phụ tinh tế */}
           <div className="flex items-center space-x-3.5">
+            <ThemeToggle className="h-7 px-1.5 text-stone-600 hover:bg-stone-100" />
             <Link
               to="/advertiser"
               className="text-stone-500 hover:text-stone-900 font-medium transition-colors"
@@ -105,7 +107,7 @@ export function PublicLayout() {
                   />
                   <span className="font-semibold text-xs">{currentUser.name.split(' ')[0]}</span>
                   {isPremiumUser && (
-                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded">
+                    <span className="bg-amber-100 text-amber-900 text-[11px] font-semibold px-1.5 rounded">
                       VIP
                     </span>
                   )}
@@ -138,8 +140,8 @@ export function PublicLayout() {
                 <span className="text-crimson inline-block ml-0.5">.</span>
               </h1>
             </Link>
-            <p className="font-serif text-[11px] text-stone-400 italic tracking-wider mt-0.5">
-              Báo điện tử địa phương Hải Phòng • Tiếng nói của Nhân dân thành phố Cảng
+            <p className="font-serif text-[13px] text-stone-600 mt-1">
+              Báo điện tử địa phương Hải Phòng
             </p>
           </div>
 
@@ -151,7 +153,7 @@ export function PublicLayout() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm tin tức..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-full focus:outline-none focus:ring-1 focus:ring-stone-400 focus:bg-white transition-all placeholder:text-stone-400"
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-full focus:outline-none focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors placeholder:text-stone-500"
               />
               <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2" />
             </form>
@@ -201,7 +203,7 @@ export function PublicLayout() {
 
             {/* Mobile toggle button */}
             <div className="lg:hidden flex items-center justify-between w-full py-2.5">
-              <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider flex items-center">
+              <span className="text-sm font-medium text-stone-700 flex items-center">
                 <Menu className="w-4 h-4 mr-1.5 text-stone-700" />
                 Chuyên mục
               </span>
@@ -239,25 +241,24 @@ export function PublicLayout() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="block py-1.5 text-sm font-semibold text-amber-700"
               >
-                👑 Chuyên mục VIP
+                Gói Premium
               </Link>
               <Link
                 to="/advertiser"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block py-2 text-sm font-semibold text-primary-900 border-t border-stone-100 mt-2 pt-2"
               >
-                🏢 Đặt Quảng Cáo
+                Đặt quảng cáo
               </Link>
             </div>
           )}
         </nav>
 
         {/* 3. Dải tin mới siêu mỏng & trang nhã (Minimalist Breaking News Ticker) */}
-        <div className="bg-stone-50 border-b border-stone-100 py-1.5 px-4 text-xs">
+        <div className="bg-stone-50 py-2 px-4 text-[13px]">
           <div className="max-w-7xl mx-auto flex items-center space-x-2 text-stone-600">
-            <span className="font-bold text-crimson uppercase text-[10px] tracking-wider flex items-center shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-crimson mr-1.5 animate-pulse" />
-              MỚI NHẤT
+            <span className="font-semibold text-crimson text-xs shrink-0">
+              Mới nhất
             </span>
             <span className="text-stone-300">•</span>
             <Link
@@ -282,32 +283,32 @@ export function PublicLayout() {
       </main>
 
       {/* 6. Comprehensive Newspaper Footer */}
-      <footer className="border-t border-stone-300 bg-white mt-16 text-stone-600 text-xs">
-        <div className="max-w-7xl mx-auto px-4 py-10">
+      <footer className="bg-white mt-24 text-stone-700 text-[13px]">
+        <div className="max-w-7xl mx-auto px-4 py-14">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
             <div className="md:col-span-2 space-y-3">
               <Link to="/">
-                <h2 className="font-serif text-2xl font-black text-stone-900 uppercase tracking-tight">
+                <h2 className="font-serif text-4xl font-black text-stone-900 uppercase tracking-tight">
                   LOCAL<span className="text-crimson">PRESS</span>
                   <span className="text-crimson">.</span>
                 </h2>
               </Link>
-              <p className="text-stone-500 leading-relaxed text-xs">
+              <p className="text-stone-700 leading-6 text-[13px] max-w-md">
                 Báo điện tử địa phương & Nền tảng Doanh thu tự chủ — Kênh truyền thông báo chí dữ liệu, phóng sự điều tra và kết nối thương mại địa phương Hải Phòng.
               </p>
-              <div className="pt-1 space-y-1 text-stone-500 text-[11px]">
-                <p>📍 <strong>Tòa soạn:</strong> Số 10 đường Lạch Tray, Quận Ngô Quyền, TP. Hải Phòng</p>
-                <p>📞 <strong>Đường dây nóng:</strong> (0225) 3.842.123 • <strong>Hotline:</strong> 0912.345.678</p>
-                <p>✉️ <strong>Tòa soạn:</strong> toasoan@localpress.vn • <strong>Quảng cáo:</strong> quangcao@localpress.vn</p>
-                <p>📜 Giấy phép xuất bản báo điện tử số: 108/GP-BTTTT cấp ngày 15/01/2026</p>
+              <div className="pt-1 space-y-1 text-stone-700 text-[13px] leading-6">
+                <p><span className="text-stone-500">Tòa soạn:</span> Số 10 đường Lạch Tray, Quận Ngô Quyền, TP. Hải Phòng</p>
+                <p><span className="text-stone-500">Đường dây nóng:</span> (0225) 3.842.123 · 0912.345.678</p>
+                <p><span className="text-stone-500">Thư điện tử:</span> toasoan@localpress.vn · quangcao@localpress.vn</p>
+                <p><span className="text-stone-500">Giấy phép:</span> 108/GP-BTTTT, cấp ngày 15/01/2026</p>
               </div>
             </div>
 
             <div>
-              <h3 className="font-bold text-stone-900 uppercase tracking-wider text-xs mb-3 pb-1 border-b border-stone-100">
+              <h3 className="font-semibold text-stone-900 text-sm mb-3">
                 Chuyên mục
               </h3>
-              <ul className="space-y-1.5 text-stone-600">
+              <ul className="space-y-2 text-stone-700">
                 {categories.map((c) => (
                   <li key={c.id}>
                     <Link to={`/categories/${c.slug}`} className="hover:text-stone-900 transition-colors">
@@ -319,10 +320,10 @@ export function PublicLayout() {
             </div>
 
             <div>
-              <h3 className="font-bold text-stone-900 uppercase tracking-wider text-xs mb-3 pb-1 border-b border-stone-100">
+              <h3 className="font-semibold text-stone-900 text-sm mb-3">
                 Độc giả
               </h3>
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 <li>
                   <Link to="/premium" className="text-amber-700 font-medium hover:underline flex items-center">
                     <Crown className="w-3 h-3 mr-1 text-amber-500" />
@@ -348,10 +349,10 @@ export function PublicLayout() {
             </div>
 
             <div>
-              <h3 className="font-bold text-stone-900 uppercase tracking-wider text-xs mb-3 pb-1 border-b border-stone-100">
+              <h3 className="font-semibold text-stone-900 text-sm mb-3">
                 Quản trị & B2B
               </h3>
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 <li>
                   <Link to="/advertiser" className="text-primary-900 font-medium hover:underline flex items-center">
                     <Building2 className="w-3.5 h-3.5 mr-1 text-primary-800" />
@@ -377,9 +378,9 @@ export function PublicLayout() {
             </div>
           </div>
 
-          <div className="border-t border-stone-200 mt-8 pt-4 flex flex-col md:flex-row items-center justify-between text-stone-400 text-[11px] gap-2">
+          <div className="mt-10 pt-4 flex flex-col md:flex-row items-center justify-between text-stone-600 text-xs gap-2">
             <p>© 2026 Báo điện tử LocalPress. Bản quyền thuộc về Tòa soạn.</p>
-            <p className="font-mono text-stone-400">SWP391 — Nhóm 2 FPTU</p>
+            <p>SWP391, Nhóm 2, Đại học FPT</p>
           </div>
         </div>
       </footer>

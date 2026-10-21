@@ -1,5 +1,5 @@
 @startuml swimlane_sv4_00_overview_vi
-title SV4-00 Tổng quan: Thanh toán, Khiếu nại và Hoàn tiền\n<size:11>Bản tóm tắt - chi tiết từng nhánh xem SV4-01 .. SV4-06</size>
+title SV4-00 Tổng quan: Thanh toán (luôn qua ví), Khiếu nại và Hoàn tiền\n<size:11>Bản tóm tắt - chi tiết từng nhánh xem SV4-01 .. SV4-06</size>
 
 scale max 4000 width
 skinparam backgroundColor white
@@ -41,31 +41,25 @@ hết hạn sau 15 phút;
 |Khách hàng|
 :Mở trang thanh toán chung
 /payment/:orderCode;
-if (Thanh toán bằng?) then (Ví LocalPress)
-  if (Ví đủ tiền?) then (đủ)
-  else (không đủ)
-    :Nạp thêm tiền vào ví
-(QR SePay, xem SV4-02);
-  endif
+|Hệ thống LocalPress|
+if (Số dư ví >= số tiền?) then (đủ)
+  |Khách hàng|
+  :Bấm "Thanh toán bằng ví";
+else (thiếu)
   |Hệ thống LocalPress|
-  :Trừ ví, đơn SUCCESS;
-else (QR SePay)
+  :Tạo QR nạp bù đúng phần thiếu
+(nội dung = mã nạp);
   |Khách hàng|
   :Quét QR, chuyển khoản;
   |SePay / Ngân hàng|
-  :Gửi webhook IPN;
+  :Gửi webhook (UC048, UC049);
   |Hệ thống LocalPress|
-  switch (Kết quả webhook\n(UC048, UC049)?)
-  case (đủ / thừa)
-    :Đơn SUCCESS
-(tiền thừa vào ví);
-  case (thiếu / về muộn)
-    :Tiền vào ví,
-đơn chưa hoàn tất;
-  case (đơn nạp ví)
-    :Cộng tiền vào ví;
-  endswitch
+  :Cộng ví đúng 1 lần
+(sepay_id UNIQUE, Rule 5);
 endif
+|Hệ thống LocalPress|
+:Trừ ví, đơn SUCCESS,
+phát PaymentSuccessEvent;
 |Khách hàng|
 if (Đã chuyển > 15 phút
 mà chưa ghi nhận?) then (có)

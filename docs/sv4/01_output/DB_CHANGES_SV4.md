@@ -90,6 +90,24 @@ Bất biến đã kiểm trong test E2E: `wallets.balance = SUM(CREDIT) - SUM(DE
 
 `order_code` chỉ là liên kết logic tới `transactions.gateway_transaction_id`, không đặt FK. Lý do: khách có thể khai sai mã, khi đó kế toán vẫn xử lý được bằng cách cộng vào ví.
 
+## 5b. V5 — Bảng mới `sepay_webhook_logs` (21/10/2026)
+
+File: `V5__sepay_webhook_logs.sql`. Mỗi khoản tiền SePay báo về (webhook), mỗi giao dịch kéo về qua API SePay, và mỗi lần bấm nút giả lập đều ghi 1 dòng.
+
+| Cột | Kiểu | Ý nghĩa |
+|---|---|---|
+| `log_id` | BIGINT PK | |
+| `source` | ENUM('WEBHOOK','API_SYNC','SIMULATION') | SePay gọi vào / LocalPress hỏi API SePay / nút demo |
+| `sepay_id` | BIGINT, **UNIQUE** | Id giao dịch phía SePay. Chống xử lý trùng khi SePay gửi lại (tối đa 7 lần) hoặc vừa nhận webhook vừa đồng bộ API. Null với bản giả lập, bản sai khóa, bản lỗi |
+| `auth_ok` | BOOLEAN | Khóa webhook có đúng không (sai thì vẫn ghi để kiểm toán, không xử lý) |
+| `gateway`, `account_number`, `transfer_type`, `transfer_amount`, `content`, `payment_code`, `reference_code`, `transaction_date` | | Các trường SePay gửi |
+| `order_code` | VARCHAR | Mã đơn LP... tìm được trong nội dung chuyển khoản |
+| `result_status`, `result_message` | VARCHAR | SUCCESS, ALREADY_PROCESSED, DUPLICATE_DELIVERY, ORDER_NOT_FOUND, UNDERPAID_CREDITED_TO_WALLET, LATE_PAYMENT_CREDITED_TO_WALLET, IGNORED_OUTGOING, INVALID_SIGNATURE, ERROR |
+| `raw_payload` | TEXT | Nguyên văn JSON nhận được |
+| `remote_ip`, `received_at` | | IP gọi vào (qua tunnel lấy `X-Forwarded-For`), thời điểm nhận |
+
+Index: `received_at`, `order_code`, (`result_status`, `received_at`). Không có khóa ngoại tới `transactions`: log phải ghi được cả khi không tìm thấy đơn.
+
 ## 6. Ảnh hưởng tới truy vấn báo cáo
 
 | Chỗ | Thay đổi | Lý do |
@@ -109,6 +127,8 @@ SELECT version, description, success FROM flyway_schema_history ORDER BY install
 SHOW CREATE TABLE wallets;
 SHOW CREATE TABLE wallet_entries;
 SHOW CREATE TABLE payment_complaints;
+SHOW CREATE TABLE sepay_webhook_logs;
+SELECT source, result_status, COUNT(*) FROM sepay_webhook_logs GROUP BY source, result_status;
 SELECT w.user_id, w.balance,
        (SELECT SUM(IF(direction='CREDIT', amount, -amount)) FROM wallet_entries e WHERE e.wallet_id = w.wallet_id) AS by_entries
 FROM wallets w;

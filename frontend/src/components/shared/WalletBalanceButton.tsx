@@ -35,20 +35,20 @@ export function WalletBalanceButton() {
   if (currentUser.role === 'GUEST') return null
 
   return (
-    <div className="flex items-center rounded-full border border-amber-300 bg-amber-50 text-xs overflow-hidden">
+    <div className="flex h-8 flex-none items-center overflow-hidden rounded-md border border-slate-300 bg-white text-[13px]">
       <Link
         to="/wallet"
         title="Ví LocalPress"
-        className="flex items-center gap-1 pl-2.5 pr-2 py-1 font-semibold text-amber-900 hover:bg-amber-100"
+        className="flex h-full items-center gap-1.5 px-2.5 font-semibold text-slate-900 num hover:bg-slate-50"
       >
-        <Wallet className="w-3.5 h-3.5 text-gold" />
+        <Wallet className="h-3.5 w-3.5 text-slate-500" />
         <span>{balance === null ? '—' : formatCurrency(balance)}</span>
       </Link>
       <Link
         to="/wallet/topup"
-        className="flex items-center gap-0.5 bg-gold text-white px-2.5 py-1 font-bold hover:bg-amber-700"
+        className="flex h-full items-center gap-1 border-l border-slate-300 px-2.5 font-medium text-primary-900 hover:bg-slate-50"
       >
-        <Plus className="w-3 h-3" />
+        <Plus className="h-3.5 w-3.5" />
         Nạp tiền
       </Link>
     </div>

@@ -65,6 +65,7 @@ import {
   WalletPage,
   PaymentComplaintPage,
   ComplaintQueuePage,
+  SepayLogPage,
 } from '@/features/finance'
 
 /** Link cũ /checkout/:orderId -> trang thanh toán chung của SV4 */
@@ -298,6 +299,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
             <ReconciliationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/sepay',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <SepayLogPage />
           </ProtectedRoute>
         ),
       },

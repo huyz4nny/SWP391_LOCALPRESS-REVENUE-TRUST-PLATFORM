@@ -1,24 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Copy,
-  QrCode,
-  RefreshCw,
-  ShieldCheck,
-  Wallet,
-  Zap,
-} from 'lucide-react'
+import { CheckCircle2, Copy, RefreshCw, Zap } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
 import { mockStore } from '@/mocks/store'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { paymentApi } from '../api/payment'
 import type { IpnResult, PaymentOrderView } from '../types'
+import { KeyValue, Notice } from '../components/LedgerUI'
 
 /**
  * ==============================================================================
@@ -48,11 +38,18 @@ const DEFAULT_RETURN: Record<PaymentOrderView['orderType'], { to: string; label:
 }
 
 const IPN_MESSAGES: Record<string, string> = {
-  SUCCESS: 'SePay xác nhận đã nhận đủ tiền.',
+  SUCCESS: 'SePay xác nhận tiền đã về ví.',
   ALREADY_PROCESSED: 'Webhook lặp lại: hệ thống bỏ qua, không cộng trùng (Rule 5).',
   UNDERPAID_CREDITED_TO_WALLET: 'Chuyển thiếu: số tiền đã nhận được cộng vào ví, đơn vẫn chờ thanh toán.',
   LATE_PAYMENT_CREDITED_TO_WALLET: 'Tiền về sau khi đơn hết hiệu lực: tiền được cộng vào ví (Rule 6).',
   ORDER_NOT_FOUND: 'Không tìm thấy đơn, chờ Kế toán đối soát.',
+}
+
+const AUTO_PAY_MESSAGES: Record<string, string> = {
+  PAID: 'Đã trừ ví trả đơn.',
+  ALREADY_PAID: 'Đơn đã thanh toán trước đó, tiền giữ trong ví.',
+  ORDER_EXPIRED: 'Đơn đã hết hạn, tiền giữ trong ví.',
+  INSUFFICIENT: 'Ví vẫn chưa đủ, trang sẽ hiện mã nạp bù cho phần còn lại.',
 }
 
 function useCountdown(expiresAt?: string) {
@@ -80,13 +77,18 @@ export function PaymentPage() {
 
   const [order, setOrder] = useState<PaymentOrderView | null>(null)
   const [balance, setBalance] = useState(0)
-  const [method, setMethod] = useState<'QR' | 'WALLET'>('QR')
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const [checking, setChecking] = useState(false)
   const [ipnResult, setIpnResult] = useState<IpnResult | null>(null)
+  // Mã nạp bù (đơn TOPUP gắn với đơn này) khi ví không đủ tiền
+  const [topup, setTopup] = useState<PaymentOrderView | null>(null)
+  const [topupError, setTopupError] = useState('')
+  // Lần giả lập gần nhất, để demo "SePay gửi lại" sau khi đơn đã thanh toán
+  const [lastSim, setLastSim] = useState<{ code: string; amount: number; ref: string } | null>(null)
   const countdown = useCountdown(order?.expiresAt)
+  const topupCountdown = useCountdown(topup?.expiresAt)
   const isGuest = mockStore.getCurrentUser().role === 'GUEST'
 
   const load = useCallback(async () => {
@@ -108,7 +110,34 @@ export function PaymentPage() {
     load()
   }, [isGuest, load, navigate, orderCode])
 
-  // UC050: polling trạng thái khi đơn còn chờ thanh toán
+  // Mọi đơn mua đều trả bằng ví. Ví thiếu -> cần nạp bù đúng phần còn thiếu.
+  const payable = !!order && order.orderType !== 'TOPUP' && order.status === 'PENDING' && !order.expired && !order.isPaid
+  const shortfall = order ? Math.max(0, order.amount - balance) : 0
+  const needsTopUp = payable && shortfall > 0
+  const topupExpired = !!topupCountdown && topupCountdown.left === 0
+
+  // Lấy (hoặc tạo) mã nạp bù; tạo lại khi số tiền thiếu đổi hoặc mã cũ hết hạn
+  useEffect(() => {
+    if (!needsTopUp) {
+      setTopup(null)
+      return
+    }
+    if (topup && topup.amount === shortfall && !topupExpired) return
+    let active = true
+    paymentApi
+      .createShortfallTopUp(orderCode)
+      .then((t) => {
+        if (!active) return
+        setTopup(t)
+        setTopupError('')
+      })
+      .catch((e) => active && setTopupError(e?.message || 'Không tạo được mã nạp bù'))
+    return () => {
+      active = false
+    }
+  }, [needsTopUp, shortfall, topupExpired, orderCode])
+
+  // UC050: hỏi trạng thái 3 giây/lần. Đang chờ nạp bù thì hỏi thêm số dư: tiền về là backend tự trả đơn.
   useEffect(() => {
     if (!order || order.status !== 'PENDING' || order.expired) return
     const t = setInterval(async () => {
@@ -117,16 +146,35 @@ export function PaymentPage() {
         if (s.isPaid || s.status !== order.status || s.expired !== order.expired) {
           await load()
           if (s.isPaid) notifyWalletChanged()
+          return
+        }
+        if (topup) {
+          const w = await paymentApi.getWallet()
+          if (w.balance !== balance) {
+            setBalance(w.balance)
+            notifyWalletChanged()
+          }
         }
       } catch {
         /* mạng chập chờn thì lần sau thử lại, không bắt khách trả tiền lại */
       }
     }, POLL_INTERVAL_MS)
     return () => clearInterval(t)
-  }, [order, orderCode, load])
+  }, [order, orderCode, load, topup, balance])
 
+  // Hỏi thẳng API SePay cho mã đang chờ (mã nạp bù, hoặc chính đơn nạp ví), rồi đọc lại. Không tự cấp quyền (Rule 4).
   const handleCheckAgain = async () => {
     setChecking(true)
+    setActionError('')
+    try {
+      const r = await paymentApi.checkWithSepay(topup?.orderCode ?? orderCode)
+      if (r.checked && !r.found) {
+        setActionError('SePay chưa thấy khoản chuyển nào có mã này. Ngân hàng có thể chậm vài phút, hãy kiểm tra lại sau.')
+      }
+      if (r.found) notifyWalletChanged()
+    } catch (e: any) {
+      setActionError(e?.message || 'Không kiểm tra được với SePay')
+    }
     await load()
     setChecking(false)
   }
@@ -145,11 +193,14 @@ export function PaymentPage() {
     }
   }
 
-  const handleSimulate = async (amount?: number, referenceCode?: string) => {
+  /** Chỉ môi trường dev: giả lập SePay báo tiền về cho mã {code}. */
+  const handleSimulate = async (code: string, amount: number, referenceCode?: string) => {
     setBusy(true)
     setActionError('')
     try {
-      setIpnResult(await paymentApi.simulateIpn(orderCode, amount, referenceCode))
+      const ref = referenceCode ?? `SIM${Date.now()}`
+      setIpnResult(await paymentApi.simulateIpn(code, amount, ref))
+      setLastSim({ code, amount, ref })
       notifyWalletChanged()
       await load()
     } catch (e: any) {
@@ -161,71 +212,65 @@ export function PaymentPage() {
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto py-16 px-4 text-center">
-        <AlertCircle className="w-10 h-10 text-crimson mx-auto mb-3" />
-        <h2 className="text-lg font-bold text-stone-900 mb-1">Không mở được trang thanh toán</h2>
-        <p className="text-sm text-stone-500 mb-5">{error}</p>
-        <Button onClick={() => navigate('/')}>Về trang chủ</Button>
+      <div className="mx-auto max-w-md py-16 font-sans text-slate-900">
+        <h1 className="text-xl font-semibold">Không mở được trang thanh toán</h1>
+        <p className="mt-2 text-sm text-slate-600">{error}</p>
+        <div className="mt-5 flex gap-2">
+          <Button onClick={() => load()}>Thử lại</Button>
+          <Button variant="outline" onClick={() => navigate('/')}>Về trang chủ</Button>
+        </div>
       </div>
     )
   }
 
   if (!order) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-4 animate-pulse">
-        <div className="h-72 bg-stone-200 rounded-xl" />
+      <div className="mx-auto max-w-[1040px] py-6" aria-busy="true">
+        <div className="h-8 w-56 rounded bg-slate-200" />
+        <div className="mt-5 h-80 rounded-lg border border-slate-200 bg-white" />
       </div>
     )
   }
 
   const back = returnUrl ? { to: returnUrl, label: 'Quay lại nội dung' } : DEFAULT_RETURN[order.orderType]
   const isTopUp = order.orderType === 'TOPUP'
-  const shortfall = Math.max(0, order.amount - balance)
   const isDemo = APP_CONFIG.useMockApi || import.meta.env.DEV
+  const detail = order.description && order.description !== ORDER_TYPE_LABELS[order.orderType] ? order.description : null
 
   // ----- Đã thanh toán -----
   if (order.isPaid) {
     return (
-      <div className="max-w-lg mx-auto py-14 px-4">
-        <Card className="text-center">
-          <CardContent className="pt-8 pb-8 space-y-3">
-            <CheckCircle2 className="w-14 h-14 text-emerald-600 mx-auto" />
-            <h1 className="font-serif text-2xl font-bold text-stone-900">Thanh toán thành công</h1>
-            <p className="text-sm text-stone-600">
-              {ORDER_TYPE_LABELS[order.orderType]}
-              {order.description && order.description !== ORDER_TYPE_LABELS[order.orderType] ? `: ${order.description}` : ''}
-            </p>
-            <div className="text-2xl font-bold text-primary-900">{formatCurrency(order.amount)}</div>
-            <div className="text-xs text-stone-500 space-y-0.5">
-              <div>Mã đơn: <span className="font-mono font-semibold">{order.orderCode}</span></div>
-              <div>Phương thức: {order.paymentMethod === 'WALLET' ? 'Ví LocalPress' : 'Chuyển khoản QR SePay'}</div>
-              <div>Thời gian: {formatDateTime(order.paidAt)}</div>
-            </div>
-            <div className="pt-3 flex justify-center gap-2">
-              <Button onClick={() => navigate(back.to)}>{back.label}</Button>
-              {!isTopUp && (
-                <Button variant="outline" onClick={() => navigate('/wallet')}>Xem ví</Button>
-              )}
-            </div>
-            {isDemo && order.paymentMethod !== 'WALLET' && (
-              <div className="mt-4 rounded-lg border border-dashed border-sky-300 bg-sky-50 p-3 text-left space-y-2">
-                <div className="flex items-center text-xs font-bold uppercase text-sky-800">
-                  <Zap className="w-3.5 h-3.5 mr-1" />
-                  Demo Rule 5: SePay gửi lại webhook
-                </div>
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSimulate(order.amount, `DEMO-${order.orderCode}`)}>
-                  Bắn lại webhook (cùng mã giao dịch)
-                </Button>
-                {ipnResult && (
-                  <div className="text-xs text-sky-900">
-                    Kết quả: <span className="font-mono font-bold">{ipnResult.status}</span>.{' '}
-                    {IPN_MESSAGES[ipnResult.status] || ipnResult.message}
-                  </div>
-                )}
-              </div>
+      <div className="mx-auto max-w-[560px] py-10 font-sans text-slate-900">
+        <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <div className="flex items-center gap-2 text-sm font-medium text-positive">
+            <CheckCircle2 className="h-4 w-4" />
+            Đã thanh toán
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold leading-8">{ORDER_TYPE_LABELS[order.orderType]}</h1>
+          {detail && <p className="mt-1 font-serif text-base text-slate-700">{detail}</p>}
+          <div className="mt-4 text-[32px] font-semibold leading-10 tracking-[-0.01em] num">{formatCurrency(order.amount)}</div>
+          <dl className="mt-4">
+            <KeyValue label="Mã đơn"><span className="font-mono">{order.orderCode}</span></KeyValue>
+            <KeyValue label="Phương thức">{isTopUp ? 'Chuyển khoản QR SePay vào ví' : 'Trừ Ví LocalPress'}</KeyValue>
+            <KeyValue label="Thời gian"><span className="num">{formatDateTime(order.paidAt)}</span></KeyValue>
+            <KeyValue label="Số dư ví còn lại"><span className="num">{formatCurrency(balance)}</span></KeyValue>
+          </dl>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button onClick={() => navigate(back.to)}>{back.label}</Button>
+            {!isTopUp && (
+              <Button variant="outline" onClick={() => navigate('/wallet')}>Xem ví</Button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
+
+        {isDemo && lastSim && (
+          <DemoBox title="Demo Rule 5: SePay gửi lại webhook">
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSimulate(lastSim.code, lastSim.amount, lastSim.ref)}>
+              Bắn lại webhook cùng mã giao dịch
+            </Button>
+            {ipnResult && <IpnLine result={ipnResult} />}
+          </DemoBox>
+        )}
       </div>
     )
   }
@@ -233,263 +278,238 @@ export function PaymentPage() {
   // ----- Đơn đã đóng / hết hạn -----
   if (order.status !== 'PENDING' || order.expired) {
     return (
-      <div className="max-w-lg mx-auto py-14 px-4 text-center space-y-3">
-        <Clock className="w-12 h-12 text-stone-400 mx-auto" />
-        <h1 className="font-serif text-xl font-bold text-stone-900">
-          {order.expired ? 'Mã thanh toán đã hết hạn' : 'Đơn hàng không còn hiệu lực'}
-        </h1>
-        <p className="text-sm text-stone-500">
-          Nếu bạn đã chuyển khoản sau thời điểm này, tiền sẽ được cộng vào Ví LocalPress, không bị mất.
-        </p>
-        <div className="flex justify-center gap-2 pt-2">
-          {isTopUp ? (
-            <Button onClick={() => navigate(`/wallet/topup?amount=${order.amount}`)}>Tạo mã nạp mới</Button>
-          ) : (
-            <Button onClick={() => navigate(back.to)}>Quay lại tạo đơn mới</Button>
-          )}
-          <Button variant="outline" onClick={() => navigate('/wallet')}>Kiểm tra ví</Button>
-        </div>
-        <Link
-          to={`/wallet/complaints?orderCode=${order.orderCode}&amount=${order.amount}`}
-          className="inline-block text-xs text-stone-500 hover:text-crimson underline"
-        >
-          Đã chuyển tiền nhưng chưa được ghi nhận? Gửi khiếu nại
-        </Link>
+      <div className="mx-auto max-w-[560px] py-10 font-sans text-slate-900">
+        <section className="rounded-lg border border-slate-200 bg-white p-6">
+          <h1 className="text-2xl font-semibold leading-8">
+            {order.expired ? 'Đơn đã hết hạn thanh toán' : 'Đơn không còn hiệu lực'}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Đơn <span className="font-mono text-slate-900">{order.orderCode}</span>, {formatCurrency(order.amount)}.
+            Tiền đã nạp vẫn nằm trong Ví LocalPress, không bị mất; tạo đơn mới để thanh toán bằng số dư.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {isTopUp ? (
+              <Button onClick={() => navigate(`/wallet/topup?amount=${order.amount}`)}>Tạo mã nạp mới</Button>
+            ) : (
+              <Button onClick={() => navigate(back.to)}>Tạo đơn mới</Button>
+            )}
+            <Button variant="outline" onClick={() => navigate('/wallet')}>Kiểm tra ví</Button>
+          </div>
+          <Link
+            to={`/wallet/complaints?orderCode=${order.orderCode}&amount=${order.amount}`}
+            className="mt-4 inline-block text-[13px] text-slate-600 hover:text-slate-900 hover:underline"
+          >
+            Đã chuyển tiền nhưng chưa được ghi nhận? Gửi khiếu nại
+          </Link>
+        </section>
       </div>
     )
   }
 
   // ----- Chờ thanh toán -----
+  const urgent = countdown && countdown.left < 120000
+  // Mã đang chờ chuyển khoản: mã nạp bù (đơn mua) hoặc chính đơn nạp ví
+  const qrOrder = isTopUp ? order : topup
+  const qrCountdown = isTopUp ? countdown : topupCountdown
+
+  const qrBlock = qrOrder && (
+    <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-[240px_minmax(0,1fr)]">
+      <div>
+        {qrOrder.qrCodeUrl ? (
+          <img
+            src={qrOrder.qrCodeUrl}
+            alt={`Mã QR nạp ${formatCurrency(qrOrder.amount)}, nội dung ${qrOrder.transferContent}`}
+            className="mx-auto h-60 w-60 rounded-md border border-slate-200 bg-white object-contain"
+          />
+        ) : (
+          <div className="mx-auto flex h-60 w-60 items-center justify-center rounded-md border border-dashed border-slate-300 text-[13px] text-slate-500">
+            Chưa có mã QR
+          </div>
+        )}
+        <div className="mt-2 flex items-center justify-center gap-1.5 text-[13px] text-slate-500">
+          <RefreshCw className="h-3 w-3 animate-spin" />
+          Đang chờ ngân hàng xác nhận
+        </div>
+      </div>
+      <div>
+        <dl className="rounded-md bg-slate-50 px-3.5 py-1">
+          <CopyRow label="Ngân hàng" value={qrOrder.bankCode || ''} />
+          <CopyRow label="Số tài khoản" value={qrOrder.accountNumber || ''} mono />
+          <CopyRow label="Chủ tài khoản" value={qrOrder.accountName || ''} />
+          <CopyRow label="Số tiền" value={String(qrOrder.amount)} display={formatCurrency(qrOrder.amount)} />
+          <CopyRow label="Nội dung" value={qrOrder.transferContent} mono strong />
+        </dl>
+        {qrCountdown && (
+          <p className="mt-2 text-[13px] text-slate-500">
+            Mã QR hết hạn sau <span className="font-semibold text-slate-900 num">{qrCountdown.text}</span>, hết hạn thì trang tự tạo mã mới.
+          </p>
+        )}
+        <Button variant="outline" className="mt-3 w-full" isLoading={checking} onClick={handleCheckAgain}>
+          Tôi đã chuyển khoản, kiểm tra lại
+        </Button>
+        <Link
+          to={`/wallet/complaints?orderCode=${qrOrder.orderCode}&amount=${qrOrder.amount}`}
+          className="mt-2 block text-center text-[13px] text-slate-600 hover:text-slate-900 hover:underline"
+        >
+          Chuyển hơn 15 phút mà chưa được ghi nhận? Gửi khiếu nại
+        </Link>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
-      <div className="text-center">
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">Thanh toán đơn hàng</h1>
-        <p className="text-xs text-stone-500 mt-1">
-          Mã đơn <span className="font-mono font-semibold text-stone-800">{order.orderCode}</span>
-        </p>
+    <div className="mx-auto max-w-[1040px] py-6 font-sans text-slate-900">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold leading-8 tracking-[-0.01em]">
+            {isTopUp ? 'Nạp tiền vào ví' : 'Thanh toán đơn hàng'}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {ORDER_TYPE_LABELS[order.orderType]} · mã đơn <span className="font-mono text-slate-900">{order.orderCode}</span>
+          </p>
+        </div>
+        <Link to={back.to} className="text-[13px] text-slate-600 hover:text-slate-900 hover:underline">Hủy và quay lại</Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        {/* Tóm tắt đơn */}
-        <Card className="md:col-span-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Thông tin đơn</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div>
-              <div className="text-xs text-stone-500">Loại</div>
-              <div className="font-semibold text-stone-900">{ORDER_TYPE_LABELS[order.orderType]}</div>
-            </div>
-            {order.description && order.description !== ORDER_TYPE_LABELS[order.orderType] && (
-              <div>
-                <div className="text-xs text-stone-500">Nội dung</div>
-                <div className="font-serif text-stone-900">{order.description}</div>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-stone-500">Trạng thái</span>
-              <StatusBadge type="payment" status={order.status} />
-            </div>
-            <div className="border-t border-stone-200 pt-3 flex items-baseline justify-between">
-              <span className="text-xs text-stone-500">Tổng thanh toán</span>
-              <span className="text-xl font-bold text-primary-900">{formatCurrency(order.amount)}</span>
-            </div>
+      <div className="mt-5 grid grid-cols-1 items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-semibold">Đơn hàng</h2>
+          {detail && <p className="mt-2 font-serif text-[15px] leading-6 text-slate-900">{detail}</p>}
+          <dl className="mt-3">
+            <KeyValue label="Loại">{ORDER_TYPE_LABELS[order.orderType]}</KeyValue>
+            <KeyValue label="Trạng thái"><StatusBadge type="payment" status={order.status} /></KeyValue>
             {countdown && (
-              <div className={`flex items-center text-xs ${countdown.left < 120000 ? 'text-crimson' : 'text-stone-500'}`}>
-                <Clock className="w-3.5 h-3.5 mr-1" />
-                Mã thanh toán hết hạn sau <span className="font-mono font-bold ml-1">{countdown.text}</span>
-              </div>
+              <KeyValue label={isTopUp ? 'Mã QR hết hạn sau' : 'Giữ đơn trong'}>
+                <span className={`font-semibold num ${urgent ? 'text-negative' : ''}`}>{countdown.text}</span>
+              </KeyValue>
             )}
-            <div className="flex items-start text-[11px] text-stone-500 bg-stone-50 border border-stone-200 rounded p-2">
-              <ShieldCheck className="w-3.5 h-3.5 mr-1 mt-0.5 text-emerald-600 shrink-0" />
-              Quyền lợi chỉ được kích hoạt khi máy chủ nhận xác nhận từ SePay, không phụ thuộc trình duyệt.
-            </div>
-          </CardContent>
-        </Card>
+          </dl>
+          <div className="mt-2 border-t border-slate-200 pt-3">
+            <div className="text-[13px] text-slate-500">{isTopUp ? 'Số tiền nạp' : 'Tổng thanh toán'}</div>
+            <div className="text-[30px] font-semibold leading-9 tracking-[-0.01em] num">{formatCurrency(order.amount)}</div>
+          </div>
+          <p className="mt-3 text-[13px] leading-5 text-slate-500">
+            {isTopUp
+              ? 'Tiền chỉ được cộng vào ví khi máy chủ nhận xác nhận từ SePay, không phụ thuộc trình duyệt.'
+              : 'Mọi đơn đều trả bằng Ví LocalPress. Tiền nạp chỉ được cộng khi máy chủ nhận xác nhận từ SePay.'}
+          </p>
+        </section>
 
-        {/* Phương thức */}
-        <div className="md:col-span-8 space-y-4">
-          {!isTopUp && (
-            <div className="grid grid-cols-2 gap-3">
-              <MethodTab
-                active={method === 'QR'}
-                onClick={() => setMethod('QR')}
-                icon={<QrCode className="w-5 h-5" />}
-                title="Quét mã QR SePay"
-                sub="Mọi ứng dụng ngân hàng, xác nhận tự động"
-              />
-              <MethodTab
-                active={method === 'WALLET'}
-                onClick={() => setMethod('WALLET')}
-                icon={<Wallet className="w-5 h-5" />}
-                title="Ví LocalPress"
-                sub={`Số dư ${formatCurrency(balance)}`}
-              />
-            </div>
-          )}
+        <div className="space-y-4">
+          {actionError && <Notice tone="error">{actionError}</Notice>}
 
-          {actionError && (
-            <div className="flex items-center text-sm text-crimson bg-red-50 border border-red-200 rounded p-3">
-              <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-              {actionError}
-            </div>
-          )}
-
-          {method === 'WALLET' && !isTopUp ? (
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <div className="grid grid-cols-3 gap-3 text-center text-sm">
-                  <div className="rounded border border-stone-200 p-3">
-                    <div className="text-xs text-stone-500">Số dư hiện tại</div>
-                    <div className="font-bold text-stone-900">{formatCurrency(balance)}</div>
-                  </div>
-                  <div className="rounded border border-stone-200 p-3">
-                    <div className="text-xs text-stone-500">Cần thanh toán</div>
-                    <div className="font-bold text-primary-900">{formatCurrency(order.amount)}</div>
-                  </div>
-                  <div className="rounded border border-stone-200 p-3">
-                    <div className="text-xs text-stone-500">Còn lại sau thanh toán</div>
-                    <div className={`font-bold ${shortfall > 0 ? 'text-crimson' : 'text-emerald-700'}`}>
-                      {shortfall > 0 ? `Thiếu ${formatCurrency(shortfall)}` : formatCurrency(balance - order.amount)}
-                    </div>
-                  </div>
-                </div>
-                {shortfall > 0 ? (
-                  <Button
-                    className="w-full bg-gold hover:bg-amber-700 text-white"
-                    onClick={() =>
-                      navigate(
-                        `/wallet/topup?amount=${Math.max(10000, Math.ceil(shortfall / 10000) * 10000)}&returnTo=${encodeURIComponent(`/payment/${order.orderCode}`)}`
-                      )
-                    }
-                  >
-                    Nạp thêm để thanh toán
-                  </Button>
-                ) : (
-                  <Button className="w-full" disabled={busy} onClick={handlePayWithWallet}>
-                    {busy ? 'Đang xử lý...' : `Thanh toán ${formatCurrency(order.amount)} bằng ví`}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
-                  <div className="text-center">
-                    {order.qrCodeUrl ? (
-                      <img
-                        src={order.qrCodeUrl}
-                        alt={`Mã QR thanh toán ${order.orderCode}`}
-                        className="w-60 h-60 mx-auto rounded-lg border border-stone-200 bg-white object-contain"
-                      />
-                    ) : (
-                      <div className="w-60 h-60 mx-auto rounded-lg bg-stone-100" />
-                    )}
-                    <div className="flex items-center justify-center text-xs text-stone-500 mt-2">
-                      <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                      Đang chờ xác nhận từ ngân hàng...
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <CopyRow label="Ngân hàng" value={order.bankCode || ''} />
-                    <CopyRow label="Số tài khoản" value={order.accountNumber || ''} />
-                    <CopyRow label="Chủ tài khoản" value={order.accountName || ''} />
-                    <CopyRow label="Số tiền" value={String(order.amount)} display={formatCurrency(order.amount)} />
-                    <CopyRow label="Nội dung CK" value={order.transferContent} highlight />
-                    <p className="text-[11px] text-stone-500">
-                      Giữ nguyên nội dung chuyển khoản để hệ thống tự khớp đơn. Chuyển thiếu hoặc thừa, phần chênh lệch sẽ vào ví.
-                    </p>
-                    <Button variant="outline" className="w-full" disabled={checking} onClick={handleCheckAgain}>
-                      {checking ? 'Đang kiểm tra...' : 'Tôi đã chuyển khoản, kiểm tra lại'}
-                    </Button>
-                    <Link
-                      to={`/wallet/complaints?orderCode=${order.orderCode}&amount=${order.amount}`}
-                      className="block text-center text-[11px] text-stone-500 hover:text-crimson underline"
-                    >
-                      Đã chuyển hơn 15 phút mà chưa được ghi nhận? Gửi khiếu nại
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {isDemo && (method === 'QR' || isTopUp) && (
-            <div className="rounded-lg border border-dashed border-sky-300 bg-sky-50 p-4 space-y-2">
-              <div className="flex items-center text-xs font-bold uppercase text-sky-800">
-                <Zap className="w-3.5 h-3.5 mr-1" />
-                Demo: giả lập SePay bắn webhook (chỉ có ở môi trường dev)
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" disabled={busy} onClick={() => handleSimulate(order.amount, `DEMO-${order.orderCode}`)}>
-                  Chuyển đủ tiền
-                </Button>
-                {!isTopUp && (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSimulate(Math.floor(order.amount / 2))}>
-                    Chuyển thiếu 50%
-                  </Button>
-                )}
-              </div>
-              {ipnResult && (
-                <div className="text-xs text-sky-900">
-                  Kết quả webhook: <span className="font-mono font-bold">{ipnResult.status}</span>.{' '}
-                  {IPN_MESSAGES[ipnResult.status] || ipnResult.message}
+          {isTopUp ? (
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
+              {order.topupForOrder && (
+                <div className="mb-4">
+                  <Notice tone="note">
+                    Đây là mã nạp bù cho đơn <span className="font-mono">{order.topupForOrder}</span>. Tiền về ví là hệ thống tự thanh toán đơn đó.
+                  </Notice>
                 </div>
               )}
-            </div>
+              {qrBlock}
+            </section>
+          ) : (
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
+              <h2 className="text-base font-semibold">Thanh toán bằng Ví LocalPress</h2>
+              <dl className="mt-2">
+                <KeyValue label="Số dư ví"><span className="num">{formatCurrency(balance)}</span></KeyValue>
+                <KeyValue label="Cần thanh toán"><span className="num">-{formatCurrency(order.amount)}</span></KeyValue>
+              </dl>
+              <div className="mt-1 flex items-baseline justify-between border-t border-slate-200 pt-3">
+                <span className="text-sm font-medium">{needsTopUp ? 'Còn thiếu' : 'Số dư sau thanh toán'}</span>
+                <span className={`text-xl font-semibold num ${needsTopUp ? 'text-negative' : ''}`}>
+                  {needsTopUp ? formatCurrency(shortfall) : formatCurrency(balance - order.amount)}
+                </span>
+              </div>
+
+              {!needsTopUp ? (
+                <Button size="lg" className="mt-5 w-full" isLoading={busy} onClick={handlePayWithWallet}>
+                  Thanh toán {formatCurrency(order.amount)} bằng ví
+                </Button>
+              ) : (
+                <div className="mt-5 border-t border-slate-200 pt-5">
+                  <h3 className="text-base font-semibold">Quét QR nạp bù {formatCurrency(shortfall)}</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Chuyển đúng số tiền và nội dung bên dưới. Tiền vào ví là hệ thống tự thanh toán đơn này, bạn không cần bấm thêm.
+                  </p>
+                  <div className="mt-4">
+                    {topupError ? <Notice tone="error">{topupError}</Notice> : qrBlock ?? <div className="h-60 rounded-md bg-slate-100" aria-busy="true" />}
+                  </div>
+                </div>
+              )}
+            </section>
           )}
 
-          <div className="text-center text-xs text-stone-500">
-            <Link to={back.to} className="hover:text-stone-800 underline">Hủy và quay lại</Link>
-          </div>
+          {isDemo && qrOrder && (
+            <DemoBox title="Demo: giả lập SePay báo tiền nạp về (chỉ có ở môi trường dev)">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSimulate(qrOrder.orderCode, qrOrder.amount, `DEMO-${qrOrder.orderCode}`)}>
+                  Chuyển đủ {formatCurrency(qrOrder.amount)}
+                </Button>
+                {!isTopUp && qrOrder.amount >= 2000 && (
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSimulate(qrOrder.orderCode, Math.floor(qrOrder.amount / 2 / 1000) * 1000)}>
+                    Chuyển thiếu một nửa
+                  </Button>
+                )}
+              </div>
+              {ipnResult && <IpnLine result={ipnResult} />}
+            </DemoBox>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function MethodTab(props: { active: boolean; onClick: () => void; icon: React.ReactNode; title: string; sub: string }) {
+function DemoBox({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      className={`text-left p-3.5 rounded-lg border-2 flex items-center gap-3 transition-all cursor-pointer ${
-        props.active ? 'border-primary-900 bg-primary-50/40' : 'border-stone-200 hover:border-stone-300 bg-white'
-      }`}
-    >
-      <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-900 flex items-center justify-center shrink-0">
-        {props.icon}
+    <section className="mt-4 space-y-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3">
+      <div className="flex items-center gap-1.5 text-[13px] font-medium text-slate-700">
+        <Zap className="h-3.5 w-3.5 text-slate-500" />
+        {title}
       </div>
-      <div>
-        <div className="text-sm font-bold text-stone-900">{props.title}</div>
-        <div className="text-xs text-stone-500">{props.sub}</div>
-      </div>
-    </button>
+      {children}
+    </section>
   )
 }
 
-function CopyRow(props: { label: string; value: string; display?: string; highlight?: boolean }) {
+function IpnLine({ result }: { result: IpnResult }) {
+  return (
+    <div className="text-[13px] text-slate-700">
+      Kết quả: <span className="font-mono font-medium text-slate-900">{result.status}</span>. {IPN_MESSAGES[result.status] || result.message}
+      {result.autoPay && (
+        <>
+          {' '}Tự thanh toán đơn <span className="font-mono">{result.paidOrder}</span>:{' '}
+          <span className="font-mono font-medium text-slate-900">{result.autoPay}</span>. {AUTO_PAY_MESSAGES[result.autoPay] ?? ''}
+        </>
+      )}
+    </div>
+  )
+}
+
+function CopyRow(props: { label: string; value: string; display?: string; mono?: boolean; strong?: boolean }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className={`flex items-center justify-between rounded px-2.5 py-1.5 ${props.highlight ? 'bg-amber-50 border border-amber-300' : 'bg-stone-50'}`}>
-      <div>
-        <div className="text-[11px] text-stone-500">{props.label}</div>
-        <div className={`font-semibold ${props.highlight ? 'font-mono text-amber-900' : 'text-stone-900'}`}>
-          {props.display ?? props.value}
-        </div>
+    <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 py-2 last:border-b-0">
+      <div className="min-w-0">
+        <dt className="text-xs text-slate-500">{props.label}</dt>
+        <dd className={`truncate text-sm text-slate-900 ${props.mono ? 'font-mono' : 'num'} ${props.strong ? 'font-semibold' : ''}`}>
+          {props.display ?? (props.value || '—')}
+        </dd>
       </div>
       <button
         type="button"
-        title="Sao chép"
-        className="text-stone-400 hover:text-stone-800 cursor-pointer"
+        title={`Sao chép ${props.label.toLowerCase()}`}
+        className="flex h-8 flex-none items-center gap-1 rounded-md px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-900 cursor-pointer"
         onClick={() => {
           navigator.clipboard?.writeText(props.value)
           setCopied(true)
           setTimeout(() => setCopied(false), 1500)
         }}
       >
-        {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+        {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-positive" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? 'Đã chép' : 'Chép'}
       </button>
     </div>
   )

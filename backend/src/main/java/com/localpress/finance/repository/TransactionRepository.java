@@ -46,6 +46,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     boolean existsByGatewayTransactionId(String gatewayTransactionId);
 
+    /** Mã nạp bù mới nhất còn chờ của 1 đơn, để mở lại trang thanh toán không tạo QR mới mỗi lần. */
+    Optional<Transaction> findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
+
     /**
      * UC050: Lấy danh sách giao dịch chuyển khoản thủ công đang ở trạng thái PENDING để Kế toán đối soát.
      */

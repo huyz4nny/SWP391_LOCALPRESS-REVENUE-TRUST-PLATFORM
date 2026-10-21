@@ -82,4 +82,7 @@ public class OrderCreateResponse {
     private String accountName;
 
     private String transferContent;
+
+    /** Đơn TOPUP nạp bù: mã đơn sẽ được tự trả khi tiền nạp về. */
+    private String topupForOrder;
 }

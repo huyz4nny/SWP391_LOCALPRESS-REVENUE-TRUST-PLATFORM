@@ -3,14 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertCircle, Wallet } from 'lucide-react'
 import { mockStore } from '@/mocks/store'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { paymentApi } from '../api/payment'
+import { Notice } from '../components/LedgerUI'
 
 /**
  * ==============================================================================
@@ -74,67 +73,63 @@ export function TopUpPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto py-10 px-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center text-lg">
-            <Wallet className="w-5 h-5 mr-2 text-gold" />
-            Nạp tiền vào Ví LocalPress
-          </CardTitle>
-          <p className="text-xs text-stone-500">
-            Số dư hiện tại: <span className="font-semibold text-stone-800">{balance === null ? '—' : formatCurrency(balance)}</span>.
-            Dùng số dư để mua bài Premium, gói hội viên hoặc thanh toán quảng cáo mà không cần quét QR mỗi lần.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div>
-              <Label className="mb-2 block">Chọn nhanh</Label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setValue('amount', p, { shouldValidate: true })}
-                    className={`rounded-lg border-2 py-2 text-sm font-semibold cursor-pointer transition-all ${
-                      amount === p ? 'border-primary-900 bg-primary-50/50 text-primary-900' : 'border-stone-200 hover:border-stone-300'
-                    }`}
-                  >
-                    {formatCurrency(p)}
-                  </button>
-                ))}
-              </div>
-            </div>
+    <div className="mx-auto max-w-[640px] py-6 font-sans text-slate-900">
+      <h1 className="text-2xl font-semibold leading-8 tracking-[-0.01em]">Nạp tiền vào ví</h1>
+      <p className="mt-1 text-sm leading-6 text-slate-600">
+        Số dư hiện tại <span className="font-semibold text-slate-900 num">{balance === null ? '—' : formatCurrency(balance)}</span>.
+        Nạp một lần để mua bài, gói hội viên hoặc trả quảng cáo mà không cần quét QR mỗi lần.
+      </p>
 
-            <div>
-              <Label htmlFor="amount">Hoặc nhập số tiền khác (VND)</Label>
-              <Input
-                id="amount"
-                type="number"
-                inputMode="numeric"
-                step={1000}
-                className="mt-1"
-                {...register('amount', { valueAsNumber: true })}
-              />
-              {errors.amount && <p className="text-xs text-crimson mt-1">{errors.amount.message}</p>}
-            </div>
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="mt-5 space-y-5 rounded-lg border border-slate-200 bg-white p-5">
+        <fieldset>
+          <legend className="mb-2 text-sm font-medium">Chọn nhanh</legend>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                aria-pressed={amount === p}
+                onClick={() => setValue('amount', p, { shouldValidate: true })}
+                className={`h-10 rounded-md border text-sm num transition-colors cursor-pointer ${
+                  amount === p
+                    ? 'border-slate-900 bg-white font-semibold text-slate-900 ring-1 ring-slate-900'
+                    : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
+                }`}
+              >
+                {formatCurrency(p)}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
-            {submitError && (
-              <div className="flex items-center text-sm text-crimson bg-red-50 border border-red-200 rounded p-3">
-                <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-                {submitError}
-              </div>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Đang tạo mã QR...' : `Tiếp tục: nạp ${formatCurrency(Number.isFinite(amount) ? amount : 0)} qua QR SePay`}
-            </Button>
-            <p className="text-[11px] text-stone-500 text-center">
-              Tiền nạp chỉ dùng để thanh toán trên LocalPress, không rút ra tài khoản ngân hàng.
+        <div>
+          <Label htmlFor="amount">Hoặc nhập số tiền (VND)</Label>
+          <Input
+            id="amount"
+            type="number"
+            inputMode="numeric"
+            step={1000}
+            className="num"
+            {...register('amount', { valueAsNumber: true })}
+          />
+          {errors.amount ? (
+            <p className="mt-1.5 text-xs font-medium text-negative">{errors.amount.message}</p>
+          ) : (
+            <p className="mt-1.5 text-xs text-slate-500 num">
+              Từ {formatCurrency(MIN_AMOUNT)} đến {formatCurrency(MAX_AMOUNT)}, bội số của 1.000 ₫.
             </p>
-          </form>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+
+        {submitError && <Notice tone="error">{submitError}</Notice>}
+
+        <div>
+          <Button type="submit" size="lg" className="w-full" isLoading={isSubmitting}>
+            {isSubmitting ? 'Đang tạo mã QR' : `Nạp ${formatCurrency(Number.isFinite(amount) ? amount : 0)} qua QR SePay`}
+          </Button>
+          <p className="mt-2 text-center text-xs text-slate-500">Tiền nạp chỉ dùng trên LocalPress, không rút ra tài khoản ngân hàng.</p>
+        </div>
+      </form>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
+import com.localpress.finance.model.Wallet;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.shared.event.PaymentSuccessEvent;
 import com.localpress.shared.exception.AppException;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -177,11 +179,50 @@ public class PaymentProcessingService {
             throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
         }
 
-        walletService.debit(tx, tx.getAmount(), "Thanh toán đơn " + orderCode);
-        tx.markPaidByWallet();
-        Transaction saved = transactionRepository.save(tx);
-        publishPaymentSuccess(saved);
-        return toStatus(saved);
+        return toStatus(debitAndMarkPaid(tx));
+    }
+
+    /**
+     * Ví không đủ tiền trả đơn: tạo 1 đơn TOPUP đúng bằng phần còn thiếu, gắn mã đơn cần trả (topup_for_order).
+     * Khách quét QR của mã nạp bù này; tiền về thì processSepayIpn cộng ví rồi tự trả đơn (tryAutoPay).
+     * Mở lại trang nhiều lần thì dùng lại mã nạp bù còn hạn nếu số tiền vẫn đúng, không sinh QR mới.
+     */
+    @Transactional
+    public OrderCreateResponse createShortfallTopUp(FinanceCurrentUser.Principal principal, String orderCode) {
+        Transaction order = findByCode(orderCode);
+        if (!order.getUserId().equals(principal.userId())) {
+            throw new AppException("Bạn không có quyền thanh toán đơn hàng này", HttpStatus.FORBIDDEN);
+        }
+        if (order.getTransactionType() == TransactionType.TOPUP || order.getTransactionType() == TransactionType.REFUND) {
+            throw new AppException("Đơn nạp ví không cần nạp bù", HttpStatus.BAD_REQUEST);
+        }
+        if (order.getStatus() == TransactionStatus.SUCCESS) {
+            throw new AppException("Đơn " + orderCode + " đã được thanh toán", HttpStatus.CONFLICT);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (order.getStatus() != TransactionStatus.PENDING || order.isExpired(now)) {
+            throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
+        }
+
+        BigDecimal balance = walletService.findByUserId(order.getUserId()).map(Wallet::getBalance).orElse(BigDecimal.ZERO);
+        BigDecimal shortfall = order.getAmount().subtract(balance);
+        if (shortfall.signum() <= 0) {
+            throw new AppException("Ví đã đủ tiền, hãy thanh toán bằng ví", HttpStatus.CONFLICT);
+        }
+
+        Optional<Transaction> existing = transactionRepository
+                .findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(orderCode, TransactionStatus.PENDING);
+        if (existing.isPresent() && !existing.get().isExpired(now) && existing.get().getAmount().compareTo(shortfall) == 0) {
+            return toPaymentView(existing.get());
+        }
+
+        Transaction topup = transactionRepository.save(
+                newPendingOrder(order.getUserId(), TransactionType.TOPUP, shortfall, "Nạp bù cho đơn " + orderCode)
+                        .paymentMethod("SEPAY")
+                        .topupForOrder(orderCode)
+                        .build());
+        log.info("User #{} nạp bù {} VND cho đơn {}, mã nạp {}", order.getUserId(), shortfall, orderCode, topup.getGatewayTransactionId());
+        return toPaymentView(topup);
     }
 
     // =========================================================================
@@ -229,8 +270,17 @@ public class PaymentProcessingService {
             tx.setAmount(paidAmount);
             tx.markPaidByGateway(orderCode, sePayService.getBankCode());
             transactionRepository.save(tx);
-            walletService.credit(tx, paidAmount, "Nạp tiền qua SePay, mã " + orderCode);
-            return result(true, "SUCCESS", orderCode, "Đã cộng " + paidAmount.toPlainString() + " VND vào ví");
+            walletService.credit(tx, paidAmount, tx.getTopupForOrder() != null
+                    ? "Nạp bù qua SePay cho đơn " + tx.getTopupForOrder() + ", mã " + orderCode
+                    : "Nạp tiền qua SePay, mã " + orderCode);
+            Map<String, Object> body = result(true, "SUCCESS", orderCode, "Đã cộng " + paidAmount.toPlainString() + " VND vào ví");
+            if (tx.getTopupForOrder() != null) {
+                String autoPay = tryAutoPay(tx.getUserId(), tx.getTopupForOrder());
+                body.put("autoPay", autoPay);
+                body.put("paidOrder", tx.getTopupForOrder());
+                body.put("message", body.get("message") + autoPayMessage(autoPay, tx.getTopupForOrder()));
+            }
+            return body;
         }
 
         // 4. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ: không cấp quyền, tiền vào ví
@@ -318,6 +368,41 @@ public class PaymentProcessingService {
         return result(true, status, origin.getGatewayTransactionId(), reason);
     }
 
+    /** Trừ ví và đánh dấu đơn SUCCESS (đã khóa dòng đơn từ trước), phát PaymentSuccessEvent. */
+    private Transaction debitAndMarkPaid(Transaction order) {
+        walletService.debit(order, order.getAmount(), "Thanh toán đơn " + order.getGatewayTransactionId());
+        order.markPaidByWallet();
+        Transaction saved = transactionRepository.save(order);
+        publishPaymentSuccess(saved);
+        return saved;
+    }
+
+    /**
+     * Tiền nạp bù vừa vào ví: tự trả đơn nếu đơn còn chờ, còn hạn và ví đủ tiền.
+     * Kiểm tra số dư trên dòng ví đã khóa trước khi trừ, để không ném 402 làm rollback cả tiền nạp.
+     * Kết quả: PAID, ALREADY_PAID, ORDER_EXPIRED (tiền ở lại ví), INSUFFICIENT (chờ nạp thêm), ORDER_NOT_FOUND.
+     */
+    private String tryAutoPay(Long userId, String orderCode) {
+        Transaction order = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode).orElse(null);
+        if (order == null || !order.getUserId().equals(userId)) return "ORDER_NOT_FOUND";
+        if (order.getStatus() == TransactionStatus.SUCCESS) return "ALREADY_PAID";
+        if (order.getStatus() != TransactionStatus.PENDING || order.isExpired(LocalDateTime.now())) return "ORDER_EXPIRED";
+        if (walletService.lockedBalance(userId).compareTo(order.getAmount()) < 0) return "INSUFFICIENT";
+        debitAndMarkPaid(order);
+        log.info("Tự trả đơn {} bằng ví sau khi nạp bù", orderCode);
+        return "PAID";
+    }
+
+    private static String autoPayMessage(String autoPay, String orderCode) {
+        return switch (autoPay) {
+            case "PAID" -> ", đã tự thanh toán đơn " + orderCode;
+            case "ALREADY_PAID" -> ", đơn " + orderCode + " đã thanh toán trước đó";
+            case "ORDER_EXPIRED" -> ", đơn " + orderCode + " đã hết hạn nên tiền giữ trong ví";
+            case "INSUFFICIENT" -> ", ví vẫn chưa đủ để trả đơn " + orderCode;
+            default -> "";
+        };
+    }
+
     private Transaction.TransactionBuilder newPendingOrder(Long userId, TransactionType type, BigDecimal amount, String description) {
         LocalDateTime now = LocalDateTime.now();
         return Transaction.builder()
@@ -396,6 +481,7 @@ public class PaymentProcessingService {
                 .accountNumber(sePayService.getAccountNumber())
                 .accountName(sePayService.getAccountName())
                 .transferContent(tx.getGatewayTransactionId())
+                .topupForOrder(tx.getTopupForOrder())
                 .createdAt(tx.getCreatedAt())
                 .expiresAt(tx.getExpiresAt())
                 .paidAt(tx.getPaidAt())
