@@ -1,5 +1,5 @@
 @startuml swimlane_sv4_01_payment_vi
-title SV4-01 Trang thanh toán chung /payment/:orderCode (UC047 - UC050)
+title SV4-01 Trang thanh toán chung /payment/:orderCode, luôn qua ví (UC047 - UC050)
 
 scale max 4000 width
 skinparam backgroundColor white
@@ -67,59 +67,73 @@ kiểm tra ví hoặc gửi khiếu nại;
 case (PENDING còn hạn)
   |Trang thanh toán|
   :Hiện đơn, số dư ví,
-mã QR và đồng hồ đếm ngược;
+số tiền và thời gian giữ đơn;
   note right
-  Đơn nạp ví: chỉ có QR,
-không trả bằng ví (SV4-02)
+  Mọi đơn mua đều trả bằng
+Ví LocalPress (từ 22/10/2026)
   end note
-  |Khách hàng|
-  if (Thanh toán bằng?) then (Ví LocalPress)
+  |Hệ thống LocalPress|
+  if (Số dư >= số tiền?) then (đủ)
     |Trang thanh toán|
-    if (Số dư >= số tiền?) then (thiếu)
-      :Hiện nút "Nạp thêm để thanh toán": khách
-nạp phần thiếu (SV4-02) rồi quay lại;
-    else (đủ)
-      |Hệ thống LocalPress|
-      :pay-with-wallet:
+    :Hiện 1 nút
+"Thanh toán X bằng ví";
+    |Khách hàng|
+    :Bấm thanh toán;
+    |Hệ thống LocalPress|
+    :pay-with-wallet:
 khóa đơn + ví,
 kiểm tra lại chủ đơn,
 hạn, số dư;
-      if (Hợp lệ?) then (có)
-        :Trừ ví, đơn SUCCESS
+    if (Hợp lệ?) then (có)
+      :Trừ ví, đơn SUCCESS
 (phương thức WALLET);
-      else (không)
-        :402 / 403 / 410,
+    else (không)
+      :402 / 403 / 410,
 rollback, đơn
 vẫn PENDING;
-      endif
     endif
-  else (QR SePay)
+  else (thiếu)
+    :shortfall-topup: tạo (hoặc dùng lại)
+TOPUP = số tiền - số dư,
+topup_for_order = mã đơn;
+    |Trang thanh toán|
+    :Hiện "Quét QR nạp bù X"
+(nội dung = mã nạp);
     |Khách hàng|
-    :Chuyển khoản, nội dung = mã đơn;
+    :Quét QR, chuyển khoản;
     |SePay / Ngân hàng|
-    :Gửi webhook IPN;
+    :Gửi webhook;
     |Hệ thống LocalPress|
     switch (Kết quả webhook (UC048, UC049)?)
-    case (sai key /\nkhông thấy đơn /\nđã SUCCESS)
+    case (sai key /\nkhông có mã /\ngửi lại)
       :Không ghi nhận gì:
 401 sai key,
 ORDER_NOT_FOUND
-(-> khiếu nại),
+(-> khiếu nại SV4-03),
 ALREADY_PROCESSED;
-    case (booking hết\ngiữ chỗ /\nđơn đã đóng)
-      :Đơn FAILED, tiền vào
-ví "-LATE" (Rule 6);
-    case (chuyển thiếu)
-      :Tiền vào ví "-PART",
-đơn vẫn PENDING;
-    case (đủ / thừa)
-      :Đơn SUCCESS, tiền thừa
-vào ví "-EXCESS";
+    case (tiền nạp về)
+      :Cộng ví đúng số tiền thực nhận
+(ghi nhật ký sepay_id);
+      if (Đơn còn chờ, còn hạn
+và ví >= số tiền?) then (có)
+        :Tự trừ ví,
+đơn SUCCESS (autoPay PAID);
+      else (không)
+        :Tiền giữ trong ví:
+INSUFFICIENT -> QR mới cho phần còn lại,
+ORDER_EXPIRED -> tạo đơn mới;
+      endif
     endswitch
+    note right
+    Chuyển thẳng vào mã đơn
+(cách cũ / khiếu nại) vẫn được xử lý:
+đủ -> SUCCESS, thiếu / muộn -> ví
+    end note
   endif
   |Trang thanh toán|
   :Hỏi trạng thái mỗi 3 giây hoặc
-"Tôi đã chuyển khoản, kiểm tra lại" (UC050);
+"Tôi đã chuyển khoản, kiểm tra lại"
+(hỏi API SePay, UC050);
   |Hệ thống LocalPress|
   if (Đơn SUCCESS?) then (có)
     :Phát PaymentSuccessEvent
@@ -134,7 +148,7 @@ SV1 / SV3 phải tự viết
   else (không)
     |Trang thanh toán|
     :Tiếp tục chờ đến khi trả đủ
-hoặc mã hết hạn;
+hoặc đơn hết hạn;
   endif
 endswitch
 |Khách hàng|

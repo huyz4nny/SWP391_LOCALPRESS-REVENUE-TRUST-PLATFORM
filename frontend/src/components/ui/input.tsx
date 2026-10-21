@@ -12,14 +12,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           type={type}
           className={cn(
-            'flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-900 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all',
-            error && 'border-red-500 focus:ring-red-500',
+            'flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors hover:border-slate-400 focus:outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
+            error && 'border-negative focus:border-negative focus:ring-negative/15',
             className
           )}
           ref={ref}
           {...props}
         />
-        {error && <p className="mt-1 text-xs text-red-600 font-medium">{error}</p>}
+        {error && <p className="mt-1.5 text-xs font-medium text-negative">{error}</p>}
       </div>
     )
   }
@@ -36,14 +36,14 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       <div className="w-full">
         <textarea
           className={cn(
-            'flex min-h-[80px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-900 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all',
-            error && 'border-red-500 focus:ring-red-500',
+            'flex min-h-[80px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors hover:border-slate-400 focus:outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
+            error && 'border-negative focus:border-negative focus:ring-negative/15',
             className
           )}
           ref={ref}
           {...props}
         />
-        {error && <p className="mt-1 text-xs text-red-600 font-medium">{error}</p>}
+        {error && <p className="mt-1.5 text-xs font-medium text-negative">{error}</p>}
       </div>
     )
   }
@@ -56,9 +56,9 @@ export interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> 
 
 export function Label({ className, required, children, ...props }: LabelProps) {
   return (
-    <label className={cn('text-sm font-medium text-slate-700 select-none block mb-1', className)} {...props}>
+    <label className={cn('mb-1.5 block select-none text-sm font-medium text-slate-900', className)} {...props}>
       {children}
-      {required && <span className="text-red-500 ml-1">*</span>}
+      {required && <span className="ml-0.5 text-negative">*</span>}
     </label>
   )
 }

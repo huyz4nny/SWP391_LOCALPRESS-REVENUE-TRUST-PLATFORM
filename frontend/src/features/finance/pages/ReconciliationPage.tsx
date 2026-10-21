@@ -4,10 +4,12 @@ import { financeApi } from '../api'
 import { mockStore } from '@/mocks/store'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Input, Textarea } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
-import { Scale, CheckCircle2, AlertTriangle, Lock, FileCheck } from 'lucide-react'
+import { Lock } from 'lucide-react'
+import { PageHeader, Panel, KpiStrip, KeyValue, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
 
 export function ReconciliationPage() {
   const currentUser = mockStore.getCurrentUser()
@@ -15,8 +17,8 @@ export function ReconciliationPage() {
 
   const [period, setPeriod] = useState<ReconciliationPeriod | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Discrepancy resolve modal
   const [selectedDisc, setSelectedDisc] = useState<ReconciliationDiscrepancy | null>(null)
   const [resolutionNote, setResolutionNote] = useState('')
   const [isResolving, setIsResolving] = useState(false)
@@ -29,8 +31,11 @@ export function ReconciliationPage() {
   const loadReconciliation = async () => {
     try {
       setLoading(true)
+      setError('')
       const data = await financeApi.getReconciliation()
       setPeriod(data)
+    } catch (e: any) {
+      setError(e?.message || 'Không tải được kỳ đối soát')
     } finally {
       setLoading(false)
     }
@@ -63,7 +68,7 @@ export function ReconciliationPage() {
         return
       }
     } else {
-      if (!window.confirm('Xác nhận đóng kỳ đối soát Tháng 09/2026? Sau khi đóng, dữ liệu kỳ này sẽ bị khóa và không thể chỉnh sửa.')) {
+      if (!window.confirm('Xác nhận đóng kỳ đối soát? Sau khi đóng, dữ liệu kỳ này sẽ bị khóa và không thể chỉnh sửa.')) {
         return
       }
     }
@@ -72,192 +77,182 @@ export function ReconciliationPage() {
     try {
       await financeApi.closeReconciliationPeriod()
       loadReconciliation()
-      alert('Kỳ đối soát đã được ĐÓNG THÀNH CÔNG và lưu vào kho lưu trữ tài chính!')
+      alert('Kỳ đối soát đã được đóng và lưu vào kho lưu trữ tài chính.')
     } finally {
       setIsClosingPeriod(false)
     }
   }
 
-  if (loading || !period) {
-    return <div className="py-12 text-center animate-pulse">Đang tải kỳ đối soát...</div>
+  if (loading && !period) return <LoadingBlock rows={5} />
+
+  if (!period) {
+    return (
+      <>
+        <PageHeader title="Đối soát kỳ" />
+        <Notice tone="error">
+          {error || 'Không có dữ liệu kỳ đối soát.'}{' '}
+          <button onClick={loadReconciliation} className="font-medium underline cursor-pointer">Thử lại</button>
+        </Notice>
+      </>
+    )
   }
 
   const isClosed = period.status === 'CLOSED'
+  const matched = period.discrepancyTotal === 0
+  const unresolved = period.discrepancies.filter((d) => d.status === 'UNRESOLVED').length
+  const rawGap = period.totalGatewayRevenue - period.totalSystemRevenue
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{period.periodName}</h1>
-            <span
-              className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                isClosed
-                  ? 'bg-slate-800 text-white'
-                  : period.discrepancyTotal === 0
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {isClosed ? 'ĐÃ ĐÓNG KỲ (KHÓA)' : period.discrepancyTotal === 0 ? 'ĐÃ KHỚP SỐ LIỆU' : 'CÓ CHÊNH LỆCH'}
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Thời hạn kỳ: {formatDate(period.startDate)} → {formatDate(period.endDate)}
-            {isClosed && ` • Đã đóng bởi: ${period.closedByName} lúc ${formatDateTime(period.closedAt)}`}
-          </p>
-        </div>
-
-        <div>
-          {!isClosed && (
+    <div>
+      <PageHeader
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {period.periodName}
+            {isClosed ? (
+              <Badge variant="secondary">Đã đóng kỳ</Badge>
+            ) : matched ? (
+              <Badge variant="success">Đã khớp</Badge>
+            ) : (
+              <Badge variant="warning">Có chênh lệch</Badge>
+            )}
+          </span>
+        }
+        sub={
+          <span className="num">
+            {formatDate(period.startDate)} đến {formatDate(period.endDate)}
+            {isClosed
+              ? `. Đóng bởi ${period.closedByName} lúc ${formatDateTime(period.closedAt)}.`
+              : unresolved > 0
+              ? `. Còn ${unresolved} khoản lệch chưa xử lý.`
+              : '.'}
+          </span>
+        }
+        actions={
+          !isClosed && (
             <Button
+              size="sm"
               onClick={handleClosePeriod}
               isLoading={isClosingPeriod}
-              className="text-xs font-bold bg-slate-900 hover:bg-slate-800"
+              title={isManager ? undefined : 'Chỉ Kế toán trưởng được đóng kỳ'}
             >
-              <Lock className="w-3.5 h-3.5 mr-1 text-amber-400" />
-              Đóng kỳ đối soát (Khóa sổ)
+              {!isClosingPeriod && <Lock className="h-3.5 w-3.5" />}
+              Đóng kỳ, khóa sổ
             </Button>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs font-semibold text-slate-500">1. Doanh thu hệ thống ghi nhận</span>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {formatCurrency(period.totalSystemRevenue)}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Dữ liệu từ đơn hàng LocalPress</div>
-        </div>
+      <div className="space-y-4">
+        <KpiStrip
+          items={[
+            { label: 'Hệ thống ghi nhận', value: formatCurrency(period.totalSystemRevenue), note: 'Tổng đơn đã thanh toán trên LocalPress' },
+            { label: 'Sao kê ngân hàng và cổng', value: formatCurrency(period.totalGatewayRevenue), note: 'Tiền thực về tài khoản' },
+            {
+              label: 'Chênh lệch chưa xử lý',
+              value: formatCurrency(period.discrepancyTotal),
+              tone: matched ? 'muted' : 'negative',
+              // Hai tổng có thể vẫn khác nhau khi mọi khoản lệch đã được giải trình: ghi rõ để số không tự mâu thuẫn
+              note:
+                rawGap === 0
+                  ? 'Hai bên khớp nhau'
+                  : matched
+                  ? `Sổ lệch ${formatCurrency(rawGap)}, đã giải trình hết`
+                  : `Sổ lệch ${formatCurrency(rawGap)}`,
+            },
+          ]}
+        />
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs font-semibold text-slate-500">2. Số dư sao kê Ngân hàng / Cổng</span>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {formatCurrency(period.totalGatewayRevenue)}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Vietcombank + BIDV + MoMo</div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <span className="text-xs font-semibold text-slate-500">3. Chênh lệch đối soát</span>
-          <div
-            className={`text-xl font-black mt-1 ${
-              period.discrepancyTotal === 0 ? 'text-emerald-600' : 'text-crimson'
-            }`}
-          >
-            {formatCurrency(period.discrepancyTotal)}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            {period.discrepancyTotal === 0 ? '✓ Số liệu khớp 100%' : 'Cần kế toán đối chiếu và xử lý'}
-          </div>
-        </div>
-      </div>
-
-      {/* Discrepancies Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="font-bold text-sm text-slate-900 flex items-center">
-            <Scale className="w-4 h-4 mr-1.5 text-primary-900" />
-            Bảng chi tiết chênh lệch giao dịch đối soát
-          </h3>
-          <span className="text-xs text-slate-500">{period.discrepancies.length} khoản mục</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="px-4 py-3">Mã GD</th>
-                <th className="px-4 py-3">Đơn hàng</th>
-                <th className="px-4 py-3">Số tiền hệ thống</th>
-                <th className="px-4 py-3">Số tiền cổng/NH</th>
-                <th className="px-4 py-3">Chênh lệch</th>
-                <th className="px-4 py-3">Nguyên nhân</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3 text-right">Xử lý</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {period.discrepancies.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50/80">
-                  <td className="px-4 py-3 font-mono font-bold text-slate-900">{d.transactionCode}</td>
-                  <td className="px-4 py-3 font-mono text-slate-700">{d.orderCode}</td>
-                  <td className="px-4 py-3 font-bold text-slate-800">{formatCurrency(d.systemAmount)}</td>
-                  <td className="px-4 py-3 font-bold text-slate-800">{formatCurrency(d.gatewayAmount)}</td>
-                  <td className="px-4 py-3 font-bold text-crimson">{formatCurrency(d.discrepancyAmount)}</td>
-                  <td className="px-4 py-3 text-slate-600 max-w-xs">{d.reason}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        d.status === 'RESOLVED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {d.status === 'RESOLVED' ? 'Đã xử lý' : 'Chưa xử lý'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {d.status === 'UNRESOLVED' && !isClosed ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedDisc(d)
-                          setResolutionNote(
-                            'Đã liên hệ hỗ trợ kỹ thuật cổng MoMo; xác nhận đối soát bù vào đợt kế tiếp.'
-                          )
-                        }}
-                        className="text-xs font-bold"
-                      >
-                        Xử lý lệch
-                      </Button>
-                    ) : (
-                      <span className="text-slate-400 text-[11px]">
-                        {d.resolvedBy ? `Xử lý bởi: ${d.resolvedBy}` : 'Đã khóa'}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Discrepancy Modal */}
-      {selectedDisc && (
-        <Dialog
-          open={!!selectedDisc}
-          onClose={() => setSelectedDisc(null)}
-          title={`Xử Lý Chênh Lệch Giao Dịch: ${selectedDisc.transactionCode}`}
+        <Panel
+          title="Khoản chênh lệch"
+          aside={<span className="num">{period.discrepancies.length} khoản</span>}
+          bodyClassName="px-0 pb-1"
         >
-          <form onSubmit={handleResolveDiscrepancy} className="space-y-4 text-xs">
-            <div className="p-3 bg-slate-50 rounded border border-slate-200 space-y-1">
-              <div>Đơn hàng: <strong>{selectedDisc.orderCode}</strong></div>
-              <div>Số tiền chênh lệch: <strong className="text-crimson">{formatCurrency(selectedDisc.discrepancyAmount)}</strong></div>
-              <div>Lý do ghi nhận ban đầu: {selectedDisc.reason}</div>
+          {period.discrepancies.length === 0 ? (
+            <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Không có khoản lệch nào trong kỳ.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className={tableCls.table}>
+                <thead className={tableCls.thead}>
+                  <tr>
+                    <th className={tableCls.th}>Mã giao dịch</th>
+                    <th className={tableCls.th}>Đơn</th>
+                    <th className={tableCls.th}>Nguyên nhân</th>
+                    <th className={tableCls.thNum}>Hệ thống</th>
+                    <th className={tableCls.thNum}>Sao kê</th>
+                    <th className={tableCls.thNum}>Lệch</th>
+                    <th className={tableCls.th}>Trạng thái</th>
+                    <th className={tableCls.th}><span className="sr-only">Xử lý</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {period.discrepancies.map((d) => (
+                    <tr key={d.id} className={tableCls.tr}>
+                      <td className={tableCls.td}><span className={tableCls.code}>{d.transactionCode}</span></td>
+                      <td className={tableCls.td}><span className="font-mono text-[13px]">{d.orderCode}</span></td>
+                      <td className={`${tableCls.td} max-w-[280px]`}>
+                        <div className="line-clamp-2">{d.reason}</div>
+                        {d.resolutionNote && <div className="mt-0.5 line-clamp-2 text-xs text-slate-500">{d.resolutionNote}</div>}
+                      </td>
+                      <td className={tableCls.tdNum}>{formatCurrency(d.systemAmount)}</td>
+                      <td className={tableCls.tdNum}>{formatCurrency(d.gatewayAmount)}</td>
+                      <td className={`${tableCls.tdNum} font-semibold ${d.status === 'UNRESOLVED' && d.discrepancyAmount !== 0 ? 'text-negative' : ''}`}>
+                        {formatCurrency(d.discrepancyAmount)}
+                      </td>
+                      <td className={tableCls.td}>
+                        {d.status === 'RESOLVED' ? <Badge variant="success">Đã xử lý</Badge> : <Badge variant="warning">Chưa xử lý</Badge>}
+                      </td>
+                      <td className={`${tableCls.td} text-right`}>
+                        {d.status === 'UNRESOLVED' && !isClosed ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedDisc(d)
+                              setResolutionNote('Đã liên hệ hỗ trợ kỹ thuật cổng MoMo; xác nhận đối soát bù vào đợt kế tiếp.')
+                            }}
+                          >
+                            Xử lý
+                          </Button>
+                        ) : (
+                          <span className="whitespace-nowrap text-xs text-slate-500">{d.resolvedBy ? d.resolvedBy : 'Đã khóa'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          )}
+        </Panel>
+      </div>
+
+      {selectedDisc && (
+        <Dialog open={!!selectedDisc} onClose={() => setSelectedDisc(null)} title={`Xử lý chênh lệch ${selectedDisc.transactionCode}`}>
+          <form onSubmit={handleResolveDiscrepancy} className="space-y-4">
+            <dl className="rounded-md bg-slate-50 px-3.5 py-1">
+              <KeyValue label="Đơn"><span className="font-mono">{selectedDisc.orderCode}</span></KeyValue>
+              <KeyValue label="Số tiền lệch" strong><span className="num">{formatCurrency(selectedDisc.discrepancyAmount)}</span></KeyValue>
+              <KeyValue label="Nguyên nhân ghi nhận">{selectedDisc.reason}</KeyValue>
+            </dl>
 
             <div>
-              <Label htmlFor="resNote" required>Ghi chú biện pháp xử lý & Bút toán điều chỉnh</Label>
+              <Label htmlFor="resNote" required>Biện pháp xử lý và bút toán điều chỉnh</Label>
               <Textarea
                 id="resNote"
                 rows={3}
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
-                placeholder="Nhập ghi chú xử lý đối soát..."
+                placeholder="Ghi rõ đã đối chiếu gì và điều chỉnh ra sao"
                 required
               />
             </div>
 
-            <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setSelectedDisc(null)}>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedDisc(null)}>
                 Đóng
               </Button>
-              <Button type="submit" size="sm" isLoading={isResolving} className="bg-emerald-700 hover:bg-emerald-800">
-                Xác nhận đã xử lý xong chênh lệch
+              <Button type="submit" size="sm" isLoading={isResolving}>
+                Đánh dấu đã xử lý
               </Button>
             </div>
           </form>

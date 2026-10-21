@@ -1,5 +1,5 @@
 @startuml swimlane_sv4_01_payment
-title SV4-01 Shared Payment Page /payment/:orderCode (UC047 - UC050)
+title SV4-01 Shared Payment Page /payment/:orderCode, always via wallet (UC047 - UC050)
 
 scale max 4000 width
 skinparam backgroundColor white
@@ -67,59 +67,74 @@ check wallet or file complaint;
 case (PENDING, in time)
   |Payment Page|
   :Show order, wallet balance,
-QR code and countdown;
+amount and hold countdown;
   note right
-  Top-up order: QR only,
-no wallet option (SV4-02)
+  Every purchase is paid from the
+LocalPress Wallet (since 22/10/2026)
   end note
-  |Customer|
-  if (Pay with?) then (LocalPress Wallet)
+  |LocalPress Backend|
+  if (Balance >= amount?) then (yes)
     |Payment Page|
-    if (Balance >= amount?) then (no)
-      :Show "Top up to pay": customer tops up
-the shortfall (SV4-02), then comes back;
-    else (yes)
-      |LocalPress Backend|
-      :pay-with-wallet:
+    :Show one button
+"Pay X with wallet";
+    |Customer|
+    :Click pay;
+    |LocalPress Backend|
+    :pay-with-wallet:
 lock order + wallet,
 re-check owner,
 expiry, balance;
-      if (All valid?) then (yes)
-        :Debit wallet, order SUCCESS
+    if (All valid?) then (yes)
+      :Debit wallet, order SUCCESS
 (method WALLET);
-      else (no)
-        :402 / 403 / 410,
+    else (no)
+      :402 / 403 / 410,
 rollback, order
 stays PENDING;
-      endif
     endif
-  else (SePay QR)
+  else (no)
+    :shortfall-topup: create (or reuse)
+TOPUP = amount - balance,
+topup_for_order = order code;
+    |Payment Page|
+    :Show "Scan QR to top up X"
+(content = top-up code);
     |Customer|
-    :Transfer, content = order code;
+    :Scan QR and transfer;
     |SePay / Bank|
-    :Send IPN webhook;
+    :Send webhook;
     |LocalPress Backend|
     switch (Webhook result (UC048, UC049)?)
-    case (wrong key /\nno order /\nalready paid)
+    case (wrong key /\nno code /\nresent)
       :Nothing recorded:
 401 wrong key,
 ORDER_NOT_FOUND
-(-> complaint),
+(-> complaint SV4-03),
 ALREADY_PROCESSED;
-    case (ad hold\nexpired /\norder closed)
-      :Order FAILED, money to
-wallet "-LATE" (Rule 6);
-    case (underpaid)
-      :Money to wallet "-PART",
-order stays PENDING;
-    case (full / overpaid)
-      :Order SUCCESS, excess
-to wallet "-EXCESS";
+    case (top-up received)
+      :Credit wallet with the amount
+actually received (log sepay_id);
+      if (Order PENDING, in time
+and wallet >= amount?) then (yes)
+        :Auto debit wallet,
+order SUCCESS (autoPay PAID);
+      else (no)
+        :Money stays in wallet:
+INSUFFICIENT -> new QR for the rest,
+ORDER_EXPIRED -> create a new order;
+      endif
     endswitch
+    note right
+    Transfers made with the order code
+itself (old way / complaint) are
+still processed: full -> SUCCESS,
+short / late -> wallet
+    end note
   endif
   |Payment Page|
   :Poll status every 3 s or
-"I have paid, check again" (UC050);
+"I have paid, check again"
+(asks SePay API, UC050);
   |LocalPress Backend|
   if (Order SUCCESS?) then (yes)
     :Publish PaymentSuccessEvent
@@ -134,7 +149,7 @@ SV1 / SV3 must write it
   else (no)
     |Payment Page|
     :Keep waiting until paid
-or the code expires;
+or the order expires;
   endif
 endswitch
 |Customer|

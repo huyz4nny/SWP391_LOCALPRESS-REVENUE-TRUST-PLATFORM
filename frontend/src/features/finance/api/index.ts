@@ -1,10 +1,28 @@
 import { httpClient } from '@/lib/http/client'
+import { APP_CONFIG } from '@/app/config'
 import {
   Order,
+  OrderType,
   RefundRequest,
   ReconciliationPeriod,
   GeneralLedgerEntry,
 } from '../types'
+
+
+/** Loại giao dịch backend (ENUM transactions.transaction_type) -> loại đơn hiển thị. */
+const mapOrderType = (t: string): OrderType =>
+  t === 'AD' ? 'AD_CAMPAIGN' : t === 'ARTICLE' ? 'ARTICLE_PURCHASE' : t === 'TOPUP' ? 'TOPUP' : t === 'REFUND' ? 'REFUND' : 'SUBSCRIPTION'
+
+const TITLE_BY_TYPE: Record<string, string> = {
+  SUBSCRIPTION: 'Gói hội viên',
+  ARTICLE: 'Mua bài Premium',
+  AD: 'Booking quảng cáo',
+  TOPUP: 'Nạp tiền vào ví',
+  REFUND: 'Hoàn tiền',
+}
+
+const titleOf = (tx: any): string =>
+  tx.description || `${TITLE_BY_TYPE[tx.transactionType] || tx.transactionType} #${tx.targetId || tx.transactionId || tx.id}`
 
 /**
  * ==============================================================================
@@ -17,6 +35,7 @@ import {
 export const financeApi = {
   getDashboard: async () => {
     const res = await httpClient.get<any>('/finance/dashboard')
+    if (APP_CONFIG.useMockApi) return res // mock đã trả recentOrders dạng Order
     if (res && res.totalRevenue !== undefined) {
       return {
         totalRevenue: Number(res.totalRevenue || 0),
@@ -30,9 +49,9 @@ export const financeApi = {
           userId: String(tx.userId),
           userName: `Khách hàng #${tx.userId}`,
           userEmail: `user${tx.userId}@localpress.vn`,
-          orderType: tx.transactionType === 'AD' ? 'AD_CAMPAIGN' : (tx.transactionType === 'ARTICLE' ? 'ARTICLE_PURCHASE' : 'SUBSCRIPTION'),
+          orderType: mapOrderType(tx.transactionType),
           targetId: String(tx.targetId || ''),
-          targetTitle: `Giao dịch ${tx.transactionType} #${tx.transactionId}`,
+          targetTitle: titleOf(tx),
           amount: Number(tx.amount || 0),
           discount: 0,
           finalAmount: Number(tx.amount || 0),
@@ -48,7 +67,9 @@ export const financeApi = {
   },
 
   getOrders: async (): Promise<Order[]> => {
-    const res = await httpClient.get<any>('/finance/ledger')
+    // Mock store lưu sẵn Order ở /finance/orders; backend thật trả transactions ở /finance/ledger
+    if (APP_CONFIG.useMockApi) return httpClient.get<Order[]>('/finance/orders')
+    const res = await httpClient.get<any>('/finance/ledger', { params: { size: 100 } })
     const list = res?.data?.content || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
     return list.map((tx: any) => ({
       id: String(tx.transactionId || tx.id),
@@ -56,9 +77,9 @@ export const financeApi = {
       userId: String(tx.userId),
       userName: `Khách hàng #${tx.userId}`,
       userEmail: `user${tx.userId}@localpress.vn`,
-      orderType: tx.transactionType === 'AD' ? 'AD_CAMPAIGN' : (tx.transactionType === 'ARTICLE' ? 'ARTICLE_PURCHASE' : 'SUBSCRIPTION'),
+      orderType: mapOrderType(tx.transactionType),
       targetId: String(tx.targetId || ''),
-      targetTitle: `Đơn ${tx.transactionType} #${tx.targetId || tx.transactionId}`,
+      targetTitle: titleOf(tx),
       amount: Number(tx.amount || 0),
       discount: 0,
       finalAmount: Number(tx.amount || 0),
@@ -80,6 +101,7 @@ export const financeApi = {
   },
 
   getOrderById: async (id: string): Promise<Order> => {
+    if (APP_CONFIG.useMockApi) return httpClient.get<Order>(`/finance/orders/${id}`)
     const res = await httpClient.get<any>(`/finance/ledger/${id}`)
     const tx = res?.data || res
     return {
@@ -88,9 +110,9 @@ export const financeApi = {
       userId: String(tx.userId),
       userName: `Khách hàng #${tx.userId}`,
       userEmail: `user${tx.userId}@localpress.vn`,
-      orderType: tx.transactionType === 'AD' ? 'AD_CAMPAIGN' : (tx.transactionType === 'ARTICLE' ? 'ARTICLE_PURCHASE' : 'SUBSCRIPTION'),
+      orderType: mapOrderType(tx.transactionType),
       targetId: String(tx.targetId || ''),
-      targetTitle: `Giao dịch ${tx.transactionType} #${tx.transactionId || tx.id}`,
+      targetTitle: titleOf(tx),
       amount: Number(tx.amount || 0),
       discount: 0,
       finalAmount: Number(tx.amount || 0),
@@ -148,10 +170,15 @@ export const financeApi = {
     return res?.data || res
   },
 
-  getLedger: async () => {
-    const res = await httpClient.get<any>('/finance/ledger')
+  getLedger: async (): Promise<GeneralLedgerEntry[]> => {
+    if (APP_CONFIG.useMockApi) return httpClient.get<GeneralLedgerEntry[]>('/finance/ledger')
+    const res = await httpClient.get<any>('/finance/ledger', { params: { size: 100 } })
     const list = res?.data?.content || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
-    return list.map((tx: any) => ({
+    // Rule 16: tiền nạp ví là công nợ phải trả khách, không phải doanh thu -> không đưa vào sổ quỹ doanh thu.
+    // Chỉ lấy giao dịch đã thành công / đã hoàn; đơn chờ hoặc thất bại chưa phát sinh tiền.
+    return list
+      .filter((tx: any) => tx.transactionType !== 'TOPUP' && ['SUCCESS', 'REFUNDED'].includes(tx.status))
+      .map((tx: any) => ({
       id: String(tx.transactionId || tx.id),
       entryCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
       timestamp: tx.createdAt || new Date().toISOString(),

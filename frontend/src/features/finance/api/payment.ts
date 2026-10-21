@@ -7,6 +7,8 @@ import type {
   PaymentComplaint,
   PaymentOrderView,
   PaymentStatusView,
+  SepayLog,
+  SepayStatus,
   WalletInfo,
 } from '../types'
 
@@ -46,6 +48,7 @@ function toView(raw: any): PaymentOrderView {
     accountNumber: raw.accountNumber,
     accountName: raw.accountName,
     transferContent: raw.transferContent ?? raw.orderCode,
+    topupForOrder: raw.topupForOrder ?? undefined,
     createdAt: raw.createdAt,
     expiresAt: raw.expiresAt,
     paidAt: raw.paidAt,
@@ -80,8 +83,37 @@ export const paymentApi = {
 
   /** Chỉ dùng khi demo ở máy local (backend profile dev): giả lập SePay bắn webhook. */
   simulateIpn: async (orderCode: string, amount?: number, referenceCode?: string): Promise<IpnResult> => {
-    if (APP_CONFIG.useMockApi) return mock.simulateIpn(orderCode, amount, referenceCode)
+    if (APP_CONFIG.useMockApi) {
+      const view = mock.getOrder(orderCode)
+      const r = mock.simulateIpn(orderCode, amount, referenceCode)
+      mock.recordLog({
+        orderCode,
+        amount: amount ?? view.amount,
+        referenceCode: referenceCode ?? null,
+        resultStatus: r.status === 'ALREADY_PROCESSED' && referenceCode ? 'DUPLICATE_DELIVERY' : r.status,
+        resultMessage: r.message,
+      })
+      return r
+    }
     return httpClient.post<IpnResult>(`/finance/orders/code/${orderCode}/simulate-ipn`, { amount, referenceCode })
+  },
+
+  /**
+   * Nút "Tôi đã chuyển khoản, kiểm tra lại": backend hỏi thẳng API SePay cho đơn này (khi chưa nhận được webhook).
+   * checked=false khi chưa cấu hình token SePay hoặc vừa hỏi trong 10 giây; khi đó chỉ đọc lại trạng thái đơn.
+   */
+  checkWithSepay: async (orderCode: string): Promise<{ checked: boolean; reason?: string; found?: number }> => {
+    if (APP_CONFIG.useMockApi) return { checked: false, reason: 'MOCK_MODE' }
+    return unwrap(await httpClient.post<any>(`/finance/orders/code/${orderCode}/check-sepay`))
+  },
+
+  /**
+   * Ví không đủ tiền trả đơn: tạo (hoặc dùng lại) mã nạp bù đúng phần còn thiếu.
+   * Tiền nạp về thì backend tự trừ ví trả đơn; trang thanh toán chỉ cần chờ đơn chuyển SUCCESS.
+   */
+  createShortfallTopUp: async (orderCode: string): Promise<PaymentOrderView> => {
+    if (APP_CONFIG.useMockApi) return mock.createShortfallTopUp(orderCode)
+    return toView(unwrap(await httpClient.post<any>(`/finance/orders/code/${orderCode}/shortfall-topup`)))
   },
 
   getWallet: async (): Promise<WalletInfo> => {
@@ -155,6 +187,51 @@ function toComplaint(raw: any): PaymentComplaint {
   }
 }
 
+
+/**
+ * Nhật ký tiền SePay báo về (UC048, UC049) - màn hình /backoffice/finance/sepay của kế toán.
+ * Nguồn: WEBHOOK (SePay gọi vào), API_SYNC (LocalPress hỏi API SePay), SIMULATION (nút demo).
+ */
+export const sepayApi = {
+  logs: async (source?: SepayLog['source']): Promise<SepayLog[]> => {
+    if (APP_CONFIG.useMockApi) return (mock.load().sepayLogs ?? []).filter((l) => !source || l.source === source)
+    return (unwrap<any[]>(await httpClient.get<any>('/finance/sepay/logs', { params: { source, limit: 200 } })) || []).map(toSepayLog)
+  },
+
+  status: async (): Promise<SepayStatus> => {
+    if (APP_CONFIG.useMockApi) {
+      return { webhookKeyConfigured: false, apiTokenConfigured: false, accountNumber: '****9981', webhookPath: '/api/v1/finance/webhook/sepay', lastWebhookAt: null, mock: true }
+    }
+    return unwrap(await httpClient.get<any>('/finance/sepay/status'))
+  },
+
+  sync: async (hours = 24): Promise<{ fetched: number; processed: number; skippedDuplicate: number; ignored: number }> => {
+    if (APP_CONFIG.useMockApi) throw new Error('Chế độ mock không gọi được API SePay. Chạy backend thật để đồng bộ.')
+    return unwrap(await httpClient.post<any>('/finance/sepay/sync', undefined, { params: { hours } }))
+  },
+}
+
+function toSepayLog(raw: any): SepayLog {
+  return {
+    logId: String(raw.logId),
+    source: raw.source,
+    sepayId: raw.sepayId ?? null,
+    authOk: Boolean(raw.authOk),
+    gateway: raw.gateway ?? null,
+    transferType: raw.transferType ?? null,
+    amount: raw.transferAmount != null ? Number(raw.transferAmount) : null,
+    content: raw.content ?? null,
+    referenceCode: raw.referenceCode ?? null,
+    transactionDate: raw.transactionDate ?? null,
+    orderCode: raw.orderCode ?? null,
+    resultStatus: raw.resultStatus,
+    resultMessage: raw.resultMessage ?? null,
+    rawPayload: raw.rawPayload ?? null,
+    remoteIp: raw.remoteIp ?? null,
+    receivedAt: raw.receivedAt,
+  }
+}
+
 // =============================================================================
 // MOCK MODE (chỉ chạy khi VITE_USE_MOCK_API != 'false')
 // =============================================================================
@@ -167,6 +244,7 @@ interface MockWalletState {
   topups: Record<string, PaymentOrderView & { userId: string }>
   processedRefs: string[]
   complaints?: PaymentComplaint[]
+  sepayLogs?: SepayLog[]
 }
 
 const mock = {
@@ -263,8 +341,8 @@ const mock = {
     }
   },
 
-  createTopUp(amount: number): PaymentOrderView {
-    if (!Number.isInteger(amount) || amount < 10000 || amount > 50000000) {
+  createTopUp(amount: number, topupForOrder?: string): PaymentOrderView {
+    if (!topupForOrder && (!Number.isInteger(amount) || amount < 10000 || amount > 50000000)) {
       throw new Error('Số tiền nạp phải từ 10.000 đến 50.000.000 VND')
     }
     const state = mock.load()
@@ -275,7 +353,8 @@ const mock = {
       transactionId: orderCode,
       orderCode,
       orderType: 'TOPUP',
-      description: 'Nạp tiền vào Ví LocalPress',
+      description: topupForOrder ? `Nạp bù cho đơn ${topupForOrder}` : 'Nạp tiền vào Ví LocalPress',
+      topupForOrder,
       amount,
       status: 'PENDING',
       isPaid: false,
@@ -292,6 +371,35 @@ const mock = {
     state.topups[orderCode] = view
     mock.save(state)
     return view
+  },
+
+  /** Giống backend createShortfallTopUp: dùng lại mã nạp bù còn hạn nếu số tiền vẫn đúng. */
+  createShortfallTopUp(orderCode: string): PaymentOrderView {
+    const view = mock.getOrder(orderCode)
+    if (view.orderType === 'TOPUP') throw new Error('Đơn nạp ví không cần nạp bù')
+    if (view.isPaid) throw new Error(`Đơn ${orderCode} đã được thanh toán`)
+    if (view.expired || view.status !== 'PENDING') throw new Error('Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới')
+    const userId = mockStore.getCurrentUser().id
+    const state = mock.load()
+    const shortfall = view.amount - mock.wallet(state, userId).balance
+    if (shortfall <= 0) throw new Error('Ví đã đủ tiền, hãy thanh toán bằng ví')
+    const existing = Object.values(state.topups).find(
+      (t) => t.topupForOrder === orderCode && t.status === 'PENDING' && t.amount === shortfall && !!t.expiresAt && Date.now() < Date.parse(t.expiresAt)
+    )
+    return existing ?? mock.createTopUp(shortfall, orderCode)
+  },
+
+  /** Tiền nạp bù vừa vào ví: tự trả đơn nếu còn chờ, còn hạn và ví đủ (giống tryAutoPay ở backend). */
+  autoPay(userId: string, orderCode: string): string {
+    const view = mock.getOrder(orderCode, userId)
+    if (view.isPaid) return 'ALREADY_PAID'
+    if (view.expired || view.status !== 'PENDING') return 'ORDER_EXPIRED'
+    const state = mock.load()
+    if (mock.wallet(state, userId).balance < view.amount) return 'INSUFFICIENT'
+    mock.move(state, userId, orderCode, 'DEBIT', view.amount, `Thanh toán đơn ${orderCode}`)
+    mock.save(state)
+    mockStore.markOrderPaid(view.transactionId)
+    return 'PAID'
   },
 
   payWithWallet(orderCode: string): PaymentOrderView {
@@ -324,9 +432,15 @@ const mock = {
       t.isPaid = true
       t.amount = paid
       t.paidAt = new Date().toISOString()
-      mock.move(state, userId, orderCode, 'CREDIT', paid, `Nạp tiền qua SePay, mã ${orderCode}`)
+      mock.move(state, userId, orderCode, 'CREDIT', paid,
+        t.topupForOrder ? `Nạp bù qua SePay cho đơn ${t.topupForOrder}, mã ${orderCode}` : `Nạp tiền qua SePay, mã ${orderCode}`)
       mock.save(state)
-      return { success: true, status: 'SUCCESS', orderCode, message: `Đã cộng ${paid.toLocaleString('vi-VN')} VND vào ví` }
+      const r: IpnResult = { success: true, status: 'SUCCESS', orderCode, message: `Đã cộng ${paid.toLocaleString('vi-VN')} VND vào ví` }
+      if (t.topupForOrder) {
+        r.autoPay = mock.autoPay(userId, t.topupForOrder)
+        r.paidOrder = t.topupForOrder
+      }
+      return r
     }
     if ((view.orderType === 'AD' && view.expired) || view.status !== 'PENDING') {
       mock.move(state, userId, `${orderCode}-LATE`, 'CREDIT', paid, `Tiền về sau khi đơn ${orderCode} hết hiệu lực, chuyển vào ví`)
@@ -348,6 +462,31 @@ const mock = {
 
   complaints(): PaymentComplaint[] {
     return mock.load().complaints ?? []
+  },
+
+  recordLog(input: { orderCode: string; amount: number; referenceCode: string | null; resultStatus: string; resultMessage: string }) {
+    const state = mock.load()
+    state.sepayLogs ??= []
+    const now = new Date().toISOString()
+    state.sepayLogs.unshift({
+      logId: String(state.sepayLogs.length + 1),
+      source: 'SIMULATION',
+      sepayId: null,
+      authOk: true,
+      gateway: 'Vietcombank',
+      transferType: 'in',
+      amount: input.amount,
+      content: `LOCALPRESS ${input.orderCode}`,
+      referenceCode: input.referenceCode,
+      transactionDate: now.slice(0, 19).replace('T', ' '),
+      orderCode: input.orderCode,
+      resultStatus: input.resultStatus,
+      resultMessage: input.resultMessage,
+      rawPayload: JSON.stringify({ simulated: true, orderCode: input.orderCode, amount: input.amount, referenceCode: input.referenceCode }),
+      remoteIp: 'localhost',
+      receivedAt: now,
+    })
+    window.localStorage.setItem(MOCK_KEY, JSON.stringify(state))
   },
 
   createComplaint(input: CreateComplaintInput): PaymentComplaint {

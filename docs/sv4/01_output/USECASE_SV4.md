@@ -2,6 +2,7 @@
 
 > **Bản tiếng Việt:** `diagrams_vi/usecase_sv4_vi.png`, `usecase_sv4_customer_vi.png`, `usecase_sv4_backoffice_vi.png`.
 
+> Cập nhật 22/10/2026: cột Iter theo `TRACKING_SV4.xlsx` (sắp theo hành trình của tiền); mọi đơn trả qua ví. Sơ đồ ảnh use case chưa vẽ lại cột Iter.
 > Form theo mẫu `notebooklm_docs/usecase_sv4_standard.png`: khung hệ thống xanh, use case nền trắng ghi "Tên + mã UC", người dùng bên trái, hệ thống ngoài bên phải; nét liền = actor sử dụng, nét đứt = include / extend.
 > Nguồn: `docs/sv4/02_source/usecase_sv4*.puml`.
 
@@ -24,20 +25,20 @@
 
 | UC | Tên | Iter | Màn hình | Ghi chú |
 |---|---|---|---|---|
-| UC047 | Create Payment Transaction | 2 | II.4.3 `/payment/:orderCode` | include Generate SePay QR Code; Pay With Wallet là extend |
-| UC048 | Verify Payment Result | 2 | (backend) | Được UC049 include: tìm đơn, so số tiền |
-| UC049 | Handle Payment Webhook | 2 | (backend) | API key, idempotent, tiền thừa/thiếu/muộn vào ví |
-| UC050 | Check Payment Status | 2 | II.4.3 | Polling 3 giây/lần |
-| UC051 | **Handle Unrecorded Payment Complaint** | 1 | II.4.2 `/backoffice/finance/complaints`, `/wallet/complaints` | Thay "Confirm Manual Bank Transfer"; include Match Bank Statement và UC049 |
-| UC052 | View Cash Flow Dashboard | 3 | II.4.5 | UC059 extend; doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ) |
-| UC053 | Manage Advertiser Receivables | 2 | II.4.4 | Nhóm nợ PAID_IN_FULL / IN_TERM / OVERDUE; mới có API, chưa có màn hình, chưa có nhắc nợ |
-| UC054 | Reconcile Payment Mismatch | 3 | II.4.6 | include Match Bank Statement |
-| UC055 | Process Refund Request | 3 | II.4.7 | 4 mắt, include UC056; đơn trả bằng ví thì hoàn lại vào ví; không hoàn TOPUP / REFUND |
-| UC056 | Adjust Reading or Campaign Rights | 3 | II.4.7 | SV4 phát `RefundCompletedEvent` (có cờ `fullRefund`); listener của SV1/SV3 tự điều chỉnh quyền: hoàn toàn bộ thì thu hồi, hoàn một phần thì giữ quyền. Listener chưa có trong code |
-| UC057 | Generate Financial Documents | 1 | II.4.1 | extend UC058, chỉ giao dịch SUCCESS |
-| UC058 | View Financial Ledger | 1 | II.4.1 | |
-| UC059 | Export Financial Report | 3 | II.4.8 | Mới có API, chưa lọc theo ngày |
-| UC060 | View Financial Alerts | 3 | II.4.8 | `REFUND_PENDING`, `COMPLAINT_OPEN`, `DEBT_OVERDUE`; mới có API |
+| UC047 | Create Payment Transaction | 1 | II.4.1 `/payment/:orderCode`, II.4.2 `/wallet/topup` | Mọi đơn trả bằng ví; ví thiếu thì tạo QR nạp bù đúng phần thiếu (include Generate SePay QR Code), tiền về tự trả đơn |
+| UC048 | Verify Payment Result | 1 | II.4.3 `/backoffice/finance/sepay` | Được UC049 include: tìm đơn, so số tiền |
+| UC049 | Handle Payment Webhook | 1 | II.4.3 `POST /webhook/sepay` | API key, idempotent, tiền thừa/thiếu/muộn vào ví |
+| UC050 | Check Payment Status | 1 | II.4.1 | Polling 3 giây/lần |
+| UC051 | **Handle Unrecorded Payment Complaint** | 2 | II.4.4 `/wallet/complaints`, II.4.5 `/backoffice/finance/complaints` | Thay "Confirm Manual Bank Transfer"; include Match Bank Statement và UC049 |
+| UC052 | View Cash Flow Dashboard | 3 | II.4.8 | UC059 extend; doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ) |
+| UC053 | Manage Advertiser Receivables | 3 | II.4.9 | Nhóm nợ PAID_IN_FULL / IN_TERM / OVERDUE; mới có API, chưa có màn hình, chưa có nhắc nợ |
+| UC054 | Reconcile Payment Mismatch | 3 | II.4.10 | include Match Bank Statement |
+| UC055 | Process Refund Request | 3 | II.4.11 | 4 mắt, include UC056; đơn trả bằng ví thì hoàn lại vào ví; không hoàn TOPUP / REFUND |
+| UC056 | Adjust Reading or Campaign Rights | 3 | II.4.11 | SV4 phát `RefundCompletedEvent` (có cờ `fullRefund`); listener của SV1/SV3 tự điều chỉnh quyền: hoàn toàn bộ thì thu hồi, hoàn một phần thì giữ quyền. Listener chưa có trong code |
+| UC057 | Generate Financial Documents | 2 | II.4.6 | extend UC058, chỉ giao dịch SUCCESS |
+| UC058 | View Financial Ledger | 2 | II.4.7 | |
+| UC059 | Export Financial Report | 3 | II.4.12 | Mới có API, chưa lọc theo ngày |
+| UC060 | View Financial Alerts | 3 | II.4.12 | `REFUND_PENDING`, `COMPLAINT_OPEN`, `DEBT_OVERDUE`; mới có API |
 
 Use case phụ (không có mã, phục vụ giải thích): Generate SePay QR Code, Pay With Wallet, Top Up Wallet, Match Bank Statement.
 

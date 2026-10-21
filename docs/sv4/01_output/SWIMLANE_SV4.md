@@ -14,12 +14,12 @@
 | # | File ảnh | UC | Iter |
 |---|---|---|---|
 | 00 | `swimlane_sv4_00_overview.png` | Tóm tắt UC047 - UC060 | 1 - 3 |
-| 01 | `swimlane_sv4_01_payment.png` | UC047, UC048, UC049, UC050 | 2 |
-| 02 | `swimlane_sv4_02_wallet_topup.png` | Nạp ví (include UC047) | 2 |
-| 03 | `swimlane_sv4_03_complaint.png` | UC051 (+ UC049, UC060) | 1 |
-| 04 | `swimlane_sv4_04_reconciliation.png` | UC053, UC054 | 2 - 3 |
+| 01 | `swimlane_sv4_01_payment.png` | UC047, UC048, UC049, UC050 (luôn qua ví) | 1 |
+| 02 | `swimlane_sv4_02_wallet_topup.png` | Nạp ví (include UC047) | 1 |
+| 03 | `swimlane_sv4_03_complaint.png` | UC051 (+ UC049, UC060) | 2 |
+| 04 | `swimlane_sv4_04_reconciliation.png` | UC053, UC054 | 3 |
 | 05 | `swimlane_sv4_05_refund.png` | UC055, UC056 | 3 |
-| 06 | `swimlane_sv4_06_reports.png` | UC052, UC057 - UC060 | 1 - 3 |
+| 06 | `swimlane_sv4_06_reports.png` | UC052, UC057 - UC060 | 2 - 3 |
 
 ---
 
@@ -31,9 +31,10 @@
 |---|---|---|
 | 1 | Khách hàng | Chọn mua bài, gói, booking quảng cáo, hoặc bấm "Nạp tiền" trên header |
 | 2 | Hệ thống | Tạo đơn PENDING, mã `LP...`, hết hạn sau 15 phút (UC047) |
-| 3 | Khách hàng | Mở trang thanh toán chung, chọn **Ví** hoặc **QR SePay** |
-| 4a | Hệ thống | Ví đủ tiền: trừ ví, đơn SUCCESS. **Ví không đủ: khách nạp thêm (SV4-02) rồi quay lại trả** |
-| 4b | SePay → Hệ thống | QR: webhook về (UC048, UC049). Đủ/thừa → SUCCESS, phần thừa vào ví; thiếu/về muộn → tiền vào ví, đơn chưa xong; đơn nạp ví → cộng ví |
+| 3 | Khách hàng → Hệ thống | Mở trang thanh toán chung. **Mọi đơn mua trả bằng ví** (từ 22/10/2026): hệ thống so số dư với số tiền |
+| 4a | Khách hàng | Ví đủ: bấm "Thanh toán bằng ví" |
+| 4b | Hệ thống → Khách → SePay | Ví thiếu: tạo QR nạp bù **đúng phần thiếu** (nội dung = mã nạp), khách quét QR, SePay gửi webhook (UC048, UC049), hệ thống cộng ví đúng 1 lần |
+| 4c | Hệ thống | Trừ ví, đơn SUCCESS, phát `PaymentSuccessEvent` (nạp bù về thì tự làm bước này) |
 | 5 | Khách → Kế toán | Chuyển > 15 phút chưa ghi nhận: gửi khiếu nại (UC051). Thấy tiền → ghi nhận vào đơn hoặc cộng ví; không thấy → từ chối kèm lý do. Nhánh "không": thanh toán đã ghi nhận bình thường |
 | 6 | Kế toán → Kế toán trưởng | Khách xin hoàn (qua hỗ trợ): mắt 1 đề xuất, mắt 2 duyệt → giao dịch REFUND + thu hồi quyền; từ chối → khách giữ quyền. Nhánh "không": giữ quyền lợi đã mua |
 | 7 | Khách hàng | **Điểm kết thúc duy nhất:** nhận kết quả cuối |
@@ -48,14 +49,20 @@
 | 2 | Hệ thống | Tạo đơn PENDING, mã `LP`+yyMMddHHmm+4 ký tự, `expires_at` = +15 phút. User lấy từ phiên đăng nhập | `POST /finance/orders` |
 | 3 | Trang thanh toán | Chưa đăng nhập → sang `/login` rồi quay lại | `PaymentPage.tsx` |
 | 4 | Hệ thống | Tải đơn (UC050), rẽ 4 trạng thái: **không phải chủ đơn → 403** (Rule 14); **đã SUCCESS** → hiện "Đã thanh toán"; **hết hạn / FAILED** → hiện "Mã đã hết hạn" + nút tạo đơn mới, xem ví, khiếu nại; **PENDING còn hạn** → hiện đơn, số dư ví, QR, đếm ngược | `GET /orders/code/{code}` |
-| 5 | Trang thanh toán | Đơn nạp ví chỉ có QR, không có tab Ví | |
-| 6a | Trang thanh toán | Ví: số dư < số tiền → nút "Nạp thêm để thanh toán" (nạp phần thiếu, làm tròn lên 10.000, quay lại đúng trang này) | |
-| 6b | Hệ thống | Ví đủ: `pay-with-wallet` khóa dòng đơn + dòng ví, kiểm tra lại chủ đơn, hạn, số dư. Hợp lệ → trừ ví, SUCCESS, `payment_method = WALLET`. Không hợp lệ → 402 thiếu tiền / 403 đơn người khác / 410 hết hạn, rollback, đơn vẫn PENDING | `POST /orders/code/{code}/pay-with-wallet` |
-| 7 | Khách → SePay | QR: chuyển khoản, nội dung = mã đơn; SePay bắn webhook | `POST /webhook/sepay` |
-| 8 | Hệ thống | Kết quả webhook: **sai key** → 401; **không thấy đơn** → `ORDER_NOT_FOUND` (khách khiếu nại); **đã SUCCESS** → `ALREADY_PROCESSED`; **booking quảng cáo hết giữ chỗ / đơn đã đóng** → đơn FAILED, tiền vào ví mã `-LATE`; **thiếu** → tiền vào ví `-PART`, đơn vẫn PENDING (khách trả nốt bằng ví); **đủ / thừa** → SUCCESS, thừa vào ví `-EXCESS` | Rule 4, 5, 6 |
-| 9 | Trang thanh toán | Hỏi trạng thái 3 giây/lần, hoặc nút "Tôi đã chuyển khoản, kiểm tra lại" (chỉ đọc lại trạng thái, không cấp quyền) | UC050 |
+| 5 | Trang thanh toán | Hiện đơn, số dư ví, số tiền, thời gian giữ đơn. Đơn nạp ví (TOPUP) chỉ có QR (xem SV4-02) | `PaymentPage.tsx` |
+| 6a | Hệ thống | **Ví đủ**: 1 nút "Thanh toán X bằng ví" → `pay-with-wallet` khóa dòng đơn + dòng ví, kiểm tra lại chủ đơn, hạn, số dư. Hợp lệ → trừ ví, SUCCESS, `payment_method = WALLET`. Không hợp lệ → 402 / 403 / 410, rollback, đơn vẫn PENDING | `POST /orders/code/{code}/pay-with-wallet` |
+| 6b | Hệ thống | **Ví thiếu**: `shortfall-topup` tạo (hoặc dùng lại mã còn hạn) đơn TOPUP = số tiền − số dư, `topup_for_order` = mã đơn (V6). Ví đủ → 409, đơn hết hạn → 410 | `POST /orders/code/{code}/shortfall-topup` |
+| 7 | Trang thanh toán → Khách → SePay | Hiện "Quét QR nạp bù X", nội dung = mã nạp; khách chuyển khoản; SePay gửi webhook | `POST /webhook/sepay` |
+| 8 | Hệ thống | Kết quả webhook: **sai key** → 401; **không có mã / gửi lại** → `ORDER_NOT_FOUND` (khách khiếu nại) / `ALREADY_PROCESSED`; **tiền nạp về** → cộng ví đúng số thực nhận (ghi `sepay_webhook_logs`), rồi `tryAutoPay`: đơn còn chờ, còn hạn, ví đủ → tự trừ ví, SUCCESS (`PAID`); thiếu → tiền giữ trong ví, trang tạo QR mới cho phần còn lại (`INSUFFICIENT`); đơn hết hạn → tiền giữ trong ví (`ORDER_EXPIRED`). Chuyển thẳng vào mã đơn (cách cũ / khiếu nại) vẫn xử lý: đủ / thừa → SUCCESS, thiếu / muộn → ví | Rule 4, 5, 6 |
+| 9 | Trang thanh toán | Hỏi trạng thái 3 giây/lần (kèm số dư khi đang chờ nạp bù), hoặc "Tôi đã chuyển khoản, kiểm tra lại" (hỏi API SePay; chỉ đọc lại trạng thái, không cấp quyền) | UC050 |
 | 10 | Hệ thống → SV1/SV3 | SUCCESS: phát `PaymentSuccessEvent`; module nguồn mở quyền / kích hoạt quảng cáo. **Chưa có trong code: SV1, SV3 chưa viết `@EventListener`**. Chưa SUCCESS: tiếp tục chờ đến khi trả đủ hoặc mã hết hạn | |
 | 11 | Khách hàng | **Kết thúc:** xem kết quả thanh toán | |
+
+Cập nhật 21/10 (không vẽ lại sơ đồ, chỉ bổ sung vào bước 7-9):
+- Bước 7-8 đi qua `SepayGatewayService.receive`: mỗi lần tiền về ghi 1 dòng `sepay_webhook_logs` kèm payload gốc; `sepay_id` UNIQUE nên SePay gửi lại cùng giao dịch thì trả `ALREADY_PROCESSED` mà không xử lý lại; đã xử lý xong luôn trả `200 {"success": true}`; tiền ra (`transferType = out`) bị bỏ qua.
+- Payload thật của SePay là camelCase (`transferAmount`, `referenceCode`, `id`). Bản trước đọc `amount`, `reference_code`, nên webhook thật sẽ ra số tiền 0; đã sửa.
+- Bước 9: nút "Tôi đã chuyển khoản, kiểm tra lại" giờ hỏi thẳng API SePay cho đơn đó (`POST /orders/code/{code}/check-sepay`), vẫn không cấp quyền dựa vào trình duyệt.
+- Kế toán xem toàn bộ tại `/backoffice/finance/sepay` (Nhật ký SePay, màn hình II.4.3).
 
 Lưu ý: chỉ đơn **quảng cáo** quá hạn mới bị chuyển tiền vào ví. Đơn bài/gói quá 15 phút mà tiền vẫn về khi đơn còn PENDING thì vẫn ghi nhận SUCCESS (đúng code hiện tại).
 
@@ -65,7 +72,7 @@ Lưu ý: chỉ đơn **quảng cáo** quá hạn mới bị chuyển tiền vào
 
 | Bước | Lane | Diễn giải | Code / API |
 |---|---|---|---|
-| 1 | Khách hàng | Bấm "Nạp tiền" trên header, hoặc "Nạp thêm để thanh toán" trên trang thanh toán | `WalletBalanceButton` |
+| 1 | Khách hàng | Bấm "Nạp tiền" trên header (nạp tự do). Nạp bù cho đơn do trang thanh toán tự tạo (SV4-01 bước 6b) | `WalletBalanceButton` |
 | 2 | Trang thanh toán | Chưa đăng nhập → sang `/login` rồi quay lại `/wallet/topup` | `TopUpPage.tsx` |
 | 3 | Trang thanh toán | Chọn 50k / 100k / 200k / 500k / 1tr hoặc tự nhập. Kiểm tra 10.000 - 50.000.000 ₫, bội số 1.000; sai → báo lỗi tiếng Việt | zod |
 | 4 | Hệ thống | Kiểm tra lại hạn mức (ngoài hạn mức hoặc số lẻ → 400), tạo đơn `TOPUP` PENDING 15 phút | `POST /wallet/topups` |
@@ -74,7 +81,7 @@ Lưu ý: chỉ đơn **quảng cáo** quá hạn mới bị chuyển tiền vào
 | 7 | Trang thanh toán | Polling thấy SUCCESS → hiện số dư mới, quay lại `/wallet` hoặc đơn đang trả. Chưa thấy → chờ tiếp; quá 15 phút hiện "Tạo mã nạp mới" | |
 | 8 | Khách hàng | **Kết thúc:** xem số dư và lịch sử ví | `GET /wallet/me` |
 
-Tiền nạp là **công nợ phải trả khách**, không phải doanh thu (Rule 16): dashboard và sổ quỹ loại `TOPUP` khỏi doanh thu.
+Tiền nạp là **công nợ phải trả khách**, không phải doanh thu (Rule 16): dashboard và sổ quỹ loại `TOPUP` khỏi doanh thu. Đơn nạp bù (`topup_for_order` khác null): cộng ví xong thì tự trả đơn gắn kèm (SV4-01 bước 8).
 
 ## 03. Khiếu nại thanh toán chưa ghi nhận (UC051)
 

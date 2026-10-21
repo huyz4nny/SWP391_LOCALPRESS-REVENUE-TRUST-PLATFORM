@@ -1,4 +1,4 @@
-export type OrderType = 'SUBSCRIPTION' | 'ARTICLE_PURCHASE' | 'AD_CAMPAIGN'
+export type OrderType = 'SUBSCRIPTION' | 'ARTICLE_PURCHASE' | 'AD_CAMPAIGN' | 'TOPUP' | 'REFUND'
 
 export type PaymentMethod = 'SEPAY' | 'VIETQR' | 'BANK_TRANSFER' | 'MANUAL_BANK_TRANSFER' | 'VNPAY' | 'MOMO'
 
@@ -146,6 +146,8 @@ export interface PaymentOrderView {
   accountNumber?: string
   accountName?: string
   transferContent: string
+  /** Đơn TOPUP nạp bù: mã đơn sẽ được tự trả khi tiền nạp về */
+  topupForOrder?: string
   createdAt?: string
   expiresAt?: string
   paidAt?: string
@@ -180,6 +182,9 @@ export interface IpnResult {
   status: string
   orderCode?: string
   message: string
+  /** Nạp bù: kết quả tự trả đơn (PAID, ALREADY_PAID, ORDER_EXPIRED, INSUFFICIENT) */
+  autoPay?: string
+  paidOrder?: string
 }
 
 /** Khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" (UC051) */
@@ -204,4 +209,37 @@ export interface CreateComplaintInput {
   transferredAt: string
   bankReference: string
   note?: string
+}
+
+// =============================================================================
+// NHẬT KÝ SEPAY (UC048, UC049)
+// =============================================================================
+
+export interface SepayLog {
+  logId: string
+  /** WEBHOOK = SePay gọi vào, API_SYNC = LocalPress hỏi API SePay, SIMULATION = nút demo */
+  source: 'WEBHOOK' | 'API_SYNC' | 'SIMULATION'
+  sepayId: number | null
+  authOk: boolean
+  gateway: string | null
+  transferType: string | null
+  amount: number | null
+  content: string | null
+  referenceCode: string | null
+  transactionDate: string | null
+  orderCode: string | null
+  resultStatus: string
+  resultMessage: string | null
+  rawPayload: string | null
+  remoteIp: string | null
+  receivedAt: string
+}
+
+export interface SepayStatus {
+  webhookKeyConfigured: boolean
+  apiTokenConfigured: boolean
+  accountNumber: string | null
+  webhookPath: string
+  lastWebhookAt: string | null
+  mock?: boolean
 }

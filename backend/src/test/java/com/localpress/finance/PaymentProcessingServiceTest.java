@@ -307,4 +307,89 @@ class PaymentProcessingServiceTest {
         assertFalse(sePayService.verifyIpnSecretKey("Apikey wrong"));
         assertFalse(sePayService.verifyIpnSecretKey(null));
     }
+
+    // =========================================================================
+    // MỌI THANH TOÁN QUA VÍ: NẠP BÙ GẮN ĐƠN + TỰ TRẢ KHI TIỀN VỀ (V6)
+    // =========================================================================
+
+    private static final String TOPUP_CODE = "LP2610221000TOPU";
+
+    private Transaction linkedTopUp(String amount) {
+        return Transaction.builder()
+                .transactionId(77L).userId(7L).transactionType(TransactionType.TOPUP)
+                .amount(new BigDecimal(amount)).currency("VND").paymentMethod("SEPAY")
+                .gatewayTransactionId(TOPUP_CODE).topupForOrder(ORDER_CODE)
+                .status(TransactionStatus.PENDING).createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusMinutes(15)).build();
+    }
+
+    @Test
+    @DisplayName("Ví thiếu: tạo mã nạp bù đúng phần còn thiếu, gắn mã đơn")
+    void shortfallTopUpIsExactAndLinked() {
+        Transaction order = pending(TransactionType.ARTICLE, "15000");
+        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(order));
+        when(walletService.findByUserId(7L)).thenReturn(Optional.of(com.localpress.finance.model.Wallet.builder()
+                .userId(7L).balance(new BigDecimal("4000")).build()));
+        when(transactionRepository.findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(ORDER_CODE, TransactionStatus.PENDING))
+                .thenReturn(Optional.empty());
+        stubSaveEcho();
+
+        OrderCreateResponse view = paymentProcessingService.createShortfallTopUp(reader, ORDER_CODE);
+
+        assertEquals(0, view.getAmount().compareTo(new BigDecimal("11000")));
+        assertEquals("TOPUP", view.getOrderType());
+        assertEquals(ORDER_CODE, view.getTopupForOrder());
+    }
+
+    @Test
+    @DisplayName("Ví đã đủ: không tạo mã nạp bù (409)")
+    void noShortfallWhenWalletEnough() {
+        Transaction order = pending(TransactionType.ARTICLE, "15000");
+        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(order));
+        when(walletService.findByUserId(7L)).thenReturn(Optional.of(com.localpress.finance.model.Wallet.builder()
+                .userId(7L).balance(new BigDecimal("20000")).build()));
+
+        AppException ex = assertThrows(AppException.class, () -> paymentProcessingService.createShortfallTopUp(reader, ORDER_CODE));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    @DisplayName("Tiền nạp bù về: cộng ví rồi tự trả đơn, phát PaymentSuccessEvent")
+    void linkedTopUpAutoPaysOrder() {
+        Transaction topup = linkedTopUp("11000");
+        Transaction order = pending(TransactionType.ARTICLE, "15000");
+        when(transactionRepository.findByGatewayTransactionIdForUpdate(TOPUP_CODE)).thenReturn(Optional.of(topup));
+        stubLockedOrder(order);
+        when(walletService.lockedBalance(7L)).thenReturn(new BigDecimal("15000"));
+        stubSaveEcho();
+
+        Map<String, Object> r = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
+                .content(TOPUP_CODE).amount(new BigDecimal("11000")).referenceCode("FT9").build());
+
+        assertEquals("SUCCESS", r.get("status"));
+        assertEquals("PAID", r.get("autoPay"));
+        assertEquals(TransactionStatus.SUCCESS, order.getStatus());
+        assertEquals("WALLET", order.getPaymentMethod());
+        verify(walletService).credit(eq(topup), any(), anyString());
+        verify(walletService).debit(eq(order), any(), anyString());
+        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
+    }
+
+    @Test
+    @DisplayName("Nạp bù về nhưng ví vẫn thiếu: giữ tiền trong ví, đơn vẫn chờ, không trừ ví")
+    void linkedTopUpInsufficientKeepsOrderPending() {
+        Transaction topup = linkedTopUp("11000");
+        Transaction order = pending(TransactionType.ARTICLE, "15000");
+        when(transactionRepository.findByGatewayTransactionIdForUpdate(TOPUP_CODE)).thenReturn(Optional.of(topup));
+        stubLockedOrder(order);
+        when(walletService.lockedBalance(7L)).thenReturn(new BigDecimal("9000"));
+        stubSaveEcho();
+
+        Map<String, Object> r = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
+                .content(TOPUP_CODE).amount(new BigDecimal("5000")).referenceCode("FT10").build());
+
+        assertEquals("INSUFFICIENT", r.get("autoPay"));
+        assertEquals(TransactionStatus.PENDING, order.getStatus());
+        verify(walletService, never()).debit(any(), any(), anyString());
+    }
 }

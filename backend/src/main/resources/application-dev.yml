@@ -42,6 +42,9 @@ localpress:
     account-number: ${SEPAY_ACCOUNT_NUMBER:}
     account-name: ${SEPAY_ACCOUNT_NAME:}
     webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
+    # Token API (my.sepay.vn > Cấu hình công ty > API Access) để tự hỏi giao dịch khi không nhận được webhook
+    api-token: ${SEPAY_API_TOKEN:}
+    api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}
   payment:
     order-ttl-minutes: 15
     topup-min-amount: 10000

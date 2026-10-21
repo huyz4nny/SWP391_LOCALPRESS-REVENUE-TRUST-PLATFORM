@@ -1,5 +1,5 @@
 @startuml swimlane_sv4_00_overview
-title SV4-00 Overview: Payment, Complaint and Refund\n<size:11>Summary only - every branch is detailed in SV4-01 .. SV4-06</size>
+title SV4-00 Overview: Payment (always via wallet), Complaint and Refund\n<size:11>Summary only - every branch is detailed in SV4-01 .. SV4-06</size>
 
 scale max 4000 width
 skinparam backgroundColor white
@@ -41,31 +41,25 @@ expires in 15 min;
 |Customer|
 :Open shared payment page
 /payment/:orderCode;
-if (Pay with?) then (LocalPress Wallet)
-  if (Enough balance?) then (yes)
-  else (no)
-    :Top up the shortfall
-(SePay QR, see SV4-02);
-  endif
+|LocalPress Backend|
+if (Wallet balance >= amount?) then (yes)
+  |Customer|
+  :Click "Pay with wallet";
+else (no)
   |LocalPress Backend|
-  :Debit wallet, order SUCCESS;
-else (SePay QR)
+  :Create top-up QR for the shortfall
+(content = top-up code);
   |Customer|
   :Scan QR and transfer;
   |SePay / Bank|
-  :Send IPN webhook;
+  :Send webhook (UC048, UC049);
   |LocalPress Backend|
-  switch (Webhook result\n(UC048, UC049)?)
-  case (full / overpaid)
-    :Order SUCCESS
-(excess to wallet);
-  case (underpaid / late)
-    :Money to wallet,
-order not completed;
-  case (top-up order)
-    :Credit wallet;
-  endswitch
+  :Credit wallet once
+(sepay_id UNIQUE, Rule 5);
 endif
+|LocalPress Backend|
+:Debit wallet, order SUCCESS,
+publish PaymentSuccessEvent;
 |Customer|
 if (Transferred > 15 min
 but not recorded?) then (yes)

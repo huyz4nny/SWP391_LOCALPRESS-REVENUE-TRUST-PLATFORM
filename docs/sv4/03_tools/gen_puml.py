@@ -53,7 +53,7 @@ D = {}
 
 # ---------------------------------------------------------------------------------------------
 D["swimlane_sv4_00_overview"] = dict(
-    title="«SV4-00 Overview: Payment, Complaint and Refund§SV4-00 Tổng quan: Thanh toán, Khiếu nại và Hoàn tiền»"
+    title="«SV4-00 Overview: Payment (always via wallet), Complaint and Refund§SV4-00 Tổng quan: Thanh toán (luôn qua ví), Khiếu nại và Hoàn tiền»"
           "\\n<size:11>«Summary only - every branch is detailed in SV4-01 .. SV4-06§Bản tóm tắt - chi tiết từng nhánh xem SV4-01 .. SV4-06»</size>",
     lanes="CBSAM",
     body=r"""
@@ -70,34 +70,28 @@ hết hạn sau 15 phút»;
 :«Open shared payment page
 /payment/:orderCode§Mở trang thanh toán chung
 /payment/:orderCode»;
-if («Pay with?§Thanh toán bằng?») then («LocalPress Wallet§Ví LocalPress»)
-  if («Enough balance?§Ví đủ tiền?») then («yes§đủ»)
-  else («no§không đủ»)
-    :«Top up the shortfall
-(SePay QR, see SV4-02)§Nạp thêm tiền vào ví
-(QR SePay, xem SV4-02)»;
-  endif
+|B|
+if («Wallet balance >= amount?§Số dư ví >= số tiền?») then («yes§đủ»)
+  |C|
+  :«Click "Pay with wallet"§Bấm "Thanh toán bằng ví"»;
+else («no§thiếu»)
   |B|
-  :«Debit wallet, order SUCCESS§Trừ ví, đơn SUCCESS»;
-else («SePay QR§QR SePay»)
+  :«Create top-up QR for the shortfall
+(content = top-up code)§Tạo QR nạp bù đúng phần thiếu
+(nội dung = mã nạp)»;
   |C|
   :«Scan QR and transfer§Quét QR, chuyển khoản»;
   |S|
-  :«Send IPN webhook§Gửi webhook IPN»;
+  :«Send webhook (UC048, UC049)§Gửi webhook (UC048, UC049)»;
   |B|
-  switch («Webhook result\n(UC048, UC049)?§Kết quả webhook\n(UC048, UC049)?»)
-  case («full / overpaid§đủ / thừa»)
-    :«Order SUCCESS
-(excess to wallet)§Đơn SUCCESS
-(tiền thừa vào ví)»;
-  case («underpaid / late§thiếu / về muộn»)
-    :«Money to wallet,
-order not completed§Tiền vào ví,
-đơn chưa hoàn tất»;
-  case («top-up order§đơn nạp ví»)
-    :«Credit wallet§Cộng tiền vào ví»;
-  endswitch
+  :«Credit wallet once
+(sepay_id UNIQUE, Rule 5)§Cộng ví đúng 1 lần
+(sepay_id UNIQUE, Rule 5)»;
 endif
+|B|
+:«Debit wallet, order SUCCESS,
+publish PaymentSuccessEvent§Trừ ví, đơn SUCCESS,
+phát PaymentSuccessEvent»;
 |C|
 if («Transferred > 15 min
 but not recorded?§Đã chuyển > 15 phút
@@ -152,7 +146,7 @@ stop
 
 # ---------------------------------------------------------------------------------------------
 D["swimlane_sv4_01_payment"] = dict(
-    title="«SV4-01 Shared Payment Page /payment/:orderCode (UC047 - UC050)§SV4-01 Trang thanh toán chung /payment/:orderCode (UC047 - UC050)»",
+    title="«SV4-01 Shared Payment Page /payment/:orderCode, always via wallet (UC047 - UC050)§SV4-01 Trang thanh toán chung /payment/:orderCode, luôn qua ví (UC047 - UC050)»",
     lanes="CPBSX",
     body=r"""
 |C|
@@ -196,76 +190,99 @@ kiểm tra ví hoặc gửi khiếu nại»;
 case («PENDING, in time§PENDING còn hạn»)
   |P|
   :«Show order, wallet balance,
-QR code and countdown§Hiện đơn, số dư ví,
-mã QR và đồng hồ đếm ngược»;
+amount and hold countdown§Hiện đơn, số dư ví,
+số tiền và thời gian giữ đơn»;
   note right
-  «Top-up order: QR only,
-no wallet option (SV4-02)§Đơn nạp ví: chỉ có QR,
-không trả bằng ví (SV4-02)»
+  «Every purchase is paid from the
+LocalPress Wallet (since 22/10/2026)§Mọi đơn mua đều trả bằng
+Ví LocalPress (từ 22/10/2026)»
   end note
-  |C|
-  if («Pay with?§Thanh toán bằng?») then («LocalPress Wallet§Ví LocalPress»)
+  |B|
+  if («Balance >= amount?§Số dư >= số tiền?») then («yes§đủ»)
     |P|
-    if («Balance >= amount?§Số dư >= số tiền?») then («no§thiếu»)
-      :«Show "Top up to pay": customer tops up
-the shortfall (SV4-02), then comes back§Hiện nút "Nạp thêm để thanh toán": khách
-nạp phần thiếu (SV4-02) rồi quay lại»;
-    else («yes§đủ»)
-      |B|
-      :«pay-with-wallet:
+    :«Show one button
+"Pay X with wallet"§Hiện 1 nút
+"Thanh toán X bằng ví"»;
+    |C|
+    :«Click pay§Bấm thanh toán»;
+    |B|
+    :«pay-with-wallet:
 lock order + wallet,
 re-check owner,
 expiry, balance§pay-with-wallet:
 khóa đơn + ví,
 kiểm tra lại chủ đơn,
 hạn, số dư»;
-      if («All valid?§Hợp lệ?») then («yes§có»)
-        :«Debit wallet, order SUCCESS
+    if («All valid?§Hợp lệ?») then («yes§có»)
+      :«Debit wallet, order SUCCESS
 (method WALLET)§Trừ ví, đơn SUCCESS
 (phương thức WALLET)»;
-      else («no§không»)
-        :«402 / 403 / 410,
+    else («no§không»)
+      :«402 / 403 / 410,
 rollback, order
 stays PENDING§402 / 403 / 410,
 rollback, đơn
 vẫn PENDING»;
-      endif
     endif
-  else («SePay QR§QR SePay»)
+  else («no§thiếu»)
+    :«shortfall-topup: create (or reuse)
+TOPUP = amount - balance,
+topup_for_order = order code§shortfall-topup: tạo (hoặc dùng lại)
+TOPUP = số tiền - số dư,
+topup_for_order = mã đơn»;
+    |P|
+    :«Show "Scan QR to top up X"
+(content = top-up code)§Hiện "Quét QR nạp bù X"
+(nội dung = mã nạp)»;
     |C|
-    :«Transfer, content = order code§Chuyển khoản, nội dung = mã đơn»;
+    :«Scan QR and transfer§Quét QR, chuyển khoản»;
     |S|
-    :«Send IPN webhook§Gửi webhook IPN»;
+    :«Send webhook§Gửi webhook»;
     |B|
     switch («Webhook result (UC048, UC049)?§Kết quả webhook (UC048, UC049)?»)
-    case («wrong key /\nno order /\nalready paid§sai key /\nkhông thấy đơn /\nđã SUCCESS»)
+    case («wrong key /\nno code /\nresent§sai key /\nkhông có mã /\ngửi lại»)
       :«Nothing recorded:
 401 wrong key,
 ORDER_NOT_FOUND
-(-> complaint),
+(-> complaint SV4-03),
 ALREADY_PROCESSED§Không ghi nhận gì:
 401 sai key,
 ORDER_NOT_FOUND
-(-> khiếu nại),
+(-> khiếu nại SV4-03),
 ALREADY_PROCESSED»;
-    case («ad hold\nexpired /\norder closed§booking hết\ngiữ chỗ /\nđơn đã đóng»)
-      :«Order FAILED, money to
-wallet "-LATE" (Rule 6)§Đơn FAILED, tiền vào
-ví "-LATE" (Rule 6)»;
-    case («underpaid§chuyển thiếu»)
-      :«Money to wallet "-PART",
-order stays PENDING§Tiền vào ví "-PART",
-đơn vẫn PENDING»;
-    case («full / overpaid§đủ / thừa»)
-      :«Order SUCCESS, excess
-to wallet "-EXCESS"§Đơn SUCCESS, tiền thừa
-vào ví "-EXCESS"»;
+    case («top-up received§tiền nạp về»)
+      :«Credit wallet with the amount
+actually received (log sepay_id)§Cộng ví đúng số tiền thực nhận
+(ghi nhật ký sepay_id)»;
+      if («Order PENDING, in time
+and wallet >= amount?§Đơn còn chờ, còn hạn
+và ví >= số tiền?») then («yes§có»)
+        :«Auto debit wallet,
+order SUCCESS (autoPay PAID)§Tự trừ ví,
+đơn SUCCESS (autoPay PAID)»;
+      else («no§không»)
+        :«Money stays in wallet:
+INSUFFICIENT -> new QR for the rest,
+ORDER_EXPIRED -> create a new order§Tiền giữ trong ví:
+INSUFFICIENT -> QR mới cho phần còn lại,
+ORDER_EXPIRED -> tạo đơn mới»;
+      endif
     endswitch
+    note right
+    «Transfers made with the order code
+itself (old way / complaint) are
+still processed: full -> SUCCESS,
+short / late -> wallet§Chuyển thẳng vào mã đơn
+(cách cũ / khiếu nại) vẫn được xử lý:
+đủ -> SUCCESS, thiếu / muộn -> ví»
+    end note
   endif
   |P|
   :«Poll status every 3 s or
-"I have paid, check again" (UC050)§Hỏi trạng thái mỗi 3 giây hoặc
-"Tôi đã chuyển khoản, kiểm tra lại" (UC050)»;
+"I have paid, check again"
+(asks SePay API, UC050)§Hỏi trạng thái mỗi 3 giây hoặc
+"Tôi đã chuyển khoản, kiểm tra lại"
+(hỏi API SePay, UC050)»;
   |B|
   if («Order SUCCESS?§Đơn SUCCESS?») then («yes§có»)
     :«Publish PaymentSuccessEvent
@@ -283,8 +300,8 @@ SV1 / SV3 phải tự viết»
   else («no§không»)
     |P|
     :«Keep waiting until paid
-or the code expires§Tiếp tục chờ đến khi trả đủ
-hoặc mã hết hạn»;
+or the order expires§Tiếp tục chờ đến khi trả đủ
+hoặc đơn hết hạn»;
   endif
 endswitch
 |C|
@@ -301,8 +318,10 @@ D["swimlane_sv4_02_wallet_topup"] = dict(
 |C|
 start
 :«Click "Top Up" in the header
-or "Top up to pay" on payment page§Bấm "Nạp tiền" trên header
-hoặc "Nạp thêm để thanh toán"»;
+(free top-up; shortfall top-ups
+are created by SV4-01)§Bấm "Nạp tiền" trên header
+(nạp tự do; nạp bù cho đơn
+do SV4-01 tạo)»;
 |P|
 if («Logged in?§Đã đăng nhập?») then («yes§rồi»)
 else («no§chưa»)
@@ -350,7 +369,11 @@ thực nhận (kể cả sau hạn QR),
 ghi wallet_entries CREDIT»;
     note right
     UNIQUE(transaction_id, direction)
-    «blocks a second credit§chặn cộng 2 lần»
+    «blocks a second credit.
+Shortfall top-up (topup_for_order):
+then auto-pay the order (SV4-01)§chặn cộng 2 lần.
+Nạp bù (topup_for_order):
+sau đó tự trả đơn (SV4-01)»
     end note
   endswitch
   |P|

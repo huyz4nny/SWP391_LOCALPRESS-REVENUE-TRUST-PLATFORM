@@ -120,6 +120,12 @@ public class Transaction {
     private String description;
 
     /**
+     * Chỉ với đơn TOPUP nạp bù: mã đơn (bài / gói / quảng cáo) cần trả ngay khi tiền nạp về (V6).
+     */
+    @Column(name = "topup_for_order", length = 255)
+    private String topupForOrder;
+
+    /**
      * Trạng thái giao dịch hiện tại: PENDING, SUCCESS, FAILED, REFUNDED.
      */
     @Enumerated(EnumType.STRING)

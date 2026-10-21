@@ -33,7 +33,8 @@ skinparam note {
 |Customer|
 start
 :Click "Top Up" in the header
-or "Top up to pay" on payment page;
+(free top-up; shortfall top-ups
+are created by SV4-01);
 |Payment Page|
 if (Logged in?) then (yes)
 else (no)
@@ -74,7 +75,9 @@ actually received (even after QR expiry),
 wallet_entries CREDIT;
     note right
     UNIQUE(transaction_id, direction)
-    blocks a second credit
+    blocks a second credit.
+Shortfall top-up (topup_for_order):
+then auto-pay the order (SV4-01)
     end note
   endswitch
   |Payment Page|

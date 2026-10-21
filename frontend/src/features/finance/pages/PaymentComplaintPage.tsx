@@ -3,17 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AlertCircle, CheckCircle2, MessageSquareWarning } from 'lucide-react'
 import { mockStore } from '@/mocks/store'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { EmptyState } from '@/components/shared/EmptyState'
 import { complaintApi } from '../api/payment'
 import type { PaymentComplaint } from '../types'
 import { ComplaintStatusBadge } from './ComplaintQueuePage'
+import { Panel, Notice } from '../components/LedgerUI'
 
 /**
  * ==============================================================================
@@ -91,96 +89,86 @@ export function PaymentComplaintPage() {
     }
   }
 
+  const fieldErr = (m?: string) => m && <p className="mt-1.5 text-xs font-medium text-negative">{m}</p>
+
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center text-lg">
-            <MessageSquareWarning className="w-5 h-5 mr-2 text-crimson" />
-            Đã chuyển tiền nhưng chưa được ghi nhận?
-          </CardTitle>
-          <p className="text-xs text-stone-500">
-            Thông thường hệ thống ghi nhận trong 1-2 phút sau khi ngân hàng báo có. Nếu sau 15 phút đơn vẫn chưa thanh toán
-            hoặc ví chưa được cộng, hãy gửi thông tin bên dưới. Kế toán sẽ đối chiếu sao kê và phản hồi. Bạn không cần chuyển tiền lại.
-          </p>
-        </CardHeader>
-        <CardContent>
+    <div className="mx-auto max-w-[960px] py-6 font-sans text-slate-900">
+      <h1 className="text-2xl font-semibold leading-8 tracking-[-0.01em]">Đã chuyển tiền mà chưa được ghi nhận?</h1>
+      <p className="mt-1 max-w-[70ch] text-sm leading-6 text-slate-600">
+        Thường hệ thống ghi nhận trong 1-2 phút sau khi ngân hàng báo có. Sau 15 phút mà đơn vẫn chờ hoặc ví chưa được cộng,
+        hãy gửi thông tin dưới đây. Kế toán đối chiếu sao kê rồi phản hồi; bạn không cần chuyển tiền lại.
+      </p>
+
+      <div className="mt-5 grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <form noValidate onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-5 sm:grid-cols-2">
+          <h2 className="text-base font-semibold sm:col-span-2">Gửi khiếu nại</h2>
           {submitted && (
-            <div className="flex items-center text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded p-3 mb-4">
-              <CheckCircle2 className="w-4 h-4 mr-2 shrink-0" />
-              Đã gửi khiếu nại. Bạn có thể theo dõi trạng thái ở danh sách bên dưới.
+            <div className="sm:col-span-2">
+              <Notice tone="success">Đã gửi khiếu nại. Theo dõi trạng thái ở danh sách bên cạnh.</Notice>
             </div>
           )}
-          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="orderCode">Mã đơn (nếu có)</Label>
-              <Input id="orderCode" placeholder="LP..." className="mt-1 font-mono" {...register('orderCode')} />
-            </div>
-            <div>
-              <Label htmlFor="amount">Số tiền đã chuyển (VND)</Label>
-              <Input id="amount" type="number" inputMode="numeric" className="mt-1" {...register('amount', { valueAsNumber: true })} />
-              {errors.amount && <p className="text-xs text-crimson mt-1">{errors.amount.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="transferredAt">Thời gian chuyển khoản</Label>
-              <Input id="transferredAt" type="datetime-local" className="mt-1" {...register('transferredAt')} />
-              {errors.transferredAt && <p className="text-xs text-crimson mt-1">{errors.transferredAt.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="bankReference">Mã giao dịch ngân hàng</Label>
-              <Input id="bankReference" placeholder="FT26293..." className="mt-1 font-mono" {...register('bankReference')} />
-              {errors.bankReference && <p className="text-xs text-crimson mt-1">{errors.bankReference.message}</p>}
-            </div>
+          <div>
+            <Label htmlFor="amount" required>Số tiền đã chuyển (VND)</Label>
+            <Input id="amount" type="number" inputMode="numeric" className="num" {...register('amount', { valueAsNumber: true })} />
+            {fieldErr(errors.amount?.message)}
+          </div>
+          <div>
+            <Label htmlFor="transferredAt" required>Thời gian chuyển</Label>
+            <Input id="transferredAt" type="datetime-local" {...register('transferredAt')} />
+            {fieldErr(errors.transferredAt?.message)}
+          </div>
+          <div>
+            <Label htmlFor="bankReference" required>Mã giao dịch ngân hàng</Label>
+            <Input id="bankReference" placeholder="FT26293..." className="font-mono" {...register('bankReference')} />
+            {fieldErr(errors.bankReference?.message)}
+          </div>
+          <div>
+            <Label htmlFor="orderCode">Mã đơn, nếu có</Label>
+            <Input id="orderCode" placeholder="LP..." className="font-mono" {...register('orderCode')} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="note">Ghi chú</Label>
+            <Input id="note" placeholder="Ngân hàng chuyển, nội dung chuyển khoản đã ghi" {...register('note')} />
+          </div>
+          {submitError && (
             <div className="sm:col-span-2">
-              <Label htmlFor="note">Ghi chú (ngân hàng chuyển, nội dung đã ghi...)</Label>
-              <Input id="note" className="mt-1" {...register('note')} />
+              <Notice tone="error">{submitError}</Notice>
             </div>
-            {submitError && (
-              <div className="sm:col-span-2 flex items-center text-sm text-crimson bg-red-50 border border-red-200 rounded p-3">
-                <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-                {submitError}
-              </div>
-            )}
-            <div className="sm:col-span-2">
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Đang gửi...' : 'Gửi khiếu nại'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          )}
+          <div className="sm:col-span-2">
+            <Button type="submit" className="w-full sm:w-auto" isLoading={isSubmitting}>
+              Gửi khiếu nại
+            </Button>
+          </div>
+        </form>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Khiếu nại của tôi</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <Panel title="Khiếu nại của tôi" aside={<span className="num">{items.length}</span>} bodyClassName="px-0 pb-1">
           {items.length === 0 ? (
-            <EmptyState title="Chưa có khiếu nại nào" />
+            <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Bạn chưa gửi khiếu nại nào.</p>
           ) : (
-            <div className="space-y-2">
+            <ul>
               {items.map((c) => (
-                <div key={c.complaintId} className="rounded border border-stone-200 p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold">
-                      #{c.complaintId} • {formatCurrency(c.amount)} • <span className="font-mono">{c.bankReference}</span>
-                    </div>
+                <li key={c.complaintId} className="border-t border-slate-100 px-5 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold num">{formatCurrency(c.amount)}</span>
                     <ComplaintStatusBadge status={c.status} />
                   </div>
-                  <div className="text-xs text-stone-500 mt-1">
-                    {c.orderCode ? `Đơn ${c.orderCode} • ` : ''}Chuyển lúc {formatDateTime(c.transferredAt)}
+                  <div className="mt-1 text-[13px] text-slate-500">
+                    <span className="font-mono">{c.bankReference}</span>
+                    {c.orderCode ? <> · đơn <span className="font-mono">{c.orderCode}</span></> : null}
                   </div>
+                  <div className="text-[13px] text-slate-500 num">Chuyển lúc {formatDateTime(c.transferredAt)}</div>
                   {c.resolutionNote && (
-                    <div className={`text-xs mt-1 ${c.status === 'REJECTED' ? 'text-crimson' : 'text-emerald-800'}`}>
-                      Phản hồi kế toán: {c.resolutionNote}
+                    <div className={`mt-1 text-[13px] ${c.status === 'REJECTED' ? 'text-[#831c1e]' : 'text-slate-700'}`}>
+                      Kế toán: {c.resolutionNote}
                     </div>
                   )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </div>
     </div>
   )
 }
