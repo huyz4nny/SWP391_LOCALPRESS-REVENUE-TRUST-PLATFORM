@@ -15,7 +15,9 @@ import java.util.Map;
         ArticleDraftController.class,
         ArticleDraftSaveController.class,
         ArticleMetadataController.class,
-        ArticleMediaController.class
+        ArticleMediaController.class,
+        ArticleVersionController.class
+
 })
 public class ContentExceptionHandler {
     public record ContentErrorResponse(
@@ -38,7 +40,7 @@ public class ContentExceptionHandler {
     public ResponseEntity<ContentErrorResponse> handleValidationError(MethodArgumentNotValidException exception) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         exception.getBindingResult().getFieldErrors().forEach(error ->
-                fieldErrors.putIfAbsent(error.getField(),
+                fieldErrors.putIfAbsent("premiumPriceValid".equals(error.getField()) ? "price" : error.getField(),
                         error.getDefaultMessage() == null ? "Dữ liệu không hợp lệ" : error.getDefaultMessage()));
         return ResponseEntity.badRequest().body(new ContentErrorResponse(
                 Instant.now().toString(), 400, "Bad Request",

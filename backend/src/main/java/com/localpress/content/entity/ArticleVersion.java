@@ -191,4 +191,33 @@ public class ArticleVersion {
         this.reviewedAt = LocalDateTime.now();
         this.reviewFeedback = notes != null ? notes.trim() : null;
     }
+
+    public static ArticleVersion restoreAsDraft(
+            ArticleVersion source,
+            Long editedBy,
+            int newVersionNumber,
+            Map<String, Object> copiedMetadata,
+            String changelog
+    ) {
+        ArticleVersion restored = createDraft(
+                source.getArticleId(),
+                editedBy,
+                newVersionNumber,
+                source.getTitle(),
+                source.getSapo(),
+                source.getContent(),
+                null
+        );
+
+        restored.coverImageUrl = source.getCoverImageUrl();
+
+        restored.metadata = copiedMetadata == null
+                ? new HashMap<>()
+                : new HashMap<>(copiedMetadata);
+
+        restored.metadata.put("restoredFromVersion", source.getVersionNumber());
+        restored.metadata.put("changelog", changelog.trim());
+
+        return restored;
+    }
 }

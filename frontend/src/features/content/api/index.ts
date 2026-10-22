@@ -1,5 +1,5 @@
 import { httpClient } from '@/lib/http/client'
-
+import { APP_CONFIG } from '@/app/config'
 import type {
     CategoryOption,
     SaveArticleDraftRequest,
@@ -9,9 +9,72 @@ import type {
     UpdateArticleMetadataRequest,
     CoverImageInfoRequest,
     ArticleCoverImageResponse,
+    ArticleVersionSummary,
+    ArticleVersionDetail,
+    RestoreArticleVersionRequest,
+    UpdateArticleVersionContentRequest,
 } from '../types'
 
+function requireRealVersionApi(): void {
+    if (APP_CONFIG.useMockApi) {
+        throw new Error(
+            'Lịch sử phiên bản cần chế độ API thật. '
+            + 'Hãy đặt VITE_USE_MOCK_API=false và khởi động lại frontend.',
+        )
+    }
+}
+
 export const contentApi = {
+    async getVersions(
+        articleId: string,
+    ): Promise<ArticleVersionSummary[]> {
+        requireRealVersionApi()
+
+        return httpClient.get<ArticleVersionSummary[]>(
+            `/articles/${encodeURIComponent(articleId)}/versions`,
+        )
+    },
+
+    async getVersion(
+        articleId: string,
+        versionNumber: number,
+    ): Promise<ArticleVersionDetail> {
+        requireRealVersionApi()
+
+        return httpClient.get<ArticleVersionDetail>(
+            `/articles/${encodeURIComponent(articleId)}`
+            + `/versions/${versionNumber}`,
+        )
+    },
+
+    async restoreVersion(
+        articleId: string,
+        versionNumber: number,
+        request: RestoreArticleVersionRequest,
+    ): Promise<ArticleVersionDetail> {
+        requireRealVersionApi()
+
+        return httpClient.post<ArticleVersionDetail>(
+            `/articles/${encodeURIComponent(articleId)}`
+            + `/versions/${versionNumber}/restore`,
+            request,
+        )
+    },
+
+    async updateVersionContent(
+        articleId: string,
+        versionNumber: number,
+        request: UpdateArticleVersionContentRequest,
+    ): Promise<ArticleVersionDetail> {
+        requireRealVersionApi()
+
+        return httpClient.put<ArticleVersionDetail>(
+            `/articles/${encodeURIComponent(articleId)}`
+            + `/versions/${versionNumber}/content`,
+            request,
+        )
+    },
+
     saveDraft(id: string | undefined, request: SaveArticleDraftRequest,
               file?: File | null, info?: CoverImageInfoRequest): Promise<ArticleDraftDetailResponse> {
         const path = id ? `/articles/${encodeURIComponent(id)}` : '/articles/drafts'

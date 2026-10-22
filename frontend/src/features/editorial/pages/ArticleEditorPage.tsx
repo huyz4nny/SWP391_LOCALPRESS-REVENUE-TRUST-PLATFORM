@@ -4,6 +4,10 @@ import { Article, ArticleVersion } from '@/features/reader/types'
 import { editorialApi, type EditorialCategoryOption } from '../api'
 import { contentApi } from '@/features/content/api'
 import { APP_CONFIG } from '@/app/config'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { AppApiError } from '@/lib/http/errors'
+import { articleEditorSchema, checkCoverDimensions, editorFieldForApiError, type ArticleEditorValues } from '@/features/content/validation/articleEditor'
 import { mockStore } from '@/mocks/store'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -23,6 +27,7 @@ import {
   Clock,
   RotateCcw,
 } from 'lucide-react'
+import { ArticleVersionDraftEditor } from '@/features/content/components/ArticleVersionDraftEditor'
 
 export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -47,12 +52,16 @@ export function ArticleEditorPage() {
   const [price, setPrice] = useState(15000)
   const [changelog, setChangelog] = useState('')
   const [status, setStatus] = useState<Article['status']>('DRAFT')
+  const [draftVersion, setDraftVersion] = useState<number | null>(null)
   const [versions, setVersions] = useState<ArticleVersion[]>([])
 
   const [categories, setCategories] = useState<EditorialCategoryOption[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const { setValue, trigger, setError, clearErrors, formState: { errors: fieldErrors } } =
+    useForm<ArticleEditorValues>({ resolver: zodResolver(articleEditorSchema) })
 
   // AI Modal
   const [showAiModal, setShowAiModal] = useState(false)
@@ -69,6 +78,8 @@ export function ArticleEditorPage() {
     const loadData = async () => {
       setLoading(true)
       setLoadError('')
+      setSaveError('')
+      clearErrors()
       setCategories([])
       setTitle('')
       setSapo('')
@@ -86,6 +97,7 @@ export function ArticleEditorPage() {
       setPrice(15000)
       setChangelog('')
       setStatus('DRAFT')
+      setDraftVersion(null)
       setVersions([])
 
       try {
@@ -105,6 +117,7 @@ export function ArticleEditorPage() {
                 isPremium: draft.isPremium,
                 price: draft.price,
                 status: draft.status,
+                currentVersion: draft.latestVersion,
                 versions: [] as ArticleVersion[],
               })) : editorialApi.getArticle(id))
             : Promise.resolve(null),
@@ -128,6 +141,7 @@ export function ArticleEditorPage() {
           setIsPremium(article.isPremium)
           setPrice(article.price || 15000)
           setStatus(article.status)
+          setDraftVersion(article.currentVersion)
           setVersions(article.versions ?? [])
         } else {
           setCategoryId(
@@ -146,7 +160,7 @@ export function ArticleEditorPage() {
 
     void loadData()
     return () => { active = false }
-  }, [id, isEditing, isAuthor])
+  }, [id, isEditing, isAuthor, clearErrors])
 
   useEffect(() => {
     let active = true
@@ -177,6 +191,7 @@ export function ArticleEditorPage() {
   const handleChooseCover = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     setCoverError('')
+    clearErrors('coverFile')
     if (file && ((file.type && !['image/jpeg', 'image/png'].includes(file.type)) || file.size > 5 * 1024 * 1024)) {
       event.target.value = ''
       setCoverFile(null)
@@ -189,19 +204,34 @@ export function ArticleEditorPage() {
   const handleSave = async (submitForReview: boolean = false) => {
     if (isSaving || loading) return
     setCoverError('')
-    const hasStoredCover = coverImage.startsWith('/api/v1/content/images/')
-    if ((coverFile || hasStoredCover) && !coverAltText.trim()) {
-      setCoverError('Vui lòng nhập văn bản thay thế cho ảnh')
+    setSaveError('')
+    clearErrors()
+    const values: ArticleEditorValues = {
+      title, sapo, content, categoryId, coverImage, coverFile, coverAltText,
+      coverCaption, coverSource, tags, isPremium, price: isPremium ? price : 0, changelog,
+    }
+    for (const key of Object.keys(values) as (keyof ArticleEditorValues)[]) setValue(key, values[key])
+    if (!await trigger()) {
+      setSaveError('Vui lòng kiểm tra các trường được đánh dấu bên dưới')
       return
     }
+    const selectedCat = categories.find((category) => category.id === categoryId)
+    if (!selectedCat || (!APP_CONFIG.useMockApi && (!Number.isSafeInteger(Number(selectedCat.apiId)) || Number(selectedCat.apiId) <= 0))) {
+      setError('categoryId', { message: 'Vui lòng chọn chuyên mục hợp lệ' })
+      return
+    }
+    if (coverFile) {
+      const dimensionError = await checkCoverDimensions(coverFile)
+      if (dimensionError) {
+        setError('coverFile', { message: dimensionError })
+        return
+      }
+    }
+    const hasCover = Boolean(coverImage.trim())
     const imageInfo = {
       caption: coverCaption.trim() || null,
       altText: coverAltText.trim(),
       imageSource: coverSource.trim() || null,
-    }
-    if (!title.trim()) {
-      alert('Vui lòng nhập tiêu đề bài viết')
-      return
     }
 
     if (!APP_CONFIG.useMockApi && submitForReview) {
@@ -219,13 +249,13 @@ export function ArticleEditorPage() {
         }
         await contentApi.saveDraft(isEditing ? id : undefined, {
           categoryId: numericCategoryId,
-          title, sapo, content,
-          coverImageUrl: coverImage,
+          title: title.trim(), sapo: sapo.trim(), content,
+          coverImageUrl: coverImage.trim(),
           tags: tagsArray,
           isPremium,
           price: isPremium ? price : 0,
           changelog,
-          imageInfo: !coverFile && hasStoredCover ? imageInfo : undefined,
+          imageInfo: !coverFile && hasCover ? imageInfo : undefined,
         }, coverFile, imageInfo)
         navigate('/backoffice/editorial/articles')
         return
@@ -251,7 +281,7 @@ export function ArticleEditorPage() {
         if (coverFile) {
           await editorialApi.updateArticleWithCover(id, articlePayload, coverFile, imageInfo, notes)
         } else {
-          await editorialApi.updateArticle(id, articlePayload, notes, hasStoredCover ? imageInfo : undefined)
+          await editorialApi.updateArticle(id, articlePayload, notes, hasCover ? imageInfo : undefined)
         }
       } else {
         const created = coverFile
@@ -264,7 +294,13 @@ export function ArticleEditorPage() {
 
       navigate('/backoffice/editorial/articles')
     } catch (err: any) {
-      alert(err.message || 'Lỗi lưu bài viết')
+      if (err instanceof AppApiError) {
+        for (const [path, message] of Object.entries(err.fieldErrors ?? {})) {
+          const field = editorFieldForApiError(path)
+          if (field) setError(field, { type: 'server', message })
+        }
+      }
+      setSaveError(err instanceof Error ? err.message : 'Lỗi lưu bài viết')
     } finally {
       setIsSaving(false)
     }
@@ -306,6 +342,27 @@ export function ArticleEditorPage() {
       <p role="alert" className="text-red-600">{loadError}</p>
       <Link to="/backoffice/editorial/articles" className="text-sky-700 underline">Về danh sách bài viết</Link>
     </div>
+  }
+
+  if (!APP_CONFIG.useMockApi && isEditing && id && status === 'PUBLISHED') {
+    if (draftVersion === null) {
+      return (
+        <p role="alert" className="text-red-700">
+          Không xác định được phiên bản bản nháp. Vui lòng mở lại bài viết.
+        </p>
+      )
+    }
+
+    return (
+      <ArticleVersionDraftEditor
+        key={`${id}:${draftVersion}`}
+        articleId={id}
+        versionNumber={draftVersion}
+        initialTitle={title}
+        initialSapo={sapo}
+        initialContent={content}
+      />
+    )
   }
 
   return (
@@ -383,6 +440,7 @@ export function ArticleEditorPage() {
         </div>
       </div>
 
+      {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
       {/* Editor Body */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Main Content Fields */}
@@ -395,8 +453,9 @@ export function ArticleEditorPage() {
                 </Label>
                 <Input
                   id="artTitle"
+                  error={fieldErrors.title?.message}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => { setTitle(e.target.value); clearErrors('title') }}
                   placeholder="Nhập tiêu đề hấp dẫn, đúng sự thật..."
                   className="font-serif text-base font-bold"
                   required
@@ -409,8 +468,9 @@ export function ArticleEditorPage() {
                 </Label>
                 <Textarea
                   id="artSapo"
+                  error={fieldErrors.sapo?.message}
                   value={sapo}
-                  onChange={(e) => setSapo(e.target.value)}
+                  onChange={(e) => { setSapo(e.target.value); clearErrors('sapo') }}
                   placeholder="Đoạn tóm tắt cốt lõi bài viết (1-3 câu)..."
                   rows={3}
                   className="font-serif italic text-sm"
@@ -424,8 +484,9 @@ export function ArticleEditorPage() {
                 </Label>
                 <Textarea
                   id="artContent"
+                  error={fieldErrors.content?.message}
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  onChange={(e) => { setContent(e.target.value); clearErrors('content') }}
                   placeholder="Nội dung phóng sự... Dùng ### cho tiêu đề đoạn"
                   rows={14}
                   className="font-serif text-sm leading-relaxed"
@@ -438,8 +499,9 @@ export function ArticleEditorPage() {
                   <Label htmlFor="changelog">Ghi chú thay đổi phiên bản (Changelog)</Label>
                   <Input
                     id="changelog"
+                    error={fieldErrors.changelog?.message}
                     value={changelog}
-                    onChange={(e) => setChangelog(e.target.value)}
+                    onChange={(e) => { setChangelog(e.target.value); clearErrors('changelog') }}
                     placeholder="VD: Bổ sung số liệu hải quan theo yêu cầu của Reviewer..."
                   />
                 </div>
@@ -456,11 +518,11 @@ export function ArticleEditorPage() {
             </CardHeader>
             <CardContent className="space-y-4 text-xs">
               <div>
-                <Label htmlFor="cat">Chuyên mục</Label>
+                <Label htmlFor="cat" required>Chuyên mục</Label>
                 <select
                   id="cat"
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
+                  onChange={(e) => { setCategoryId(e.target.value); clearErrors('categoryId') }}
                   className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-sky-600"
                 >
                   {categories.map((c) => (
@@ -469,14 +531,16 @@ export function ArticleEditorPage() {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.categoryId && <p role="alert" className="mt-1 text-xs text-red-600">{fieldErrors.categoryId.message}</p>}
               </div>
 
               <div>
                 <Label htmlFor="cover">Ảnh đại diện bài viết (URL)</Label>
                 <Input
                   id="cover"
+                  error={fieldErrors.coverImage?.message}
                   value={coverImage}
-                  onChange={(e) => { setCoverImage(e.target.value); setCoverError('') }}
+                  onChange={(e) => { setCoverImage(e.target.value); setCoverError(''); clearErrors('coverImage') }}
                   placeholder="https://images.unsplash..."
                   disabled={Boolean(coverFile) || isSaving}
                 />
@@ -484,6 +548,7 @@ export function ArticleEditorPage() {
                 <Input
                   ref={coverFileInput}
                   id="coverFile"
+                  error={fieldErrors.coverFile?.message}
                   type="file"
                   accept="image/jpeg,image/png"
                   onChange={handleChooseCover}
@@ -506,22 +571,22 @@ export function ArticleEditorPage() {
                     <img src={coverPreview} alt={coverAltText || 'Xem trước ảnh bìa'} className="w-full h-28 object-cover" />
                   </div>
                 )}
-                {(coverFile || coverImage.startsWith('/api/v1/content/images/')) && (
+                {(coverFile || coverImage.trim()) && (
                   <div className="mt-3 space-y-3">
                     <div>
                       <Label htmlFor="coverAltText" required>Văn bản thay thế</Label>
-                      <Input id="coverAltText" value={coverAltText} maxLength={300}
-                        onChange={(event) => setCoverAltText(event.target.value)} disabled={isSaving} />
+                      <Input error={fieldErrors.coverAltText?.message} id="coverAltText" value={coverAltText} maxLength={300}
+                        onChange={(event) => { setCoverAltText(event.target.value); clearErrors('coverAltText') }} disabled={isSaving} />
                     </div>
                     <div>
                       <Label htmlFor="coverCaption">Chú thích ảnh</Label>
-                      <Input id="coverCaption" value={coverCaption} maxLength={500}
-                        onChange={(event) => setCoverCaption(event.target.value)} disabled={isSaving} />
+                      <Input error={fieldErrors.coverCaption?.message} id="coverCaption" value={coverCaption} maxLength={500}
+                        onChange={(event) => { setCoverCaption(event.target.value); clearErrors('coverCaption') }} disabled={isSaving} />
                     </div>
                     <div>
                       <Label htmlFor="coverSource">Nguồn ảnh</Label>
-                      <Input id="coverSource" value={coverSource} maxLength={300}
-                        onChange={(event) => setCoverSource(event.target.value)} disabled={isSaving} />
+                      <Input error={fieldErrors.coverSource?.message} id="coverSource" value={coverSource} maxLength={300}
+                        onChange={(event) => { setCoverSource(event.target.value); clearErrors('coverSource') }} disabled={isSaving} />
                     </div>
                   </div>
                 )}
@@ -532,8 +597,9 @@ export function ArticleEditorPage() {
                 <Label htmlFor="tags">Thẻ Tag (ngăn cách bằng dấu phẩy)</Label>
                 <Input
                   id="tags"
+                  error={fieldErrors.tags?.message}
                   value={tags}
-                  onChange={(e) => setTags(e.target.value)}
+                  onChange={(e) => { setTags(e.target.value); clearErrors('tags') }}
                   placeholder="Hải Phòng, Kinh tế, Lạch Huyện"
                 />
               </div>
@@ -562,9 +628,10 @@ export function ArticleEditorPage() {
                     <Label htmlFor="price">Giá mua lẻ bài viết (VND)</Label>
                     <Input
                       id="price"
+                      error={fieldErrors.price?.message}
                       type="number"
                       value={price}
-                      onChange={(e) => setPrice(Number(e.target.value))}
+                      onChange={(e) => { setPrice(Number(e.target.value)); clearErrors('price') }}
                       step={5000}
                       min={5000}
                     />
