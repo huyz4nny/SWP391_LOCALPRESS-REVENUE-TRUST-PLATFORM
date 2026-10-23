@@ -6,6 +6,7 @@ interface RequestOptions {
     headers?: Record<string, string>
     params?: Record<string, string | number | boolean | undefined>
     skipAuth?: boolean
+    credentials?: RequestCredentials
 }
 
 class HttpClient {
@@ -13,6 +14,7 @@ class HttpClient {
     private useMock: boolean
     // ponytail: credentials last only until page reload; use the shared identity session when it is available.
     private basicAuth = ''
+    private bearerToken = ''
 
     constructor() {
         this.baseUrl = APP_CONFIG.apiBaseUrl
@@ -24,11 +26,22 @@ class HttpClient {
     }
 
     public setBasicAuth(email: string, password: string) {
+        this.bearerToken = ''
         this.basicAuth = `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${email}:${password}`)))}`
     }
 
     public clearBasicAuth() {
         this.basicAuth = ''
+        this.bearerToken = ''
+    }
+
+    public setBearerToken(token: string) {
+        this.basicAuth = ''
+        this.bearerToken = token
+    }
+
+    public hasAuth() {
+        return Boolean(this.basicAuth || this.bearerToken)
     }
 
     public hasBasicAuth() {
@@ -38,8 +51,8 @@ class HttpClient {
   private headers(options?: RequestOptions) {
     return {
       'Content-Type': 'application/json',
-      ...(!options?.skipAuth && this.basicAuth
-          ? { Authorization: this.basicAuth }
+      ...(!options?.skipAuth && this.hasAuth()
+          ? { Authorization: this.bearerToken ? `Bearer ${this.bearerToken}` : this.basicAuth }
           : {}),
       ...options?.headers,
     }
@@ -67,6 +80,7 @@ class HttpClient {
         const response = await fetch(url, {
             method: 'GET',
             headers: this.headers(options),
+            credentials: options?.credentials,
         })
 
         if (!response.ok) {
@@ -89,7 +103,7 @@ class HttpClient {
             throw new Error('Tải ảnh bản nháp cần dùng API thật')
         }
 
-        if (!this.hasBasicAuth()) {
+        if (!this.hasAuth()) {
             throw new Error('Bạn cần đăng nhập trước khi tải ảnh')
         }
 
@@ -131,6 +145,7 @@ class HttpClient {
         const response = await fetch(url, {
             method: 'POST',
             headers: this.headers(options),
+            credentials: options?.credentials,
             body: JSON.stringify(body),
         })
 
@@ -192,7 +207,7 @@ class HttpClient {
             throw new Error('Upload ảnh cần dùng API thật')
         }
 
-        if (!this.hasBasicAuth()) {
+        if (!this.hasAuth()) {
             throw new Error('Bạn cần đăng nhập trước khi upload ảnh')
         }
 

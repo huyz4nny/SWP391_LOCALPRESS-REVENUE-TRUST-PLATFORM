@@ -14,10 +14,11 @@ public record CreateArticleDraftRequest(
         @Size(max = 255, message = "Tiêu đề tối đa 255 ký tự")
         String title,
 
+        @NotBlank(message = "Vui lòng nhập đoạn mở đầu (Sapo)")
         @Size(max = 2000, message = "Sapo tối đa 2000 ký tự")
         String sapo,
 
-        @NotNull(message = "Nội dung không được null")
+        @NotBlank(message = "Vui lòng nhập nội dung bài viết")
         @Size(max = 100000, message = "Nội dung tối đa 100000 ký tự")
         String content,
 
