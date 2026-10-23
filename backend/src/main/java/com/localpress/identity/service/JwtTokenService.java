@@ -4,7 +4,6 @@ import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.slf4j.LoggerFactory;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -22,12 +21,10 @@ public class JwtTokenService {
         }
         this.expirationMs = expirationMs;
         if (secret == null || secret.isBlank()) {
-            this.key = Jwts.SIG.HS256.key().build();
-            LoggerFactory.getLogger(JwtTokenService.class).warn(
-                    "LOCALPRESS_JWT_SECRET is unset; using an ephemeral development key. Tokens expire on restart.");
-        } else {
-            this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+            throw new IllegalArgumentException(
+                    "LOCALPRESS_JWT_SECRET is required outside dev; use at least 32 UTF-8 bytes");
         }
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public LoginResponse issue(User user) {

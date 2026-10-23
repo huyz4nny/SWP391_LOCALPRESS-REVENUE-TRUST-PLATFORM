@@ -41,7 +41,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "localpress.google.client-id=test-client",
         "localpress.jwt.secret=test-signing-key-at-least-32-bytes-long"
 })
-@Import({SecurityConfig.class, GoogleLoginNonceService.class, GoogleLoginExceptionHandler.class})
+@Import({SecurityConfig.class, GoogleLoginNonceService.class, GoogleLoginExceptionHandler.class,
+        GoogleLoginSecurityTest.WebhookProbeController.class})
 class GoogleLoginSecurityTest {
     @Autowired MockMvc mvc;
     @Autowired JwtTokenService tokens;
@@ -97,6 +98,28 @@ class GoogleLoginSecurityTest {
     @Test void basicAuthenticationStillWorks() throws Exception {
         mvc.perform(get("/api/v1/auth/me").with(httpBasic("reader@gmail.com", "password")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.email").value("reader@gmail.com"));
+    }
+
+    @Test void webhookWithoutAuthorizationPassesSecurityChain() throws Exception {
+        mvc.perform(post("/api/v1/finance/webhook/review-probe"))
+                .andExpect(status().isOk()).andExpect(content().string("accepted"));
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test void webhookWithSepayApiKeyDoesNotEnterJwtAuthentication() throws Exception {
+        mvc.perform(post("/api/v1/finance/webhook/review-probe")
+                        .header("Authorization", "Apikey test-webhook-key"))
+                .andExpect(status().isOk()).andExpect(content().string("accepted"));
+        verifyNoInteractions(jdbc);
+    }
+
+    // Test-only endpoint: verifies the real security chain, not SePay payload handling.
+    @org.springframework.web.bind.annotation.RestController
+    static class WebhookProbeController {
+        @org.springframework.web.bind.annotation.PostMapping("/api/v1/finance/webhook/review-probe")
+        String receive() {
+            return "accepted";
+        }
     }
     @Test void readerJwtCannotAccessBackoffice() throws Exception {
         mvc.perform(get("/api/v1/editorial/articles").header("Authorization", "Bearer " + tokens.issue(reader).accessToken()))
