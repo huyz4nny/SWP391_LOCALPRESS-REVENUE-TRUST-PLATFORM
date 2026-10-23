@@ -34,6 +34,10 @@ public class TransactionLedgerResponse {
     private LocalDateTime paidAt;
     private LocalDateTime createdAt;
     private Long targetId;
+    /** Nội dung đơn (vd: "Mua bài: ...", "Nạp tiền qua SePay") để danh sách đơn hiển thị dễ đọc. */
+    private String description;
+    /** Kế toán đối soát (null = hệ thống tự ghi nhận qua webhook / ví). */
+    private Long reconciledBy;
 
     /**
      * Chuyển đổi từ JPA Entity sang DTO phẳng.
@@ -53,6 +57,8 @@ public class TransactionLedgerResponse {
                 .paidAt(tx.getPaidAt())
                 .createdAt(tx.getCreatedAt())
                 .targetId(tx.resolveTargetId())
+                .description(tx.getDescription())
+                .reconciledBy(tx.getReconciledBy())
                 .build();
     }
 }

@@ -8,17 +8,17 @@ import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
-import { RotateCcw, PlusCircle, CheckCircle2, XCircle, ShieldAlert, AlertCircle } from 'lucide-react'
+import { PlusCircle } from 'lucide-react'
+import { PageHeader, Panel, KeyValue, Notice, tableCls, LoadingBlock } from '../components/LedgerUI'
 
 export function RefundManagementPage() {
   const currentUser = mockStore.getCurrentUser()
-  const isFinanceManager = currentUser.role === 'FINANCE_MANAGER' || currentUser.role === 'SYSTEM_ADMIN'
 
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
   const [paidOrders, setPaidOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Propose Refund Modal
+  // Lập đề xuất (nhân viên kế toán)
   const [showProposeModal, setShowProposeModal] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState('')
   const [refundAmount, setRefundAmount] = useState<number>(0)
@@ -26,7 +26,7 @@ export function RefundManagementPage() {
   const [affectedBenefit, setAffectedBenefit] = useState('')
   const [isSubmittingPropose, setIsSubmittingPropose] = useState(false)
 
-  // Review Refund Modal
+  // Xét duyệt (kế toán trưởng)
   const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null)
   const [reviewNotes, setReviewNotes] = useState('')
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
@@ -94,7 +94,7 @@ export function RefundManagementPage() {
   const handleReviewRefund = async (approved: boolean) => {
     if (!selectedRefund) return
 
-    // Strict Separation of Duty check
+    // Tách bạch nhiệm vụ: người lập không được tự duyệt
     if (selectedRefund.proposedBy === currentUser.id) {
       alert('Nguyên tắc kiểm soát tài chính: Người lập đề xuất không được tự phê duyệt yêu cầu của chính mình! Vui lòng đổi sang vai trò Kế toán trưởng (Phạm Trưởng Phòng).')
       return
@@ -113,132 +113,135 @@ export function RefundManagementPage() {
     }
   }
 
+  const isWaiting = (r: RefundRequest) => r.status === 'UNDER_REVIEW' || (r.status as string) === 'PENDING'
+  const pending = refunds.filter(isWaiting)
+  const pendingAmount = pending.reduce((acc, r) => acc + r.refundAmount, 0)
+  const selectedOrder = paidOrders.find((x) => x.id === selectedOrderId)
+
+  if (loading && refunds.length === 0) return <LoadingBlock rows={6} />
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Quản trị Hoàn tiền & Thu hồi Quyền lợi (Refunds)
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Nguyên tắc 4 mắt (Four-Eyes Principle): Nhân viên kế toán lập đề xuất → Kế toán trưởng độc lập phê duyệt
-          </p>
-        </div>
+    <div>
+      <PageHeader
+        title="Hoàn tiền"
+        sub={
+          pending.length > 0 ? (
+            <span className="num">
+              {pending.length} đề xuất chờ kế toán trưởng duyệt, tổng {formatCurrency(pendingAmount)}. Người lập đề xuất không được tự duyệt.
+            </span>
+          ) : (
+            'Không có đề xuất nào chờ duyệt. Nhân viên kế toán lập đề xuất, kế toán trưởng duyệt độc lập.'
+          )
+        }
+        actions={
+          <Button size="sm" onClick={() => setShowProposeModal(true)} disabled={paidOrders.length === 0}>
+            <PlusCircle className="h-3.5 w-3.5" />
+            Lập đề xuất hoàn tiền
+          </Button>
+        }
+      />
 
-        <Button
-          onClick={() => setShowProposeModal(true)}
-          size="sm"
-          className="text-xs font-bold bg-primary-900"
-        >
-          <PlusCircle className="w-3.5 h-3.5 mr-1" />
-          Lập đề xuất hoàn tiền mới
-        </Button>
-      </div>
+      <Panel title="Đề xuất hoàn tiền" aside={<span className="num">{refunds.length} đề xuất</span>} bodyClassName="px-0 pb-1">
+        {refunds.length === 0 ? (
+          <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Chưa có đề xuất hoàn tiền nào.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className={tableCls.table}>
+              <thead className={tableCls.thead}>
+                <tr>
+                  <th className={tableCls.th}>Mã yêu cầu</th>
+                  <th className={tableCls.th}>Khách hàng</th>
+                  <th className={tableCls.th}>Quyền lợi bị thu hồi</th>
+                  <th className={tableCls.th}>Người lập</th>
+                  <th className={tableCls.th}>Trạng thái</th>
+                  <th className={tableCls.thNum}>Số tiền hoàn</th>
+                  <th className={tableCls.th}><span className="sr-only">Phê duyệt</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {refunds.map((r) => {
+                  const isCreator = r.proposedBy === currentUser.id
+                  return (
+                    <tr key={r.id} className={tableCls.tr}>
+                      <td className={tableCls.td}>
+                        <div className={tableCls.code}>{r.id}</div>
+                        <div className="whitespace-nowrap font-mono text-xs text-slate-500">{r.orderCode}</div>
+                      </td>
+                      <td className={`${tableCls.td} whitespace-nowrap text-slate-900`}>{r.userName}</td>
+                      <td className={`${tableCls.td} max-w-[220px]`}>
+                        <div className="truncate" title={r.affectedBenefit}>{r.affectedBenefit}</div>
+                      </td>
+                      <td className={`${tableCls.td} whitespace-nowrap`}>
+                        <div className="max-w-[170px] truncate text-slate-900" title={r.proposedByName || r.proposedBy}>{(r.proposedByName || r.proposedBy || '').replace(/\s*\(.*\)$/, '')}</div>
+                        <div className="text-xs text-slate-500 num">{formatDateTime(r.requestedAt)}</div>
+                      </td>
+                      <td className={tableCls.td}>
+                        <StatusBadge type="refund" status={r.status} />
+                      </td>
+                      <td className={tableCls.tdNum}>
+                        <div className="font-semibold">{formatCurrency(r.refundAmount)}</div>
+                        <div className="text-xs text-slate-500">
+                          {r.isPartial ? `một phần của ${formatCurrency(r.originalAmount)}` : 'toàn bộ'}
+                        </div>
+                      </td>
+                      <td className={`${tableCls.td} text-right`}>
+                        {isWaiting(r) ? (
+                          isCreator ? (
+                            <span className="whitespace-nowrap text-xs text-slate-500" title="Người lập không được tự duyệt đề xuất của chính mình">
+                              Bạn lập, chờ người khác duyệt
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedRefund(r)
+                                setReviewNotes('')
+                              }}
+                            >
+                              Xét duyệt
+                            </Button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedRefund(r)
+                              setReviewNotes(r.reviewNotes || '')
+                            }}
+                            className="text-[13px] font-medium text-primary-900 hover:underline cursor-pointer"
+                          >
+                            Chi tiết
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
 
-      {/* Refunds Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="px-4 py-3">Mã yêu cầu</th>
-                <th className="px-4 py-3">Đơn hàng gốc</th>
-                <th className="px-4 py-3">Khách hàng</th>
-                <th className="px-4 py-3">Số tiền hoàn</th>
-                <th className="px-4 py-3">Quyền lợi bị ảnh hưởng</th>
-                <th className="px-4 py-3">Người lập đề xuất</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3 text-right">Phê duyệt</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {refunds.map((r) => {
-                const isCreator = r.proposedBy === currentUser.id
-                return (
-                  <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-900">{r.id}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700">{r.orderCode}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold text-slate-800">{r.userName}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-crimson">{formatCurrency(r.refundAmount)}</div>
-                      {r.isPartial && (
-                        <span className="text-[10px] text-amber-700 font-medium">Hoàn một phần</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 max-w-xs truncate text-slate-600 font-medium">
-                      {r.affectedBenefit}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      <div>{r.proposedByName || r.proposedBy}</div>
-                      <div className="text-[10px] text-slate-400">{formatDateTime(r.requestedAt)}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge type="refund" status={r.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {r.status === 'UNDER_REVIEW' ? (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedRefund(r)
-                            setReviewNotes('')
-                          }}
-                          className={`text-xs font-bold ${
-                            isCreator
-                              ? 'bg-slate-300 text-slate-600 hover:bg-slate-400'
-                              : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                          }`}
-                          title={isCreator ? 'Người lập không được tự duyệt đề xuất của chính mình' : 'Xem và phê duyệt'}
-                        >
-                          {isCreator ? 'Tự tạo (Không thể duyệt)' : 'Phê duyệt'}
-                        </Button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setSelectedRefund(r)
-                            setReviewNotes(r.reviewNotes || '')
-                          }}
-                          className="text-slate-500 hover:text-slate-800 underline text-xs cursor-pointer"
-                        >
-                          Chi tiết
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Propose Refund Modal (Finance Staff) */}
-      <Dialog
-        open={showProposeModal}
-        onClose={() => setShowProposeModal(false)}
-        title="Lập Đề Xuất Hoàn Tiền (Finance Staff)"
-      >
-        <form onSubmit={handleProposeRefund} className="space-y-4 text-xs">
+      <Dialog open={showProposeModal} onClose={() => setShowProposeModal(false)} title="Lập đề xuất hoàn tiền">
+        <form onSubmit={handleProposeRefund} className="space-y-4">
           <div>
-            <Label htmlFor="orderSel" required>Chọn đơn hàng đã thanh toán</Label>
+            <Label htmlFor="orderSel" required>Đơn đã thanh toán</Label>
             <select
               id="orderSel"
               value={selectedOrderId}
               onChange={handleOrderChange}
-              className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-primary-900"
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 hover:border-slate-400 focus:border-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-900/15"
             >
               {paidOrders.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.orderCode} — {o.userName} — {o.targetTitle} ({formatCurrency(o.finalAmount)})
+                  {o.orderCode}, {o.userName}, {formatCurrency(o.finalAmount)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <Label htmlFor="rfAmount" required>Số tiền hoàn (VND) - Hỗ trợ hoàn một phần</Label>
+            <Label htmlFor="rfAmount" required>Số tiền hoàn (VND)</Label>
             <Input
               id="rfAmount"
               type="number"
@@ -246,102 +249,83 @@ export function RefundManagementPage() {
               onChange={(e) => setRefundAmount(Number(e.target.value))}
               required
               min={1000}
+              className="num"
             />
+            {selectedOrder && (
+              <p className="mt-1.5 text-xs text-slate-500 num">
+                Tối đa {formatCurrency(selectedOrder.finalAmount)}, số khách đã trả. Hoàn một phần thì khách giữ quyền lợi.
+              </p>
+            )}
           </div>
 
           <div>
-            <Label htmlFor="affected" required>Quyền lợi bị thu hồi / điều chỉnh</Label>
+            <Label htmlFor="affected" required>Quyền lợi bị thu hồi hoặc điều chỉnh</Label>
             <Input
               id="affected"
               value={affectedBenefit}
               onChange={(e) => setAffectedBenefit(e.target.value)}
-              placeholder="VD: Hủy quyền VIP, rút ngắn ngày phát sóng chiến dịch..."
+              placeholder="Ví dụ: hủy gói Premium tháng 10"
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="rfReason" required>Lý do hoàn tiền chi tiết & căn cứ</Label>
+            <Label htmlFor="rfReason" required>Lý do và căn cứ</Label>
             <Textarea
               id="rfReason"
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Ghi rõ lý do và tài liệu đối chiếu (VD: Khách trả thừa, hợp đồng điều chỉnh)..."
+              placeholder="Ví dụ: khách trả trùng hai lần, đối chiếu sao kê ngày 12/10"
               required
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setShowProposeModal(false)}>
-              Hủy bỏ
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowProposeModal(false)}>
+              Hủy
             </Button>
             <Button type="submit" size="sm" isLoading={isSubmittingPropose}>
-              Nộp Đề Xuất Hoàn Tiền
+              Gửi đề xuất
             </Button>
           </div>
         </form>
       </Dialog>
 
-      {/* Review Refund Dialog (Finance Manager) */}
       {selectedRefund && (
-        <Dialog
-          open={!!selectedRefund}
-          onClose={() => setSelectedRefund(null)}
-          title={`Xét Duyệt Hoàn Tiền: ${selectedRefund.id}`}
-        >
-          <div className="space-y-4 text-xs">
-            <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Mã đơn gốc:</span>
-                <span className="font-mono font-bold text-slate-800">{selectedRefund.orderCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Khách hàng:</span>
-                <span className="font-semibold text-slate-800">{selectedRefund.userName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Số tiền gốc:</span>
-                <span>{formatCurrency(selectedRefund.originalAmount)}</span>
-              </div>
-              <div className="flex justify-between text-crimson font-bold text-sm">
-                <span>Số tiền đề xuất hoàn:</span>
-                <span>{formatCurrency(selectedRefund.refundAmount)}</span>
-              </div>
-              <div className="pt-1 text-slate-600">
-                <strong>Quyền lợi bị hủy:</strong> {selectedRefund.affectedBenefit}
-              </div>
-              <div className="pt-1 text-slate-600">
-                <strong>Lý do đề xuất:</strong> {selectedRefund.reason}
-              </div>
-              <div className="pt-1 text-slate-400 text-[11px]">
-                Người lập: {selectedRefund.proposedByName || selectedRefund.proposedBy}
-              </div>
-            </div>
+        <Dialog open={!!selectedRefund} onClose={() => setSelectedRefund(null)} title={`Đề xuất hoàn tiền ${selectedRefund.id}`}>
+          <div className="space-y-4">
+            <dl className="rounded-md bg-slate-50 px-3.5 py-1">
+              <KeyValue label="Đơn gốc"><span className="font-mono">{selectedRefund.orderCode}</span></KeyValue>
+              <KeyValue label="Khách hàng">{selectedRefund.userName}</KeyValue>
+              <KeyValue label="Khách đã trả"><span className="num">{formatCurrency(selectedRefund.originalAmount)}</span></KeyValue>
+              <KeyValue label="Đề xuất hoàn" strong><span className="num">{formatCurrency(selectedRefund.refundAmount)}</span></KeyValue>
+              <KeyValue label="Quyền lợi bị thu hồi">{selectedRefund.affectedBenefit}</KeyValue>
+              <KeyValue label="Lý do">{selectedRefund.reason}</KeyValue>
+              <KeyValue label="Người lập">{selectedRefund.proposedByName || selectedRefund.proposedBy}</KeyValue>
+              {selectedRefund.reviewNotes && <KeyValue label="Ý kiến duyệt">{selectedRefund.reviewNotes}</KeyValue>}
+            </dl>
 
             {selectedRefund.proposedBy === currentUser.id && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-900 flex items-start space-x-2">
-                <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Cảnh báo phân quyền:</strong> Bạn là người lập đề xuất này. Theo quy chế tài chính (Four-Eyes Principle), bạn không được tự phê duyệt đề xuất của chính mình. Hãy đổi sang tài khoản <strong>Phạm Trưởng Phòng (Finance Manager)</strong> để duyệt!
-                </span>
-              </div>
+              <Notice tone="warning">
+                Bạn là người lập đề xuất này nên không được tự duyệt (nguyên tắc 4 mắt). Đổi sang tài khoản kế toán trưởng để duyệt.
+              </Notice>
             )}
 
             {selectedRefund.status === 'UNDER_REVIEW' && (
               <div>
-                <Label htmlFor="rvNotes">Ý kiến phê duyệt của Kế toán trưởng</Label>
+                <Label htmlFor="rvNotes">Ý kiến của kế toán trưởng</Label>
                 <Textarea
                   id="rvNotes"
                   rows={2}
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
-                  placeholder="Ghi chú phê duyệt hoặc lý do từ chối..."
+                  placeholder="Ghi chú khi duyệt, hoặc lý do từ chối"
                 />
               </div>
             )}
 
-            <div className="flex justify-end space-x-2 pt-2">
+            <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" size="sm" onClick={() => setSelectedRefund(null)}>
                 Đóng
               </Button>
@@ -349,13 +333,13 @@ export function RefundManagementPage() {
               {selectedRefund.status === 'UNDER_REVIEW' && (
                 <>
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
+                    className="text-negative"
                     onClick={() => handleReviewRefund(false)}
                     disabled={selectedRefund.proposedBy === currentUser.id}
                     isLoading={isSubmittingReview}
                   >
-                    <XCircle className="w-3.5 h-3.5 mr-1" />
                     Từ chối
                   </Button>
                   <Button
@@ -363,10 +347,8 @@ export function RefundManagementPage() {
                     onClick={() => handleReviewRefund(true)}
                     disabled={selectedRefund.proposedBy === currentUser.id}
                     isLoading={isSubmittingReview}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                    Phê duyệt hoàn tiền
+                    Duyệt hoàn {formatCurrency(selectedRefund.refundAmount)}
                   </Button>
                 </>
               )}

@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: "optional:file:./config/application-secrets.yml"
   datasource:
     url: jdbc:mysql://localhost:3306/localpress_db?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: root
@@ -28,3 +30,23 @@ logging:
 localpress:
   storage:
     image-directory: "${user.home}/localpress-data/uploads"
+  # Thông tin SePay KHÔNG để trong file này (file này lên GitHub).
+  # Giá trị thật đặt ở backend/config/application-secrets.yml (đã .gitignore) hoặc biến môi trường SEPAY_*.
+  # Mẫu: backend/config/application-secrets.example.yml
+  sepay:
+    merchant-id: ${SEPAY_MERCHANT_ID:}
+    secret-key: ${SEPAY_SECRET_KEY:}
+    env: ${SEPAY_ENV:sandbox}
+    bank-code: ${SEPAY_BANK_CODE:VCB}
+    bank-short-name: ${SEPAY_BANK_SHORT_NAME:vietcombank}
+    account-number: ${SEPAY_ACCOUNT_NUMBER:}
+    account-name: ${SEPAY_ACCOUNT_NAME:}
+    webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
+    # Token API (my.sepay.vn > Cấu hình công ty > API Access) để tự hỏi giao dịch khi không nhận được webhook
+    api-token: ${SEPAY_API_TOKEN:}
+    api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}
+  payment:
+    order-ttl-minutes: 15
+    topup-min-amount: 10000
+    topup-max-amount: 50000000
+

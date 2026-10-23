@@ -179,6 +179,14 @@ export function LoginPage() {
                   Đăng ký miễn phí
                 </Link>
               </div>
+
+              {!APP_CONFIG.useMockApi && (
+                <div className="w-full rounded-md bg-stone-50 border border-stone-200 p-2.5 text-[11px] text-stone-600 space-y-1">
+                  <div className="font-semibold text-stone-700">Gợi ý tài khoản Seed MySQL:</div>
+                  <div>Kế toán: <code className="text-primary-900 font-semibold">ketoan@localpress.vn</code></div>
+                  <div>Mật khẩu: <code className="text-primary-900 font-semibold">password</code> hoặc <code className="text-primary-900 font-semibold">password123</code></div>
+                </div>
+              )}
             </CardFooter>
           </form>
           {!APP_CONFIG.useMockApi && import.meta.env.VITE_GOOGLE_CLIENT_ID && (

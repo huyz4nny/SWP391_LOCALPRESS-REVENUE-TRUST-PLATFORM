@@ -4,6 +4,7 @@ import { Article } from '../types'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { httpClient } from '@/lib/http/client'
+import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
 import { Crown, Sparkles, Check, Lock, ShieldCheck } from 'lucide-react'
 
@@ -32,7 +33,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
         amount: article.price || 15000,
         paymentMethod: 'VIETQR',
       })
-      navigate(`/checkout/${order.id}`)
+      navigate(paymentPath(order), { state: { returnUrl: `/articles/${article.slug}` } })
     } catch (err) {
       console.error(err)
     } finally {

@@ -323,3 +323,140 @@ Khi lên bảo vệ trước Hội đồng Giám khảo SWP391, nhóm tự tin t
 * 📖 **Đặc tả kiến trúc & Ngữ cảnh hệ thống 360°:** [SYSTEM_CONTEXT_AND_ARCHITECTURE.md](docs/SYSTEM_CONTEXT_AND_ARCHITECTURE.md)
 * 🗺️ **Lộ trình 4 Iteration & Sổ tay phản biện:** [LOCALPRESS_MASTER_ROADMAP.md](LOCALPRESS_MASTER_ROADMAP.md)
 * 📊 **Danh mục 125 chức năng tham chiếu (Excel 7 sheets):** [LocalPress_Danh_muc_chuc_nang.xlsx](LocalPress_Danh_muc_chuc_nang.xlsx)
+
+---
+
+## 9. HƯỚNG DẪN TÍCH HỢP LIÊN PHÂN HỆ — BỘ XỬ LÝ THANH TOÁN DÙNG CHUNG (SV4 - HUY)
+
+Phân hệ Kế toán & Thanh toán (`com.localpress.finance`) cung cấp bộ giải pháp thanh toán dùng chung cho toàn bộ hệ thống LocalPress, kết nối trực tiếp cổng thanh toán VietQR / SePay PG (Vietcombank). Các thành viên phụ trách luồng B2B (SV1 - Tây) và B2C (SV3 - Hoàng) sử dụng hợp đồng dịch vụ sau để tích hợp chức năng thanh toán:
+
+### 9.1. Tổng quan kiến trúc tương tác liên phân hệ
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Độc giả (SV3) / Doanh nghiệp (SV1)
+    participant FE as Frontend Portal (SV1 / SV3)
+    participant FinanceAPI as Finance API (/finance/orders)
+    participant PG as SePay Payment Gateway / VietQR
+    participant Event as Spring Event Publisher
+    participant Consumer as Listener (SV1 / SV3)
+
+    User->>FE: Bấm "Thanh toán" (Mua gói, bài lẻ, booking ad)
+    FE->>FinanceAPI: POST /api/v1/finance/orders (CreateOrderRequest)
+    FinanceAPI->>FinanceAPI: Tạo Transaction (PENDING) & sinh HMAC-SHA256
+    FinanceAPI-->>FE: Trả về OrderCreateResponse (qrCodeUrl, checkoutUrl, orderCode)
+    FE->>User: Hiển thị mã QR VietQR / Chuyển hướng SePay Checkout
+    User->>PG: Quét mã QR chuyển khoản ngân hàng
+    PG->>FinanceAPI: Webhook IPN (POST /api/v1/finance/webhook/sepay)
+    Note over FinanceAPI: Kiểm tra chữ ký số HMAC, chống cộng trùng (Idempotent)
+    FinanceAPI->>FinanceAPI: Cập nhật Transaction -> SUCCESS
+    FinanceAPI->>Event: Phát sự kiện PaymentSuccessEvent
+    Event->>Consumer: Nhận event xử lý nghiệp vụ nội bộ
+    Note over Consumer: SV3: Cấp quyền đọc bài / kích hoạt gói cước<br/>SV1: Chuyển booking sang PAID / kích hoạt campaign
+    FE->>FinanceAPI: Polling GET /api/v1/finance/orders/code/{orderCode}/status
+    FinanceAPI-->>FE: Trả về status: SUCCESS
+    FE->>User: Thông báo thanh toán thành công & mở khóa nội dung
+```
+
+### 9.2. Danh mục API Thanh toán & Tài chính dùng chung
+
+| Phân hệ | Phương thức | Endpoint | Use Case | Mô tả & Bên sử dụng |
+| :--- | :---: | :--- | :--- | :--- |
+| **Thanh toán** | `POST` | `/api/v1/finance/orders` | UC047 | Tạo đơn thanh toán dùng chung cho B2C (Mua bài lẻ, Gói cước) & B2B (Booking quảng cáo). Trả về link QR SePay Vietcombank. |
+| **Thanh toán** | `GET` | `/api/v1/finance/orders/code/{orderCode}/status` | UC047 | Tra cứu trạng thái đơn hàng thời gian thực (phục vụ Frontend polling mỗi 2-3s). |
+| **Thanh toán** | `POST` | `/api/v1/finance/orders/{id}/pay` | UC047 | Giả lập xác nhận thanh toán tức thì (phục vụ phòng thi / demo nhanh). |
+| **Webhook** | `POST` | `/api/v1/finance/webhook/sepay` | UC050 | Webhook IPN nhận callback từ SePay / Vietcombank, kiểm tra HMAC và chống cộng tiền trùng lặp (Rule 5). |
+| **Chuyển khoản** | `GET` | `/api/v1/finance/transfers/pending` | UC051 | Lấy danh sách giao dịch chuyển khoản thủ công chờ kế toán đối soát. |
+| **Chuyển khoản** | `POST` | `/api/v1/finance/transfers/{id}/confirm` | UC051 | Kế toán xác nhận tiền đã vào tài khoản ngân hàng, kích hoạt quyền lợi. |
+| **Chuyển khoản** | `POST` | `/api/v1/finance/transfers/{id}/reject` | UC051 | Kế toán từ chối giao dịch kèm lý do cụ thể. |
+| **Sổ quỹ kép** | `GET` | `/api/v1/finance/ledger` | UC047 | Tra cứu danh sách chứng từ, biến động dòng tiền vào/ra toàn hệ thống. |
+| **Sổ quỹ kép** | `GET` | `/api/v1/finance/ledger/summary` | UC049 | Thống kê số dư khả dụng, tổng thu độc giả, tổng thu quảng cáo, tiền hoàn. |
+| **Công nợ B2B** | `GET` | `/api/v1/finance/receivables` | UC053 | Báo cáo công nợ quảng cáo B2B của Doanh nghiệp (SV1). |
+| **Đối soát** | `GET` | `/api/v1/finance/reconciliation` | UC054 | Đối soát khớp nối dòng tiền giữa hệ thống LocalPress và Sao kê SePay. |
+| **Đối soát** | `POST` | `/api/v1/finance/reconciliation/resolve` | UC054 | Kế toán xử lý giải quyết sai lệch số liệu. |
+| **Hoàn tiền 4 mắt** | `GET` | `/api/v1/finance/refunds` | UC055 | Danh sách yêu cầu hoàn tiền đang chờ hoặc đã xử lý. |
+| **Hoàn tiền 4 mắt** | `POST` | `/api/v1/finance/refunds/propose` | UC055 | Nhân viên CSKH/Kế toán lập đề xuất hoàn tiền (Kiểm soát trần hoàn tiền Rule 11). |
+| **Hoàn tiền 4 mắt** | `POST` | `/api/v1/finance/refunds/{id}/review-refund` | UC055, UC056 | Kế toán trưởng duyệt/từ chối (Four-Eyes Principle), tự động thu hồi quyền đọc bài (`REVOKED`), hủy gói (`CANCELLED`), hoặc tạm dừng quảng cáo (`SUSPENDED`). |
+| **Báo cáo & Rủi ro**| `GET` | `/api/v1/finance/reports/export` | UC059 | Xuất báo cáo tài chính dạng CSV (hỗ trợ tiếng Việt UTF-8 BOM chuẩn Excel). |
+| **Báo cáo & Rủi ro**| `GET` | `/api/v1/finance/alerts` | UC060 | Cảnh báo tài chính thời gian thực (giao dịch treo, sai lệch, nghi vấn rửa tiền). |
+
+---
+
+### 9.3. Hướng dẫn tích hợp cho SV1 (Quảng cáo) & SV3 (Độc giả)
+
+#### Cách 1: Gọi API tạo đơn & Hiển thị mã QR VietQR (Phía Frontend Client)
+Khi người dùng bấm "Mua gói" (SV3), "Mua bài lẻ" (SV3) hoặc "Thanh toán booking" (SV1), gọi API:
+
+```typescript
+// Ví dụ: Độc giả mua bài phóng sự 15.000 ₫
+const res = await fetch('/api/v1/finance/orders', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Basic ' + btoa('email:password') // Hoặc Authorization header
+  },
+  body: JSON.stringify({
+    orderType: 'ARTICLE', // 'ARTICLE' | 'SUBSCRIPTION' | 'AD'
+    targetId: 10,        // ID bài viết, ID gói cước, hoặc ID campaign
+    amount: 15000,
+    paymentMethod: 'SEPAY', // hoặc 'BANK_TRANSFER'
+    description: 'Thanh toan bai bao Premium #10'
+  })
+});
+
+const data = await res.json();
+// data trả về:
+// {
+//   orderCode: 'LP2610141200ABCD',
+//   amount: 15000,
+//   qrCodeUrl: 'https://qr.sepay.vn/img?acc=...&bank=VCB&amount=15000&des=LP2610141200ABCD',
+//   checkoutUrl: 'https://pay.sepay.vn/v1/checkout/init?...',
+//   bankInfo: { bankCode: 'VCB', accountNumber: '...', accountName: '...', transferContent: 'LP2610141200ABCD' }
+// }
+
+// Bật polling kiểm tra mỗi 2s:
+const interval = setInterval(async () => {
+  const check = await fetch(`/api/v1/finance/orders/code/${data.orderCode}/status`).then(r => r.json());
+  if (check.status === 'SUCCESS') {
+    clearInterval(interval);
+    alert('Thanh toán thành công! Bài viết đã được mở khóa.');
+    window.location.reload();
+  }
+}, 2000);
+```
+
+#### Cách 2: Lắng nghe sự kiện kích hoạt quyền lợi ở Backend (`PaymentSuccessEvent`)
+SV1 và SV3 không cần can thiệp trực tiếp vào mã nguồn của SV4. Khi Webhook SePay IPN ghi nhận tiền về thành công hoặc kế toán viên duyệt chuyển khoản, phân hệ Finance sẽ tự động phát tán sự kiện Spring Event `PaymentSuccessEvent`:
+
+```java
+package com.localpress.reader.listener; // Hoặc package com.localpress.advertising.listener
+
+import com.localpress.shared.event.PaymentSuccessEvent;
+import com.localpress.finance.model.TransactionType;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Component
+public class PaymentEventListener {
+
+    @EventListener
+    @Transactional
+    public void handlePaymentSuccess(PaymentSuccessEvent event) {
+        if (event.getTargetType() == TransactionType.ARTICLE) {
+            // SV3: Mở khóa quyền đọc bài viết lẻ (article_purchases)
+            Long purchaseId = event.getTargetId();
+            // Cập nhật access_status = 'ACTIVE' ...
+        } else if (event.getTargetType() == TransactionType.SUBSCRIPTION) {
+            // SV3: Kích hoạt gói cước hội viên (subscriptions)
+            Long subscriptionId = event.getTargetId();
+            // Cập nhật status = 'ACTIVE' ...
+        } else if (event.getTargetType() == TransactionType.AD) {
+            // SV1: Kích hoạt chiến dịch quảng cáo (ad_campaigns)
+            Long campaignId = event.getTargetId();
+            // Cập nhật status = 'SCHEDULED' / 'RUNNING' ...
+        }
+    }
+}
+```
+
