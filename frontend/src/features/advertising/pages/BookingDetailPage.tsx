@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { AdBooking, AdCampaign, AdCreative } from '../types'
+import { AdBooking, AdCampaign } from '../types'
 import { advertisingApi } from '../api'
+import { CreativeUploadForm } from '../components/CreativeUploadForm'
 import { mockStore } from '@/mocks/store'
 import { httpClient } from '@/lib/http/client'
 import { paymentPath } from '@/features/finance/api/payment'
@@ -19,7 +20,6 @@ import {
   Clock,
   AlertCircle,
   ExternalLink,
-  Upload,
   ArrowRight,
   ShieldCheck,
   RotateCcw,
@@ -31,13 +31,11 @@ export function BookingDetailPage() {
   const [booking, setBooking] = useState<AdBooking | null>(null)
   const [campaign, setCampaign] = useState<AdCampaign | null>(null)
   const [loading, setLoading] = useState(true)
-
-  // Creative upload form
-  const [creativeTitle, setCreativeTitle] = useState('')
-  const [creativeImage, setCreativeImage] = useState('')
-  const [creativeTarget, setCreativeTarget] = useState('https://')
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [isAccepting, setIsAccepting] = useState(false)
+  const [isPaying, setIsPaying] = useState(false)
 
   // Cancel/Refund dialog state
   const [showRefundDialog, setShowRefundDialog] = useState(false)
@@ -51,73 +49,46 @@ export function BookingDetailPage() {
   const loadData = async (bookingId: string) => {
     try {
       setLoading(true)
+      setLoadError('')
       const bData = await advertisingApi.getBookingById(bookingId)
       setBooking(bData)
-      if (bData.campaignId) {
-        const cData = await advertisingApi.getCampaignById(bData.campaignId)
-        setCampaign(cData)
-      } else {
-        const matchingCamp = mockStore.getState().campaigns.find((c) => c.bookingId === bData.id)
-        setCampaign(matchingCamp || null)
-      }
+      // Backend: booking chính là campaign (campaignId = id). Mock: campaign tạo sau khi xác nhận báo giá.
+      setCampaign(bData.campaignId ? await advertisingApi.getCampaignById(bData.campaignId) : null)
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Không tải được booking')
     } finally {
       setLoading(false)
     }
   }
 
   const handleAcceptQuotation = async () => {
-    if (!booking) return
+    if (!booking || !termsAccepted) return
+    setActionError('')
+    setIsAccepting(true)
     try {
-      const updated = await advertisingApi.acceptQuotation(booking.id)
-      setBooking(updated)
-      loadData(booking.id)
-    } catch (err: any) {
-      alert(err.message || 'Lỗi chấp nhận báo giá')
+      await advertisingApi.acceptQuotation(booking.id, booking.quoteVersion ?? 0)
+      await loadData(booking.id)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Lỗi xác nhận báo giá')
+      // Báo giá có thể vừa đổi phiên bản: tải lại để khách xem bản mới.
+      await loadData(booking.id)
+    } finally {
+      setIsAccepting(false)
     }
   }
 
   const handleGoToPayment = async () => {
     if (!booking) return
+    setActionError('')
+    setIsPaying(true)
     try {
-      // Create Order for Booking
-      const order = await httpClient.post<any>('/finance/checkout', {
-        orderType: 'AD_CAMPAIGN',
-        targetId: booking.id,
-        targetTitle: `Hợp đồng Quảng cáo: ${booking.slotName} (${booking.daysCount} ngày)`,
-        amount: booking.finalPrice,
-        paymentMethod: 'BANK_TRANSFER',
-      })
+      // Backend chốt số tiền theo báo giá đã xác nhận và dùng lại đơn còn hạn (không tạo đơn trùng).
+      const order = await advertisingApi.createPayment(booking.campaignId ?? booking.id)
       navigate(paymentPath(order), { state: { returnUrl: `/advertiser/bookings/${booking.id}` } })
-    } catch (err: any) {
-      alert(err.message || 'Lỗi chuyển hướng thanh toán')
-    }
-  }
-
-  const handleUploadCreative = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!campaign) {
-      alert('Vui lòng đợi báo giá được chấp nhận để tạo chiến dịch trước khi tải banner.')
-      return
-    }
-
-    setIsUploading(true)
-    try {
-      await advertisingApi.uploadCreative(campaign.id, {
-        title: creativeTitle || `Banner phiên bản v${campaign.creatives.length + 1}`,
-        imageUrl: creativeImage || 'https://images.unsplash.com/photo-1542744094-3a31f272c490?w=1000&auto=format&fit=crop&q=80',
-        targetUrl: creativeTarget,
-        width: 1140,
-        height: 120,
-        fileSizeKb: 185,
-      })
-      setUploadSuccess(true)
-      setCreativeTitle('')
-      setCreativeImage('')
-      loadData(booking!.id)
-    } catch (err: any) {
-      alert(err.message || 'Lỗi tải lên banner')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Lỗi tạo đơn thanh toán')
     } finally {
-      setIsUploading(false)
+      setIsPaying(false)
     }
   }
 
@@ -158,6 +129,7 @@ export function BookingDetailPage() {
     return (
       <div className="text-center py-12">
         <h2 className="text-xl font-bold">Không tìm thấy thông tin Booking</h2>
+        {loadError && <p role="alert" className="mt-2 text-sm text-red-700">{loadError}</p>}
         <Button onClick={() => navigate('/advertiser/bookings')} className="mt-4">
           Về danh sách Booking
         </Button>
@@ -175,7 +147,7 @@ export function BookingDetailPage() {
           <div className="flex items-center space-x-2">
             <span className="font-mono text-xs font-bold text-slate-500">{booking.id}</span>
             <span className="text-slate-300">•</span>
-            <h1 className="text-xl font-bold text-slate-900">{booking.slotName}</h1>
+            <h1 className="text-xl font-bold text-slate-900">{booking.campaignName || booking.slotName}</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Doanh nghiệp: <strong>{booking.companyName}</strong> • Người liên hệ: {booking.contactPerson} ({booking.contactPhone})
@@ -232,39 +204,79 @@ export function BookingDetailPage() {
         </div>
       </div>
 
-      {/* Workflow Guidance Banner */}
+      {actionError && (
+        <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-800 flex items-center">
+          <AlertCircle className="w-4 h-4 mr-1.5 shrink-0" />
+          {actionError}
+        </div>
+      )}
+
+      {booking.bookingStatus === 'SUBMITTED' && (
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs flex items-center">
+          <Clock className="w-4 h-4 text-slate-500 mr-1.5 shrink-0" />
+          Booking đang giữ chỗ và chờ tòa soạn gửi báo giá chính thức. Giá hiển thị bên dưới chỉ là dự toán theo giá niêm yết.
+        </div>
+      )}
+
+      {booking.bookingStatus === 'REJECTED' && booking.rejectionReason && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs">
+          <strong>Lý do từ chối:</strong> {booking.rejectionReason}
+        </div>
+      )}
+
+      {/* UC006: xác nhận đúng phiên bản báo giá đang xem */}
       {booking.bookingStatus === 'QUOTED' && (
-        <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 text-xs space-y-3">
           <div className="space-y-1">
             <div className="font-bold flex items-center">
               <Clock className="w-4 h-4 text-sky-600 mr-1.5" />
-              Tòa soạn đã gửi Báo giá & Điều khoản hợp đồng
+              Tòa soạn đã gửi báo giá{booking.quoteVersion ? ` (phiên bản ${booking.quoteVersion})` : ''}
             </div>
             <p className="text-sky-800">
-              Kinh phí duyệt: <strong>{formatCurrency(booking.finalPrice)}</strong> {booking.discountPercent ? `(Đã chiết khấu ${booking.discountPercent}%)` : ''}.
-              Vui lòng xem xét và chấp nhận báo giá để sang bước thanh toán.
+              Kinh phí: <strong>{formatCurrency(booking.finalPrice)}</strong> {booking.discountPercent ? `(đã chiết khấu ${booking.discountPercent}%)` : ''}.
+              Xem chi tiết và ghi chú điều khoản bên dưới trước khi xác nhận.
             </p>
           </div>
-          <Button onClick={handleAcceptQuotation} size="sm" className="shrink-0 bg-sky-700 hover:bg-sky-800 text-white font-bold">
-            Chấp nhận Báo giá
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" className="mt-0.5" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
+            <span>Tôi đã đọc và đồng ý với giá, lịch phát và điều khoản trong báo giá này.</span>
+          </label>
+          <Button onClick={handleAcceptQuotation} size="sm" disabled={!termsAccepted} isLoading={isAccepting}
+            className="bg-sky-700 hover:bg-sky-800 text-white font-bold">
+            Xác nhận báo giá
           </Button>
         </div>
       )}
 
-      {booking.bookingStatus === 'CONFIRMED' && booking.paymentStatus === 'UNPAID' && (
+      {booking.paymentIssue === 'LATE_PAYMENT_CONFLICT' && (
+        <div role="alert" className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs">
+          Tiền về sau khi hết hạn giữ chỗ và vị trí đã có doanh nghiệp khác đặt. Khoản thanh toán đã được ghi nhận,
+          tòa soạn sẽ liên hệ để chọn lịch mới hoặc hoàn tiền. Quảng cáo chưa được phát.
+        </div>
+      )}
+
+      {booking.bookingStatus === 'CONFIRMED' && (booking.paymentStatus === 'UNPAID' || booking.paymentStatus === 'PENDING') && (
         <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="font-bold flex items-center">
               <CreditCard className="w-4 h-4 text-amber-600 mr-1.5" />
-              Chờ thanh toán kinh phí hợp đồng
+              {booking.paymentStatus === 'PENDING' ? 'Đang chờ xác nhận thanh toán' : 'Chờ thanh toán kinh phí hợp đồng'}
             </div>
             <p className="text-amber-800">
-              Bạn đã xác nhận hợp đồng. Bấm nút bên cạnh để lấy mã chuyển khoản VietQR hoặc thông tin tài khoản BIDV tòa soạn.
+              {booking.paymentStatus === 'PENDING'
+                ? 'Hệ thống chỉ ghi nhận khi cổng thanh toán xác nhận. Nếu đã chuyển tiền, bấm kiểm tra lại; đơn cũ được dùng lại, không phải trả lần hai.'
+                : 'Bạn đã xác nhận báo giá. Bấm nút để mở trang thanh toán (QR hoặc ví LocalPress).'}
+              {booking.holdExpiresAt && <> Giữ chỗ đến <strong>{formatDateTime(booking.holdExpiresAt)}</strong>.</>}
             </p>
           </div>
-          <Button onClick={handleGoToPayment} size="sm" className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold">
-            Thanh toán ngay ({formatCurrency(booking.finalPrice)})
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            {booking.paymentStatus === 'PENDING' && (
+              <Button variant="outline" size="sm" onClick={() => loadData(booking.id)}>Kiểm tra lại</Button>
+            )}
+            <Button onClick={handleGoToPayment} size="sm" isLoading={isPaying} className="bg-amber-600 hover:bg-amber-700 text-white font-bold">
+              {booking.paymentStatus === 'PENDING' ? 'Tiếp tục thanh toán' : `Thanh toán ngay (${formatCurrency(booking.finalPrice)})`}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -293,7 +305,7 @@ export function BookingDetailPage() {
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span className="text-slate-500">Giá niêm yết:</span>
-              <span className="text-slate-700">{formatCurrency(booking.standardPrice)}</span>
+              <span className="text-slate-700">{booking.standardPrice != null ? formatCurrency(booking.standardPrice) : 'Theo báo giá'}</span>
             </div>
             {booking.discountPercent ? (
               <div className="flex justify-between py-1 border-b border-slate-100 text-emerald-600 font-medium">
@@ -302,8 +314,8 @@ export function BookingDetailPage() {
               </div>
             ) : null}
             <div className="flex justify-between py-2 text-sm font-bold text-slate-900 border-t border-slate-200">
-              <span>Giá hợp đồng chốt:</span>
-              <span className="text-primary-900 font-black">{formatCurrency(booking.finalPrice)}</span>
+              <span>{booking.bookingStatus === 'SUBMITTED' ? 'Dự toán:' : booking.bookingStatus === 'CONFIRMED' ? 'Giá đã chốt:' : 'Giá báo:'}</span>
+              <span className="text-primary-900 font-black">{booking.finalPrice != null ? formatCurrency(booking.finalPrice) : 'Theo báo giá'}</span>
             </div>
 
             {booking.quotationNotes && (
@@ -448,70 +460,12 @@ export function BookingDetailPage() {
             </div>
           )}
 
-          {/* Upload New Creative Form */}
-          {campaign && (
-            <form onSubmit={handleUploadCreative} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-900 flex items-center">
-                  <Upload className="w-4 h-4 mr-1.5 text-primary-900" />
-                  Tải lên phiên bản Creative mới (v{(campaign?.creatives.length || 0) + 1})
-                </h4>
-                {uploadSuccess && (
-                  <span className="text-xs font-semibold text-emerald-600">
-                    ✓ Đã gửi phiên bản mới lên tòa soạn để kiểm duyệt!
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <Label htmlFor="crTitle" required>Tiêu đề mô tả banner</Label>
-                  <Input
-                    id="crTitle"
-                    placeholder="VD: Banner Khuyến mại Tháng 10..."
-                    value={creativeTitle}
-                    onChange={(e) => setCreativeTitle(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="crTarget" required>URL trang đích (Link khi khách click)</Label>
-                  <Input
-                    id="crTarget"
-                    value={creativeTarget}
-                    onChange={(e) => setCreativeTarget(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="text-xs">
-                <Label htmlFor="crImage" required>Đường dẫn hình ảnh Banner (URL mẫu)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="crImage"
-                    placeholder="https://..."
-                    value={creativeImage}
-                    onChange={(e) => setCreativeImage(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCreativeImage('https://images.unsplash.com/photo-1542744094-3a31f272c490?w=1000&auto=format&fit=crop&q=80')}
-                  >
-                    Dùng ảnh mẫu
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <Button type="submit" size="sm" isLoading={isUploading}>
-                  Gửi phiên bản banner mới để Tòa Soạn duyệt
-                </Button>
-              </div>
-            </form>
+          {/* UC008: nộp banner sau khi đã xác nhận báo giá */}
+          {campaign && booking.bookingStatus === 'CONFIRMED' && (
+            <CreativeUploadForm campaign={campaign} onUploaded={() => loadData(booking.id)} />
+          )}
+          {booking.bookingStatus !== 'CONFIRMED' && booking.bookingStatus !== 'REJECTED' && (
+            <p className="text-xs text-slate-500 italic">Bạn có thể nộp banner sau khi xác nhận báo giá.</p>
           )}
         </CardContent>
       </Card>

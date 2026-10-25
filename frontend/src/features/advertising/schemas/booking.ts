@@ -21,7 +21,7 @@ export const bookingScheduleSchema = z.object({
 
 export const bookingSchema = bookingScheduleSchema.and(z.object({
   slotId: z.string().min(1, 'Vui lòng chọn vị trí quảng cáo'),
-  companyName: companyProfileSchema.shape.companyName,
+  campaignName: z.string().trim().min(1, 'Vui lòng nhập tên chiến dịch').max(255, 'Tên chiến dịch tối đa 255 ký tự'),
   contactPerson: companyProfileSchema.shape.contactPerson,
   contactPhone: companyProfileSchema.shape.phone,
   contactEmail: companyProfileSchema.shape.email,
