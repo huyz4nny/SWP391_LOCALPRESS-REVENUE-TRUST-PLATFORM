@@ -2,6 +2,184 @@
 @tailwind components;
 @tailwind utilities;
 
+/* === THEME (sinh bởi frontend/scripts/gen_theme_css.py, sửa màu ở script rồi chạy lại) === */
+@layer base {
+  /* Thang màu slate/stone (kênh RGB) dùng bởi tailwind.config.js. Sáng: */
+  :root {
+    --slate-50: 247 247 248;
+    --slate-100: 240 241 242;
+    --slate-200: 230 231 233;
+    --slate-300: 209 211 214;
+    --slate-400: 110 113 119;
+    --slate-500: 95 98 104;
+    --slate-600: 75 78 84;
+    --slate-700: 53 55 59;
+    --slate-800: 35 36 39;
+    --slate-900: 20 21 22;
+    --slate-950: 11 11 12;
+    --stone-50: 250 250 249;
+    --stone-100: 245 245 244;
+    --stone-200: 231 229 228;
+    --stone-300: 214 211 209;
+    --stone-400: 168 162 158;
+    --stone-500: 120 113 108;
+    --stone-600: 87 83 78;
+    --stone-700: 68 64 60;
+    --stone-800: 41 37 36;
+    --stone-900: 28 25 23;
+    --stone-950: 12 10 9;
+    --ground: 242 244 247;     /* nền backoffice */
+    --page: 250 250 249;       /* nền báo giấy ngà */
+    --surface: 255 255 255;    /* panel */
+    --positive: 36 123 80;
+    --negative: 196 36 42;
+    --chart-grid: #e7e8ea;
+    --chart-axis: #a3a6ab;
+    --chart-tick: #5f6268;
+    --chart-bar: #1e3a8a;
+    color-scheme: light;
+  }
+
+  /* Tối: xám trung tính thật (taste-skill app-screens §9.3), không navy, không slate xanh. */
+  .dark {
+    --slate-50: 29 30 33;
+    --slate-100: 36 37 41;
+    --slate-200: 46 48 52;
+    --slate-300: 64 66 71;
+    --slate-400: 142 145 152;
+    --slate-500: 163 166 172;
+    --slate-600: 186 189 194;
+    --slate-700: 208 210 214;
+    --slate-800: 228 229 232;
+    --slate-900: 242 243 245;
+    --slate-950: 250 250 251;
+    --stone-50: 30 29 27;
+    --stone-100: 38 36 34;
+    --stone-200: 48 46 43;
+    --stone-300: 66 63 60;
+    --stone-400: 150 145 140;
+    --stone-500: 168 162 157;
+    --stone-600: 192 187 182;
+    --stone-700: 212 208 204;
+    --stone-800: 230 227 224;
+    --stone-900: 244 242 240;
+    --stone-950: 250 249 248;
+    --ground: 15 16 18;
+    --page: 18 17 16;
+    --surface: 23 24 26;
+    --positive: 74 199 130;
+    --negative: 240 110 120;
+    --chart-grid: #2a2b2f;
+    --chart-axis: #4a4c51;
+    --chart-tick: #a3a6ac;
+    --chart-bar: #7f9ff0;
+    color-scheme: dark;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * Dark mode ghi đè: các trang của mọi module dùng bg-white và màu nhạt cố định,
+ * đổi ở đây để cả site tối theo mà không phải sửa code từng module (Rule 17).
+ * --------------------------------------------------------------------------- */
+@layer utilities {
+  .dark body { background-color: rgb(var(--page)); color: rgb(var(--slate-900)); }
+  .dark .bg-white { background-color: rgb(var(--surface)); }
+  .dark .hover\:bg-white:hover { background-color: rgb(var(--slate-50)); }
+  .dark .border-white { border-color: rgb(var(--slate-200)); }
+  /* Nền đậm (slate/stone 800-950) đã đảo thành sáng: chữ trắng trên đó phải thành chữ tối */
+  .dark :is(.bg-slate-800, .bg-slate-900, .bg-slate-950, .bg-stone-800, .bg-stone-900, .bg-stone-950):is(.text-white),
+  .dark :is(.bg-slate-800, .bg-slate-900, .bg-slate-950, .bg-stone-800, .bg-stone-900, .bg-stone-950) .text-white { color: rgb(var(--ground)); }
+  .dark .bg-black\/40 { background-color: rgb(0 0 0 / 0.6); }
+  .dark img { filter: brightness(0.92); }
+  .dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: rgb(16 185 129 / 0.14); }
+  .dark .bg-emerald-200 { background-color: rgb(16 185 129 / 0.24); }
+  .dark .border-emerald-100, .dark .border-emerald-200, .dark .border-emerald-300 { border-color: rgb(16 185 129 / 0.35); }
+  .dark .text-emerald-600, .dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900, .dark .text-emerald-950 { color: #6ee7b7; }
+  .dark .bg-green-50, .dark .bg-green-100 { background-color: rgb(34 197 94 / 0.14); }
+  .dark .bg-green-200 { background-color: rgb(34 197 94 / 0.24); }
+  .dark .border-green-100, .dark .border-green-200, .dark .border-green-300 { border-color: rgb(34 197 94 / 0.35); }
+  .dark .text-green-600, .dark .text-green-700, .dark .text-green-800, .dark .text-green-900, .dark .text-green-950 { color: #86efac; }
+  .dark .bg-amber-50, .dark .bg-amber-100 { background-color: rgb(245 158 11 / 0.14); }
+  .dark .bg-amber-200 { background-color: rgb(245 158 11 / 0.24); }
+  .dark .border-amber-100, .dark .border-amber-200, .dark .border-amber-300 { border-color: rgb(245 158 11 / 0.35); }
+  .dark .text-amber-600, .dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900, .dark .text-amber-950 { color: #fcd34d; }
+  .dark .bg-yellow-50, .dark .bg-yellow-100 { background-color: rgb(234 179 8 / 0.14); }
+  .dark .bg-yellow-200 { background-color: rgb(234 179 8 / 0.24); }
+  .dark .border-yellow-100, .dark .border-yellow-200, .dark .border-yellow-300 { border-color: rgb(234 179 8 / 0.35); }
+  .dark .text-yellow-600, .dark .text-yellow-700, .dark .text-yellow-800, .dark .text-yellow-900, .dark .text-yellow-950 { color: #fde047; }
+  .dark .bg-orange-50, .dark .bg-orange-100 { background-color: rgb(249 115 22 / 0.14); }
+  .dark .bg-orange-200 { background-color: rgb(249 115 22 / 0.24); }
+  .dark .border-orange-100, .dark .border-orange-200, .dark .border-orange-300 { border-color: rgb(249 115 22 / 0.35); }
+  .dark .text-orange-600, .dark .text-orange-700, .dark .text-orange-800, .dark .text-orange-900, .dark .text-orange-950 { color: #fdba74; }
+  .dark .bg-red-50, .dark .bg-red-100 { background-color: rgb(239 68 68 / 0.14); }
+  .dark .bg-red-200 { background-color: rgb(239 68 68 / 0.24); }
+  .dark .border-red-100, .dark .border-red-200, .dark .border-red-300 { border-color: rgb(239 68 68 / 0.35); }
+  .dark .text-red-600, .dark .text-red-700, .dark .text-red-800, .dark .text-red-900, .dark .text-red-950 { color: #fca5a5; }
+  .dark .bg-rose-50, .dark .bg-rose-100 { background-color: rgb(244 63 94 / 0.14); }
+  .dark .bg-rose-200 { background-color: rgb(244 63 94 / 0.24); }
+  .dark .border-rose-100, .dark .border-rose-200, .dark .border-rose-300 { border-color: rgb(244 63 94 / 0.35); }
+  .dark .text-rose-600, .dark .text-rose-700, .dark .text-rose-800, .dark .text-rose-900, .dark .text-rose-950 { color: #fda4af; }
+  .dark .bg-sky-50, .dark .bg-sky-100 { background-color: rgb(14 165 233 / 0.14); }
+  .dark .bg-sky-200 { background-color: rgb(14 165 233 / 0.24); }
+  .dark .border-sky-100, .dark .border-sky-200, .dark .border-sky-300 { border-color: rgb(14 165 233 / 0.35); }
+  .dark .text-sky-600, .dark .text-sky-700, .dark .text-sky-800, .dark .text-sky-900, .dark .text-sky-950 { color: #7dd3fc; }
+  .dark .bg-blue-50, .dark .bg-blue-100 { background-color: rgb(59 130 246 / 0.14); }
+  .dark .bg-blue-200 { background-color: rgb(59 130 246 / 0.24); }
+  .dark .border-blue-100, .dark .border-blue-200, .dark .border-blue-300 { border-color: rgb(59 130 246 / 0.35); }
+  .dark .text-blue-600, .dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900, .dark .text-blue-950 { color: #93c5fd; }
+  .dark .bg-indigo-50, .dark .bg-indigo-100 { background-color: rgb(99 102 241 / 0.14); }
+  .dark .bg-indigo-200 { background-color: rgb(99 102 241 / 0.24); }
+  .dark .border-indigo-100, .dark .border-indigo-200, .dark .border-indigo-300 { border-color: rgb(99 102 241 / 0.35); }
+  .dark .text-indigo-600, .dark .text-indigo-700, .dark .text-indigo-800, .dark .text-indigo-900, .dark .text-indigo-950 { color: #a5b4fc; }
+  .dark .bg-purple-50, .dark .bg-purple-100 { background-color: rgb(168 85 247 / 0.14); }
+  .dark .bg-purple-200 { background-color: rgb(168 85 247 / 0.24); }
+  .dark .border-purple-100, .dark .border-purple-200, .dark .border-purple-300 { border-color: rgb(168 85 247 / 0.35); }
+  .dark .text-purple-600, .dark .text-purple-700, .dark .text-purple-800, .dark .text-purple-900, .dark .text-purple-950 { color: #d8b4fe; }
+  .dark .bg-teal-50, .dark .bg-teal-100 { background-color: rgb(20 184 166 / 0.14); }
+  .dark .bg-teal-200 { background-color: rgb(20 184 166 / 0.24); }
+  .dark .border-teal-100, .dark .border-teal-200, .dark .border-teal-300 { border-color: rgb(20 184 166 / 0.35); }
+  .dark .text-teal-600, .dark .text-teal-700, .dark .text-teal-800, .dark .text-teal-900, .dark .text-teal-950 { color: #5eead4; }
+  .dark .bg-primary-50, .dark .bg-primary-100 { background-color: rgb(96 140 235 / 0.14); }
+  .dark .bg-primary-200 { background-color: rgb(96 140 235 / 0.24); }
+  .dark .border-primary-100, .dark .border-primary-200, .dark .border-primary-300 { border-color: rgb(96 140 235 / 0.35); }
+  .dark .text-primary-600, .dark .text-primary-700, .dark .text-primary-800, .dark .text-primary-900, .dark .text-primary-950 { color: #a9c1f5; }
+  .dark .bg-crimson-50, .dark .bg-crimson-100 { background-color: rgb(239 68 68 / 0.14); }
+  .dark .bg-crimson-200 { background-color: rgb(239 68 68 / 0.24); }
+  .dark .border-crimson-100, .dark .border-crimson-200, .dark .border-crimson-300 { border-color: rgb(239 68 68 / 0.35); }
+  .dark .text-crimson-600, .dark .text-crimson-700, .dark .text-crimson-800, .dark .text-crimson-900, .dark .text-crimson-950 { color: #fca5a5; }
+  .dark .bg-gold-50, .dark .bg-gold-100 { background-color: rgb(245 158 11 / 0.14); }
+  .dark .bg-gold-200 { background-color: rgb(245 158 11 / 0.24); }
+  .dark .border-gold-100, .dark .border-gold-200, .dark .border-gold-300 { border-color: rgb(245 158 11 / 0.35); }
+  .dark .text-gold-600, .dark .text-gold-700, .dark .text-gold-800, .dark .text-gold-900, .dark .text-gold-950 { color: #fcd34d; }
+  .dark .text-primary, .dark .text-crimson { color: #a9c1f5; }
+  .dark .text-crimson { color: #f2a3a3; }
+  .dark .bg-\[\#fafaf9\] { background-color: rgb(var(--page)); }
+  .dark .bg-\[\#fdfbf7\] { background-color: rgb(var(--page)); }
+  .dark .bg-\[\#e9ecf0\] { background-color: rgb(var(--slate-100)); }
+  .dark .hover\:bg-\[\#e9ecf0\]:hover { background-color: rgb(var(--slate-100)); }
+  .dark .bg-\[\#e3e6eb\] { background-color: rgb(var(--slate-200)); }
+  .dark .bg-\[\#dfe7f5\] { background-color: rgb(96 140 235 / 0.22); }
+  .dark .border-\[\#e1e4e9\] { border-color: rgb(var(--slate-200)); }
+  .dark .bg-\[\#dcfae5\] { background-color: rgb(16 185 129 / 0.16); }
+  .dark .text-\[\#04250e\] { color: #86efac; }
+  .dark .bg-\[\#ffedea\] { background-color: rgb(239 68 68 / 0.16); }
+  .dark .text-\[\#831c1e\] { color: #fca5a5; }
+  .dark .bg-\[\#fffbeb\] { background-color: rgb(245 158 11 / 0.12); }
+  .dark .text-\[\#92400e\] { color: #fcd34d; }
+  .dark .ring-\[\#fde68a\] { --tw-ring-color: rgb(245 158 11 / 0.35); }
+  .dark .border-\[\#fde68a\] { border-color: rgb(245 158 11 / 0.35); }
+  .dark .bg-\[\#fef3c7\] { background-color: rgb(245 158 11 / 0.16); }
+  .dark .text-\[\#78350f\] { color: #fcd34d; }
+  .dark .bg-\[\#e8effc\] { background-color: rgb(96 140 235 / 0.18); }
+  .dark .text-\[\#1e3a8a\] { color: #a9c1f5; }
+  .dark .bg-\[\#fff5f4\] { background-color: rgb(239 68 68 / 0.12); }
+  .dark .border-\[\#f6cfca\] { border-color: rgb(239 68 68 / 0.35); }
+  .dark .bg-\[\#f0fbf3\] { background-color: rgb(16 185 129 / 0.12); }
+  .dark .border-\[\#c6ecd2\] { border-color: rgb(16 185 129 / 0.35); }
+  .dark .text-\[\#14532d\] { color: #86efac; }
+}
+/* === HẾT THEME === */
+
 @layer base {
   :root {
     --background: 40 20% 98%;
@@ -12,18 +190,34 @@
     --popover-foreground: 20 14% 10%;
     --primary: 221 83% 33%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --secondary: 220 6% 94%;
+    --secondary-foreground: 220 6% 8%;
+    --muted: 220 6% 94%;
+    --muted-foreground: 220 4% 39%;
+    --accent: 220 6% 94%;
+    --accent-foreground: 220 6% 8%;
+    --destructive: 0 69% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 225 4% 91%;
+    --input: 222 4% 83%;
     --ring: 221 83% 33%;
     --radius: 0.5rem;
+  }
+
+  /* Số liệu trong bảng và số tiền luôn dùng chữ số đều cột */
+  table,
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid #1e3a8a;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: #dbeafe;
+    color: #0f172a;
   }
 }
 
@@ -31,18 +225,27 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-/* Custom scrollbars for backoffice tables & drawers */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: #d1d3d6;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a3a6ab;
 }

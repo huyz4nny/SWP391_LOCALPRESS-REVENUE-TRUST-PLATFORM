@@ -1,4 +1,14 @@
 /** @type {import('tailwindcss').Config} */
+// Design tokens theo taste-skill (style "achromatic-ledger", giữ màu & phông brand LocalPress).
+// - slate: xám trung tính (không ngả xanh), các bậc chứa chữ đạt >= 4.5:1 trên nền trắng.
+// - Không shadow cho vật đứng yên (card, nút, badge); shadow chỉ còn ở lg/xl/2xl cho thứ nổi (dialog, menu).
+// - Bo góc 2 mức: 8px cho panel, 6px cho control, 4px cho chip.
+// - Dark mode: class 'dark' trên <html> (ThemeToggle), nền xám trung tính thật, không navy.
+// slate / stone đọc từ biến CSS (kênh RGB) để dark mode đảo cả thang màu mà không phải sửa class ở từng trang.
+// Giá trị sáng / tối nằm ở src/styles/globals.css (:root và .dark).
+const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
+const scale = (name) => Object.fromEntries(STEPS.map((n) => [n, `rgb(var(--${name}-${n}) / <alpha-value>)`]))
+
 export default {
   darkMode: ['class'],
   content: [
@@ -13,6 +23,9 @@ export default {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        slate: scale('slate'),
+        stone: scale('stone'),
+        ground: 'rgb(var(--ground) / <alpha-value>)', // nền backoffice: xám-xanh nhạt của sổ cái (tối: xám trung tính)
         primary: {
           DEFAULT: '#1e3a8a', // Deep Navy
           foreground: '#ffffff',
@@ -44,6 +57,8 @@ export default {
           600: '#d97706',
           700: '#b45309',
         },
+        positive: 'rgb(var(--positive) / <alpha-value>)',
+        negative: 'rgb(var(--negative) / <alpha-value>)',
         editorial: {
           bg: '#fafaf9',
           card: '#ffffff',
@@ -56,6 +71,24 @@ export default {
       fontFamily: {
         serif: ['"Merriweather"', '"Noto Serif"', 'Georgia', 'Cambria', 'serif'],
         sans: ['"Inter"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+      },
+      boxShadow: {
+        '2xs': 'none',
+        xs: 'none',
+        sm: 'none',
+        DEFAULT: 'none',
+        md: 'none',
+        inner: 'none',
+        lg: '0 8px 24px rgba(0, 0, 0, 0.08)',
+        xl: '0 12px 32px rgba(0, 0, 0, 0.12)',
+        '2xl': '0 16px 48px rgba(0, 0, 0, 0.16)',
+      },
+      borderRadius: {
+        sm: '4px',
+        md: '6px',
+        lg: '8px',
+        xl: '8px',
+        '2xl': '8px',
       },
     },
   },

@@ -7,6 +7,8 @@ import com.localpress.finance.dto.response.TransactionLedgerResponse;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
+import com.localpress.finance.model.RefundStatus;
+import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceLedgerService;
 import com.localpress.shared.exception.AppException;
@@ -44,6 +46,9 @@ class FinanceLedgerServiceTest {
 
     @Mock
     private TransactionRepository transactionRepository;
+
+    @Mock
+    private RefundRequestRepository refundRequestRepository;
 
     @InjectMocks
     private FinanceLedgerService financeLedgerService;
@@ -157,5 +162,21 @@ class FinanceLedgerServiceTest {
             assertThat(summary.getFailedCount()).isEqualTo(2L);
             assertThat(summary.getPendingManualTransfersCount()).isEqualTo(3L);
         }
+    }
+
+    @Test
+    @DisplayName("Dashboard: doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ), số hoàn chờ duyệt lấy từ DB")
+    void dashboardUsesNetRevenueAndRealPendingRefundCount() {
+        when(transactionRepository.calculateTotalGrossRevenue()).thenReturn(new BigDecimal("30000"));
+        when(transactionRepository.calculateTotalRefundedAmount()).thenReturn(new BigDecimal("15000"));
+        when(transactionRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        when(refundRequestRepository.countByStatus(RefundStatus.PENDING)).thenReturn(3L);
+
+        var dashboard = financeLedgerService.getFinanceDashboard();
+        var summary = financeLedgerService.getLedgerSummary();
+
+        assertThat(dashboard.getTotalRevenue()).isEqualByComparingTo("15000");
+        assertThat(dashboard.getTotalRevenue()).isEqualByComparingTo(summary.getNetRevenue());
+        assertThat(dashboard.getRefundReviewCount()).isEqualTo(3L);
     }
 }

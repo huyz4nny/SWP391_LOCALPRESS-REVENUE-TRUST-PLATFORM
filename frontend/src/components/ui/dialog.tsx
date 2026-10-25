@@ -45,32 +45,27 @@ export function Dialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
 
-      {/* Modal Dialog */}
       <div
         className={cn(
-          'relative z-50 w-full rounded-xl bg-white p-6 shadow-2xl transition-all animate-in zoom-in-95',
+          'relative z-50 max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-xl',
           maxWidthClasses[maxWidth]
         )}
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none cursor-pointer"
+          className="absolute right-3 top-3 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
           <span className="sr-only">Đóng</span>
         </button>
 
-        {title && <h3 className="text-lg font-bold text-slate-900 pr-6">{title}</h3>}
-        {description && <p className="mt-1 text-sm text-slate-500 mb-4">{description}</p>}
+        {title && <h3 className="pr-8 text-base font-semibold leading-6 text-slate-900">{title}</h3>}
+        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
 
-        <div className="mt-4">{children}</div>
+        <div className={title || description ? 'mt-5' : ''}>{children}</div>
       </div>
     </div>
   )
