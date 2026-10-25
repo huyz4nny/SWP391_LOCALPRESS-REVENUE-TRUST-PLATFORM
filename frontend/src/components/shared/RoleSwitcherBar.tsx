@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { mockStore } from '@/mocks/store'
 import { APP_CONFIG, ROLE_LABELS } from '@/app/config'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Users,
   RotateCcw,
-  ShieldCheck,
   ChevronDown,
-  Sparkles,
-  ExternalLink,
   ChevronUp,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -43,150 +39,95 @@ export function RoleSwitcherBar() {
     }
   }
 
+  const shortcuts = [
+    { label: 'Trang báo', to: '/' },
+    { label: 'Doanh nghiệp (SV1)', to: '/advertiser' },
+    { label: 'Tòa soạn (SV2)', to: '/backoffice/editorial' },
+    { label: 'Độc giả (SV3)', to: '/account' },
+    { label: 'Tài chính (SV4)', to: '/backoffice/finance' },
+    { label: 'Hệ thống (SV5)', to: '/backoffice/admin' },
+  ]
+
   return (
-    <div className="fixed bottom-3 right-3 z-50 font-sans">
+    <div className="fixed bottom-3 right-3 z-50 font-sans text-slate-900">
       {isMinimized ? (
         <button
           onClick={() => setIsMinimized(false)}
-          className="flex items-center space-x-2 bg-slate-900 text-white px-3 py-2 rounded-full shadow-2xl hover:bg-slate-800 transition-all border border-slate-700 text-xs font-semibold cursor-pointer"
+          className="flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-[13px] font-medium shadow-lg hover:bg-slate-50 cursor-pointer"
         >
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>Demo Role: {currentUser.name.split(' (')[0]}</span>
-          <ChevronUp className="w-3.5 h-3.5" />
+          <Users className="h-4 w-4 text-slate-500" />
+          <span>Demo: {currentUser.name.split(' (')[0]}</span>
+          <ChevronUp className="h-3.5 w-3.5 text-slate-500" />
         </button>
       ) : (
-        <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700 p-3 max-w-md transition-all">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
-            <div className="flex items-center space-x-2">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Bộ Điều Khiển Kịch Bản Demo (Mock Switcher)
-              </span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={() => setIsMinimized(true)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer"
-                title="Thu nhỏ"
-              >
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
+        <div className="w-[min(420px,calc(100vw-1.5rem))] rounded-lg border border-slate-200 bg-white p-3 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[13px] font-semibold">Bộ chuyển vai trò demo</span>
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+              title="Thu nhỏ"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center space-x-2 overflow-hidden">
-              <img
-                src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&auto=format&fit=crop&q=80'}
-                alt=""
-                className="w-7 h-7 rounded-full object-cover border border-slate-600"
-              />
-              <div className="truncate">
-                <div className="text-xs font-semibold text-white truncate">{currentUser.name}</div>
-                <div className="text-[10px] text-slate-400 truncate">{ROLE_LABELS[currentUser.role]}</div>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                {currentUser.name.charAt(0)}
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-medium">{currentUser.name}</div>
+                <div className="truncate text-xs text-slate-500">{ROLE_LABELS[currentUser.role]}</div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-1.5 shrink-0">
+            <div className="flex flex-none items-center gap-1.5">
               <div className="relative">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsOpen(!isOpen)}
-                  className="bg-slate-800 text-slate-200 hover:bg-slate-700 border-slate-700 text-xs h-7"
-                >
-                  <Users className="w-3.5 h-3.5 mr-1 text-sky-400" />
+                <Button variant="outline" size="sm" onClick={() => setIsOpen(!isOpen)}>
                   Đổi vai trò
-                  <ChevronDown className="w-3 h-3 ml-1" />
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
                 </Button>
 
                 {isOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 w-80 max-h-96 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-1.5 z-50">
-                    <div className="text-[11px] font-bold text-slate-400 px-2.5 py-1.5 uppercase">
-                      Chọn vai trò thử nghiệm:
-                    </div>
+                  <div className="absolute bottom-full right-0 z-50 mb-2 max-h-96 w-80 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
                     {users.map((u) => (
                       <button
                         key={u.id}
                         onClick={() => handleSwitch(u.id)}
-                        className={`w-full text-left px-2.5 py-2 rounded-md flex items-center justify-between text-xs transition-colors cursor-pointer ${
-                          u.id === currentUser.id
-                            ? 'bg-primary-900 text-white font-medium'
-                            : 'text-slate-300 hover:bg-slate-800'
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[13px] cursor-pointer ${
+                          u.id === currentUser.id ? 'bg-slate-100 font-medium' : 'hover:bg-slate-50'
                         }`}
                       >
-                        <div className="truncate pr-2">
+                        <div className="min-w-0 pr-2">
                           <div className="truncate">{u.name}</div>
-                          <div className="text-[10px] opacity-75">{ROLE_LABELS[u.role]}</div>
+                          <div className="truncate text-xs text-slate-500">{ROLE_LABELS[u.role]}</div>
                         </div>
-                        {u.id === currentUser.id && (
-                          <span className="text-[10px] bg-primary-700 px-1.5 py-0.5 rounded text-white shrink-0">
-                            Hiện tại
-                          </span>
-                        )}
+                        {u.id === currentUser.id && <span className="flex-none text-xs text-slate-500">Hiện tại</span>}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReset}
-                title="Khôi phục trạng thái dữ liệu gốc"
-                className="bg-slate-800/80 text-amber-300 border-amber-500/30 hover:bg-amber-950/40 text-xs h-7 px-2"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+              <Button variant="ghost" size="sm" onClick={handleReset} title="Khôi phục dữ liệu mẫu ban đầu">
+                <RotateCcw className="h-3.5 w-3.5" />
                 Reset
               </Button>
             </div>
           </div>
 
-          {/* Quick Route Shortcuts for the 5 students */}
-          <div className="mt-2 pt-2 border-t border-slate-800/80 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className="text-slate-400 font-medium">Truy cập nhanh:</span>
-            <button
-              onClick={() => navigate('/')}
-              className="text-sky-400 hover:underline px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
-            >
-              Trang báo (Khách)
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              onClick={() => navigate('/advertiser')}
-              className="text-sky-400 hover:underline px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
-            >
-              Cổng Advertiser (SV1)
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              onClick={() => navigate('/backoffice/editorial')}
-              className="text-sky-400 hover:underline px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
-            >
-              Tòa soạn (SV2)
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              onClick={() => navigate('/account')}
-              className="text-sky-400 hover:underline px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
-            >
-              Độc giả (SV3)
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              onClick={() => navigate('/backoffice/finance')}
-              className="text-amber-400 hover:underline px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer font-medium"
-            >
-              Tài chính (SV4)
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              onClick={() => navigate('/backoffice/admin')}
-              className="text-emerald-400 hover:underline px-1.5 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
-            >
-              Hệ thống (SV5)
-            </button>
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-2.5 text-xs">
+            {shortcuts.map((s) => (
+              <button
+                key={s.to}
+                onClick={() => navigate(s.to)}
+                className="text-slate-600 hover:text-primary-900 hover:underline cursor-pointer"
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
         </div>
       )}

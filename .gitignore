@@ -67,3 +67,18 @@ desktop.ini
 __pycache__/
 *.pyc
 /huyz4nny/
+
+# --- SePay / payment secrets (SV4) ---
+backend/config/application-secrets.yml
+
+# --- taste-skill working files ---
+frontend/.taste-skill/
+
+# --- SV4 (Huy) personal docs & tools, not shared ---
+/AI_REPORT_SV4_HUY.md
+/backend/scripts/sv4_finance_e2e.sh
+/docs/diagrams/swimlane_sv4.png
+/docs/sv4/
+/notebooklm_docs/02_CHUYEN_SAU_LUONG_4_KE_TOAN_THANH_TOAN_DOI_SOAT.md
+/notebooklm_docs/*sv4*
+/notebooklm_docs/*SV4*

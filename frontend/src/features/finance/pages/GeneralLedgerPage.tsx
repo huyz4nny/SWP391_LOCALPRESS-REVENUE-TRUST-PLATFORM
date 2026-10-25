@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { GeneralLedgerEntry } from '../types'
 import { financeApi } from '../api'
 import { formatCurrency, formatDateTime } from '@/lib/format'
-import { BookMarked, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { PageHeader, Panel, KpiStrip, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
 
 export function GeneralLedgerPage() {
   const [entries, setEntries] = useState<GeneralLedgerEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadLedger()
@@ -15,8 +16,11 @@ export function GeneralLedgerPage() {
   const loadLedger = async () => {
     try {
       setLoading(true)
+      setError('')
       const data = await financeApi.getLedger()
       setEntries(data)
+    } catch (e: any) {
+      setError(e?.message || 'Không tải được sổ quỹ')
     } finally {
       setLoading(false)
     }
@@ -26,76 +30,74 @@ export function GeneralLedgerPage() {
   const totalDebit = entries.filter((e) => e.entryType === 'DEBIT').reduce((acc, e) => acc + e.amount, 0)
   const netBalance = totalCredit - totalDebit
 
+  if (loading && entries.length === 0) return <LoadingBlock rows={8} />
+
   return (
-    <div className="space-y-6">
-      <div className="pb-4 border-b border-slate-200">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Sổ Quỹ & Bút Toán Kế Toán (General Ledger)
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Ghi nhận các bút toán phát sinh: Thu tiền dịch vụ (Credit), Hoàn trả (Debit) và các bút toán điều chỉnh
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="Sổ quỹ"
+        sub="Bút toán phát sinh: thu tiền dịch vụ ghi Có, hoàn tiền ghi Nợ. Số dư ròng tính từ chính các dòng bên dưới."
+      />
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold">Tổng phát sinh Thu (Credit)</span>
-            <ArrowDownRight className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-xl font-black text-emerald-700">{formatCurrency(totalCredit)}</div>
-        </div>
+      {error && <div className="mb-4"><Notice tone="error">{error} <button onClick={loadLedger} className="font-medium underline cursor-pointer">Thử lại</button></Notice></div>}
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold">Tổng phát sinh Hoàn (Debit)</span>
-            <ArrowUpRight className="w-4 h-4 text-red-600" />
-          </div>
-          <div className="text-xl font-black text-crimson">{formatCurrency(totalDebit)}</div>
-        </div>
+      <div className="space-y-4">
+        <KpiStrip
+          items={[
+            { label: 'Số dư ròng', value: formatCurrency(netBalance), lead: true, note: `${entries.length} bút toán` },
+            { label: 'Phát sinh thu (Có)', value: formatCurrency(totalCredit), note: `${entries.filter((e) => e.entryType === 'CREDIT').length} bút toán` },
+            { label: 'Phát sinh hoàn (Nợ)', value: formatCurrency(totalDebit), note: `${entries.filter((e) => e.entryType === 'DEBIT').length} bút toán` },
+          ]}
+        />
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold">Số dư thực tế ròng (Net Balance)</span>
-            <BookMarked className="w-4 h-4 text-primary-900" />
-          </div>
-          <div className="text-xl font-black text-slate-900">{formatCurrency(netBalance)}</div>
-        </div>
-      </div>
-
-      {/* Ledger Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-        <table className="w-full text-xs text-left">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-            <tr>
-              <th className="px-4 py-3">Mã bút toán</th>
-              <th className="px-4 py-3">Thời gian ghi sổ</th>
-              <th className="px-4 py-3">Tham chiếu</th>
-              <th className="px-4 py-3">Diễn giải nội dung</th>
-              <th className="px-4 py-3 text-right">Phát sinh Thu (Credit)</th>
-              <th className="px-4 py-3 text-right">Phát sinh Hoàn (Debit)</th>
-              <th className="px-4 py-3">Người ghi nhận</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {entries.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/80">
-                <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.entryCode}</td>
-                <td className="px-4 py-3 text-slate-500">{formatDateTime(item.timestamp)}</td>
-                <td className="px-4 py-3 font-mono text-primary-900 font-semibold">{item.referenceCode}</td>
-                <td className="px-4 py-3 font-medium text-slate-800 max-w-sm">{item.description}</td>
-                <td className="px-4 py-3 text-right font-bold text-emerald-700">
-                  {item.entryType === 'CREDIT' ? formatCurrency(item.amount) : '—'}
-                </td>
-                <td className="px-4 py-3 text-right font-bold text-crimson">
-                  {item.entryType === 'DEBIT' ? formatCurrency(item.amount) : '—'}
-                </td>
-                <td className="px-4 py-3 text-slate-500">{item.createdBy}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Panel title="Bút toán" aside={<span className="num">{entries.length} dòng</span>} bodyClassName="px-0 pb-1">
+          {entries.length === 0 ? (
+            <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Chưa có bút toán nào.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className={tableCls.table}>
+                <thead className={tableCls.thead}>
+                  <tr>
+                    <th className={tableCls.th}>Mã bút toán</th>
+                    <th className={tableCls.th}>Ghi sổ lúc</th>
+                    <th className={tableCls.th}>Diễn giải</th>
+                    <th className={tableCls.th}>Người ghi</th>
+                    <th className={tableCls.thNum}>Thu (Có)</th>
+                    <th className={tableCls.thNum}>Hoàn (Nợ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((item) => (
+                    <tr key={item.id} className={tableCls.tr}>
+                      <td className={tableCls.td}>
+                        <div className={tableCls.code}>{item.entryCode}</div>
+                        <div className="font-mono text-xs text-slate-500">{item.referenceCode}</div>
+                      </td>
+                      <td className={`${tableCls.td} whitespace-nowrap num`}>{formatDateTime(item.timestamp)}</td>
+                      <td className={`${tableCls.td} max-w-[360px]`}>
+                        <div className="line-clamp-2 text-slate-900">{item.description}</div>
+                      </td>
+                      <td className={`${tableCls.td} whitespace-nowrap`}>{item.createdBy}</td>
+                      <td className={`${tableCls.tdNum} ${item.entryType === 'CREDIT' ? 'font-semibold text-positive' : ''}`}>
+                        {item.entryType === 'CREDIT' ? `+${formatCurrency(item.amount)}` : <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className={`${tableCls.tdNum} ${item.entryType === 'DEBIT' ? 'font-semibold' : ''}`}>
+                        {item.entryType === 'DEBIT' ? `-${formatCurrency(item.amount)}` : <span className="text-slate-400">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-slate-200 text-sm">
+                    <td colSpan={4} className="h-12 pl-5 pr-3 font-medium text-slate-900">Cộng phát sinh</td>
+                    <td className="h-12 px-3 text-right font-semibold text-positive num">+{formatCurrency(totalCredit)}</td>
+                    <td className="h-12 pl-3 pr-5 text-right font-semibold text-slate-900 num">-{formatCurrency(totalDebit)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </Panel>
       </div>
     </div>
   )
