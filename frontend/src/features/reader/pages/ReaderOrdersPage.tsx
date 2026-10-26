@@ -1,27 +1,66 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
-import { Order } from '@/features/finance/types'
 import { httpClient } from '@/lib/http/client'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Receipt, FileText, ExternalLink } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Receipt } from 'lucide-react'
 
+// một đơn trong GET /finance/orders/me của SV4
+interface MyOrder {
+  transactionId: number | string
+  orderCode: string
+  orderType: string
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
+  isPaid: boolean
+  expired?: boolean
+  amount: number
+  paymentMethod?: string
+  createdAt: string
+  paidAt?: string
+  description?: string
+  targetId?: number | string
+}
+
+interface MyOrdersResponse {
+  data?: {
+    content?: MyOrder[]
+    totalPages?: number
+    number?: number
+  }
+}
+
+const PAGE_SIZE = 20
+
+// UC045 lịch sử giao dịch của độc giả ở màn hình II.3.10
+// luồng đi là trang này gọi GET /finance/orders/me của SV4 -> backend lấy user từ phiên đăng nhập -> trả Page đơn mới nhất trước
 export function ReaderOrdersPage() {
   const currentUser = mockStore.getCurrentUser()
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<MyOrder[]>([])
+  const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    loadOrders()
-  }, [currentUser.id])
+    loadOrders(page)
+  }, [currentUser.id, page])
 
-  const loadOrders = async () => {
+  const loadOrders = async (pageToLoad: number) => {
     try {
       setLoading(true)
-      const data = await httpClient.get<Order[]>('/finance/orders')
-      setOrders(data)
+      setError('')
+      const res = await httpClient.get<MyOrdersResponse>('/finance/orders/me', {
+        params: { page: pageToLoad, size: PAGE_SIZE },
+      })
+      setOrders(res?.data?.content ?? [])
+      setTotalPages(res?.data?.totalPages ?? 0)
+    } catch (err) {
+      // lỗi mạng hoặc chưa đăng nhập thì báo lỗi thay vì để trang trắng
+      setOrders([])
+      setError(err instanceof Error ? err.message : 'Không tải được lịch sử giao dịch')
     } finally {
       setLoading(false)
     }
@@ -36,7 +75,13 @@ export function ReaderOrdersPage() {
         </p>
       </div>
 
-      {orders.length === 0 ? (
+      {error && (
+        <p className="text-xs text-crimson border border-red-200 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {loading ? (
+        <p className="text-xs text-stone-500">Đang tải lịch sử giao dịch...</p>
+      ) : orders.length === 0 ? (
         <EmptyState
           icon={<Receipt className="w-12 h-12 text-stone-300 mx-auto mb-3" />}
           title="Chưa có giao dịch nào"
@@ -58,35 +103,31 @@ export function ReaderOrdersPage() {
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-stone-50/70 transition-colors">
+                  <tr key={o.orderCode} className="hover:bg-stone-50/70 transition-colors">
                     <td className="px-4 py-3 font-mono font-medium text-stone-900">
                       {o.orderCode}
                     </td>
                     <td className="px-4 py-3 max-w-xs truncate font-medium text-stone-800">
-                      {o.targetTitle}
+                      {o.description || o.orderType}
                     </td>
                     <td className="px-4 py-3 font-bold text-stone-900">
-                      {formatCurrency(o.finalAmount)}
+                      {formatCurrency(o.amount)}
                     </td>
                     <td className="px-4 py-3 text-stone-500">
-                      {formatDateTime(o.createdAt)}
+                      {formatDateTime(o.paidAt ?? o.createdAt)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge type="payment" status={o.paymentStatus} />
+                      <StatusBadge type="payment" status={o.expired && o.status === 'PENDING' ? 'EXPIRED' : o.status} />
                     </td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      {o.paymentStatus === 'PENDING' && (
+                    <td className="px-4 py-3 text-right">
+                      {/* chỉ đơn còn chờ và chưa hết hạn mới cho thanh toán tiếp ở trang thanh toán chung của SV4 */}
+                      {o.status === 'PENDING' && !o.isPaid && !o.expired && (
                         <Link
-                          to={`/checkout/${o.id}`}
+                          to={`/payment/${o.orderCode}`}
                           className="font-bold text-primary-900 hover:underline"
                         >
                           Thanh toán ngay
                         </Link>
-                      )}
-                      {o.paymentStatus === 'PAID' && o.invoiceNumber && (
-                        <span className="text-stone-400 font-mono text-[11px]" title="Mã hóa đơn">
-                          {o.invoiceNumber}
-                        </span>
                       )}
                     </td>
                   </tr>
@@ -94,6 +135,20 @@ export function ReaderOrdersPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 text-xs">
+          <Button variant="outline" size="sm" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>
+            Trang trước
+          </Button>
+          <span className="text-stone-500">
+            Trang {page + 1} / {totalPages}
+          </span>
+          <Button variant="outline" size="sm" disabled={page + 1 >= totalPages || loading} onClick={() => setPage(page + 1)}>
+            Trang sau
+          </Button>
         </div>
       )}
     </div>
