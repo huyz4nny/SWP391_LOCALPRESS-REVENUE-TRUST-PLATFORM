@@ -25,6 +25,18 @@ function requireRealVersionApi(): void {
 }
 
 export const contentApi = {
+    async submitVersionForReview(
+        articleId: string,
+        versionNumber: number,
+    ): Promise<ArticleVersionDetail> {
+        requireRealVersionApi()
+
+        return httpClient.post<ArticleVersionDetail>(
+            `/articles/${encodeURIComponent(articleId)}`
+            + `/versions/${versionNumber}/submit`,
+        )
+    },
+
     async getVersions(
         articleId: string,
     ): Promise<ArticleVersionSummary[]> {

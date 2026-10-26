@@ -286,4 +286,61 @@ public class ArticleVersionService {
 
         return getVersion(article.getId(), versionNumber);
     }
+
+    @Transactional
+    public ArticleVersionDetailResponse submitVersionForReview(
+            Long articleId,
+            Integer versionNumber
+    ) {
+        User currentUser = currentUserService.requireCurrentAuthor();
+
+        // Same lock order as restore/update: article first, version second.
+        Article article = articleRepository
+                .findOwnedArticleForUpdate(articleId, currentUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy bài viết"
+                ));
+
+        if (!Objects.equals(versionNumber, article.getLatestVersion())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Đây không còn là phiên bản mới nhất. Vui lòng tải lại bản nháp"
+            );
+        }
+
+        ArticleVersion version = articleVersionRepository
+                .findVersionForUpdate(article.getId(), versionNumber)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy phiên bản"
+                ));
+
+        ArticleDraftPolicy.requireEditable(article, version);
+
+        if (version.getTitle() == null || version.getTitle().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Vui lòng nhập tiêu đề trước khi gửi duyệt"
+            );
+        }
+        if (version.getContent() == null || version.getContent().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Vui lòng nhập nội dung trước khi gửi duyệt"
+            );
+        }
+
+        version.submitForReview();
+
+        // A pending revision must not take the currently published article offline.
+        if (article.getStatus() == Article.Status.DRAFT) {
+            article.setStatus(Article.Status.PENDING);
+        }
+
+        articleVersionRepository.saveAndFlush(version);
+        articleRepository.saveAndFlush(article);
+
+        return getVersion(article.getId(), versionNumber);
+    }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { Article, ArticleVersion } from '@/features/reader/types'
 import { editorialApi, type EditorialCategoryOption } from '../api'
 import { contentApi } from '@/features/content/api'
@@ -28,10 +28,13 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { ArticleVersionDraftEditor } from '@/features/content/components/ArticleVersionDraftEditor'
+import { articleVersionEditorPath, isArticleVersionEditorMode } from '@/features/content/routes'
 
 export function ArticleEditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const saveInFlight = useRef(false)
+  const location = useLocation()
   const isEditing = !!id && id !== 'new'
   const isAuthor = mockStore.getCurrentUser().role === 'AUTHOR'
 
@@ -160,7 +163,7 @@ export function ArticleEditorPage() {
 
     void loadData()
     return () => { active = false }
-  }, [id, isEditing, isAuthor, clearErrors])
+  }, [id, isEditing, isAuthor, clearErrors, location.search])
 
   useEffect(() => {
     let active = true
@@ -202,44 +205,41 @@ export function ArticleEditorPage() {
   }
 
   const handleSave = async (submitForReview: boolean = false) => {
-    if (isSaving || loading) return
-    setCoverError('')
-    setSaveError('')
-    clearErrors()
-    const values: ArticleEditorValues = {
-      title, sapo, content, categoryId, coverImage, coverFile, coverAltText,
-      coverCaption, coverSource, tags, isPremium, price: isPremium ? price : 0, changelog,
-    }
-    for (const key of Object.keys(values) as (keyof ArticleEditorValues)[]) setValue(key, values[key])
-    if (!await trigger()) {
-      setSaveError('Vui lòng kiểm tra các trường được đánh dấu bên dưới')
-      return
-    }
-    const selectedCat = categories.find((category) => category.id === categoryId)
-    if (!selectedCat || (!APP_CONFIG.useMockApi && (!Number.isSafeInteger(Number(selectedCat.apiId)) || Number(selectedCat.apiId) <= 0))) {
-      setError('categoryId', { message: 'Vui lòng chọn chuyên mục hợp lệ' })
-      return
-    }
-    if (coverFile) {
-      const dimensionError = await checkCoverDimensions(coverFile)
-      if (dimensionError) {
-        setError('coverFile', { message: dimensionError })
-        return
-      }
-    }
-    const hasCover = Boolean(coverImage.trim())
-    const imageInfo = {
-      caption: coverCaption.trim() || null,
-      altText: coverAltText.trim(),
-      imageSource: coverSource.trim() || null,
-    }
-
-    if (!APP_CONFIG.useMockApi && submitForReview) {
-      alert('Hãy lưu bản nháp trước. Luồng gửi duyệt cần API riêng của quy trình kiểm duyệt.')
-      return
-    }
+    if (saveInFlight.current || loading) return
+    saveInFlight.current = true
     setIsSaving(true)
     try {
+      setCoverError('')
+      setSaveError('')
+      clearErrors()
+      const values: ArticleEditorValues = {
+        title, sapo, content, categoryId, coverImage, coverFile, coverAltText,
+        coverCaption, coverSource, tags, isPremium, price: isPremium ? price : 0, changelog,
+      }
+      for (const key of Object.keys(values) as (keyof ArticleEditorValues)[]) setValue(key, values[key])
+      if (!await trigger()) {
+        setSaveError('Vui lòng kiểm tra các trường được đánh dấu bên dưới')
+        return
+      }
+      const validatedCategory = categories.find((category) => category.id === categoryId)
+      if (!validatedCategory || (!APP_CONFIG.useMockApi && (!Number.isSafeInteger(Number(validatedCategory.apiId)) || Number(validatedCategory.apiId) <= 0))) {
+        setError('categoryId', { message: 'Vui lòng chọn chuyên mục hợp lệ' })
+        return
+      }
+      if (coverFile) {
+        const dimensionError = await checkCoverDimensions(coverFile)
+        if (dimensionError) {
+          setError('coverFile', { message: dimensionError })
+          return
+        }
+      }
+      const hasCover = Boolean(coverImage.trim())
+      const imageInfo = {
+        caption: coverCaption.trim() || null,
+        altText: coverAltText.trim(),
+        imageSource: coverSource.trim() || null,
+      }
+
       const selectedCat = categories.find((c) => c.id === categoryId)
       const tagsArray = tags.split(',').map((t) => t.trim()).filter(Boolean)
       if (!APP_CONFIG.useMockApi) {
@@ -247,7 +247,7 @@ export function ArticleEditorPage() {
         if (!Number.isSafeInteger(numericCategoryId) || numericCategoryId <= 0) {
           throw new Error('Vui lòng chọn chuyên mục hợp lệ')
         }
-        await contentApi.saveDraft(isEditing ? id : undefined, {
+        const saved = await contentApi.saveDraft(isEditing ? id : undefined, {
           categoryId: numericCategoryId,
           title: title.trim(), sapo: sapo.trim(), content,
           coverImageUrl: coverImage.trim(),
@@ -257,7 +257,7 @@ export function ArticleEditorPage() {
           changelog,
           imageInfo: !coverFile && hasCover ? imageInfo : undefined,
         }, coverFile, imageInfo)
-        navigate('/backoffice/editorial/articles')
+        navigate(articleVersionEditorPath(saved.id), { replace: !isEditing })
         return
       }
 
@@ -302,6 +302,7 @@ export function ArticleEditorPage() {
       }
       setSaveError(err instanceof Error ? err.message : 'Lỗi lưu bài viết')
     } finally {
+      saveInFlight.current = false
       setIsSaving(false)
     }
   }
@@ -344,7 +345,7 @@ export function ArticleEditorPage() {
     </div>
   }
 
-  if (!APP_CONFIG.useMockApi && isEditing && id && status === 'PUBLISHED') {
+  if (!APP_CONFIG.useMockApi && isEditing && id && (status === 'PUBLISHED' || isArticleVersionEditorMode(location.search))) {
     if (draftVersion === null) {
       return (
         <p role="alert" className="text-red-700">
@@ -361,6 +362,7 @@ export function ArticleEditorPage() {
         initialTitle={title}
         initialSapo={sapo}
         initialContent={content}
+        metadataEditorPath={status === 'DRAFT' ? `/backoffice/editorial/articles/${encodeURIComponent(id)}/edit` : undefined}
       />
     )
   }
@@ -430,19 +432,19 @@ export function ArticleEditorPage() {
           <Button
             type="button"
             size="sm"
-            onClick={() => handleSave(true)}
+            onClick={() => handleSave(APP_CONFIG.useMockApi)}
             isLoading={isSaving}
             className="text-xs bg-sky-700 hover:bg-sky-800 font-bold"
           >
             <Send className="w-3.5 h-3.5 mr-1" />
-            Gửi kiểm duyệt (Submit)
+            {APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Lưu và tiếp tục gửi duyệt'}
           </Button>
         </div>
       </div>
 
       {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
       {/* Editor Body */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+      <fieldset disabled={isSaving} className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Main Content Fields */}
         <div className="md:col-span-8 space-y-4">
           <Card>
@@ -641,7 +643,7 @@ export function ArticleEditorPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </fieldset>
 
       {/* AI Assistant Modal */}
       <Dialog

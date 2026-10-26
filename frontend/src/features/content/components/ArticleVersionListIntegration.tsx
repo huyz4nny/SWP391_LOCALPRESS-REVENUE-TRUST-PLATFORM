@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import type { ArticleVersionReviewStatus } from '../types'
 import { ArticleVersionHistoryDialog } from './ArticleVersionHistoryDialog'
+import { ArticleRevisionDialog } from './ArticleRevisionDialog'
 
 interface VersionedArticle {
   id: string
@@ -52,6 +53,7 @@ export function ArticleVersionActions({ article, onRestored }: {
   onRestored: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [revisionOpen, setRevisionOpen] = useState(false)
   const user = mockStore.getCurrentUser()
   const allowed = !APP_CONFIG.useMockApi
     && PERMISSION_CHECKERS.canComposeArticles(user.role)
@@ -76,6 +78,15 @@ export function ArticleVersionActions({ article, onRestored }: {
         >
           <Edit className="mr-1 h-3 w-3" /> Sửa bản nháp v{article.currentVersion}
         </Link>
+      )}
+      {article.latestReviewStatus === 'REJECTED' && (article.status === 'CHANGES_REQUESTED' || article.status === 'REJECTED' || article.status === 'PUBLISHED') && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setRevisionOpen(true)}>
+          Xem phản hồi / Sửa bài
+        </Button>
+      )}
+      {revisionOpen && (
+        <ArticleRevisionDialog key={`${article.id}:${article.currentVersion}`} articleId={article.id}
+          versionNumber={article.currentVersion} onClose={() => setRevisionOpen(false)} onCreated={onRestored} />
       )}
       {open && (
         <ArticleVersionHistoryDialog

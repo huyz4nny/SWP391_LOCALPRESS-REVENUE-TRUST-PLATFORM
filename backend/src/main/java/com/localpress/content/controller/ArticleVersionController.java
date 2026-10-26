@@ -101,4 +101,17 @@ public class ArticleVersionController {
                 .cacheControl(CacheControl.noStore())
                 .body(updated);
     }
+
+    @PostMapping("/{articleId:\\d+}/versions/{versionNumber:[1-9]\\d*}/submit")
+    public ResponseEntity<ArticleVersionDetailResponse> submitVersionForReview(
+            @PathVariable("articleId") Long articleId,
+            @PathVariable("versionNumber") Integer versionNumber
+    ) {
+        ArticleVersionDetailResponse submitted =
+                articleVersionService.submitVersionForReview(articleId, versionNumber);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(submitted);
+    }
 }
