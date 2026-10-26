@@ -46,6 +46,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     boolean existsByGatewayTransactionId(String gatewayTransactionId);
 
+    /** "Đơn của tôi" (UC045 của SV3): đơn của 1 user, lọc theo loại nếu có. Dùng index idx_transactions_user_created. */
+    @Query("""
+        SELECT t FROM Transaction t
+        WHERE t.userId = :userId
+          AND (:transactionType IS NULL OR t.transactionType = :transactionType)
+    """)
+    Page<Transaction> findMyOrders(
+            @Param("userId") Long userId,
+            @Param("transactionType") TransactionType transactionType,
+            Pageable pageable
+    );
+
     /** Mã nạp bù mới nhất còn chờ của 1 đơn, để mở lại trang thanh toán không tạo QR mới mỗi lần. */
     Optional<Transaction> findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
 

@@ -15,6 +15,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -144,6 +148,18 @@ public class PaymentProcessingService {
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng #" + transactionId, HttpStatus.NOT_FOUND));
         principal.assertCanAccess(tx.getUserId());
         return toStatus(tx);
+    }
+
+    /**
+     * "Đơn của tôi": mọi đơn của user đang đăng nhập (kể cả TOPUP, REFUND), mới nhất trước.
+     * SV3 dùng cho UC045 thay vì đọc thẳng bảng transactions (Rule 17).
+     */
+    @Transactional(readOnly = true)
+    public Page<OrderStatusResponse> getMyOrders(Long userId, String type, int page, int size) {
+        TransactionType transactionType = type == null || type.isBlank() ? null : parseOrderType(type);
+        Pageable pageable = PageRequest.of(Math.max(0, page), size <= 0 ? 20 : Math.min(size, 100),
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "transactionId")));
+        return transactionRepository.findMyOrders(userId, transactionType, pageable).map(this::toStatus);
     }
 
     @Transactional(readOnly = true)
@@ -502,6 +518,8 @@ public class PaymentProcessingService {
                 .paidAt(tx.getPaidAt())
                 .createdAt(tx.getCreatedAt())
                 .expiresAt(tx.getExpiresAt())
+                .description(tx.getDescription())
+                .targetId(tx.resolveTargetId())
                 .build();
     }
 
