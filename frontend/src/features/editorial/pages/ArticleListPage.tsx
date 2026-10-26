@@ -23,6 +23,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 
+import { ArticleVersionActions, ArticleVersionCell, ArticlePublishedVersionNote } from '@/features/content/components/ArticleVersionListIntegration'
+
 export function ArticleListPage() {
   const navigate = useNavigate()
   const currentUser = mockStore.getCurrentUser()
@@ -119,7 +121,7 @@ export function ArticleListPage() {
       {/* Filter Toolbar */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-semibold text-slate-500 mr-1">Trạng thái:</span>
+          <span className="font-semibold text-slate-500 mr-1">Trạng thái bài viết:</span>
           {['ALL', 'DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED', 'PUBLISHED', 'UNPUBLISHED'].map((st) => (
             <button
               key={st}
@@ -157,12 +159,19 @@ export function ArticleListPage() {
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="px-4 py-3">Bài viết</th>
+                <th className="px-4 py-3">
+                  Bài viết
+                  {isAuthor && (
+                    <span className="mt-1 block text-[10px] font-normal normal-case">
+                      Tiêu đề phiên bản mới nhất
+                    </span>
+                  )}
+                </th>
                 <th className="px-4 py-3">Chuyên mục</th>
                 <th className="px-4 py-3">Loại</th>
                 <th className="px-4 py-3">Tác giả</th>
-                <th className="px-4 py-3">Phiên bản</th>
-                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3">{isAuthor ? 'Phiên bản mới nhất' : 'Phiên bản'}</th>
+                <th className="px-4 py-3">Trạng thái bài viết</th>
                 <th className="px-4 py-3 text-right">Hành động</th>
               </tr>
             </thead>
@@ -200,11 +209,17 @@ export function ArticleListPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{art.authorName}</td>
-                  <td className="px-4 py-3 font-mono text-slate-500">v{art.currentVersion || 1}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge type="article" status={art.status} />
+                    <ArticleVersionCell article={art} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="space-y-2">
+                      <StatusBadge type="article" status={art.status} />
+                      {isAuthor && <ArticlePublishedVersionNote article={art} />}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right space-x-1 shrink-0">
+                    <ArticleVersionActions article={art} onRestored={() => { void loadArticles() }} />
                     {(!isAuthor || art.status === 'DRAFT') && (
                       <Link
                         to={`/backoffice/editorial/articles/${art.id}/edit`}

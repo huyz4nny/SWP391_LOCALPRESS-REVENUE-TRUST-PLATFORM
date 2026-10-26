@@ -5,6 +5,7 @@ import com.localpress.reader.dto.ArticleReaderResponse;
 import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.repository.ArticleProjection;
 import com.localpress.reader.repository.ReaderArticleRepository;
+import com.localpress.delivery.service.PaywallEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class ReaderArticleServiceImpl implements ReaderArticleService {
 
     private final ReaderArticleRepository readerArticleRepository;
+    private final PaywallEngine paywallEngine;
 
     // block lấy danh sách bài tóm tắt cho UC029 và UC030 ở màn hình II.3.1
     // chuỗi rỗng được đổi thành null trước để câu sql bỏ qua bộ lọc đó
@@ -46,8 +48,11 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
                         "Không tìm thấy bài viết hoặc bài chưa được xuất bản"));
         // tăng lượt xem thêm 1 trong database
         readerArticleRepository.incrementViewCount(slug);
+        // hỏi PaywallEngine của SV5 xem người đọc hiện tại có quyền đọc toàn văn không
+        // engine tự xét bài free người đã mua lẻ hoặc người có gói còn hạn nên ở đây chỉ nhận kết quả đúng hay sai
+        boolean allowed = paywallEngine.checkCurrentAccess(projection.getId()).allowed();
         // đẩy sang applyPaywall để quyết định trả toàn văn hay chỉ preview
-        return applyPaywall(mapToDetail(projection), projection.getContent(), projection.getAccessType());
+        return applyPaywall(mapToDetail(projection), projection.getContent(), projection.getAccessType(), allowed);
     }
 
     // block tính vị trí cắt 30 phần trăm văn bản cho UC032 (rule 3)
@@ -69,19 +74,19 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
     }
 
     // block rào chắn paywall phía server cho UC031 và UC032 (rule 3)
-    // luồng đi là nhận dto đã map -> xem bài free hay premium -> free thì trả toàn văn còn premium thì chỉ trả 30 phần trăm -> trả về getArticleBySlug
-    private ArticleReaderResponse applyPaywall(ArticleReaderResponse response, String rawContent, String accessType) {
+    // luồng đi là nhận dto đã map và cờ allowed từ PaywallEngine -> được phép thì trả toàn văn còn không thì chỉ trả 30 phần trăm -> trả về getArticleBySlug
+    private ArticleReaderResponse applyPaywall(ArticleReaderResponse response, String rawContent, String accessType, boolean allowed) {
         boolean premium = "PREMIUM".equalsIgnoreCase(accessType);
         response.setIsPremium(premium);
-        // nhánh free hoặc bài không có nội dung thì mở hết không khóa
-        if (!premium || rawContent == null) {
+        // nhánh được phép đọc gồm bài free người đã mua lẻ hoặc người có gói còn hạn thì mở hết không khóa
+        if (allowed) {
             response.setContent(rawContent);
             response.setPreviewContent(rawContent);
             response.setIsLocked(false);
             return response;
         }
-        // nhánh premium chỉ gán đoạn preview 30 phần trăm
-        response.setPreviewContent(rawContent.substring(0, previewCut(rawContent)));
+        // nhánh không được phép chỉ gán đoạn preview 30 phần trăm và bài không có nội dung thì preview rỗng
+        response.setPreviewContent(rawContent == null ? "" : rawContent.substring(0, previewCut(rawContent)));
         // xóa sạch toàn văn ở server để bấm F12 cũng không thấy phần còn lại
         response.setContent(null);
         // bật cờ khóa để frontend hiện khung paywall mời mua

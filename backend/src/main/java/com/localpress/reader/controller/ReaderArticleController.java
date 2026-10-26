@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,6 +59,7 @@ public class ReaderArticleController {
     // luồng đi là nhận slug -> gọi service getArticleBySlug -> service tự áp paywall -> trả chi tiết về frontend
     @GetMapping("/{slug:.*\\D.*}")
     public ResponseEntity<ArticleReaderResponse> getArticleBySlug(@PathVariable String slug) {
-        return ResponseEntity.ok(readerArticleService.getArticleBySlug(slug));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).varyBy("Authorization")
+                .body(readerArticleService.getArticleBySlug(slug));
     }
 }

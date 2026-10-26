@@ -32,6 +32,9 @@ public class User {
     @Column(name = "phone", length = 20)
     private String phone;
 
+    @Column(name = "avatar_url", length = 1000)
+    private String avatarUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role;
@@ -65,6 +68,12 @@ public class User {
         user.status = Status.ACTIVE;
         user.failedAttempts = 0;
 
+        return user;
+    }
+
+    public static User createGoogleReader(String name, String email, String passwordHash, String avatarUrl) {
+        User user = createReader(name, email, passwordHash, null);
+        user.avatarUrl = avatarUrl;
         return user;
     }
 

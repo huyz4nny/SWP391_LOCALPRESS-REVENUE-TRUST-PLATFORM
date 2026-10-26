@@ -9,7 +9,7 @@ export function logout(): void {
 
 /** Real API mode: a remembered user without credentials (new tab, closed session) is shown as Guest. */
 export function syncAuthSession(): void {
-    if (!APP_CONFIG.useMockApi && !httpClient.hasBasicAuth() && mockStore.getCurrentUser().id !== 'user-guest') {
+    if (!APP_CONFIG.useMockApi && !httpClient.hasAuth() && mockStore.getCurrentUser().id !== 'user-guest') {
         mockStore.setCurrentUser('user-guest')
     }
 }

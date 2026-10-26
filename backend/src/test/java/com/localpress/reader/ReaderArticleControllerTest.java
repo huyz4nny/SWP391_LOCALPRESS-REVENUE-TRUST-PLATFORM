@@ -9,6 +9,7 @@ import com.localpress.reader.service.ReaderArticleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -72,6 +73,8 @@ class ReaderArticleControllerTest {
 
         mvc.perform(get("/api/v1/articles/hai-phong-thu-hut-fdi"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Vary", "Authorization"))
                 .andExpect(jsonPath("$.slug").value("hai-phong-thu-hut-fdi"))
                 .andExpect(jsonPath("$.isLocked").value(false));
 
