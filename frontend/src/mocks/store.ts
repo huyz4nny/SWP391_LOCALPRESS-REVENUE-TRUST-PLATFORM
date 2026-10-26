@@ -217,7 +217,12 @@ function getInitialState(): MockStoreState {
       }
 
       parsed.categories = SEED_CATEGORIES
+      // Keep a user logged in from the real backend (not in the seed) so a reload does not drop to Guest
+      const loggedInUser = parsed.users?.find((u) => u.id === parsed.currentUserId)
       parsed.users = SEED_USERS
+      if (loggedInUser && !SEED_USERS.some((u) => u.id === loggedInUser.id)) {
+        parsed.users = [...SEED_USERS, loggedInUser]
+      }
       parsed.advertiserProfiles = parsed.advertiserProfiles || structuredClone(SEED_ADVERTISER_PROFILES)
       parsed.advertiserHistory = parsed.advertiserHistory || {}
       parsed.users = parsed.users.map((user) => ({

@@ -9,11 +9,30 @@ interface RequestOptions {
     credentials?: RequestCredentials
 }
 
+const AUTH_STORAGE_KEY = 'localpress_basic_auth'
+
+function readStoredAuth(): string {
+    try {
+        return window.sessionStorage.getItem(AUTH_STORAGE_KEY) ?? ''
+    } catch {
+        return ''
+    }
+}
+
+function writeStoredAuth(value: string) {
+    try {
+        if (value) window.sessionStorage.setItem(AUTH_STORAGE_KEY, value)
+        else window.sessionStorage.removeItem(AUTH_STORAGE_KEY)
+    } catch {
+        // storage unavailable: login only lasts until reload
+    }
+}
+
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
-    // ponytail: credentials last only until page reload; use the shared identity session when it is available.
-    private basicAuth = ''
+    // Preserve main's Basic session across reloads; Google Bearer remains in memory.
+    private basicAuth = readStoredAuth()
     private bearerToken = ''
 
     constructor() {
@@ -28,15 +47,18 @@ class HttpClient {
     public setBasicAuth(email: string, password: string) {
         this.bearerToken = ''
         this.basicAuth = `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${email}:${password}`)))}`
+        writeStoredAuth(this.basicAuth)
     }
 
     public clearBasicAuth() {
         this.basicAuth = ''
         this.bearerToken = ''
+        writeStoredAuth('')
     }
 
     public setBearerToken(token: string) {
         this.basicAuth = ''
+        writeStoredAuth('')
         this.bearerToken = token
     }
 

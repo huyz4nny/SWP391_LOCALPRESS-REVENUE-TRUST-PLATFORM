@@ -364,6 +364,7 @@ sequenceDiagram
 | :--- | :---: | :--- | :--- | :--- |
 | **Thanh toán** | `POST` | `/api/v1/finance/orders` | UC047 | Tạo đơn thanh toán dùng chung cho B2C (Mua bài lẻ, Gói cước) & B2B (Booking quảng cáo). Trả về link QR SePay Vietcombank. |
 | **Thanh toán** | `GET` | `/api/v1/finance/orders/code/{orderCode}/status` | UC047 | Tra cứu trạng thái đơn hàng thời gian thực (phục vụ Frontend polling mỗi 2-3s). |
+| **Thanh toán** | `GET` | `/api/v1/finance/orders/me` | UC045 (SV3) | Đơn của user đang đăng nhập, mới nhất trước, lọc `type` (`SUBSCRIPTION`, `ARTICLE`, `AD`, `TOPUP`, `REFUND`), phân trang `page`/`size` (tối đa 100). Mỗi đơn có `targetId` để nối sang bài/gói. |
 | **Thanh toán** | `POST` | `/api/v1/finance/orders/{id}/pay` | UC047 | Giả lập xác nhận thanh toán tức thì (phục vụ phòng thi / demo nhanh). |
 | **Webhook** | `POST` | `/api/v1/finance/webhook/sepay` | UC050 | Webhook IPN nhận callback từ SePay / Vietcombank, kiểm tra HMAC và chống cộng tiền trùng lặp (Rule 5). |
 | **Chuyển khoản** | `GET` | `/api/v1/finance/transfers/pending` | UC051 | Lấy danh sách giao dịch chuyển khoản thủ công chờ kế toán đối soát. |
