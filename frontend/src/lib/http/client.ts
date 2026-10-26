@@ -8,11 +8,30 @@ interface RequestOptions {
     skipAuth?: boolean
 }
 
+const AUTH_STORAGE_KEY = 'localpress_basic_auth'
+
+function readStoredAuth(): string {
+    try {
+        return window.sessionStorage.getItem(AUTH_STORAGE_KEY) ?? ''
+    } catch {
+        return ''
+    }
+}
+
+function writeStoredAuth(value: string) {
+    try {
+        if (value) window.sessionStorage.setItem(AUTH_STORAGE_KEY, value)
+        else window.sessionStorage.removeItem(AUTH_STORAGE_KEY)
+    } catch {
+        // storage unavailable: login only lasts until reload
+    }
+}
+
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
-    // ponytail: credentials last only until page reload; use the shared identity session when it is available.
-    private basicAuth = ''
+    // Kept in sessionStorage so a reload or a direct link in the same tab keeps the login; closing the tab ends it.
+    private basicAuth = readStoredAuth()
 
     constructor() {
         this.baseUrl = APP_CONFIG.apiBaseUrl
@@ -25,10 +44,12 @@ class HttpClient {
 
     public setBasicAuth(email: string, password: string) {
         this.basicAuth = `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${email}:${password}`)))}`
+        writeStoredAuth(this.basicAuth)
     }
 
     public clearBasicAuth() {
         this.basicAuth = ''
+        writeStoredAuth('')
     }
 
     public hasBasicAuth() {
