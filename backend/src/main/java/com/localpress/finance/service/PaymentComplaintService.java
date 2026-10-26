@@ -92,8 +92,7 @@ public class PaymentComplaintService {
      */
     @Transactional
     public ComplaintResponse resolve(Long complaintId, Long accountantId, Target target, String note) {
-        PaymentComplaint c = complaintRepository.findByIdForUpdate(complaintId)
-                .orElseThrow(() -> new AppException("Không tìm thấy khiếu nại #" + complaintId, HttpStatus.NOT_FOUND));
+        PaymentComplaint c = lockComplaint(complaintId);
         if (c.getStatus() != PaymentComplaint.Status.OPEN) {
             throw new AppException("Khiếu nại #" + complaintId + " đã được xử lý (" + c.getStatus() + ")", HttpStatus.CONFLICT);
         }
@@ -137,10 +136,14 @@ public class PaymentComplaintService {
      */
     @Transactional
     public ComplaintResponse reject(Long complaintId, Long accountantId, String reason) {
-        PaymentComplaint c = complaintRepository.findByIdForUpdate(complaintId)
-                .orElseThrow(() -> new AppException("Không tìm thấy khiếu nại #" + complaintId, HttpStatus.NOT_FOUND));
+        PaymentComplaint c = lockComplaint(complaintId);
         c.reject(accountantId, reason);
         log.info("Kế toán #{} từ chối khiếu nại #{}: {}", accountantId, complaintId, reason);
         return ComplaintResponse.fromEntity(complaintRepository.save(c));
+    }
+
+    private PaymentComplaint lockComplaint(Long complaintId) {
+        return complaintRepository.findByIdForUpdate(complaintId)
+                .orElseThrow(() -> new AppException("Không tìm thấy khiếu nại #" + complaintId, HttpStatus.NOT_FOUND));
     }
 }

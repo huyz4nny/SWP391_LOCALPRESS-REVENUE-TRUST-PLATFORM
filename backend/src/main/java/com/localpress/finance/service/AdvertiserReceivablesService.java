@@ -69,18 +69,13 @@ public class AdvertiserReceivablesService {
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             BigDecimal contractValue = rs.getBigDecimal("quoted_amount");
             BigDecimal paidAmount = rs.getBigDecimal("paid_amount");
-            BigDecimal remainingDebt = contractValue.subtract(paidAmount);
-            if (remainingDebt.compareTo(BigDecimal.ZERO) < 0) {
-                remainingDebt = BigDecimal.ZERO;
-            }
-
-            Date endDateSql = rs.getDate("end_date");
-            LocalDate dueDate = endDateSql != null ? endDateSql.toLocalDate() : today;
+            BigDecimal remainingDebt = contractValue.subtract(paidAmount).max(BigDecimal.ZERO);
+            LocalDate dueDate = localDateOr(rs.getDate("end_date"), today);
 
             long overdueDays = 0;
             String debtGroup;
 
-            if (remainingDebt.compareTo(BigDecimal.ZERO) == 0 && contractValue.compareTo(BigDecimal.ZERO) > 0) {
+            if (remainingDebt.signum() == 0 && contractValue.signum() > 0) {
                 debtGroup = "PAID_IN_FULL";
             } else if (today.isAfter(dueDate)) {
                 overdueDays = ChronoUnit.DAYS.between(dueDate, today);
@@ -88,9 +83,6 @@ public class AdvertiserReceivablesService {
             } else {
                 debtGroup = "IN_TERM";
             }
-
-            Date startDateSql = rs.getDate("start_date");
-            LocalDate startDate = startDateSql != null ? startDateSql.toLocalDate() : today;
 
             return AdvertiserReceivableResponse.builder()
                     .campaignId(rs.getLong("campaign_id"))
@@ -105,7 +97,7 @@ public class AdvertiserReceivablesService {
                     .contractValue(contractValue)
                     .paidAmount(paidAmount)
                     .remainingDebt(remainingDebt)
-                    .startDate(startDate)
+                    .startDate(localDateOr(rs.getDate("start_date"), today))
                     .dueDate(dueDate)
                     .overdueDays(overdueDays)
                     .paymentStatus(rs.getString("payment_status"))
@@ -113,5 +105,9 @@ public class AdvertiserReceivablesService {
                     .debtGroup(debtGroup)
                     .build();
         });
+    }
+
+    private static LocalDate localDateOr(Date date, LocalDate fallback) {
+        return date != null ? date.toLocalDate() : fallback;
     }
 }

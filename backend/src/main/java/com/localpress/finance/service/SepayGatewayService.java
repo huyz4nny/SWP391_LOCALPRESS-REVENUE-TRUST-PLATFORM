@@ -76,35 +76,37 @@ public class SepayGatewayService {
         SepayWebhookLog.SepayWebhookLogBuilder entry = SepayWebhookLog.builder()
                 .source(source)
                 .authOk(authOk)
-                .gateway(ipn != null ? ipn.getGateway() : null)
-                .accountNumber(ipn != null ? ipn.getAccountNumber() : null)
-                .transferType(ipn != null ? ipn.getTransferType() : null)
-                .transferAmount(ipn != null ? ipn.resolveAmount() : null)
-                .content(ipn != null ? truncate(ipn.getContent(), 500) : null)
-                .paymentCode(ipn != null ? ipn.getCode() : null)
-                .referenceCode(ipn != null ? ipn.getReferenceCode() : null)
-                .transactionDate(ipn != null ? ipn.getTransactionDate() : null)
-                .orderCode(ipn != null ? ipn.resolveOrderCode() : null)
                 .rawPayload(rawPayload)
                 .remoteIp(remoteIp)
                 .receivedAt(LocalDateTime.now());
+        if (ipn != null) {
+            entry.gateway(ipn.getGateway())
+                    .accountNumber(ipn.getAccountNumber())
+                    .transferType(ipn.getTransferType())
+                    .transferAmount(ipn.resolveAmount())
+                    .content(truncate(ipn.getContent(), 500))
+                    .paymentCode(ipn.getCode())
+                    .referenceCode(ipn.getReferenceCode())
+                    .transactionDate(ipn.getTransactionDate())
+                    .orderCode(ipn.resolveOrderCode());
+        }
 
         if (!authOk || ipn == null) {
             // Không ghi sepay_id: kẻ giả mạo không được chiếm trước id của giao dịch thật
             save(entry.resultStatus("INVALID_SIGNATURE").resultMessage("Sai hoặc thiếu khóa xác thực webhook").build());
-            return new Outcome(401, body(false, "INVALID_SIGNATURE", null, "Sai khóa xác thực webhook"));
+            return new Outcome(401, PaymentProcessingService.result(false, "INVALID_SIGNATURE", null, "Sai khóa xác thực webhook"));
         }
 
         Long sepayId = ipn.getSepayId();
         if (sepayId != null && logRepository.existsBySepayId(sepayId)) {
             String msg = "SePay gửi lại giao dịch #" + sepayId + ", đã xử lý trước đó nên bỏ qua (Rule 5)";
             save(entry.resultStatus("DUPLICATE_DELIVERY").resultMessage(msg).build());
-            return new Outcome(200, body(true, "ALREADY_PROCESSED", ipn.resolveOrderCode(), msg));
+            return new Outcome(200, PaymentProcessingService.result(true, "ALREADY_PROCESSED", ipn.resolveOrderCode(), msg));
         }
 
         if (ipn.isOutgoing()) {
             save(entry.sepayId(sepayId).resultStatus("IGNORED_OUTGOING").resultMessage("Tiền ra khỏi tài khoản, không phải khách thanh toán").build());
-            return new Outcome(200, body(true, "IGNORED_OUTGOING", null, "Bỏ qua giao dịch tiền ra"));
+            return new Outcome(200, PaymentProcessingService.result(true, "IGNORED_OUTGOING", null, "Bỏ qua giao dịch tiền ra"));
         }
 
         Map<String, Object> result;
@@ -114,7 +116,7 @@ public class SepayGatewayService {
             log.error("Lỗi xử lý tiền SePay #{}: {}", sepayId, e.getMessage(), e);
             // Không ghi sepay_id để lần SePay gửi lại được xử lý tiếp
             save(entry.resultStatus("ERROR").resultMessage(truncate(e.getMessage(), 500)).build());
-            return new Outcome(500, body(false, "ERROR", ipn.resolveOrderCode(), "Lỗi xử lý, SePay sẽ gửi lại"));
+            return new Outcome(500, PaymentProcessingService.result(false, "ERROR", ipn.resolveOrderCode(), "Lỗi xử lý, SePay sẽ gửi lại"));
         }
 
         String status = String.valueOf(result.get("status"));
@@ -137,7 +139,7 @@ public class SepayGatewayService {
      * orderCode khác null: chỉ xử lý giao dịch có mã đơn đó trong nội dung chuyển khoản.
      */
     public SyncResult syncFromSepay(int hours, String orderCode) {
-        if (apiToken == null || apiToken.isBlank()) {
+        if (!apiTokenConfigured()) {
             throw new AppException("Chưa cấu hình localpress.sepay.api-token (tạo ở my.sepay.vn > Cấu hình công ty > API Access)",
                     HttpStatus.SERVICE_UNAVAILABLE);
         }
@@ -167,16 +169,14 @@ public class SepayGatewayService {
             throw new AppException("API SePay trả dữ liệu không đọc được", HttpStatus.BAD_GATEWAY);
         }
 
-        JsonNode list = root.path("transactions");
-        int fetched = 0, processed = 0, duplicate = 0, ignored = 0;
-        List<Map<String, Object>> items = new ArrayList<>();
         // API trả mới nhất trước; xử lý từ cũ đến mới để thứ tự ghi nhận đúng thời gian
         List<JsonNode> rows = new ArrayList<>();
-        list.forEach(rows::add);
+        root.path("transactions").forEach(rows::add);
         Collections.reverse(rows);
 
+        int processed = 0, duplicate = 0, ignored = 0;
+        List<Map<String, Object>> items = new ArrayList<>();
         for (JsonNode tx : rows) {
-            fetched++;
             BigDecimal amountIn = decimal(tx.path("amount_in").asText("0"));
             if (amountIn.signum() <= 0) { ignored++; continue; }
 
@@ -206,8 +206,8 @@ public class SepayGatewayService {
             item.put("status", outcome.body().get("status"));
             items.add(item);
         }
-        log.info("Đồng bộ SePay {} giờ: lấy {}, xử lý {}, trùng {}, bỏ qua {}", window, fetched, processed, duplicate, ignored);
-        return new SyncResult(fetched, processed, duplicate, ignored, items);
+        log.info("Đồng bộ SePay {} giờ: lấy {}, xử lý {}, trùng {}, bỏ qua {}", window, rows.size(), processed, duplicate, ignored);
+        return new SyncResult(rows.size(), processed, duplicate, ignored, items);
     }
 
     /**
@@ -215,25 +215,17 @@ public class SepayGatewayService {
      * Chưa cấu hình token hoặc vừa hỏi trong 10 giây thì chỉ trả trạng thái hiện tại.
      */
     public Map<String, Object> checkOrderWithSepay(String orderCode) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        if (apiToken == null || apiToken.isBlank()) {
-            out.put("checked", false);
-            out.put("reason", "API_TOKEN_NOT_CONFIGURED");
-            return out;
+        if (!apiTokenConfigured()) {
+            return Map.of("checked", false, "reason", "API_TOKEN_NOT_CONFIGURED");
         }
         long now = System.currentTimeMillis();
         Long last = lastOrderCheck.get(orderCode);
         if (last != null && now - last < ORDER_CHECK_COOLDOWN_MS) {
-            out.put("checked", false);
-            out.put("reason", "TOO_SOON");
-            return out;
+            return Map.of("checked", false, "reason", "TOO_SOON");
         }
         lastOrderCheck.put(orderCode, now);
         SyncResult r = syncFromSepay(48, orderCode);
-        out.put("checked", true);
-        out.put("found", r.processed());
-        out.put("items", r.items());
-        return out;
+        return Map.of("checked", true, "found", r.processed(), "items", r.items());
     }
 
     // =========================================================================
@@ -250,7 +242,7 @@ public class SepayGatewayService {
     public Map<String, Object> configStatus() {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("webhookKeyConfigured", webhookApiKey != null && !webhookApiKey.isBlank());
-        s.put("apiTokenConfigured", apiToken != null && !apiToken.isBlank());
+        s.put("apiTokenConfigured", apiTokenConfigured());
         s.put("accountNumber", mask(accountNumber));
         s.put("webhookPath", "/api/v1/finance/webhook/sepay");
         List<SepayWebhookLog> lastWebhook = logRepository.findBySourceOrderByReceivedAtDesc(SepayWebhookLog.Source.WEBHOOK, PageRequest.of(0, 1));
@@ -273,13 +265,8 @@ public class SepayGatewayService {
         }
     }
 
-    private static Map<String, Object> body(boolean success, String status, String orderCode, String message) {
-        Map<String, Object> b = new LinkedHashMap<>();
-        b.put("success", success);
-        b.put("status", status);
-        if (orderCode != null) b.put("orderCode", orderCode);
-        b.put("message", message);
-        return b;
+    private boolean apiTokenConfigured() {
+        return apiToken != null && !apiToken.isBlank();
     }
 
     private static String text(JsonNode n, String field) {

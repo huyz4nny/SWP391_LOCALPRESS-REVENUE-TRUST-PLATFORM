@@ -32,5 +32,10 @@ public enum TransactionType {
      * Nạp tiền vào Ví LocalPress qua QR SePay. Không gắn đối tượng nghiệp vụ nào.
      * Là công nợ phải trả khách, KHÔNG tính vào doanh thu (doanh thu ghi nhận khi tiêu ví).
      */
-    TOPUP
+    TOPUP;
+
+    /** Đơn mua (bài, gói, quảng cáo): loại duy nhất được thanh toán bằng ví và được hoàn tiền. */
+    public boolean isPurchase() {
+        return this != REFUND && this != TOPUP;
+    }
 }
