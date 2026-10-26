@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
+import { logout } from '@/features/identity/authSession'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
@@ -140,7 +141,7 @@ export function BackofficeLayout() {
     .sort((a, b) => b.length - a.length)[0]
 
   const handleLogout = () => {
-    mockStore.setCurrentUser('user-guest')
+    logout()
     navigate('/login')
   }
 
