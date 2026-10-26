@@ -115,10 +115,62 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return mockStore.getEntitlements(currentUser.id)
   }
 
-  if (pathname.startsWith('/reader/bookmarks/') && method === 'POST') {
-    const articleId = pathname.replace('/reader/bookmarks/', '')
-    const isBookmarked = mockStore.toggleBookmark(currentUser.id, articleId)
-    return { bookmarked: isBookmarked }
+  // UC038 và UC040 mock giống backend thật: khách chưa đăng nhập bị 401
+  const isLibraryPath = pathname.startsWith('/reader/saved-articles')
+    || pathname.startsWith('/reader/followed-categories')
+    || pathname === '/reader/feed'
+  if (isLibraryPath && currentUser.role === 'GUEST') {
+    throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập để dùng chức năng này', path: pathname })
+  }
+
+  if (pathname === '/reader/saved-articles/ids' && method === 'GET') {
+    const published = new Set(mockStore.getState().articles.filter((a) => a.status === 'PUBLISHED').map((a) => a.id))
+    return mockStore.getEntitlements(currentUser.id).bookmarkedArticleIds.filter((id) => published.has(id))
+  }
+
+  if (pathname === '/reader/saved-articles' && method === 'GET') {
+    const articles = mockStore.getState().articles
+    return mockStore.getEntitlements(currentUser.id).bookmarkedArticleIds
+      .map((id) => articles.find((a) => a.id === id && a.status === 'PUBLISHED'))
+      .filter((a): a is Article => Boolean(a))
+  }
+
+  if (pathname.startsWith('/reader/saved-articles/') && (method === 'PUT' || method === 'DELETE')) {
+    const articleId = decodeURIComponent(pathname.replace('/reader/saved-articles/', ''))
+    if (method === 'PUT' && !mockStore.getState().articles.some((a) => a.id === articleId && a.status === 'PUBLISHED')) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy bài viết hoặc bài chưa được xuất bản', path: pathname })
+    }
+    return { articleId, saved: mockStore.setBookmark(currentUser.id, articleId, method === 'PUT') }
+  }
+
+  if (pathname === '/reader/followed-categories' && method === 'GET') {
+    const { categories, articles } = mockStore.getState()
+    return mockStore.getEntitlements(currentUser.id).followedCategoryIds
+      .map((id) => categories.find((c) => c.id === id))
+      .filter((c): c is Category => Boolean(c))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+        articleCount: articles.filter((a) => a.categoryId === c.id && a.status === 'PUBLISHED').length,
+        followedAt: null,
+      }))
+  }
+
+  if (pathname.startsWith('/reader/followed-categories/') && (method === 'PUT' || method === 'DELETE')) {
+    const categoryId = decodeURIComponent(pathname.replace('/reader/followed-categories/', ''))
+    if (method === 'PUT' && !mockStore.getState().categories.some((c) => c.id === categoryId)) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy chuyên mục hoặc chuyên mục đã ngừng hoạt động', path: pathname })
+    }
+    return { categoryId, following: mockStore.setCategoryFollow(currentUser.id, categoryId, method === 'PUT') }
+  }
+
+  if (pathname === '/reader/feed' && method === 'GET') {
+    const followed = new Set(mockStore.getEntitlements(currentUser.id).followedCategoryIds)
+    return mockStore.getState().articles
+      .filter((a) => a.status === 'PUBLISHED' && followed.has(a.categoryId))
+      .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
   }
 
   // UC034 mock của POST /reader/article-purchases giống backend thật: trả targetId và giá do server tính

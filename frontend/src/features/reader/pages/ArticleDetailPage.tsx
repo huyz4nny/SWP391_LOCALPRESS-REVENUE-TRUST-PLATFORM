@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { Article } from '../types'
 import { readerApi } from '../api'
 import { mockStore } from '@/mocks/store'
+import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { PaywallPrompt } from '../components/PaywallPrompt'
 import { CommentSection } from '../components/CommentSection'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
@@ -26,11 +27,12 @@ export function ArticleDetailPage() {
   const [relatedArticles, setRelatedArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
 
   const currentUser = mockStore.getCurrentUser()
-  const entitlements = mockStore.getEntitlements(currentUser.id)
+  const library = useReaderLibrary()
+  const isBookmarked = article ? library.isSaved(article.id) : false
 
   useEffect(() => {
     if (slug) {
@@ -44,7 +46,6 @@ export function ArticleDetailPage() {
       setError(null)
       const data = await readerApi.getArticleBySlug(articleSlug)
       setArticle(data)
-      setIsBookmarked(entitlements.bookmarkedArticleIds.includes(data.id))
 
       // Load related in same category
       const allArticles = await readerApi.getArticles({ category: data.categorySlug })
@@ -58,12 +59,7 @@ export function ArticleDetailPage() {
 
   const handleToggleBookmark = async () => {
     if (!article) return
-    try {
-      const res = await readerApi.toggleBookmark(article.id)
-      setIsBookmarked(res.bookmarked)
-    } catch (err) {
-      console.error(err)
-    }
+    setBookmarkError(await library.toggleSaved(article.id))
   }
 
   if (loading) {
@@ -156,6 +152,7 @@ export function ArticleDetailPage() {
                   <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
                   <span>{isBookmarked ? 'Đã lưu' : 'Lưu bài'}</span>
                 </button>
+                {bookmarkError && <span className="text-xs text-red-700">{bookmarkError}</span>}
 
                 <button
                   onClick={() => setIsPlayingAudio(!isPlayingAudio)}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Article, Category } from '../types'
 import { readerApi } from '../api'
-import { mockStore } from '@/mocks/store'
+import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { ArticleCard, getCategoryBadgeStyle } from '../components/ArticleCard'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -24,16 +24,12 @@ export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [entitlements, setEntitlements] = useState(mockStore.getEntitlements(mockStore.getCurrentUser().id))
+  const library = useReaderLibrary()
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false)
 
   useEffect(() => {
     loadData()
-    const unsub = mockStore.subscribe(() => {
-      setEntitlements(mockStore.getEntitlements(mockStore.getCurrentUser().id))
-    })
-    return unsub
   }, [])
 
   const loadData = async () => {
@@ -56,12 +52,8 @@ export function HomePage() {
   }
 
   const handleToggleBookmark = async (articleId: string) => {
-    try {
-      await readerApi.toggleBookmark(articleId)
-      setEntitlements(mockStore.getEntitlements(mockStore.getCurrentUser().id))
-    } catch (err) {
-      console.error(err)
-    }
+    const error = await library.toggleSaved(articleId)
+    if (error) console.error(error)
   }
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
@@ -115,7 +107,7 @@ export function HomePage() {
             <ArticleCard
               article={featuredArticle}
               variant="featured"
-              isBookmarked={entitlements.bookmarkedArticleIds.includes(featuredArticle.id)}
+              isBookmarked={library.isSaved(featuredArticle.id)}
               onToggleBookmark={handleToggleBookmark}
             />
           )}
@@ -139,7 +131,7 @@ export function HomePage() {
                 key={art.id}
                 article={art}
                 variant="horizontal"
-                isBookmarked={entitlements.bookmarkedArticleIds.includes(art.id)}
+                isBookmarked={library.isSaved(art.id)}
                 onToggleBookmark={handleToggleBookmark}
               />
             ))}
@@ -298,7 +290,7 @@ export function HomePage() {
                       <ArticleCard
                         article={leadStory}
                         variant="lead"
-                        isBookmarked={entitlements.bookmarkedArticleIds.includes(leadStory.id)}
+                        isBookmarked={library.isSaved(leadStory.id)}
                         onToggleBookmark={handleToggleBookmark}
                       />
                     )}
@@ -311,7 +303,7 @@ export function HomePage() {
                         key={art.id}
                         article={art}
                         variant="compact"
-                        isBookmarked={entitlements.bookmarkedArticleIds.includes(art.id)}
+                        isBookmarked={library.isSaved(art.id)}
                         onToggleBookmark={handleToggleBookmark}
                       />
                     ))}

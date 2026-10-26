@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Crown, ShieldCheck, Mail, Phone, Calendar, Smartphone } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useReaderLibrary } from '../hooks/useReaderLibrary'
 
 export function ReaderAccountPage() {
   const currentUser = mockStore.getCurrentUser()
   const entitlement = mockStore.getEntitlements(currentUser.id)
+  const library = useReaderLibrary()
 
   const [name, setName] = useState(currentUser.name)
   const [phone, setPhone] = useState(currentUser.phone || '')
@@ -105,7 +107,7 @@ export function ReaderAccountPage() {
           <div className="text-[11px] text-stone-500">Bài mua lẻ</div>
         </div>
         <div className="p-3 bg-stone-50 rounded-lg">
-          <div className="text-lg font-bold text-stone-900">{entitlement.bookmarkedArticleIds.length}</div>
+          <div className="text-lg font-bold text-stone-900">{library.savedIds.length}</div>
           <div className="text-[11px] text-stone-500">Bài đã lưu</div>
         </div>
         <div className="p-3 bg-stone-50 rounded-lg">

@@ -11,10 +11,14 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-// bộ xử lý lỗi chỉ áp dụng cho ReaderPurchaseController
+// bộ xử lý lỗi chỉ áp dụng cho các api /api/v1/reader của SV3 (mua bài, lưu bài, theo dõi chuyên mục)
 // mục đích là trả message tiếng Việt trong JSON để frontend hiện được lý do như đã mua rồi hoặc đã có gói
 // vì Spring Boot mặc định giấu message của ResponseStatusException
-@RestControllerAdvice(assignableTypes = ReaderPurchaseController.class)
+@RestControllerAdvice(assignableTypes = {
+        ReaderPurchaseController.class,
+        ReaderLibraryController.class,
+        ReaderFollowController.class
+})
 public class ReaderPurchaseExceptionHandler {
 
     public record ErrorResponse(String timestamp, int status, String error, String message,

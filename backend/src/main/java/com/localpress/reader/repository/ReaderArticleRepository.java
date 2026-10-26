@@ -72,6 +72,57 @@ public interface ReaderArticleRepository extends JpaRepository<ArticleEntity, Lo
         """, nativeQuery = true)
     Optional<ArticleProjection> findPublishedBySlug(@Param("slug") String slug);
 
+    // block lấy bài đã lưu của một độc giả phục vụ UC038 ở màn hình II.3.6
+    // chỉ hiện bài đang xuất bản, bài bị gỡ vẫn còn bản ghi trong saved_articles nhưng bị ẩn khỏi danh sách
+    // sắp xếp saved_at giảm dần nên bài vừa lưu lên đầu
+    @Query(value = """
+        SELECT a.article_id AS id, v.title AS title, a.slug AS slug, v.summary AS summary,
+               v.cover_image_url AS coverImageUrl, c.name AS categoryName, c.slug AS categorySlug,
+               a.access_type AS accessType, a.published_at AS publishedAt, u.full_name AS authorName,
+               a.view_count AS viewCount, a.single_price AS singlePrice
+        FROM saved_articles s
+        JOIN articles a ON a.article_id = s.article_id
+        JOIN article_versions v ON a.article_id = v.article_id AND a.published_version = v.version_number
+        LEFT JOIN categories c ON a.category_id = c.category_id
+        LEFT JOIN users u ON a.author_id = u.user_id
+        WHERE s.user_id = :userId AND a.status = 'PUBLISHED'
+        ORDER BY s.saved_at DESC, a.article_id DESC
+        """,
+            countQuery = """
+        SELECT COUNT(a.article_id) FROM saved_articles s
+        JOIN articles a ON a.article_id = s.article_id
+        JOIN article_versions v ON a.article_id = v.article_id AND a.published_version = v.version_number
+        WHERE s.user_id = :userId AND a.status = 'PUBLISHED'
+        """,
+            nativeQuery = true)
+    Page<ArticleProjection> findSavedArticles(@Param("userId") Long userId, Pageable pageable);
+
+    // block lấy feed cá nhân hóa phục vụ UC040 ở màn hình II.3.8
+    // chỉ lấy bài đã xuất bản thuộc đúng các chuyên mục độc giả đang theo dõi và chuyên mục đó còn ACTIVE
+    // không gộp chuyên mục con, bài mới nhất lên đầu
+    @Query(value = """
+        SELECT a.article_id AS id, v.title AS title, a.slug AS slug, v.summary AS summary,
+               v.cover_image_url AS coverImageUrl, c.name AS categoryName, c.slug AS categorySlug,
+               a.access_type AS accessType, a.published_at AS publishedAt, u.full_name AS authorName,
+               a.view_count AS viewCount, a.single_price AS singlePrice
+        FROM category_follows f
+        JOIN categories c ON c.category_id = f.category_id AND c.status = 'ACTIVE'
+        JOIN articles a ON a.category_id = f.category_id AND a.status = 'PUBLISHED'
+        JOIN article_versions v ON a.article_id = v.article_id AND a.published_version = v.version_number
+        LEFT JOIN users u ON a.author_id = u.user_id
+        WHERE f.user_id = :userId
+        ORDER BY a.published_at DESC, a.article_id DESC
+        """,
+            countQuery = """
+        SELECT COUNT(a.article_id) FROM category_follows f
+        JOIN categories c ON c.category_id = f.category_id AND c.status = 'ACTIVE'
+        JOIN articles a ON a.category_id = f.category_id AND a.status = 'PUBLISHED'
+        JOIN article_versions v ON a.article_id = v.article_id AND a.published_version = v.version_number
+        WHERE f.user_id = :userId
+        """,
+            nativeQuery = true)
+    Page<ArticleProjection> findFollowedFeed(@Param("userId") Long userId, Pageable pageable);
+
     // block tăng lượt xem thêm 1 ngay trong database để nhiều người đọc cùng lúc không bị mất số đếm
     // COALESCE để nếu view_count đang null thì tính từ 0
     @Modifying

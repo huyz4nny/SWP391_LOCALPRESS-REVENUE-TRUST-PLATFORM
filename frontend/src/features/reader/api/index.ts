@@ -91,6 +91,36 @@ function mapArticle(dto: ArticleDto): Article {
   }
 }
 
+// hàm đổi kết quả danh sách bài sang ArticlePage dùng chung cho trang chủ, bài đã lưu và feed theo dõi
+// mock trả mảng thẳng nên coi như chỉ có một trang, backend thật trả Page của spring thì lấy số trang và cờ last
+function toArticlePage(data: ArticleDto[] | SpringPage<ArticleDto> | null | undefined, requestedPage: number): ArticlePage {
+  const items = unwrapList(data).map(mapArticle)
+  if (Array.isArray(data)) {
+    return { items, page: 0, hasMore: false, total: items.length }
+  }
+  return {
+    items,
+    page: data?.number ?? requestedPage,
+    hasMore: data?.last === false,
+    total: data?.totalElements ?? items.length,
+  }
+}
+
+// chuyên mục độc giả đang theo dõi ở UC040, articleCount là số bài đang xuất bản
+export type FollowedCategory = {
+  id: string
+  name: string
+  slug: string
+  description: string
+  articleCount: number
+  followedAt: string | null
+}
+
+// mock dùng id chuỗi như art-001 còn backend thật cần id số trên đường dẫn
+function idSegment(id: string) {
+  return encodeURIComponent(APP_CONFIG.useMockApi ? id : String(Number(id)))
+}
+
 function mapCategory(dto: Partial<Category> & { id?: string | number; description?: string; articleCount?: number }): Category {
   return {
     id: String(dto.id ?? ''),
@@ -147,18 +177,7 @@ export const readerApi = {
         size: params.size ?? 20,
       },
     })
-    const items = unwrapList(data).map(mapArticle)
-    // chế độ mock trả mảng thẳng nên coi như chỉ có một trang và không còn trang sau
-    if (Array.isArray(data)) {
-      return { items, page: 0, hasMore: false, total: items.length }
-    }
-    // chế độ backend thật thì lấy số trang hiện tại và còn trang sau hay không (last bằng false là còn) từ Page của spring
-    return {
-      items,
-      page: data?.number ?? params.page ?? 0,
-      hasMore: data?.last === false,
-      total: data?.totalElements ?? items.length,
-    }
+    return toArticlePage(data, params.page ?? 0)
   },
 
   // UC031 và UC032 lấy chi tiết bài theo slug
@@ -182,8 +201,57 @@ export const readerApi = {
     return httpClient.get<ReaderEntitlement>('/reader/entitlements')
   },
 
-  toggleBookmark: (articleId: string) => {
-    return httpClient.post<{ bookmarked: boolean }>(`/reader/bookmarks/${articleId}`)
+  // UC038 id các bài đã lưu để tô icon lưu trên thẻ bài và đếm số bài ở menu tài khoản
+  getSavedArticleIds: async (): Promise<string[]> => {
+    const data = await httpClient.get<Array<string | number>>('/reader/saved-articles/ids')
+    return (data ?? []).map(String)
+  },
+
+  // UC038 danh sách bài đã lưu có phân trang, bài vừa lưu lên đầu
+  getSavedArticlesPage: async (page = 0, size = 20): Promise<ArticlePage> => {
+    const data = await httpClient.get<ArticleDto[] | SpringPage<ArticleDto>>('/reader/saved-articles', {
+      params: { page, size },
+    })
+    return toArticlePage(data, page)
+  },
+
+  // UC038 lưu (PUT) hoặc bỏ lưu (DELETE), gọi lặp lại không làm đảo trạng thái
+  setBookmark: async (articleId: string, saved: boolean): Promise<boolean> => {
+    const path = `/reader/saved-articles/${idSegment(articleId)}`
+    const res = saved
+      ? await httpClient.put<{ saved: boolean }>(path)
+      : await httpClient.delete<{ saved: boolean }>(path)
+    return res.saved
+  },
+
+  // UC040 danh sách chuyên mục đang theo dõi
+  getFollowedCategories: async (): Promise<FollowedCategory[]> => {
+    const data = await httpClient.get<Array<Partial<FollowedCategory> & { id?: string | number }>>('/reader/followed-categories')
+    return (data ?? []).map((c) => ({
+      id: String(c.id ?? ''),
+      name: c.name ?? '',
+      slug: c.slug ?? '',
+      description: c.description ?? '',
+      articleCount: c.articleCount ?? 0,
+      followedAt: c.followedAt ?? null,
+    }))
+  },
+
+  // UC040 theo dõi (PUT) hoặc bỏ theo dõi (DELETE) một chuyên mục
+  setCategoryFollow: async (categoryId: string, following: boolean): Promise<boolean> => {
+    const path = `/reader/followed-categories/${idSegment(categoryId)}`
+    const res = following
+      ? await httpClient.put<{ following: boolean }>(path)
+      : await httpClient.delete<{ following: boolean }>(path)
+    return res.following
+  },
+
+  // UC040 feed bài mới của các chuyên mục đang theo dõi
+  getFollowedFeedPage: async (page = 0, size = 20): Promise<ArticlePage> => {
+    const data = await httpClient.get<ArticleDto[] | SpringPage<ArticleDto>>('/reader/feed', {
+      params: { page, size },
+    })
+    return toArticlePage(data, page)
   },
 
   // UC031 lấy bình luận đã duyệt của bài (rule 12) cho CommentSection

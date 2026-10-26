@@ -32,7 +32,7 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
     public Page<ArticleSummaryResponse> getArticles(String category, String search, String access, Pageable pageable) {
         return readerArticleRepository
                 .findAllPublishedArticles(blankToNull(category), blankToNull(search), blankToNull(access), pageable)
-                .map(this::mapToSummary);
+                .map(ReaderArticleServiceImpl::mapToSummary);
     }
 
     // block lấy chi tiết bài và tăng lượt xem cho UC031 và UC032 ở màn hình II.3.2
@@ -95,7 +95,8 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
     }
 
     // đổi dữ liệu projection từ sql sang dto tóm tắt cho danh sách bài
-    private ArticleSummaryResponse mapToSummary(ArticleProjection projection) {
+    // để static trong package vì danh sách bài đã lưu và feed theo dõi cũng dùng đúng cách đổi này cho số liệu khớp nhau
+    static ArticleSummaryResponse mapToSummary(ArticleProjection projection) {
         return ArticleSummaryResponse.builder()
                 .id(projection.getId())
                 .title(projection.getTitle())
