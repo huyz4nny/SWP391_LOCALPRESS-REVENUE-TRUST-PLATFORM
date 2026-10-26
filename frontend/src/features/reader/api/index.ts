@@ -17,6 +17,15 @@ type ArticleDto = Partial<Article> & {
   price?: number
 }
 
+// kết quả backend trả sau khi tạo bản ghi chờ thanh toán cho bài lẻ hoặc gói cước
+// targetId là purchase_id hoặc subscription_id và amount là giá do server tính nên frontend không tự đặt giá
+export type PendingOrderTarget = {
+  orderType: 'ARTICLE' | 'SUBSCRIPTION'
+  targetId: string | number
+  amount: number
+  title: string
+}
+
 // kiểu của object phân trang Page mà spring boot trả về
 type SpringPage<T> = {
   content?: T[]
@@ -189,5 +198,22 @@ export const readerApi = {
 
   postComment: (articleId: string, content: string) => {
     return httpClient.post<Comment>('/reader/comments', { articleId, content })
+  },
+
+  // UC034 tạo bản ghi mua lẻ chờ thanh toán (PENDING) trước khi tạo đơn bên SV4
+  // chế độ mock giữ nguyên id chuỗi còn backend thật cần id số nên đổi bằng Number
+  // luồng đi là gọi POST /reader/article-purchases -> nhận targetId (purchase_id) và giá từ server -> PaywallPrompt đem sang POST /finance/checkout
+  createArticlePurchase: (articleId: string) => {
+    return httpClient.post<PendingOrderTarget>('/reader/article-purchases', {
+      articleId: APP_CONFIG.useMockApi ? articleId : Number(articleId),
+    })
+  },
+
+  // UC035 tạo bản ghi gói cước chờ thanh toán (PENDING) trước khi tạo đơn bên SV4
+  // luồng đi là gọi POST /reader/subscriptions -> nhận targetId (subscription_id) và giá của gói -> PremiumPlansPage đem sang POST /finance/checkout
+  createSubscription: (planId: string) => {
+    return httpClient.post<PendingOrderTarget>('/reader/subscriptions', {
+      planId: APP_CONFIG.useMockApi ? planId : Number(planId),
+    })
   },
 }

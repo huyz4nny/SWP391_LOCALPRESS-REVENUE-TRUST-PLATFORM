@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { httpClient } from '@/lib/http/client'
 import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
+import { readerApi } from '../api'
 import { Crown, Sparkles, Check, Lock, ShieldCheck } from 'lucide-react'
 
 interface PaywallPromptProps {
@@ -15,6 +16,7 @@ interface PaywallPromptProps {
 export function PaywallPrompt({ article }: PaywallPromptProps) {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const currentUser = mockStore.getCurrentUser()
 
   const handlePurchaseSingleArticle = async () => {
@@ -24,18 +26,23 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
     }
 
     setIsLoading(true)
+    setError('')
     try {
-      // Create Order for single article
+      // bước 1 UC034 là nhờ backend của SV3 tạo bản ghi mua lẻ chờ thanh toán và trả purchase_id kèm giá thật
+      const target = await readerApi.createArticlePurchase(article.id)
+      // bước 2 là tạo đơn bên SV4 với targetId là purchase_id chứ không phải id bài
       const order = await httpClient.post<any>('/finance/checkout', {
         orderType: 'ARTICLE_PURCHASE',
-        targetId: article.id,
-        targetTitle: article.title,
-        amount: article.price || 15000,
+        targetId: target.targetId,
+        targetTitle: target.title || article.title,
+        amount: target.amount,
         paymentMethod: 'VIETQR',
       })
       navigate(paymentPath(order), { state: { returnUrl: `/articles/${article.slug}` } })
     } catch (err) {
+      // các lỗi như đã mua rồi hoặc đã có gói bao trùm được hiện cho khách thay vì chỉ ghi console
       console.error(err)
+      setError(err instanceof Error ? err.message : 'Không thể tạo đơn mua bài, vui lòng thử lại')
     } finally {
       setIsLoading(false)
     }
@@ -73,7 +80,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
               </div>
               <div className="mt-1 flex items-baseline">
                 <span className="text-2xl font-extrabold text-white">
-                  {formatCurrency(article.price || 15000)}
+                  {formatCurrency(article.price)}
                 </span>
                 <span className="text-xs text-stone-400 ml-1">/ bài này</span>
               </div>
@@ -98,6 +105,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
             >
               Mua lẻ bài viết ngay
             </Button>
+            {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
           </div>
 
           {/* Option 2: Subscription (Best value) */}

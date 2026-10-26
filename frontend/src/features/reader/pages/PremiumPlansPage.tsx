@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button'
 import { httpClient } from '@/lib/http/client'
 import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
+import { readerApi } from '../api'
 import { Crown, Check, Sparkles, HelpCircle, ShieldCheck, Zap } from 'lucide-react'
 
 export function PremiumPlansPage() {
   const navigate = useNavigate()
   const [plans] = useState(SEED_SUBSCRIPTION_PLANS)
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null)
+  const [error, setError] = useState('')
   const currentUser = mockStore.getCurrentUser()
 
   const handleSelectPlan = async (plan: (typeof SEED_SUBSCRIPTION_PLANS)[0]) => {
@@ -21,17 +23,23 @@ export function PremiumPlansPage() {
     }
 
     setLoadingPlanId(plan.id)
+    setError('')
     try {
+      // bước 1 UC035 là nhờ backend của SV3 tạo bản ghi gói chờ thanh toán và trả subscription_id kèm giá thật của gói
+      const target = await readerApi.createSubscription(plan.id)
+      // bước 2 là tạo đơn bên SV4 với targetId là subscription_id chứ không phải id gói
       const order = await httpClient.post<any>('/finance/checkout', {
         orderType: 'SUBSCRIPTION',
-        targetId: plan.id,
-        targetTitle: plan.name,
-        amount: plan.price,
+        targetId: target.targetId,
+        targetTitle: target.title || plan.name,
+        amount: target.amount,
         paymentMethod: 'VIETQR',
       })
       navigate(paymentPath(order), { state: { returnUrl: '/account/subscription' } })
     } catch (err) {
+      // hiện lý do lỗi cho khách thay vì chỉ ghi console
       console.error(err)
+      setError(err instanceof Error ? err.message : 'Không thể tạo đơn đăng ký gói, vui lòng thử lại')
     } finally {
       setLoadingPlanId(null)
     }
@@ -52,6 +60,12 @@ export function PremiumPlansPage() {
           Đồng hành cùng báo chí địa phương chất lượng cao. Tiếp cận các tuyến bài điều tra, hồ sơ kinh tế độc quyền và phân tích chuyên gia sâu sắc không giới hạn.
         </p>
       </div>
+
+      {error && (
+        <p className="max-w-3xl mx-auto text-center text-xs text-crimson border border-red-200 bg-red-50 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
 
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">

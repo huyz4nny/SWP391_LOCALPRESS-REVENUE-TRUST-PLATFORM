@@ -121,6 +121,30 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return { bookmarked: isBookmarked }
   }
 
+  // UC034 mock của POST /reader/article-purchases giống backend thật: trả targetId và giá do server tính
+  if (pathname === '/reader/article-purchases' && method === 'POST') {
+    const article = mockStore.getState().articles.find((a) => a.id === body.articleId)
+    if (!article) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy bài viết', path: pathname })
+    }
+    if (!article.isPremium || !article.price) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 409, error: 'Conflict', message: 'Bài viết này không bán lẻ', path: pathname })
+    }
+    if (mockStore.hasAccessToArticle(currentUser.id, article.id)) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 409, error: 'Conflict', message: 'Bạn đã có quyền đọc bài này', path: pathname })
+    }
+    return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title }
+  }
+
+  // UC035 mock của POST /reader/subscriptions: khách đang có gói vẫn được mua tiếp để gia hạn
+  if (pathname === '/reader/subscriptions' && method === 'POST') {
+    const plan = mockStore.getState().subscriptionPlans.find((p) => p.id === body.planId && p.isActive)
+    if (!plan) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy gói cước', path: pathname })
+    }
+    return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name }
+  }
+
   if (pathname.startsWith('/reader/comments/') && method === 'GET') {
     const articleId = pathname.replace('/reader/comments/', '')
     return mockStore.getState().comments.filter((c) => c.articleId === articleId && c.status === 'APPROVED')
