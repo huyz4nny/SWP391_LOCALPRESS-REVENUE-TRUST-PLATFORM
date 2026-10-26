@@ -1,5 +1,5 @@
 -- SV1 Iteration 2: Campaign Booking, Quotation Confirmation, Advertising Payment, Creative Submission.
--- V7 đang được nhánh Tung dùng (google identities) nên advertising lấy V8.
+-- V7 (google identities) và V8 (subscription plan scope) thuộc nhánh Tung nên advertising lấy V9.
 -- Mô hình theo SDS ADV-2: gửi booking tạo ngay ad_campaigns PENDING (1 campaign = 1 slot).
 
 ALTER TABLE ad_campaigns
