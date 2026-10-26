@@ -4,10 +4,12 @@ import com.localpress.finance.dto.request.LedgerFilterRequest;
 import com.localpress.finance.dto.response.LedgerSummaryResponse;
 import com.localpress.finance.dto.response.TransactionDetailResponse;
 import com.localpress.finance.dto.response.TransactionLedgerResponse;
+import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.model.RefundStatus;
+import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceLedgerService;
@@ -49,6 +51,9 @@ class FinanceLedgerServiceTest {
 
     @Mock
     private RefundRequestRepository refundRequestRepository;
+
+    @Mock
+    private PaymentComplaintRepository paymentComplaintRepository;
 
     @InjectMocks
     private FinanceLedgerService financeLedgerService;
@@ -165,12 +170,13 @@ class FinanceLedgerServiceTest {
     }
 
     @Test
-    @DisplayName("Dashboard: doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ), số hoàn chờ duyệt lấy từ DB")
+    @DisplayName("Dashboard: doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ), số hoàn chờ duyệt và khiếu nại mở lấy từ DB")
     void dashboardUsesNetRevenueAndRealPendingRefundCount() {
         when(transactionRepository.calculateTotalGrossRevenue()).thenReturn(new BigDecimal("30000"));
         when(transactionRepository.calculateTotalRefundedAmount()).thenReturn(new BigDecimal("15000"));
         when(transactionRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
         when(refundRequestRepository.countByStatus(RefundStatus.PENDING)).thenReturn(3L);
+        when(paymentComplaintRepository.countByStatus(PaymentComplaint.Status.OPEN)).thenReturn(2L);
 
         var dashboard = financeLedgerService.getFinanceDashboard();
         var summary = financeLedgerService.getLedgerSummary();
@@ -178,5 +184,6 @@ class FinanceLedgerServiceTest {
         assertThat(dashboard.getTotalRevenue()).isEqualByComparingTo("15000");
         assertThat(dashboard.getTotalRevenue()).isEqualByComparingTo(summary.getNetRevenue());
         assertThat(dashboard.getRefundReviewCount()).isEqualTo(3L);
+        assertThat(dashboard.getOpenComplaintCount()).isEqualTo(2L);
     }
 }

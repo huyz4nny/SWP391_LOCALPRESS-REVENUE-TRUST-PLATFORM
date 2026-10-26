@@ -34,6 +34,7 @@ export function FinanceDashboard() {
     paidOrdersCount: number
     pendingOrdersCount: number
     refundReviewCount: number
+    openComplaintCount: number
     reconciliationDiscrepancy: number
     recentOrders: any[]
   } | null>(null)
@@ -120,11 +121,11 @@ export function FinanceDashboard() {
     },
     {
       label: 'Khiếu nại chuyển khoản',
-      value: null,
+      value: `${stats.openComplaintCount}`,
       note: 'Khách báo đã chuyển nhưng chưa được ghi nhận',
       to: '/backoffice/finance/complaints',
       action: 'Mở hàng chờ',
-      urgent: false,
+      urgent: stats.openComplaintCount > 0,
     },
   ]
 

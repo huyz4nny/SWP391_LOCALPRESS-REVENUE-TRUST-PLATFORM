@@ -5,8 +5,10 @@ import com.localpress.finance.dto.response.FinanceDashboardResponse;
 import com.localpress.finance.dto.response.LedgerSummaryResponse;
 import com.localpress.finance.dto.response.TransactionDetailResponse;
 import com.localpress.finance.dto.response.TransactionLedgerResponse;
+import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.RefundStatus;
+import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.shared.exception.AppException;
@@ -38,6 +40,7 @@ public class FinanceLedgerService {
 
     private final TransactionRepository transactionRepository;
     private final RefundRequestRepository refundRequestRepository;
+    private final PaymentComplaintRepository paymentComplaintRepository;
 
     /**
      * Danh sách phương thức thanh toán chuyển khoản thủ công.
@@ -127,6 +130,7 @@ public class FinanceLedgerService {
                 .paidOrdersCount(transactionRepository.countByStatus(TransactionStatus.SUCCESS))
                 .pendingOrdersCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
                 .refundReviewCount(refundRequestRepository.countByStatus(RefundStatus.PENDING))
+                .openComplaintCount(paymentComplaintRepository.countByStatus(PaymentComplaint.Status.OPEN))
                 .reconciliationDiscrepancy(BigDecimal.ZERO)
                 .recentOrders(recentTransactions)
                 .build();
