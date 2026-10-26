@@ -7,6 +7,7 @@ import {
   ReconciliationPeriod,
   GeneralLedgerEntry,
 } from '../types'
+import { complaintApi } from './payment'
 
 
 /** Loại giao dịch backend (ENUM transactions.transaction_type) -> loại đơn hiển thị. */
@@ -35,13 +36,18 @@ const titleOf = (tx: any): string =>
 export const financeApi = {
   getDashboard: async () => {
     const res = await httpClient.get<any>('/finance/dashboard')
-    if (APP_CONFIG.useMockApi) return res // mock đã trả recentOrders dạng Order
+    if (APP_CONFIG.useMockApi) {
+      // mock đã trả recentOrders dạng Order; khiếu nại mock nằm trong kho riêng của finance (payment.ts)
+      const openComplaints = await complaintApi.listForAccountant('OPEN')
+      return { ...res, openComplaintCount: openComplaints.length }
+    }
     if (res && res.totalRevenue !== undefined) {
       return {
         totalRevenue: Number(res.totalRevenue || 0),
         paidOrdersCount: Number(res.paidOrdersCount || 0),
         pendingOrdersCount: Number(res.pendingOrdersCount || 0),
         refundReviewCount: Number(res.refundReviewCount || 0),
+        openComplaintCount: Number(res.openComplaintCount || 0),
         reconciliationDiscrepancy: Number(res.reconciliationDiscrepancy || 0),
         recentOrders: (res.recentOrders || []).map((tx: any) => ({
           id: String(tx.transactionId),

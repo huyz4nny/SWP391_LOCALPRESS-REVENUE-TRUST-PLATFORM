@@ -84,9 +84,6 @@ public class PaymentProcessingController {
     }
 
     /**
-     * UC050: Tra cứu trạng thái đơn hàng theo Transaction ID.
-     */
-    /**
      * Ví không đủ tiền trả đơn: tạo (hoặc dùng lại) mã nạp bù đúng phần còn thiếu.
      * Tiền nạp về thì hệ thống tự trừ ví trả đơn {orderCode}. Mọi thanh toán đơn đều đi qua ví.
      */
@@ -110,6 +107,9 @@ public class PaymentProcessingController {
         return ResponseEntity.ok(ApiResponse.ok("Lấy danh sách đơn hàng thành công", result));
     }
 
+    /**
+     * UC050: Tra cứu trạng thái đơn hàng theo Transaction ID.
+     */
     @GetMapping("/orders/{id}")
     public ResponseEntity<ApiResponse<OrderStatusResponse>> getOrderStatus(@PathVariable Long id) {
         OrderStatusResponse response = paymentProcessingService.getOrderStatus(currentUser.require(), id);
@@ -146,11 +146,12 @@ public class PaymentProcessingController {
         } catch (Exception e) {
             log.warn("Webhook SePay sai định dạng JSON: {}", e.getMessage());
         }
+        String ip = clientIp(request);
         if (!authOk) {
-            log.warn("AUDIT: Webhook SePay bị từ chối do sai khóa xác thực, IP {}", clientIp(request));
+            log.warn("AUDIT: Webhook SePay bị từ chối do sai khóa xác thực, IP {}", ip);
         }
         SepayGatewayService.Outcome outcome = sepayGatewayService.receive(
-                SepayWebhookLog.Source.WEBHOOK, ipn, rawBody, authOk && ipn != null, clientIp(request));
+                SepayWebhookLog.Source.WEBHOOK, ipn, rawBody, authOk && ipn != null, ip);
         return ResponseEntity.status(outcome.httpStatus()).body(outcome.body());
     }
 

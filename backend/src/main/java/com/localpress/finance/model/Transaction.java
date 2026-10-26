@@ -171,16 +171,12 @@ public class Transaction {
     /**
      * Xác nhận thanh toán tự động qua cổng thanh toán / Webhook IPN (UC049).
      */
-    public void markPaidByGateway(String gatewayTxId, String bankCode) {
+    public void markPaidByGateway(String bankCode) {
         if (this.status == TransactionStatus.SUCCESS) {
             return;
         }
-        LocalDateTime now = LocalDateTime.now();
         this.status = TransactionStatus.SUCCESS;
-        this.paidAt = now;
-        if (gatewayTxId != null && !gatewayTxId.isBlank() && this.gatewayTransactionId == null) {
-            this.gatewayTransactionId = gatewayTxId.trim();
-        }
+        this.paidAt = LocalDateTime.now();
         if (bankCode != null && !bankCode.isBlank()) {
             this.bankCode = bankCode.trim().toUpperCase();
         }
@@ -191,6 +187,11 @@ public class Transaction {
      */
     public boolean isExpired(LocalDateTime now) {
         return this.expiresAt != null && now.isAfter(this.expiresAt);
+    }
+
+    /** Đơn còn chờ thanh toán nhưng đã quá hạn QR / giữ chỗ (trang thanh toán hiển thị "hết hạn"). */
+    public boolean isPendingExpired() {
+        return this.status == TransactionStatus.PENDING && isExpired(LocalDateTime.now());
     }
 
     /**

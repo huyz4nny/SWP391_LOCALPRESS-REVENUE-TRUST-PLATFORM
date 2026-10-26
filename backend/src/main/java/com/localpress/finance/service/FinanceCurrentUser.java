@@ -55,4 +55,13 @@ public class FinanceCurrentUser {
                 .findFirst()
                 .orElseThrow(() -> new AppException("Tài khoản không tồn tại", HttpStatus.UNAUTHORIZED));
     }
+
+    /** Như require() nhưng chỉ cho nhân sự tài chính, người khác nhận 403 với forbiddenMessage. */
+    public Principal requireFinanceStaff(String forbiddenMessage) {
+        Principal principal = require();
+        if (!principal.isFinanceStaff()) {
+            throw new AppException(forbiddenMessage, HttpStatus.FORBIDDEN);
+        }
+        return principal;
+    }
 }

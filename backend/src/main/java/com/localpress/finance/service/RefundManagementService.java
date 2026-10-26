@@ -4,6 +4,7 @@ import com.localpress.finance.dto.request.ProposeRefundRequest;
 import com.localpress.finance.dto.request.ReviewRefundRequest;
 import com.localpress.finance.dto.response.RefundDetailResponse;
 import com.localpress.finance.model.RefundRequest;
+import com.localpress.finance.model.RefundStatus;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
@@ -20,8 +21,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ==============================================================================
@@ -89,9 +94,6 @@ public class RefundManagementService {
             BigDecimal refundAmount = rs.getBigDecimal("refund_amount");
             boolean isPartial = originalAmount != null && refundAmount.compareTo(originalAmount) < 0;
 
-            String type = rs.getString("transaction_type");
-            String affectedBenefit = "Thu hồi quyền lợi của đơn " + rs.getString("order_code") + " (" + type + ")";
-
             return RefundDetailResponse.builder()
                     .id(String.valueOf(rs.getLong("refund_id")))
                     .orderId(String.valueOf(rs.getLong("transaction_id")))
@@ -106,14 +108,14 @@ public class RefundManagementService {
                     .reason(rs.getString("reason"))
                     .evidenceUrl(rs.getString("evidence_url"))
                     .status(rs.getString("status"))
-                    .affectedBenefit(affectedBenefit)
-                    .requestedAt(rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toLocalDateTime() : null)
+                    .affectedBenefit("Thu hồi quyền lợi của đơn " + rs.getString("order_code") + " (" + rs.getString("transaction_type") + ")")
+                    .requestedAt(localDateTime(rs, "created_at"))
                     .proposedBy(rs.getString("proposed_by"))
                     .proposedByName(rs.getString("proposed_by_name"))
                     .reviewedBy(rs.getString("reviewed_by"))
                     .reviewedByName(rs.getString("reviewed_by_name"))
                     .reviewNotes(rs.getString("review_notes"))
-                    .resolvedAt(rs.getTimestamp("resolved_at") != null ? rs.getTimestamp("resolved_at").toLocalDateTime() : null)
+                    .resolvedAt(localDateTime(rs, "resolved_at"))
                     .build();
         });
     }
@@ -130,7 +132,8 @@ public class RefundManagementService {
         Transaction originalTx = transactionRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng #" + request.getOrderId(), HttpStatus.NOT_FOUND));
 
-        if (originalTx.getTransactionType() == TransactionType.REFUND || originalTx.getTransactionType() == TransactionType.TOPUP) {
+        // Dữ liệu cũ có thể thiếu transaction_type: chỉ chặn khi biết chắc là TOPUP / REFUND
+        if (originalTx.getTransactionType() != null && !originalTx.getTransactionType().isPurchase()) {
             throw new AppException(
                     "Không thể hoàn tiền cho giao dịch loại " + originalTx.getTransactionType() + " (chỉ hoàn đơn mua bài, gói hoặc quảng cáo)",
                     HttpStatus.BAD_REQUEST
@@ -145,11 +148,7 @@ public class RefundManagementService {
         }
 
         // Kiểm tra Rule 11: Tổng tiền hoàn không vượt quá số tiền thực thu của đơn gốc
-        BigDecimal committedRefunds = refundRequestRepository.sumCommittedRefundsByTransactionId(originalTx.getTransactionId(), null);
-        if (committedRefunds == null) {
-            committedRefunds = BigDecimal.ZERO;
-        }
-        BigDecimal availableRefundCap = originalTx.getAmount().subtract(committedRefunds);
+        BigDecimal availableRefundCap = originalTx.getAmount().subtract(committedRefunds(originalTx).orElse(BigDecimal.ZERO));
 
         if (request.getRefundAmount().compareTo(availableRefundCap) > 0) {
             throw new AppException(
@@ -159,21 +158,17 @@ public class RefundManagementService {
             );
         }
 
-        RefundRequest refund = RefundRequest.builder()
+        RefundRequest savedRefund = refundRequestRepository.save(RefundRequest.builder()
                 .transactionId(originalTx.getTransactionId())
                 .userId(originalTx.getUserId())
                 .refundAmount(request.getRefundAmount())
                 .reason(request.getReason())
                 .evidenceUrl(request.getEvidenceUrl())
-                .status(com.localpress.finance.model.RefundStatus.PENDING)
+                .status(RefundStatus.PENDING)
                 .proposedBy(proposerUserId)
-                .build();
-
-        RefundRequest savedRefund = refundRequestRepository.save(refund);
+                .build());
         log.info("Đã lập thành công phiếu đề xuất hoàn tiền #{} cho giao dịch #{}",
                 savedRefund.getRefundId(), originalTx.getTransactionId());
-
-        boolean isPartial = request.getRefundAmount().compareTo(originalTx.getAmount()) < 0;
 
         return RefundDetailResponse.builder()
                 .id(String.valueOf(savedRefund.getRefundId()))
@@ -183,7 +178,7 @@ public class RefundManagementService {
                 .userId(String.valueOf(originalTx.getUserId()))
                 .originalAmount(originalTx.getAmount())
                 .refundAmount(savedRefund.getRefundAmount())
-                .isPartial(isPartial)
+                .isPartial(request.getRefundAmount().compareTo(originalTx.getAmount()) < 0)
                 .reason(savedRefund.getReason())
                 .evidenceUrl(savedRefund.getEvidenceUrl())
                 .status(savedRefund.getStatus().name())
@@ -204,7 +199,7 @@ public class RefundManagementService {
         RefundRequest refund = refundRequestRepository.findById(refundId)
                 .orElseThrow(() -> new AppException("Không tìm thấy yêu cầu hoàn tiền #" + refundId, HttpStatus.NOT_FOUND));
 
-        if (refund.getStatus() != com.localpress.finance.model.RefundStatus.PENDING) {
+        if (refund.getStatus() != RefundStatus.PENDING) {
             throw new AppException("Yêu cầu hoàn tiền #" + refundId + " đã được xử lý trước đó (Trạng thái: " + refund.getStatus() + ")", HttpStatus.CONFLICT);
         }
 
@@ -224,16 +219,14 @@ public class RefundManagementService {
         Transaction originalTx = transactionRepository.findById(refund.getTransactionId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng gốc #" + refund.getTransactionId(), HttpStatus.NOT_FOUND));
 
+        refund.setStatus(request.isApproved() ? RefundStatus.COMPLETED : RefundStatus.REJECTED);
+        refundRequestRepository.save(refund);
+
         if (!request.isApproved()) {
-            refund.setStatus(com.localpress.finance.model.RefundStatus.REJECTED);
-            refundRequestRepository.save(refund);
             log.info("Yêu cầu hoàn tiền #{} đã bị từ chối bởi Reviewer #{}", refundId, reviewerUserId);
         } else {
-            refund.setStatus(com.localpress.finance.model.RefundStatus.COMPLETED);
-            refundRequestRepository.save(refund);
-
             // 1. Tạo bút toán đảo hoàn tiền trong transactions (Bút toán kép kế toán)
-            Transaction refundTx = Transaction.builder()
+            Transaction savedRefundTx = transactionRepository.save(Transaction.builder()
                     .userId(refund.getUserId())
                     .originalTransactionId(originalTx.getTransactionId())
                     .transactionType(TransactionType.REFUND)
@@ -245,9 +238,7 @@ public class RefundManagementService {
                     .paidAt(now)
                     .reconciledAt(now)
                     .reconciledBy(reviewerUserId)
-                    .build();
-
-            Transaction savedRefundTx = transactionRepository.save(refundTx);
+                    .build());
 
             // Đơn đã trả bằng Ví LocalPress: tiền hoàn trả lại vào ví (idempotent theo UNIQUE(transaction_id, direction)).
             // Đơn trả qua QR SePay: tiền chuyển trả khách ngoài hệ thống, chỉ ghi bút toán đảo.
@@ -257,10 +248,7 @@ public class RefundManagementService {
             }
 
             // 2. Cập nhật trạng thái đơn gốc sang REFUNDED nếu đã hoàn toàn bộ
-            BigDecimal totalRefunded = refundRequestRepository.sumCommittedRefundsByTransactionId(originalTx.getTransactionId(), null);
-            if (totalRefunded == null) {
-                totalRefunded = refund.getRefundAmount();
-            }
+            BigDecimal totalRefunded = committedRefunds(originalTx).orElse(refund.getRefundAmount());
             boolean fullRefund = totalRefunded.compareTo(originalTx.getAmount()) >= 0;
             if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);
@@ -322,5 +310,15 @@ public class RefundManagementService {
                 .reason(refund.getReason())
                 .refundedAt(now)
                 .build();
+    }
+
+    /** Rule 11: tổng tiền hoàn đã chốt hoặc đang chờ duyệt của đơn (rỗng khi chưa có phiếu nào). */
+    private Optional<BigDecimal> committedRefunds(Transaction originalTx) {
+        return Optional.ofNullable(refundRequestRepository.sumCommittedRefundsByTransactionId(originalTx.getTransactionId(), null));
+    }
+
+    private static LocalDateTime localDateTime(ResultSet rs, String column) throws SQLException {
+        Timestamp ts = rs.getTimestamp(column);
+        return ts != null ? ts.toLocalDateTime() : null;
     }
 }

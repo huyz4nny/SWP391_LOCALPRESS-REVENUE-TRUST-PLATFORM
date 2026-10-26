@@ -2,7 +2,6 @@ package com.localpress.finance.service;
 
 import com.localpress.finance.dto.request.ResolveDiscrepancyRequest;
 import com.localpress.finance.dto.response.ReconciliationPeriodResponse;
-import com.localpress.finance.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 @Slf4j
 public class FinanceReconciliationService {
+
+    private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -58,9 +59,6 @@ public class FinanceReconciliationService {
         BigDecimal systemRevenue = jdbcTemplate.queryForObject(sumSql, BigDecimal.class);
         if (systemRevenue == null) systemRevenue = BigDecimal.ZERO;
 
-        // Giả lập số liệu đối soát từ sao kê SePay / Vietcombank
-        BigDecimal gatewayRevenue = systemRevenue;
-
         // 2. Tự động quét các giao dịch có dấu hiệu sai lệch / treo cần xử lý
         initDiscrepanciesIfEmpty();
 
@@ -70,7 +68,7 @@ public class FinanceReconciliationService {
                 .map(ReconciliationPeriodResponse.DiscrepancyItem::getDiscrepancyAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        String status = isPeriodClosed ? "CLOSED" : (totalDiscrepancy.compareTo(BigDecimal.ZERO) == 0 ? "RECONCILED" : "OPEN");
+        String status = isPeriodClosed ? "CLOSED" : (totalDiscrepancy.signum() == 0 ? "RECONCILED" : "OPEN");
 
         return ReconciliationPeriodResponse.builder()
                 .id("REC-" + now.format(DateTimeFormatter.ofPattern("yyyyMM")))
@@ -78,7 +76,8 @@ public class FinanceReconciliationService {
                 .startDate(startDate.toString())
                 .endDate(endDate.toString())
                 .totalSystemRevenue(systemRevenue)
-                .totalGatewayRevenue(gatewayRevenue)
+                // Giả lập số liệu đối soát từ sao kê SePay / Vietcombank
+                .totalGatewayRevenue(systemRevenue)
                 .discrepancyTotal(totalDiscrepancy)
                 .status(status)
                 .discrepancies(list)
@@ -100,7 +99,7 @@ public class FinanceReconciliationService {
             item.setStatus("RESOLVED");
             item.setResolutionNote(request.getNote());
             item.setResolvedBy("Kế toán #" + accountantId);
-            item.setResolvedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            item.setResolvedAt(LocalDateTime.now().format(TIMESTAMP));
         }
 
         return getCurrentPeriod();
@@ -113,7 +112,7 @@ public class FinanceReconciliationService {
         log.info("Đóng kỳ đối soát bởi Kế toán trưởng ID: {}", managerId);
 
         this.isPeriodClosed = true;
-        this.closedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        this.closedAt = LocalDateTime.now().format(TIMESTAMP);
         this.closedByName = "Kế toán trưởng #" + managerId;
 
         return getCurrentPeriod();

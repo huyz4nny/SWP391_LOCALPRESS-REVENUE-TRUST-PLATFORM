@@ -16,6 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * ==============================================================================
@@ -69,17 +70,17 @@ public class FinanceReportController {
         jdbcTemplate.query(sql, (rs) -> {
             csv.append(String.format("\"%d\",\"%s\",\"%s\",\"%s\",\"%.2f\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%d\",\"%s\"\n",
                     rs.getLong("transaction_id"),
-                    rs.getString("order_code") != null ? rs.getString("order_code") : "",
+                    Objects.toString(rs.getString("order_code"), ""),
                     rs.getString("created_at"),
                     rs.getString("transaction_type"),
                     rs.getBigDecimal("amount"),
                     rs.getString("currency"),
                     rs.getString("payment_method"),
-                    rs.getString("bank_code") != null ? rs.getString("bank_code") : "",
+                    Objects.toString(rs.getString("bank_code"), ""),
                     rs.getString("status"),
-                    rs.getString("paid_at") != null ? rs.getString("paid_at") : "",
+                    Objects.toString(rs.getString("paid_at"), ""),
                     rs.getLong("user_id"),
-                    rs.getString("customer_name") != null ? rs.getString("customer_name") : ""
+                    Objects.toString(rs.getString("customer_name"), "")
             ));
         });
 
@@ -101,45 +102,39 @@ public class FinanceReportController {
 
         List<Map<String, Object>> alerts = new ArrayList<>();
 
-        // 1. Cảnh báo yêu cầu hoàn tiền đang chờ duyệt
-        String pendingRefundsSql = "SELECT COUNT(*) FROM refund_requests WHERE status = 'PENDING'";
-        Integer pendingRefunds = jdbcTemplate.queryForObject(pendingRefundsSql, Integer.class);
-        if (pendingRefunds != null && pendingRefunds > 0) {
-            alerts.add(Map.of(
-                    "type", "REFUND_PENDING",
-                    "severity", "HIGH",
-                    "title", "Yêu cầu hoàn tiền chờ duyệt",
-                    "message", "Có " + pendingRefunds + " yêu cầu hoàn tiền đang chờ Kế toán trưởng phê duyệt theo nguyên tắc 4 mắt.",
-                    "actionUrl", "/backoffice/finance/refunds"
-            ));
-        }
+        // 1. Yêu cầu hoàn tiền đang chờ duyệt
+        addAlertIfAny(alerts, "SELECT COUNT(*) FROM refund_requests WHERE status = 'PENDING'",
+                "REFUND_PENDING", "HIGH", "Yêu cầu hoàn tiền chờ duyệt",
+                "Có %d yêu cầu hoàn tiền đang chờ Kế toán trưởng phê duyệt theo nguyên tắc 4 mắt.",
+                "/backoffice/finance/refunds");
 
-        // 2. Cảnh báo khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" đang chờ đối soát sao kê (UC051)
-        String openComplaintSql = "SELECT COUNT(*) FROM payment_complaints WHERE status = 'OPEN'";
-        Integer openComplaints = jdbcTemplate.queryForObject(openComplaintSql, Integer.class);
-        if (openComplaints != null && openComplaints > 0) {
-            alerts.add(Map.of(
-                    "type", "COMPLAINT_OPEN",
-                    "severity", "MEDIUM",
-                    "title", "Khiếu nại thanh toán chờ đối soát",
-                    "message", "Có " + openComplaints + " khiếu nại khách đã chuyển tiền nhưng chưa được ghi nhận, cần đối chiếu sao kê.",
-                    "actionUrl", "/backoffice/finance/complaints"
-            ));
-        }
+        // 2. Khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" đang chờ đối soát sao kê (UC051)
+        addAlertIfAny(alerts, "SELECT COUNT(*) FROM payment_complaints WHERE status = 'OPEN'",
+                "COMPLAINT_OPEN", "MEDIUM", "Khiếu nại thanh toán chờ đối soát",
+                "Có %d khiếu nại khách đã chuyển tiền nhưng chưa được ghi nhận, cần đối chiếu sao kê.",
+                "/backoffice/finance/complaints");
 
-        // 3. Cảnh báo công nợ quảng cáo B2B quá hạn
-        String overdueSql = "SELECT COUNT(*) FROM ad_campaigns WHERE payment_status = 'UNPAID' AND end_date < CURRENT_DATE";
-        Integer overdueCount = jdbcTemplate.queryForObject(overdueSql, Integer.class);
-        if (overdueCount != null && overdueCount > 0) {
-            alerts.add(Map.of(
-                    "type", "DEBT_OVERDUE",
-                    "severity", "HIGH",
-                    "title", "Công nợ quảng cáo B2B quá hạn",
-                    "message", "Có " + overdueCount + " hợp đồng quảng cáo đã quá hạn thanh toán nhưng chưa thanh toán đủ.",
-                    "actionUrl", "/backoffice/finance/orders?type=AD_CAMPAIGN"
-            ));
-        }
+        // 3. Công nợ quảng cáo B2B quá hạn
+        addAlertIfAny(alerts, "SELECT COUNT(*) FROM ad_campaigns WHERE payment_status = 'UNPAID' AND end_date < CURRENT_DATE",
+                "DEBT_OVERDUE", "HIGH", "Công nợ quảng cáo B2B quá hạn",
+                "Có %d hợp đồng quảng cáo đã quá hạn thanh toán nhưng chưa thanh toán đủ.",
+                "/backoffice/finance/orders?type=AD_CAMPAIGN");
 
         return ResponseEntity.ok(ApiResponse.ok("Lấy danh sách cảnh báo tài chính thành công", alerts));
+    }
+
+    /** Thêm 1 cảnh báo khi câu đếm countSql > 0; messageFormat nhận số đếm qua %d. */
+    private void addAlertIfAny(List<Map<String, Object>> alerts, String countSql, String type, String severity,
+                               String title, String messageFormat, String actionUrl) {
+        Integer count = jdbcTemplate.queryForObject(countSql, Integer.class);
+        if (count != null && count > 0) {
+            alerts.add(Map.of(
+                    "type", type,
+                    "severity", severity,
+                    "title", title,
+                    "message", String.format(messageFormat, count),
+                    "actionUrl", actionUrl
+            ));
+        }
     }
 }

@@ -6,11 +6,9 @@ import com.localpress.finance.dto.response.ComplaintResponse;
 import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentComplaintService;
-import com.localpress.shared.exception.AppException;
 import com.localpress.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -76,10 +74,6 @@ public class PaymentComplaintController {
     }
 
     private FinanceCurrentUser.Principal requireFinanceStaff() {
-        FinanceCurrentUser.Principal principal = currentUser.require();
-        if (!principal.isFinanceStaff()) {
-            throw new AppException("Chỉ kế toán mới được xử lý khiếu nại", HttpStatus.FORBIDDEN);
-        }
-        return principal;
+        return currentUser.requireFinanceStaff("Chỉ kế toán mới được xử lý khiếu nại");
     }
 }

@@ -41,6 +41,11 @@ public class FinanceDashboardResponse {
     private long refundReviewCount;
 
     /**
+     * Số khiếu nại "đã chuyển tiền chưa được ghi nhận" đang chờ kế toán xử lý (OPEN, UC051).
+     */
+    private long openComplaintCount;
+
+    /**
      * Số tiền chênh lệch đối soát ngân hàng (nếu có).
      */
     private BigDecimal reconciliationDiscrepancy;
