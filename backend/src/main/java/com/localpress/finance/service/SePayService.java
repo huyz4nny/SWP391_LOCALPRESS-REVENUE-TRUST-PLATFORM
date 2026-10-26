@@ -1,5 +1,6 @@
 package com.localpress.finance.service;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -9,7 +10,9 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * ==============================================================================
@@ -38,6 +41,7 @@ public class SePayService {
     @Value("${localpress.sepay.env:sandbox}")
     private String env;
 
+    @Getter
     @Value("${localpress.sepay.bank-code:VCB}")
     private String bankCode;
 
@@ -45,9 +49,11 @@ public class SePayService {
     @Value("${localpress.sepay.bank-short-name:vietcombank}")
     private String bankShortName;
 
+    @Getter
     @Value("${localpress.sepay.account-number:}")
     private String accountNumber;
 
+    @Getter
     @Value("${localpress.sepay.account-name:}")
     private String accountName;
 
@@ -76,10 +82,9 @@ public class SePayService {
      * Lấy URL endpoint nộp form thanh toán SePay PG.
      */
     public String getCheckoutUrl() {
-        if ("sandbox".equalsIgnoreCase(env)) {
-            return "https://pay-sandbox.sepay.vn/v1/checkout/init";
-        }
-        return "https://pay.sepay.vn/v1/checkout/init";
+        return "sandbox".equalsIgnoreCase(env)
+                ? "https://pay-sandbox.sepay.vn/v1/checkout/init"
+                : "https://pay.sepay.vn/v1/checkout/init";
     }
 
     /**
@@ -105,20 +110,11 @@ public class SePayService {
                 ? description
                 : "Thanh toan don hang " + orderInvoiceNumber);
 
-        if (successUrl != null && !successUrl.isBlank()) {
-            fields.put("success_url", successUrl);
-        }
-        if (errorUrl != null && !errorUrl.isBlank()) {
-            fields.put("error_url", errorUrl);
-        }
-        if (cancelUrl != null && !cancelUrl.isBlank()) {
-            fields.put("cancel_url", cancelUrl);
-        }
+        putIfPresent(fields, "success_url", successUrl);
+        putIfPresent(fields, "error_url", errorUrl);
+        putIfPresent(fields, "cancel_url", cancelUrl);
 
-        // Tính chữ ký số HMAC-SHA256
-        String signature = signFields(fields);
-        fields.put("signature", signature);
-
+        fields.put("signature", signFields(fields));
         return fields;
     }
 
@@ -129,22 +125,13 @@ public class SePayService {
      */
     public String signFields(Map<String, Object> fields) {
         try {
-            List<String> signedPairs = new ArrayList<>();
-            for (String key : SIGNED_FIELD_NAMES) {
-                if (fields.containsKey(key) && fields.get(key) != null) {
-                    signedPairs.add(key + "=" + fields.get(key));
-                }
-            }
-
-            String dataToSign = String.join(",", signedPairs);
+            String dataToSign = SIGNED_FIELD_NAMES.stream()
+                    .filter(key -> fields.get(key) != null)
+                    .map(key -> key + "=" + fields.get(key))
+                    .collect(Collectors.joining(","));
             Mac sha256Hmac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                    secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"
-            );
-            sha256Hmac.init(secretKeySpec);
-
-            byte[] hash = sha256Hmac.doFinal(dataToSign.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(hash);
+            sha256Hmac.init(new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return Base64.getEncoder().encodeToString(sha256Hmac.doFinal(dataToSign.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
             log.error("Lỗi khi tạo chữ ký HMAC-SHA256 cho SePay: {}", e.getMessage(), e);
             throw new RuntimeException("Lỗi mã hóa chữ ký số thanh toán", e);
@@ -155,31 +142,12 @@ public class SePayService {
      * Sinh link ảnh VietQR trực tiếp để render lên modal hoặc nhúng vào trang checkout.
      */
     public String generateVietQrUrl(String orderCode, BigDecimal amount) {
-        try {
-            String encodedDesc = URLEncoder.encode(orderCode, StandardCharsets.UTF_8);
-            String encodedName = URLEncoder.encode(accountName, StandardCharsets.UTF_8);
-            // Dùng chuẩn VietQR QuickLink, ngân hàng & số tài khoản lấy từ cấu hình localpress.sepay.*
-            return String.format(
-                    "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d&addInfo=%s&accountName=%s",
-                    bankShortName, accountNumber, amount.longValue(), encodedDesc, encodedName
-            );
-        } catch (Exception e) {
-            log.warn("Không thể encode URL VietQR: {}", e.getMessage());
-            return String.format("https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d",
-                    bankShortName, accountNumber, amount.longValue());
-        }
-    }
-
-    public String getBankCode() {
-        return bankCode;
-    }
-
-    public String getAccountNumber() {
-        return accountNumber;
-    }
-
-    public String getAccountName() {
-        return accountName;
+        // Dùng chuẩn VietQR QuickLink, ngân hàng & số tài khoản lấy từ cấu hình localpress.sepay.*
+        return String.format(
+                "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d&addInfo=%s&accountName=%s",
+                bankShortName, accountNumber, amount.longValue(),
+                URLEncoder.encode(orderCode, StandardCharsets.UTF_8),
+                URLEncoder.encode(Objects.toString(accountName, ""), StandardCharsets.UTF_8));
     }
 
     /**
@@ -196,8 +164,14 @@ public class SePayService {
             return false;
         }
         String cleanKey = headerSecretKey.replaceFirst("(?i)^(Bearer|Apikey)\\s+", "").trim();
-        return java.security.MessageDigest.isEqual(
+        return MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.UTF_8),
                 cleanKey.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void putIfPresent(Map<String, Object> fields, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            fields.put(key, value);
+        }
     }
 }
