@@ -118,7 +118,7 @@ export function RegisterPage() {
               />
             </div>
             <div>
-              <Label htmlFor="phone">Số điện thoại (để nhận mã OTP/Hóa đơn)</Label>
+              <Label htmlFor="phone">Số điện thoại</Label>
               <Input
                 id="phone"
                 placeholder="0912345678"

@@ -128,6 +128,20 @@ public class ArticleVersion {
         this.metadata = updatedMetadata;
     }
 
+    public void updateDraftContent(String title, String sapo, String content, String changelog) {
+        if (reviewStatus != ReviewStatus.DRAFT) {
+            throw new IllegalStateException("Chỉ được sửa nội dung phiên bản nháp");
+        }
+        this.title = title.trim();
+        this.sapo = sapo;
+        this.content = content;
+        if (changelog != null) {
+            Map<String, Object> updated = metadata == null ? new HashMap<>() : new HashMap<>(metadata);
+            putOrRemove(updated, "changelog", changelog);
+            this.metadata = updated;
+        }
+    }
+
     public void updateDraftPresentation(String coverImage, java.util.List<String> tags) {
         if (reviewStatus != ReviewStatus.DRAFT) {
             throw new IllegalStateException("Chỉ được cập nhật metadata của phiên bản nháp");
@@ -176,5 +190,34 @@ public class ArticleVersion {
         this.reviewedBy = reviewerId;
         this.reviewedAt = LocalDateTime.now();
         this.reviewFeedback = notes != null ? notes.trim() : null;
+    }
+
+    public static ArticleVersion restoreAsDraft(
+            ArticleVersion source,
+            Long editedBy,
+            int newVersionNumber,
+            Map<String, Object> copiedMetadata,
+            String changelog
+    ) {
+        ArticleVersion restored = createDraft(
+                source.getArticleId(),
+                editedBy,
+                newVersionNumber,
+                source.getTitle(),
+                source.getSapo(),
+                source.getContent(),
+                null
+        );
+
+        restored.coverImageUrl = source.getCoverImageUrl();
+
+        restored.metadata = copiedMetadata == null
+                ? new HashMap<>()
+                : new HashMap<>(copiedMetadata);
+
+        restored.metadata.put("restoredFromVersion", source.getVersionNumber());
+        restored.metadata.put("changelog", changelog.trim());
+
+        return restored;
     }
 }

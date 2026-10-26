@@ -4,6 +4,7 @@ import com.localpress.reader.dto.ArticleReaderResponse;
 import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.repository.ArticleProjection;
 import com.localpress.reader.repository.ReaderArticleRepository;
+import com.localpress.delivery.service.PaywallEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class ReaderArticleServiceImpl implements ReaderArticleService {
 
     private final ReaderArticleRepository readerArticleRepository;
+    private final PaywallEngine paywallEngine;
 
     @Override
     public Page<ArticleSummaryResponse> getArticles(String category, String search, String access, Pageable pageable) {
@@ -34,7 +36,8 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
                         HttpStatus.NOT_FOUND,
                         "Không tìm thấy bài viết hoặc bài chưa được xuất bản"));
         readerArticleRepository.incrementViewCount(slug);
-        return applyPaywall(mapToDetail(projection), projection.getContent(), projection.getAccessType());
+        boolean allowed = paywallEngine.checkCurrentAccess(projection.getId()).allowed();
+        return applyPaywall(mapToDetail(projection), projection.getContent(), projection.getAccessType(), allowed);
     }
 
     static int previewCut(String rawContent) {
@@ -49,16 +52,16 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
         return cutIndex;
     }
 
-    private ArticleReaderResponse applyPaywall(ArticleReaderResponse response, String rawContent, String accessType) {
+    private ArticleReaderResponse applyPaywall(ArticleReaderResponse response, String rawContent, String accessType, boolean allowed) {
         boolean premium = "PREMIUM".equalsIgnoreCase(accessType);
         response.setIsPremium(premium);
-        if (!premium || rawContent == null) {
+        if (allowed) {
             response.setContent(rawContent);
             response.setPreviewContent(rawContent);
             response.setIsLocked(false);
             return response;
         }
-        response.setPreviewContent(rawContent.substring(0, previewCut(rawContent)));
+        response.setPreviewContent(rawContent == null ? "" : rawContent.substring(0, previewCut(rawContent)));
         response.setContent(null);
         response.setIsLocked(true);
         return response;

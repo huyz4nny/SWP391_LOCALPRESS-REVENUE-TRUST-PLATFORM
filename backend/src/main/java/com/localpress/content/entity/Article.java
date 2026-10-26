@@ -175,4 +175,29 @@ public class Article {
             this.singlePrice = singlePrice;
         }
     }
+
+    public void advanceRestoredDraft(int versionNumber) {
+        if (status != Status.DRAFT
+                && status != Status.REJECTED
+                && status != Status.PUBLISHED) {
+            throw new IllegalStateException(
+                    "Trạng thái bài viết không cho phép khôi phục"
+            );
+        }
+
+        if (latestVersion == Integer.MAX_VALUE
+                || versionNumber != latestVersion + 1) {
+            throw new IllegalStateException(
+                    "Phiên bản mới phải liền sau phiên bản hiện tại"
+            );
+        }
+
+        this.latestVersion = versionNumber;
+
+        // Bài đang công khai vẫn giữ trạng thái PUBLISHED.
+        // Bài bị trả lại chuyển sang DRAFT để chuẩn bị sửa.
+        if (this.status == Status.REJECTED) {
+            this.status = Status.DRAFT;
+        }
+    }
 }

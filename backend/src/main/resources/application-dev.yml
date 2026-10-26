@@ -28,6 +28,9 @@ logging:
     org.springframework.security: INFO
 
 localpress:
+  jwt:
+    # Public development key only. Never use this default outside the dev profile.
+    secret: ${LOCALPRESS_JWT_SECRET:localpress-dev-only-signing-key-change-before-deploy-2026}
   storage:
     image-directory: "${user.home}/localpress-data/uploads"
   # Thông tin SePay KHÔNG để trong file này (file này lên GitHub).
