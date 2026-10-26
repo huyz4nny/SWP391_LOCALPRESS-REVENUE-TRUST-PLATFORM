@@ -3,6 +3,7 @@ package com.localpress.finance;
 import com.localpress.finance.dto.request.CreateOrderRequest;
 import com.localpress.finance.dto.request.SepayIpnRequest;
 import com.localpress.finance.dto.response.OrderCreateResponse;
+import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
@@ -23,11 +24,16 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -391,5 +397,48 @@ class PaymentProcessingServiceTest {
         assertEquals("INSUFFICIENT", r.get("autoPay"));
         assertEquals(TransactionStatus.PENDING, order.getStatus());
         verify(walletService, never()).debit(any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Đơn của tôi: lọc theo loại (nhận cả alias ARTICLE_PURCHASE), trả targetId = purchase_id")
+    void getMyOrders_filtersByTypeAndMapsTarget() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        tx.setDescription("Mua bài điều tra");
+        when(transactionRepository.findMyOrders(eq(7L), eq(TransactionType.ARTICLE), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(tx), inv.getArgument(2), 1));
+
+        Page<OrderStatusResponse> result = paymentProcessingService.getMyOrders(7L, "article_purchase", 0, 20);
+
+        assertEquals(1, result.getTotalElements());
+        OrderStatusResponse order = result.getContent().get(0);
+        assertEquals("ARTICLE", order.getOrderType());
+        assertEquals(3L, order.getTargetId());
+        assertEquals("Mua bài điều tra", order.getDescription());
+        assertEquals(ORDER_CODE, order.getOrderCode());
+    }
+
+    @Test
+    @DisplayName("Đơn của tôi: không lọc loại, trang âm về 0, size bị chặn 100, mới nhất trước")
+    void getMyOrders_clampsPagingAndSortsNewestFirst() {
+        when(transactionRepository.findMyOrders(eq(7L), eq(null), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(), inv.getArgument(2), 0));
+
+        paymentProcessingService.getMyOrders(7L, " ", -3, 500);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(transactionRepository).findMyOrders(eq(7L), eq(null), captor.capture());
+        Pageable pageable = captor.getValue();
+        assertEquals(0, pageable.getPageNumber());
+        assertEquals(100, pageable.getPageSize());
+        assertEquals(Sort.Direction.DESC, pageable.getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
+    @DisplayName("Đơn của tôi: loại không hợp lệ trả 400, không truy vấn DB")
+    void getMyOrders_rejectsUnknownType() {
+        AppException ex = assertThrows(AppException.class,
+                () -> paymentProcessingService.getMyOrders(7L, "BOOK", 0, 20));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        verify(transactionRepository, never()).findMyOrders(any(), any(), any());
     }
 }

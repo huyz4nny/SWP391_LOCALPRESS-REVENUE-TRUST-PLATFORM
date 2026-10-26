@@ -15,6 +15,7 @@ import com.localpress.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,7 @@ import java.util.Map;
  * Các API cung cấp:
  * 1. POST /api/v1/finance/orders                   : Tạo phiên thanh toán dùng chung cho Reader & Advertiser (UC047)
  * 2. GET  /api/v1/finance/orders/{id}              : Tra cứu trạng thái đơn hàng (UC050)
+ *    GET  /api/v1/finance/orders/me               : Đơn của tôi, phân trang, lọc theo loại (UC045 của SV3 dùng)
  * 3. GET  /api/v1/finance/orders/code/{code}/status : Polling trạng thái đơn hàng theo mã đơn (UC050)
  * 4. GET  /api/v1/finance/orders/code/{code}        : Dữ liệu trang thanh toán chung /payment/:orderCode
  * 5. POST /api/v1/finance/orders/code/{code}/pay-with-wallet : Trả đơn bằng số dư Ví LocalPress
@@ -92,6 +94,20 @@ public class PaymentProcessingController {
     public ResponseEntity<ApiResponse<OrderCreateResponse>> createShortfallTopUp(@PathVariable String orderCode) {
         OrderCreateResponse response = paymentProcessingService.createShortfallTopUp(currentUser.require(), orderCode);
         return ResponseEntity.ok(ApiResponse.ok("Đã tạo mã nạp bù " + response.getAmount().toPlainString() + " VND", response));
+    }
+
+    /**
+     * Đơn của user đang đăng nhập, mới nhất trước. type (tùy chọn): SUBSCRIPTION, ARTICLE, AD, TOPUP, REFUND.
+     * Đường dẫn cố định "/orders/me" được Spring ưu tiên hơn "/orders/{id}".
+     */
+    @GetMapping("/orders/me")
+    public ResponseEntity<ApiResponse<Page<OrderStatusResponse>>> getMyOrders(
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Page<OrderStatusResponse> result = paymentProcessingService.getMyOrders(currentUser.require().userId(), type, page, size);
+        return ResponseEntity.ok(ApiResponse.ok("Lấy danh sách đơn hàng thành công", result));
     }
 
     @GetMapping("/orders/{id}")
