@@ -5,7 +5,7 @@ import {
   Comment,
   SubscriptionPlan,
 } from '@/features/reader/types'
-import { AdBooking, AdCreative } from '@/features/advertising/types'
+import { AdBooking, AdCreative, AdSlot, AdCampaign } from '@/features/advertising/types'
 import type { CoverImageInfoRequest } from '@/features/content/types'
 
 export type EditorialCategoryOption = Pick<Category, 'id' | 'name' | 'slug'> & { apiId?: string }
@@ -102,9 +102,19 @@ export const editorialApi = {
   getBookings: () => {
     return httpClient.get<AdBooking[]>('/editorial/bookings')
   },
+  getAdSlots: () => {
+    return httpClient.get<AdSlot[]>('/ad-slots')
+  },
+  getCampaigns: () => {
+    return httpClient.get<AdCampaign[]>('/editorial/campaigns')
+  },
+
 
   sendQuotation: (id: string, finalPrice: number, discountPercent: number, quotationNotes: string) => {
     return httpClient.post<AdBooking>(`/editorial/bookings/${id}/quote`, { finalPrice, discountPercent, quotationNotes })
+  },
+  rejectBooking: (id: string, reason: string) => {
+    return httpClient.post<AdBooking>(`/editorial/bookings/${id}/reject`, { reason })
   },
 
   reviewCreative: (id: string, approved: boolean, notes: string) => {

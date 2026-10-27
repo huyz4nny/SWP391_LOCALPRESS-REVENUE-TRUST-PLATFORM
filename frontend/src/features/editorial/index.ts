@@ -4,3 +4,5 @@ export * from './pages/BookingManagementPage'
 export * from './pages/CreativeReviewPage'
 export * from './pages/CommentModerationPage'
 export * from './api'
+
+export * from './pages/AdvertisingInventoryCalendarPage'

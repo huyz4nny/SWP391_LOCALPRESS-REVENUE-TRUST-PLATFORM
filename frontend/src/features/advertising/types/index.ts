@@ -109,6 +109,7 @@ export interface AdBooking {
   discountPercent?: number
   finalPrice: number
   quotationNotes?: string
+  rejectionReason?: string
   bookingStatus: BookingStatus
   paymentStatus: PaymentStatus
   deliveryStatus: DeliveryStatus
