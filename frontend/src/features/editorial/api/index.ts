@@ -115,26 +115,30 @@ export const editorialApi = {
   // ==========================================
   // Advertising (Iteration 2)
   // ==========================================
-  getBookings: () => {
-    return httpClient.get<AdBooking[]>('/editorial/bookings')
+  getBookings: async (): Promise<AdBooking[]> => {
+    const res = await httpClient.get<any>('/editorial/bookings')
+    return (res?.data ?? res) as AdBooking[]
   },
   getAdSlots: () => {
     return httpClient.get<AdSlot[]>('/ad-slots')
   },
-  getCampaigns: () => {
-    return httpClient.get<AdCampaign[]>('/editorial/campaigns')
+  getCampaigns: async (): Promise<AdCampaign[]> => {
+    const res = await httpClient.get<any>('/editorial/campaigns')
+    return (res?.data ?? res) as AdCampaign[]
   },
 
-
-  sendQuotation: (id: string, finalPrice: number, discountPercent: number, quotationNotes: string) => {
-    return httpClient.post<AdBooking>(`/editorial/bookings/${id}/quote`, { finalPrice, discountPercent, quotationNotes })
+  sendQuotation: async (id: string, finalPrice: number, discountPercent: number, quotationNotes: string): Promise<AdBooking> => {
+    const res = await httpClient.post<any>(`/editorial/bookings/${id}/quote`, { finalPrice, discountPercent, quotationNotes })
+    return (res?.data ?? res) as AdBooking
   },
-  rejectBooking: (id: string, reason: string) => {
-    return httpClient.post<AdBooking>(`/editorial/bookings/${id}/reject`, { reason })
+  rejectBooking: async (id: string, reason: string): Promise<AdBooking> => {
+    const res = await httpClient.post<any>(`/editorial/bookings/${id}/reject`, { reason })
+    return (res?.data ?? res) as AdBooking
   },
 
-  reviewCreative: (id: string, approved: boolean, notes: string) => {
-    return httpClient.post<AdCreative>(`/editorial/creatives/${id}/review-creative`, { approved, notes })
+  reviewCreative: async (id: string, approved: boolean, notes: string): Promise<AdCreative> => {
+    const res = await httpClient.post<any>(`/editorial/creatives/${id}/review-creative`, { approved, notes })
+    return (res?.data ?? res) as AdCreative
   },
 
   getAiSuggestions: (topic: string) => {
