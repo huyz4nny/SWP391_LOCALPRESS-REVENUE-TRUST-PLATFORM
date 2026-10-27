@@ -109,7 +109,6 @@ export interface AdBooking {
   discountPercent?: number
   finalPrice: number
   quotationNotes?: string
-  rejectionReason?: string
   bookingStatus: BookingStatus
   paymentStatus: PaymentStatus
   deliveryStatus: DeliveryStatus
@@ -118,6 +117,21 @@ export interface AdBooking {
   termsAccepted: boolean
   createdAt: string
   updatedAt: string
+  // Iter 2 (UC005-UC007): các trường do backend advertising trả về
+  campaignName?: string
+  quoteVersion?: number          // tăng mỗi lần tòa soạn gửi/sửa báo giá; xác nhận phải gửi đúng số này
+  acceptedAt?: string | null
+  holdExpiresAt?: string | null  // hạn giữ chỗ chờ thanh toán
+  paymentOrderCode?: string | null
+  paymentIssue?: 'LATE_PAYMENT_CONFLICT' | null
+  rejectionReason?: string | null
+}
+
+export interface SlotAvailability {
+  available: boolean
+  capacity: number
+  inventoryMode: 'EXCLUSIVE' | 'ROTATING'
+  fullDates: string[]
 }
 
 export interface AdCampaign {
@@ -127,6 +141,7 @@ export interface AdCampaign {
   companyName: string
   slotId: string
   slotName: string
+  slotDimensions?: string
   name: string
   startDate: string
   endDate: string

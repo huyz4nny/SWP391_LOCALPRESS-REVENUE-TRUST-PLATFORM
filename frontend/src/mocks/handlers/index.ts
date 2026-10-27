@@ -161,7 +161,26 @@ export async function handleMockRequest(method: string, url: string, body?: any)
 
   if (pathname.endsWith('/accept-quote') && method === 'POST') {
     const id = pathname.split('/')[3]
-    return mockStore.acceptQuotation(id)
+    return mockStore.acceptQuotation(id, body?.quoteVersion)
+  }
+
+  if (pathname.startsWith('/advertiser/slots/') && pathname.endsWith('/availability') && method === 'GET') {
+    const slotId = pathname.split('/')[3]
+    const slot = mockStore.getState().adSlots.find((s) => s.id === slotId)
+    const fullDates = mockStore.getSlotFullDates(slotId, params.get('startDate') ?? '', params.get('endDate') ?? '')
+    return { available: fullDates.length === 0, capacity: slot?.maxCapacity ?? 1, inventoryMode: slot?.inventoryMode ?? 'EXCLUSIVE', fullDates }
+  }
+
+  // Mock của POST /advertiser/campaigns/:id/payment: số tiền lấy từ booking đã chốt, dùng lại đơn còn chờ.
+  if (pathname.startsWith('/advertiser/campaigns/') && pathname.endsWith('/payment') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const camp = mockStore.getState().campaigns.find((c) => c.id === id)
+    const booking = mockStore.getState().bookings.find((b) => b.id === (camp?.bookingId ?? id))
+    if (!booking || booking.bookingStatus !== 'CONFIRMED') throw new Error('Vui lòng xác nhận báo giá trước khi thanh toán')
+    if (booking.paymentStatus === 'PAID') throw new Error('Booking đã được thanh toán')
+    const pending = mockStore.getState().orders.find((o) => o.targetId === booking.id && o.paymentStatus === 'PENDING')
+    return pending ?? mockStore.createOrder(currentUser.id, 'AD_CAMPAIGN', booking.id,
+      `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'VIETQR')
   }
 
   if (pathname.startsWith('/advertiser/campaigns/') && method === 'GET') {

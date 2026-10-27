@@ -25,16 +25,18 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
     let target = bookings.find((b) => b.bookingStatus === 'SUBMITTED')
 
     if (!target) {
+      mockStore.setCurrentUser('user-adv-1')
       target = await advertisingApi.createBooking({
+        requestKey: 'req-test-reject-01',
+        campaignName: 'Chiến dịch Test Từ Chối',
         slotId: 'slot-top-leaderboard',
         startDate: '2026-11-01',
         endDate: '2026-11-05',
-        daysCount: 5,
-        companyName: 'Công ty Thử Nghiệm Từ Chối',
         contactPerson: 'Nguyễn Văn A',
         contactPhone: '0988776655',
         contactEmail: 'test-reject@company.com',
       })
+      mockStore.setCurrentUser('user-editor')
     }
 
     expect(target.bookingStatus).toBe('SUBMITTED')
@@ -56,12 +58,13 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
   // Màn II.2.5: Quotation Management (UC018)
   // ==========================================
   it('3. UC018: Editorial can send official quotation with discount and technical notes', async () => {
+    mockStore.setCurrentUser('user-adv-1')
     const newBooking = await advertisingApi.createBooking({
+      requestKey: 'req-test-quote-001',
+      campaignName: 'Chiến dịch Logistics Mùa Đông 2026',
       slotId: 'slot-sidebar-sticky',
       startDate: '2026-11-10',
       endDate: '2026-11-20',
-      daysCount: 10,
-      companyName: 'Tập đoàn Logistics Hải Phòng',
       contactPerson: 'Trần Thị B',
       contactPhone: '0912345678',
       contactEmail: 'logistics-hp@company.com',
@@ -73,6 +76,7 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
     const finalPrice = Math.round(newBooking.standardPrice * 0.9)
     const notes = 'Chiết khấu 10% cho khách hàng thân thiết. Cam kết SOV 100%.'
 
+    mockStore.setCurrentUser('user-editor')
     const quoted = await editorialApi.sendQuotation(newBooking.id, finalPrice, discountPercent, notes)
 
     expect(quoted.bookingStatus).toBe('QUOTED')
@@ -87,25 +91,26 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
   })
 
   it('4. Cross-role Integration: Advertiser creates booking -> Appears in Editorial Queue', async () => {
-    const uniqueCompany = `Công ty Cảng Biển Đất Cảng ${Date.now()}`
+    mockStore.setCurrentUser('user-adv-1')
     const created = await advertisingApi.createBooking({
+      requestKey: 'req-test-queue-' + Date.now().toString().slice(-8),
+      campaignName: 'Chiến dịch Cảng Biển Đất Cảng 2026',
       slotId: 'slot-top-leaderboard',
       startDate: '2026-12-01',
       endDate: '2026-12-07',
-      daysCount: 7,
-      companyName: uniqueCompany,
       contactPerson: 'Lê Văn C',
       contactPhone: '0909090909',
       contactEmail: 'cangbien@hp.vn',
     })
 
-    expect(created.companyName).toBe(uniqueCompany)
+    expect(created.bookingStatus).toBe('SUBMITTED')
 
+    mockStore.setCurrentUser('user-editor')
     const queue = await editorialApi.getBookings()
     const match = queue.find((b) => b.id === created.id)
 
     expect(match).toBeDefined()
-    expect(match?.companyName).toBe(uniqueCompany)
+    expect(match?.bookingStatus).toBe('SUBMITTED')
     expect(match?.bookingStatus).toBe('SUBMITTED')
   })
 
