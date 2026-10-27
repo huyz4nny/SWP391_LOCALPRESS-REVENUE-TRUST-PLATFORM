@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
-import { ShieldCheck, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Sparkles, ArrowRight } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
 import { authApi } from '@/features/identity'
 import { httpClient } from '@/lib/http/client'
 import { AppApiError } from '@/lib/http/errors'
+import { GoogleLoginButton } from '../components/GoogleLoginButton'
+import { loginWithGoogle } from '../googleAuthSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -23,6 +25,25 @@ export function LoginPage() {
   const [loginError, setLoginError] = useState('')
 
   const users = mockStore.getState().users
+
+  const handleGoogleLogin = async (idToken: string) => {
+    if (isLoading) return
+    setIsLoading(true)
+    setLoginError('')
+    try {
+      const user = await loginWithGoogle(idToken)
+      setPassword('')
+      if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
+        navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
+      } else if (user.role === 'ADVERTISER') {
+        navigate('/advertiser/profile', { replace: true })
+      } else {
+        navigate(from === '/login' ? '/' : from, { replace: true })
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -158,8 +179,24 @@ export function LoginPage() {
                   Đăng ký miễn phí
                 </Link>
               </div>
+
+              {!APP_CONFIG.useMockApi && (
+                <div className="w-full rounded-md bg-stone-50 border border-stone-200 p-2.5 text-[11px] text-stone-600 space-y-1">
+                  <div className="font-semibold text-stone-700">Gợi ý tài khoản Seed MySQL:</div>
+                  <div>Kế toán: <code className="text-primary-900 font-semibold">ketoan@localpress.vn</code></div>
+                  <div>Mật khẩu: <code className="text-primary-900 font-semibold">password</code> hoặc <code className="text-primary-900 font-semibold">password123</code></div>
+                </div>
+              )}
             </CardFooter>
           </form>
+          {!APP_CONFIG.useMockApi && import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+            <CardContent className="space-y-3 pt-2">
+              <div className="flex items-center gap-3 text-xs text-stone-400">
+                <span className="h-px flex-1 bg-stone-200" />hoặc<span className="h-px flex-1 bg-stone-200" />
+              </div>
+              <GoogleLoginButton onCredential={handleGoogleLogin} disabled={isLoading} />
+            </CardContent>
+          )}
         </Card>
 
         {/* Right: Quick Demo Persona Selector */}

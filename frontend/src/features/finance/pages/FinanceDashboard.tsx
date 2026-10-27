@@ -1,20 +1,32 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { financeApi } from '../api'
+import type { Order } from '../types'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
-import {
-  DollarSign,
-  TrendingUp,
-  Clock,
-  RotateCcw,
-  Scale,
-  ArrowRight,
-  Receipt,
-  FileCheck,
-} from 'lucide-react'
+import { RefreshCw, ChevronRight } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { PageHeader, Panel, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
+
+/**
+ * Tổng quan tài chính (SV4). Câu hỏi của màn hình: "Hôm nay có khoản nào phòng kế toán cần xử lý?"
+ * Khối lớn nhất là doanh thu thực thu kèm biểu đồ theo ngày; bên phải là hàng việc cần làm.
+ */
+
+const CHART_DAYS = 14
+const DATA_HUE = 'var(--chart-bar)' // màu dữ liệu duy nhất trên màn hình: navy của brand (tối: xanh sáng), chỉ đặt trên cột doanh thu
+
+const ORDER_TYPE_LABELS: Record<string, string> = {
+  SUBSCRIPTION: 'Gói độc giả',
+  ARTICLE_PURCHASE: 'Bài lẻ',
+  AD_CAMPAIGN: 'Quảng cáo',
+  TOPUP: 'Nạp ví',
+  REFUND: 'Hoàn tiền',
+}
+
+const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const shortMoney = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tr` : v >= 1000 ? `${Math.round(v / 1000)} k` : String(v))
 
 export function FinanceDashboard() {
   const [stats, setStats] = useState<{
@@ -22,10 +34,14 @@ export function FinanceDashboard() {
     paidOrdersCount: number
     pendingOrdersCount: number
     refundReviewCount: number
+    openComplaintCount: number
     reconciliationDiscrepancy: number
     recentOrders: any[]
   } | null>(null)
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null)
 
   useEffect(() => {
     loadDashboard()
@@ -34,168 +50,246 @@ export function FinanceDashboard() {
   const loadDashboard = async () => {
     try {
       setLoading(true)
-      const data = await financeApi.getDashboard()
+      setError('')
+      const [data, list] = await Promise.all([financeApi.getDashboard(), financeApi.getOrders().catch(() => [] as Order[])])
       setStats(data)
+      setOrders(list)
+      setLoadedAt(new Date())
+    } catch (e: any) {
+      setError(e?.message || 'Không tải được số liệu tài chính')
     } finally {
       setLoading(false)
     }
   }
 
-  const revenueData = [
-    { name: '01-05/09', revenue: 30000000 },
-    { name: '06-10/09', revenue: 159000 },
-    { name: '11-15/09', revenue: 499000 },
-    { name: '16-20/09', revenue: 15000 },
-    { name: '21-25/09', revenue: 24000000 },
-    { name: '26-27/09', revenue: 74000 },
-  ]
+  // Doanh thu theo ngày, tính từ chính các đơn đã thanh toán. Ngày không có tiền vẫn có cột 0 để thấy khoảng trống.
+  const daily = useMemo(() => {
+    const paid = orders.filter((o) => o.paymentStatus === 'PAID' && o.createdAt)
+    if (paid.length === 0) return { rows: [] as { day: string; label: string; revenue: number }[], total: 0, end: null as Date | null }
+    const end = new Date(Math.max(...paid.map((o) => Date.parse(o.updatedAt || o.createdAt))))
+    const sums = new Map<string, number>()
+    paid.forEach((o) => {
+      const k = dayKey(new Date(o.updatedAt || o.createdAt))
+      sums.set(k, (sums.get(k) || 0) + o.finalAmount)
+    })
+    const rows = Array.from({ length: CHART_DAYS }, (_, i) => {
+      const d = new Date(end)
+      d.setDate(end.getDate() - (CHART_DAYS - 1 - i))
+      return { day: dayKey(d), label: `${d.getDate()}/${d.getMonth() + 1}`, revenue: sums.get(dayKey(d)) || 0 }
+    })
+    return { rows, total: rows.reduce((a, r) => a + r.revenue, 0), end }
+  }, [orders])
 
-  if (loading || !stats) {
-    return <div className="py-12 text-center animate-pulse">Đang tải báo cáo tài chính...</div>
+  if (loading && !stats) return <LoadingBlock rows={6} />
+
+  if (error || !stats) {
+    return (
+      <>
+        <PageHeader title="Tổng quan tài chính" />
+        <Notice tone="error">
+          {error || 'Không có dữ liệu.'}{' '}
+          <button onClick={loadDashboard} className="font-medium underline cursor-pointer">Thử lại</button>
+        </Notice>
+      </>
+    )
   }
 
+  const todo = [
+    {
+      label: 'Đề xuất hoàn tiền chờ duyệt',
+      value: `${stats.refundReviewCount}`,
+      note: 'Kế toán trưởng duyệt, người lập không tự duyệt',
+      to: '/backoffice/finance/refunds',
+      action: 'Duyệt',
+      urgent: stats.refundReviewCount > 0,
+    },
+    {
+      label: 'Đơn chờ thanh toán',
+      value: `${stats.pendingOrdersCount}`,
+      note: 'Chờ webhook SePay xác nhận',
+      to: '/backoffice/finance/orders',
+      action: 'Xem đơn',
+      urgent: false,
+    },
+    {
+      label: 'Chênh lệch đối soát kỳ này',
+      value: formatCurrency(stats.reconciliationDiscrepancy),
+      note: stats.reconciliationDiscrepancy === 0 ? 'Sổ hệ thống khớp sao kê' : 'Hệ thống lệch với sao kê ngân hàng',
+      to: '/backoffice/finance/reconciliation',
+      action: 'Đối soát',
+      urgent: stats.reconciliationDiscrepancy !== 0,
+    },
+    {
+      label: 'Khiếu nại chuyển khoản',
+      value: `${stats.openComplaintCount}`,
+      note: 'Khách báo đã chuyển nhưng chưa được ghi nhận',
+      to: '/backoffice/finance/complaints',
+      action: 'Mở hàng chờ',
+      urgent: stats.openComplaintCount > 0,
+    },
+  ]
+
+  const finding = [
+    stats.refundReviewCount > 0 && `${stats.refundReviewCount} đề xuất hoàn tiền đang chờ duyệt`,
+    stats.reconciliationDiscrepancy !== 0 && `đối soát lệch ${formatCurrency(stats.reconciliationDiscrepancy)}`,
+  ].filter(Boolean) as string[]
+
   return (
-    <div className="space-y-6">
-      <div className="pb-4 border-b border-slate-200">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Tổng quan Kế toán & Quản trị Doanh thu (SV4)
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Theo dõi dòng tiền B2C (Paywall gói & bài lẻ) và B2B (Quảng cáo doanh nghiệp), kiểm soát đối soát
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="Tổng quan tài chính"
+        sub={
+          finding.length > 0
+            ? `Cần xử lý: ${finding.join(', ')}.`
+            : 'Không có khoản nào đang chờ kế toán xử lý.'
+        }
+        actions={
+          <>
+            {loadedAt && (
+              <span className="text-[13px] text-slate-500 num">
+                Cập nhật {loadedAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={loadDashboard} isLoading={loading}>
+              {!loading && <RefreshCw className="h-3.5 w-3.5" />}
+              Làm mới
+            </Button>
+          </>
+        }
+      />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Tổng doanh thu thực thu</span>
-            <DollarSign className="w-4 h-4 text-emerald-600" />
+      {/* Lưới 3 cột, gap 16: doanh thu chiếm 2 cột, việc cần làm 1 cột; bảng giao dịch trải hết 3 cột */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Panel className="xl:col-span-2" bodyClassName="pt-0">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pt-4">
+            <div>
+              <h2 className="text-[13px] text-slate-500">Doanh thu thực thu</h2>
+              <div className="mt-1 text-[32px] font-semibold leading-10 tracking-[-0.01em] text-slate-900 num">
+                {formatCurrency(stats.totalRevenue)}
+              </div>
+              <div className="mt-0.5 text-[13px] text-slate-500">
+                từ <span className="text-slate-900 num">{stats.paidOrdersCount}</span> đơn đã thanh toán
+              </div>
+            </div>
+            {daily.end && (
+              <div className="text-right text-[13px] text-slate-500">
+                {CHART_DAYS} ngày đến {daily.end.getDate()}/{daily.end.getMonth() + 1}
+                <div className="text-base font-semibold text-slate-900 num">{formatCurrency(daily.total)}</div>
+              </div>
+            )}
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">
-            {formatCurrency(stats.totalRevenue)}
-          </div>
-          <div className="text-[11px] text-emerald-600 mt-1 flex items-center">
-            <TrendingUp className="w-3 h-3 mr-1" /> {stats.paidOrdersCount} đơn thanh toán thành công
-          </div>
-        </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Đơn chờ xác minh CK</span>
-            <Clock className="w-4 h-4 text-amber-600" />
+          <div className="mt-5 h-[200px] w-full">
+            {daily.rows.length === 0 ? (
+              <div className="flex h-full items-end border-b-2 border-slate-300 pb-2 text-[13px] text-slate-500">
+                Chưa có đơn nào được thanh toán.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={daily.rows} margin={{ top: 4, right: 0, left: 0, bottom: 0 }} barCategoryGap="28%">
+                  <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={{ stroke: 'var(--chart-axis)', strokeWidth: 1 }}
+                    tick={{ fontSize: 12, fill: 'var(--chart-tick)' }}
+                    interval={1}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={52}
+                    tick={{ fontSize: 12, fill: 'var(--chart-tick)' }}
+                    tickFormatter={shortMoney}
+                    tickCount={5}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgb(var(--slate-100))' }}
+                    contentStyle={{ border: '1px solid rgb(var(--slate-200))', background: 'rgb(var(--surface))', color: 'rgb(var(--slate-900))', borderRadius: 6, boxShadow: 'none', fontSize: 13, padding: '6px 10px' }}
+                    labelFormatter={(l) => `Ngày ${l}`}
+                    formatter={(value: any) => [formatCurrency(Number(value)), 'Doanh thu']}
+                  />
+                  <Bar dataKey="revenue" fill={DATA_HUE} radius={[2, 2, 0, 0]} maxBarSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
-          <div className="text-xl sm:text-2xl font-black text-amber-600">
-            {stats.pendingOrdersCount} đơn
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            <Link to="/backoffice/finance/orders" className="text-primary-900 underline font-medium">
-              Vào đối chiếu biên lai →
+        </Panel>
+
+        <Panel title="Việc cần xử lý" bodyClassName="px-0 pb-1">
+          <ul>
+            {todo.map((t) => (
+              <li key={t.label} className="border-t border-slate-100">
+                <Link to={t.to} className="group flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-slate-900">{t.label}</div>
+                    <div className="truncate text-[13px] text-slate-500">{t.note}</div>
+                  </div>
+                  {t.value !== null && (
+                    <span className={`flex-none text-base font-semibold num ${t.urgent ? 'text-negative' : 'text-slate-900'}`}>
+                      {t.value}
+                    </span>
+                  )}
+                  <span className="flex flex-none items-center text-[13px] font-medium text-primary-900">
+                    {t.action}
+                    <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+
+        <Panel
+          className="xl:col-span-3"
+          title="Giao dịch gần đây"
+          aside={
+            <Link to="/backoffice/finance/orders" className="font-medium text-primary-900 hover:underline">
+              Xem tất cả đơn
             </Link>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Yêu cầu hoàn tiền chờ duyệt</span>
-            <RotateCcw className="w-4 h-4 text-red-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-red-600">
-            {stats.refundReviewCount} yêu cầu
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            <Link to="/backoffice/finance/refunds" className="text-red-700 underline font-medium">
-              Xem xét phê duyệt →
-            </Link>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Chênh lệch đối soát kỳ</span>
-            <Scale className="w-4 h-4 text-purple-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">
-            {formatCurrency(stats.reconciliationDiscrepancy)}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            <Link to="/backoffice/finance/reconciliation" className="text-purple-700 underline font-medium">
-              Kỳ tháng 09/2026 →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Revenue Breakdown Chart */}
-      <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-sm text-slate-900">Doanh thu tích lũy Tháng 09/2026 theo đợt</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Phân bổ nguồn thu giữa Quảng cáo doanh nghiệp B2B và Paywall độc giả B2C</p>
-          </div>
-        </div>
-
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={revenueData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${(val / 1000000).toFixed(0)}M`} />
-              <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-              <Bar dataKey="revenue" name="Doanh thu" fill="#1e3a8a" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Recent Orders quick table */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-sm text-slate-900">Giao dịch phát sinh gần đây</h3>
-          <Link to="/backoffice/finance/orders" className="text-xs text-primary-900 font-semibold hover:underline">
-            Toàn bộ danh sách đơn →
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="px-3 py-2.5">Mã đơn</th>
-                <th className="px-3 py-2.5">Người mua / Đối tác</th>
-                <th className="px-3 py-2.5">Dịch vụ</th>
-                <th className="px-3 py-2.5">Số tiền</th>
-                <th className="px-3 py-2.5">Thời gian</th>
-                <th className="px-3 py-2.5">Trạng thái</th>
-                <th className="px-3 py-2.5 text-right">Chi tiết</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {stats.recentOrders.map((o: any) => (
-                <tr key={o.id} className="hover:bg-slate-50/80">
-                  <td className="px-3 py-3 font-mono font-bold text-slate-900">{o.orderCode}</td>
-                  <td className="px-3 py-3">
-                    <span className="font-semibold text-slate-800">{o.userName}</span>
-                  </td>
-                  <td className="px-3 py-3 font-medium text-slate-700 max-w-xs truncate">{o.targetTitle}</td>
-                  <td className="px-3 py-3 font-bold text-slate-900">{formatCurrency(o.finalAmount)}</td>
-                  <td className="px-3 py-3 text-slate-500">{formatDateTime(o.createdAt)}</td>
-                  <td className="px-3 py-3">
-                    <StatusBadge type="payment" status={o.paymentStatus} />
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <Link
-                      to={`/backoffice/finance/orders/${o.id}`}
-                      className="text-primary-900 font-bold hover:underline"
-                    >
-                      Kiểm tra
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          }
+          bodyClassName="px-0 pb-1"
+        >
+          {stats.recentOrders.length === 0 ? (
+            <p className="px-5 pb-4 text-sm text-slate-500">Chưa có giao dịch nào.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className={tableCls.table}>
+                <thead className={tableCls.thead}>
+                  <tr>
+                    <th className={tableCls.th}>Mã đơn</th>
+                    <th className={tableCls.th}>Khách hàng</th>
+                    <th className={tableCls.th}>Dịch vụ</th>
+                    <th className={tableCls.th}>Thời gian</th>
+                    <th className={tableCls.th}>Trạng thái</th>
+                    <th className={tableCls.thNum}>Số tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recentOrders.slice(0, 6).map((o: any) => (
+                    <tr key={o.id} className={tableCls.tr}>
+                      <td className={tableCls.td}>
+                        <Link to={`/backoffice/finance/orders/${o.id}`} className={`${tableCls.code} hover:text-primary-900 hover:underline`}>
+                          {o.orderCode}
+                        </Link>
+                      </td>
+                      <td className={`${tableCls.td} text-slate-900`}>{o.userName}</td>
+                      <td className={`${tableCls.td} max-w-[280px]`}>
+                        <div className="truncate">{o.targetTitle}</div>
+                        <div className="text-xs text-slate-500">{ORDER_TYPE_LABELS[o.orderType] || o.orderType}</div>
+                      </td>
+                      <td className={`${tableCls.td} whitespace-nowrap num`}>{formatDateTime(o.createdAt)}</td>
+                      <td className={tableCls.td}>
+                        <StatusBadge type="payment" status={o.paymentStatus} />
+                      </td>
+                      <td className={`${tableCls.tdNum} font-semibold`}>{formatCurrency(o.finalAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
       </div>
     </div>
   )

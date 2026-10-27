@@ -77,25 +77,44 @@ public class ArticleDraftService {
                         default -> article.getStatus().name();
                     };
                     return new com.localpress.content.dto.MyArticleResponse(
-                            article.getId().toString(), version.getTitle(), author.getId().toString(),
-                            author.getFullName(), categoryName, article.getAccessType() == Article.AccessType.PREMIUM,
-                            status, article.getLatestVersion(), article.getUpdatedAt(), null);
+                            article.getId().toString(),
+                            version.getTitle(),
+                            author.getId().toString(),
+                            author.getFullName(),
+                            categoryName,
+                            article.getAccessType() == Article.AccessType.PREMIUM,
+                            status,
+                            article.getLatestVersion(),
+                            article.getUpdatedAt(),
+                            null,
+                            version.getReviewStatus().name(),
+                            article.getPublishedVersion()
+                    );
                 }).toList();
     }
 
     @Transactional(readOnly = true)
-    public ArticleDraftDetailResponse getDraft(Long articleId){
+    public ArticleDraftDetailResponse getDraft(Long articleId) {
         User author = currentUserService.requireCurrentAuthor();
 
-        Article article = articleRepository.findByIdAndAuthorId(articleId, author.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy bài viết"));
+        Article article = articleRepository
+                .findByIdAndAuthorId(articleId, author.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy bài viết"
+                ));
 
-        if(article.getStatus() != Article.Status.DRAFT){
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bài viết không ở trạng thái bản nháp");
-        }
+        ArticleVersion version = articleVersionRepository
+                .findByArticleIdAndVersionNumber(
+                        article.getId(),
+                        article.getLatestVersion()
+                )
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Không tìm thấy phiên bản mới nhất"
+                ));
 
-        ArticleVersion version = articleVersionRepository.findByArticleIdAndVersionNumber(article.getId(), article.getLatestVersion())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không tìm thấy phiên bản mới nhất của bài viết"));
+        ArticleDraftPolicy.requireEditable(article, version);
 
         return ArticleDraftDetailResponse.from(article, version);
     }

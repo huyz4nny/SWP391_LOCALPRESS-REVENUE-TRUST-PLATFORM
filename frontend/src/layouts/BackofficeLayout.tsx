@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
+import { logout } from '@/features/identity/authSession'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
-import { ROLE_LABELS, UserRole, PERMISSION_CHECKERS } from '@/app/config'
-import { Badge } from '@/components/ui/badge'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
+import { Button } from '@/components/ui/button'
 import {
-  Newspaper,
   DollarSign,
-  ShieldCheck,
   FileText,
   PlusCircle,
   Calendar,
   Image as ImageIcon,
   MessageSquare,
-  CreditCard,
+  LayoutGrid,
   RotateCcw,
   Scale,
   BookMarked,
@@ -21,13 +21,33 @@ import {
   Settings,
   Activity,
   History,
-  ArrowLeft,
-  Lock,
+  ArrowUpRight,
   LogOut,
+  Menu,
+  X,
+  Webhook,
+  type LucideIcon,
 } from 'lucide-react'
 
+interface NavItem {
+  label: string
+  path: string
+  icon: LucideIcon
+}
+
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+/**
+ * Khung Backoffice dùng chung cho Tòa soạn (SV2), Tài chính (SV4), Hệ thống (SV5).
+ * Shell "open plane" (taste-skill app-screens §3.1): sidebar có nhãn nằm trên nền trang,
+ * mục đang mở là pill xám trung tính, không có top bar. Trên điện thoại sidebar gập thành thanh 48px.
+ */
 export function BackofficeLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
+  const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -38,6 +58,10 @@ export function BackofficeLayout() {
     return unsub
   }, [])
 
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
   const isStaff = PERMISSION_CHECKERS.canAccessBackoffice(currentUser.role)
   const canSeeEditorial = PERMISSION_CHECKERS.canAccessEditorial(currentUser.role)
     || PERMISSION_CHECKERS.canComposeArticles(currentUser.role)
@@ -46,253 +70,193 @@ export function BackofficeLayout() {
 
   if (!isStaff) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-white font-sans">
-        <div className="max-w-md w-full bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700 text-center">
-          <div className="w-16 h-16 rounded-full bg-red-900/50 text-red-400 flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-            <Lock className="w-8 h-8" />
+      <div className="min-h-screen bg-ground flex items-center justify-center p-4 font-sans text-slate-900">
+        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6">
+          <div className="font-serif text-lg font-black tracking-tight">
+            Local<span className="text-crimson">Press</span>
           </div>
-          <h2 className="text-xl font-bold mb-2">403 — Không có quyền truy cập Backoffice</h2>
-          <p className="text-sm text-slate-400 mb-6">
-            Bạn đang đăng nhập với vai trò <span className="text-white font-semibold">{currentUser.name} ({ROLE_LABELS[currentUser.role]})</span>. Khu vực quản trị nội bộ chỉ dành cho Biên tập viên, Kế toán và Quản trị viên.
+          <h1 className="mt-4 text-xl font-semibold">Không có quyền vào Backoffice</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Bạn đang đăng nhập là <span className="font-medium text-slate-900">{currentUser.name}</span> ({ROLE_LABELS[currentUser.role]}).
+            Khu vực nội bộ chỉ dành cho Biên tập viên, Kế toán và Quản trị viên.
           </p>
-          <div className="space-y-2">
-            <button
-              onClick={() => mockStore.setCurrentUser('user-editor')}
-              className="w-full bg-sky-700 text-white py-2 px-4 rounded-md text-xs font-semibold hover:bg-sky-600 transition-colors cursor-pointer"
-            >
-              Demo: Đăng nhập Biên tập viên (SV2)
-            </button>
-            <button
-              onClick={() => mockStore.setCurrentUser('user-fin-staff')}
-              className="w-full bg-emerald-700 text-white py-2 px-4 rounded-md text-xs font-semibold hover:bg-emerald-600 transition-colors cursor-pointer"
-            >
-              Demo: Đăng nhập Kế toán viên (SV4)
-            </button>
-            <button
-              onClick={() => mockStore.setCurrentUser('user-admin')}
-              className="w-full bg-purple-700 text-white py-2 px-4 rounded-md text-xs font-semibold hover:bg-purple-600 transition-colors cursor-pointer"
-            >
-              Demo: Đăng nhập Quản trị viên (SV5)
-            </button>
-            <Link to="/" className="block text-xs text-slate-400 hover:text-white pt-2">
-              Quay lại Trang báo công khai
-            </Link>
+          <div className="mt-5 grid gap-2">
+            <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-editor')}>
+              Demo: đăng nhập Biên tập viên (SV2)
+            </Button>
+            <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-fin-staff')}>
+              Demo: đăng nhập Kế toán viên (SV4)
+            </Button>
+            <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-admin')}>
+              Demo: đăng nhập Quản trị viên (SV5)
+            </Button>
           </div>
+          <Link to="/" className="mt-4 inline-block text-sm text-slate-600 hover:text-slate-900 hover:underline">
+            Quay lại trang báo
+          </Link>
         </div>
         <RoleSwitcherBar />
       </div>
     )
   }
 
-  // Navigation structure categorized by business flows
-  const editorialNav = [
-    { label: currentUser.role === 'AUTHOR' ? 'Bài viết của tôi' : 'Danh sách bài viết', path: '/backoffice/editorial/articles', icon: FileText },
-    { label: 'Soạn thảo bài mới', path: '/backoffice/editorial/articles/new', icon: PlusCircle },
-    { label: 'Xử lý Booking quảng cáo', path: '/backoffice/editorial/bookings', icon: Calendar },
+  const editorialItems: NavItem[] = [
+    { label: currentUser.role === 'AUTHOR' ? 'Bài viết của tôi' : 'Bài viết', path: '/backoffice/editorial/articles', icon: FileText },
+    { label: 'Soạn bài mới', path: '/backoffice/editorial/articles/new', icon: PlusCircle },
+    { label: 'Booking quảng cáo', path: '/backoffice/editorial/bookings', icon: Calendar },
     { label: 'Lịch tồn kho slot (UC017)', path: '/backoffice/editorial/calendar', icon: Calendar },
-    { label: 'Duyệt Banner Creative', path: '/backoffice/editorial/creatives', icon: ImageIcon },
+    { label: 'Duyệt banner', path: '/backoffice/editorial/creatives', icon: ImageIcon },
     { label: 'Kiểm duyệt bình luận', path: '/backoffice/editorial/comments', icon: MessageSquare },
+  ].filter((item) => currentUser.role !== 'AUTHOR'
+    || ['/backoffice/editorial/articles', '/backoffice/editorial/articles/new'].includes(item.path))
+
+  const financeItems: NavItem[] = [
+    { label: 'Tổng quan', path: '/backoffice/finance', icon: LayoutGrid },
+    { label: 'Đơn thanh toán', path: '/backoffice/finance/orders', icon: DollarSign },
+    { label: 'Nhật ký SePay', path: '/backoffice/finance/sepay', icon: Webhook },
+    { label: 'Khiếu nại thanh toán', path: '/backoffice/finance/complaints', icon: MessageSquare },
+    { label: 'Hoàn tiền', path: '/backoffice/finance/refunds', icon: RotateCcw },
+    { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
+    { label: 'Sổ quỹ', path: '/backoffice/finance/ledger', icon: BookMarked },
   ]
 
-  const financeNav = [
-    { label: 'Tổng quan tài chính', path: '/backoffice/finance', icon: CreditCard },
-    { label: 'Đơn hàng & Xác nhận CK', path: '/backoffice/finance/orders', icon: DollarSign },
-    { label: 'Quản lý Hoàn tiền (Refund)', path: '/backoffice/finance/refunds', icon: RotateCcw },
-    { label: 'Đối soát kỳ & Chênh lệch', path: '/backoffice/finance/reconciliation', icon: Scale },
-    { label: 'Sổ cái & Bút toán kế toán', path: '/backoffice/finance/ledger', icon: BookMarked },
+  const adminItems: NavItem[] = [
+    { label: 'Tài khoản & phân quyền', path: '/backoffice/admin/users', icon: Users },
+    { label: 'Paywall & thiết bị', path: '/backoffice/admin/paywall', icon: Settings },
+    { label: 'Phân phối banner', path: '/backoffice/admin/delivery', icon: Activity },
+    { label: 'Nhật ký kiểm toán', path: '/backoffice/admin/audit-logs', icon: History },
   ]
 
-  const adminNav = [
-    { label: 'Tài khoản & Phân quyền', path: '/backoffice/admin/users', icon: Users },
-    { label: 'Cấu hình Paywall & Thiết bị', path: '/backoffice/admin/paywall', icon: Settings },
-    { label: 'Giám sát Phân phối Banner', path: '/backoffice/admin/delivery', icon: Activity },
-    { label: 'Nhật ký kiểm toán (Audit Logs)', path: '/backoffice/admin/audit-logs', icon: History },
-  ]
+  const groups: NavGroup[] = [
+    canSeeEditorial && { label: 'Tòa soạn', items: editorialItems },
+    canSeeFinance && { label: 'Tài chính & đối soát', items: financeItems },
+    canSeeAdmin && { label: 'Hệ thống', items: adminItems },
+  ].filter(Boolean) as NavGroup[]
+
+  const scope = canSeeAdmin ? 'Quản trị hệ thống' : canSeeFinance ? 'Phòng kế toán' : 'Tòa soạn'
+
+  // Mục đang mở: khớp đường dẫn dài nhất để /finance/orders/12 vẫn sáng "Đơn thanh toán"
+  const allPaths = groups.flatMap((g) => g.items.map((i) => i.path))
+  const activePath = allPaths
+    .filter((p) => location.pathname === p || location.pathname.startsWith(p + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  const sidebar = (
+    <div className="flex h-full flex-col">
+      <div className="px-5 pt-5 pb-4">
+        <Link to="/backoffice" className="font-serif text-[19px] font-black tracking-tight text-slate-900">
+          Local<span className="text-crimson">Press</span>
+        </Link>
+        <div className="mt-0.5 text-[13px] text-slate-500">Backoffice · {scope}</div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Điều hướng backoffice">
+        {groups.map((group) => (
+          <div key={group.label} className="mt-4 first:mt-1">
+            <div className="px-2.5 pb-1.5 text-xs font-medium text-slate-500">{group.label}</div>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon
+                const isActive = item.path === activePath
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors ${
+                        isActive
+                          ? 'bg-[#e3e6eb] font-medium text-slate-900'
+                          : 'text-slate-700 hover:bg-[#e9ecf0] hover:text-slate-900'
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 flex-none ${isActive ? 'text-slate-900' : 'text-slate-500'}`} strokeWidth={1.75} />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <div className="border-t border-[#e1e4e9] px-3 py-3">
+        <Link
+          to="/"
+          className="flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm text-slate-700 hover:bg-[#e9ecf0] hover:text-slate-900"
+        >
+          <ArrowUpRight className="h-4 w-4 text-slate-500" strokeWidth={1.75} />
+          Xem trang báo
+        </Link>
+        <ThemeToggle withLabel className="w-full gap-2.5 px-2.5 text-sm text-slate-700 hover:bg-[#e9ecf0]" />
+        <div className="mt-2 flex items-center gap-2.5 px-2.5">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#dfe7f5] text-xs font-semibold text-primary-900">
+            {currentUser.name.charAt(0)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-medium text-slate-900">{currentUser.name}</div>
+            <div className="truncate text-xs text-slate-500">{ROLE_LABELS[currentUser.role]}</div>
+          </div>
+          <button
+            onClick={handleLogout}
+            title="Đăng xuất"
+            className="flex-none rounded-md p-1.5 text-slate-500 hover:bg-[#e9ecf0] hover:text-slate-900 cursor-pointer"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={1.75} />
+            <span className="sr-only">Đăng xuất</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col">
-      {/* Top Header */}
-      <header className="bg-slate-900 text-white sticky top-0 z-40 border-b border-slate-800">
-        <div className="px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Link
-              to="/"
-              className="flex items-center text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 rounded px-2.5 py-1.5 hover:bg-slate-800"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-              Xem Trang Báo
-            </Link>
-            <span className="text-slate-700">|</span>
-            <div className="flex items-center space-x-2">
-              <span className="font-serif font-black text-lg tracking-tight text-white">
-                Local<span className="text-red-500">Press</span>
-              </span>
-              <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                Backoffice
-              </span>
-              {canSeeAdmin ? (
-                <span className="text-[10px] bg-purple-900/80 text-purple-200 border border-purple-600 px-2 py-0.5 rounded font-bold uppercase">
-                  Quản trị hệ thống (SV5)
-                </span>
-              ) : canSeeFinance ? (
-                <span className="text-[10px] bg-emerald-900/80 text-emerald-200 border border-emerald-600 px-2 py-0.5 rounded font-bold uppercase">
-                  Tài chính & Đối soát (SV4)
-                </span>
-              ) : (
-                <span className="text-[10px] bg-sky-900/80 text-sky-200 border border-sky-600 px-2 py-0.5 rounded font-bold uppercase">
-                  Tòa soạn & Biên tập (SV2)
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-bold text-white">{currentUser.name}</div>
-              <div className="text-[11px] text-amber-400 font-medium">{ROLE_LABELS[currentUser.role]}</div>
-            </div>
-            <img
-              src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=80'}
-              alt=""
-              className="w-8 h-8 rounded-full object-cover border border-slate-600"
-            />
-            <button
-              onClick={() => {
-                mockStore.setCurrentUser('user-guest')
-                navigate('/login')
-              }}
-              title="Đăng xuất khỏi hệ thống"
-              className="flex items-center space-x-1.5 text-xs text-slate-300 hover:text-red-400 border border-slate-700 hover:border-red-500/50 hover:bg-red-950/20 px-2.5 py-1.5 rounded transition-colors cursor-pointer ml-1"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline font-medium">Đăng xuất</span>
-            </button>
-          </div>
+    <div className="min-h-screen bg-ground font-sans text-slate-900">
+      {/* Điện thoại & tablet: thanh 48px, menu mở thành tấm phủ toàn màn hình */}
+      <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-[#e1e4e9] bg-ground px-4 lg:hidden">
+        <Link to="/backoffice" className="font-serif text-base font-black tracking-tight">
+          Local<span className="text-crimson">Press</span>
+          <span className="ml-2 font-sans text-[13px] font-normal text-slate-500">{scope}</span>
+        </Link>
+        <div className="flex items-center">
+        <ThemeToggle className="h-11 w-11 justify-center" />
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-slate-700 hover:bg-[#e9ecf0] cursor-pointer"
+          aria-label="Mở menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         </div>
       </header>
 
-      {/* Main Workspace with Sidebar */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-300 shrink-0 p-4 space-y-6 overflow-y-auto">
-          {/* Phân hệ thông tin vai trò */}
-          <div className="bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/60">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-              Phân hệ được cấp quyền:
-            </div>
-            {canSeeAdmin ? (
-              <div className="text-xs font-semibold text-purple-300 flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-                <span>Toàn quyền Quản trị (Admin)</span>
-              </div>
-            ) : canSeeFinance ? (
-              <div className="text-xs font-semibold text-emerald-300 flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Kế toán & Tài chính (SV4)</span>
-              </div>
-            ) : canSeeEditorial ? (
-              <div className="text-xs font-semibold text-sky-300 flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                <span>Tòa soạn & Biên tập (SV2)</span>
-              </div>
-            ) : null}
-          </div>
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 bg-ground lg:hidden">
+          <button
+            onClick={() => setMenuOpen(false)}
+            className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-md text-slate-700 hover:bg-[#e9ecf0] cursor-pointer"
+            aria-label="Đóng menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {sidebar}
+        </div>
+      )}
 
-          {/* Editorial Section - Chỉ hiện cho Biên tập viên / Reviewer / Phóng viên / Admin */}
-          {canSeeEditorial && (
-            <div>
-              <div className="flex items-center space-x-2 text-[11px] font-bold text-sky-400 uppercase tracking-wider mb-2 px-2">
-                <Newspaper className="w-3.5 h-3.5" />
-                <span>Tòa Soạn & Biên Tập (SV2)</span>
-              </div>
-              <div className="space-y-1">
-                {editorialNav.filter((item) => currentUser.role !== 'AUTHOR'
-                  || ['/backoffice/editorial/articles', '/backoffice/editorial/articles/new'].includes(item.path)).map((item) => {
-                  const Icon = item.icon
-                  const isActive = location.pathname === item.path
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-sky-600 text-white font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Finance Section - Chỉ hiện cho Kế toán viên / Kế toán trưởng / Admin */}
-          {canSeeFinance && (
-            <div>
-              <div className="flex items-center space-x-2 text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2 px-2">
-                <DollarSign className="w-3.5 h-3.5" />
-                <span>Tài Chính & Đối Soát (SV4)</span>
-              </div>
-              <div className="space-y-1">
-                {financeNav.map((item) => {
-                  const Icon = item.icon
-                  const isActive = location.pathname === item.path
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-emerald-600 text-white font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Admin Section - Chỉ hiện cho Quản trị viên hệ thống */}
-          {canSeeAdmin && (
-            <div>
-              <div className="flex items-center space-x-2 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-2 px-2">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Hệ Thống & Giám Sát (SV5)</span>
-              </div>
-              <div className="space-y-1">
-                {adminNav.map((item) => {
-                  const Icon = item.icon
-                  const isActive = location.pathname === item.path
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`flex items-center space-x-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-purple-600 text-white font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+      <div className="flex">
+        <aside className="sticky top-0 hidden h-screen w-60 flex-none border-r border-[#e1e4e9] lg:block">
+          {sidebar}
         </aside>
 
-        {/* Content View */}
-        <main className="flex-1 p-6 overflow-y-auto">
-          <Outlet />
+        <main className="min-w-0 flex-1 px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pt-8">
+          <div className="mx-auto w-full max-w-[1240px]">
+            <Outlet />
+          </div>
         </main>
       </div>
 

@@ -1,6 +1,5 @@
 import React from 'react'
 import { Button } from '@/components/ui/button'
-import { FileQuestion } from 'lucide-react'
 
 interface EmptyStateProps {
   icon?: React.ReactNode
@@ -10,18 +9,13 @@ interface EmptyStateProps {
   onAction?: () => void
 }
 
-export function EmptyState({
-  icon = <FileQuestion className="w-12 h-12 text-slate-300 mx-auto mb-3" />,
-  title,
-  description,
-  actionLabel,
-  onAction,
-}: EmptyStateProps) {
+// Trạng thái rỗng giữ khung: một hộp viền đứt, một câu nói rõ chuyện gì, và bước tiếp theo nếu có.
+export function EmptyState({ icon, title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
-    <div className="text-center py-12 px-4 rounded-lg border border-dashed border-slate-200 bg-white">
-      {icon}
-      <h3 className="text-base font-semibold text-slate-800">{title}</h3>
-      {description && <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">{description}</p>}
+    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-5 py-8 text-center">
+      {icon && <div className="mb-3 flex justify-center text-slate-400">{icon}</div>}
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      {description && <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>}
       {actionLabel && onAction && (
         <div className="mt-4">
           <Button variant="outline" size="sm" onClick={onAction}>

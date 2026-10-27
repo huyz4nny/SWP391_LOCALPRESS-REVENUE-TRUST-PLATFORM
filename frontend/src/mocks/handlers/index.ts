@@ -310,6 +310,44 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return mockStore.getState().orders
   }
 
+  // Đơn của tôi: trả đúng dạng backend thật (ApiResponse<Page<OrderStatusResponse>>), mới nhất trước.
+  if (pathname === '/finance/orders/me' && method === 'GET') {
+    const typeAlias: Record<string, string> = { ARTICLE_PURCHASE: 'ARTICLE', AD_CAMPAIGN: 'AD' }
+    const toBackendType = (t: string) => typeAlias[t] ?? t
+    const toBackendStatus = (s: string) =>
+      s === 'PAID' || s === 'PARTIALLY_REFUNDED' ? 'SUCCESS'
+        : s === 'PROCESSING' || s === 'EXPIRED' ? 'PENDING'
+          : s
+    const type = params.get('type')?.trim().toUpperCase()
+    const page = Math.max(0, Number(params.get('page') ?? 0) || 0)
+    const rawSize = Number(params.get('size') ?? 20) || 20
+    const size = rawSize <= 0 ? 20 : Math.min(rawSize, 100)
+    const mine = mockStore.getState().orders
+      .filter((o) => o.userId === currentUser.id)
+      .filter((o) => !type || toBackendType(o.orderType) === toBackendType(type))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    const content = mine.slice(page * size, (page + 1) * size).map((o) => ({
+      transactionId: Number(o.id.replace(/\D/g, '')) || o.id,
+      orderCode: o.orderCode,
+      orderType: toBackendType(o.orderType),
+      status: toBackendStatus(o.paymentStatus),
+      isPaid: toBackendStatus(o.paymentStatus) === 'SUCCESS',
+      expired: o.paymentStatus === 'EXPIRED',
+      amount: o.finalAmount ?? o.amount,
+      currency: 'VND',
+      paymentMethod: o.paymentMethod,
+      createdAt: o.createdAt,
+      paidAt: o.paymentStatus === 'PAID' ? o.updatedAt : undefined,
+      description: o.targetTitle,
+      targetId: o.targetId,
+    }))
+    return {
+      success: true,
+      message: 'Lấy danh sách đơn hàng thành công',
+      data: { content, totalElements: mine.length, totalPages: Math.ceil(mine.length / size), number: page, size },
+    }
+  }
+
   if (pathname.startsWith('/finance/orders/') && method === 'GET') {
     const id = pathname.replace('/finance/orders/', '')
     const order = mockStore.getState().orders.find((o) => o.id === id || o.orderCode === id)

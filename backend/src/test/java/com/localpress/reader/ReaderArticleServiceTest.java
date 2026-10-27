@@ -5,6 +5,7 @@ import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.repository.ArticleProjection;
 import com.localpress.reader.repository.ReaderArticleRepository;
 import com.localpress.reader.service.ReaderArticleServiceImpl;
+import com.localpress.delivery.service.PaywallEngine;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +37,9 @@ class ReaderArticleServiceTest {
     @Mock
     private ReaderArticleRepository readerArticleRepository;
 
+    @Mock
+    private PaywallEngine paywallEngine;
+
     @InjectMocks
     private ReaderArticleServiceImpl readerArticleService;
 
@@ -46,6 +50,8 @@ class ReaderArticleServiceTest {
         when(projection.getContent()).thenReturn("Nội dung miễn phí đầy đủ.");
         when(readerArticleRepository.findPublishedBySlug("bai-free")).thenReturn(Optional.of(projection));
 
+        when(projection.getId()).thenReturn(1L);
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(true, PaywallEngine.Reason.FREE));
         ArticleReaderResponse response = readerArticleService.getArticleBySlug("bai-free");
 
         assertFalse(response.getIsLocked());
@@ -62,6 +68,8 @@ class ReaderArticleServiceTest {
         when(projection.getContent()).thenReturn(full);
         when(readerArticleRepository.findPublishedBySlug("bai-vip")).thenReturn(Optional.of(projection));
 
+        when(projection.getId()).thenReturn(1L);
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.LOGIN_REQUIRED));
         ArticleReaderResponse response = readerArticleService.getArticleBySlug("bai-vip");
 
         assertTrue(response.getIsLocked());
@@ -84,6 +92,52 @@ class ReaderArticleServiceTest {
     }
 
     @Test
+    void entitledPremiumReaderReceivesFullPublishedContent() {
+        ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getId()).thenReturn(1L);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        when(projection.getContent()).thenReturn("Toàn văn đã xuất bản và đã mua quyền đọc");
+        when(readerArticleRepository.findPublishedBySlug("bai-da-mua")).thenReturn(Optional.of(projection));
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(true, PaywallEngine.Reason.ARTICLE_PURCHASE));
+
+        var response = readerArticleService.getArticleBySlug("bai-da-mua");
+        assertFalse(response.getIsLocked());
+        assertTrue(response.getIsPremium());
+        assertEquals("Toàn văn đã xuất bản và đã mua quyền đọc", response.getContent());
+    }
+
+    @Test
+    void premiumWithMissingBodyStillRemainsLockedWithoutRights() {
+        ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        when(readerArticleRepository.findPublishedBySlug("bai-rong")).thenReturn(Optional.of(projection));
+        when(projection.getId()).thenReturn(1L);
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.NO_ENTITLEMENT));
+        var response = readerArticleService.getArticleBySlug("bai-rong");
+        assertTrue(response.getIsLocked());
+        assertNull(response.getContent());
+        assertEquals("", response.getPreviewContent());
+    }
+
+    @Test
+    void unlockedResponseIsNeverReusedForNextReaderWithoutRights() {
+        ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getId()).thenReturn(1L);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        String full = "1234567890".repeat(10);
+        when(projection.getContent()).thenReturn(full);
+        when(readerArticleRepository.findPublishedBySlug("cung-bai")).thenReturn(Optional.of(projection));
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(
+                new PaywallEngine.Decision(true, PaywallEngine.Reason.ARTICLE_PURCHASE),
+                new PaywallEngine.Decision(false, PaywallEngine.Reason.LOGIN_REQUIRED));
+        assertEquals(full, readerArticleService.getArticleBySlug("cung-bai").getContent());
+        var guestResponse = readerArticleService.getArticleBySlug("cung-bai");
+        assertNull(guestResponse.getContent());
+        assertTrue(guestResponse.getIsLocked());
+        assertEquals(full.substring(0, 30), guestResponse.getPreviewContent());
+    }
+
+    @Test
     void premiumPreviewNeverExceedsThirtyPercentAndHidesTheTail() {
         String tail = "PHAN_BI_KHOA_TUYET_DOI_KHONG_DUOC_LO";
         String full = "Mot hai ba bon nam sau bay tam chin muoi ".repeat(8) + tail;
@@ -92,6 +146,8 @@ class ReaderArticleServiceTest {
         when(projection.getContent()).thenReturn(full);
         when(readerArticleRepository.findPublishedBySlug("bai-vip-dai")).thenReturn(Optional.of(projection));
 
+        when(projection.getId()).thenReturn(1L);
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.NO_ENTITLEMENT));
         ArticleReaderResponse response = readerArticleService.getArticleBySlug("bai-vip-dai");
 
         assertTrue(response.getIsLocked());

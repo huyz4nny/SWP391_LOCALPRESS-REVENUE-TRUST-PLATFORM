@@ -5,7 +5,9 @@ import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,12 +21,7 @@ import java.util.Optional;
  * ==============================================================================
  * REPOSITORY: QUẢN LÝ DỮ LIỆU GIAO DỊCH TÀI CHÍNH & SỔ QUÝ (SV4 - HUY)
  * ==============================================================================
- * - Phục vụ các nghiệp vụ trong Iteration 1:
- *   + UC047: Tra cứu danh sách chứng từ & sổ quỹ theo bộ lọc đa tiêu chí.
- *   + UC048: Tra cứu chi tiết chứng từ giao dịch.
- *   + UC049: Tổng hợp số liệu sổ quỹ (Tổng thu, tổng chi/hoàn, số lượng đơn).
- *   + UC050: Hàng đợi giao dịch chuyển khoản thủ công cần xác nhận.
- *   + UC051: Xác nhận / Từ chối giao dịch chuyển khoản.
+ * - Sổ quỹ (tra cứu, chi tiết, tổng hợp), đơn thanh toán, khóa dòng khi xử lý tiền vào.
  */
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
@@ -35,13 +32,29 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     Optional<Transaction> findByGatewayTransactionId(String gatewayTransactionId);
 
     /**
-     * UC050: Lấy danh sách giao dịch chuyển khoản thủ công đang ở trạng thái PENDING để Kế toán đối soát.
+     * Khóa dòng đơn hàng (SELECT ... FOR UPDATE) khi xử lý webhook / trả bằng ví,
+     * để webhook bắn đồng thời hoặc khách bấm "Trả bằng ví" 2 lần không xử lý trùng 1 đơn.
      */
-    Page<Transaction> findByStatusAndPaymentMethodIn(
-            TransactionStatus status,
-            Collection<String> paymentMethods,
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Transaction t WHERE t.gatewayTransactionId = :code")
+    Optional<Transaction> findByGatewayTransactionIdForUpdate(@Param("code") String code);
+
+    boolean existsByGatewayTransactionId(String gatewayTransactionId);
+
+    /** "Đơn của tôi" (UC045 của SV3): đơn của 1 user, lọc theo loại nếu có. Dùng index idx_transactions_user_created. */
+    @Query("""
+        SELECT t FROM Transaction t
+        WHERE t.userId = :userId
+          AND (:transactionType IS NULL OR t.transactionType = :transactionType)
+    """)
+    Page<Transaction> findMyOrders(
+            @Param("userId") Long userId,
+            @Param("transactionType") TransactionType transactionType,
             Pageable pageable
     );
+
+    /** Mã nạp bù mới nhất còn chờ của 1 đơn, để mở lại trang thanh toán không tạo QR mới mỗi lần. */
+    Optional<Transaction> findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
 
     /**
      * UC047: Tra cứu sổ quỹ tài chính (Ledger) với bộ lọc linh hoạt (Status, Type, Khoảng thời gian, Keyword).
@@ -71,13 +84,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     );
 
     /**
-     * UC049: Tính tổng số tiền thu về thành công (không tính các giao dịch hoàn tiền).
+     * UC049: Tổng doanh thu gộp = mọi đơn đã thu tiền, kể cả đơn sau đó bị hoàn hết (REFUNDED).
+     * Tiền hoàn được trừ riêng 1 lần qua calculateTotalRefundedAmount (doanh thu thuần = gộp - hoàn).
+     * Không tính TOPUP (tiền nạp ví là công nợ, Rule 16) và không tính chính bút toán REFUND.
      */
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
         FROM Transaction t
-        WHERE t.status = 'SUCCESS'
-          AND t.transactionType != 'REFUND'
+        WHERE t.status IN ('SUCCESS', 'REFUNDED')
+          AND t.transactionType NOT IN ('REFUND', 'TOPUP')
     """)
     BigDecimal calculateTotalGrossRevenue();
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { createBrowserRouter, Navigate, Link } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Link, useParams } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
 import { UserRole, PERMISSION_CHECKERS } from '@/app/config'
 import { mockStore } from '@/mocks/store'
@@ -20,7 +20,6 @@ import {
   ArticleDetailPage,
   SearchPage,
   PremiumPlansPage,
-  CheckoutPage,
   PaymentResultPage,
   ReaderAccountPage,
   ReaderLibraryPage,
@@ -62,7 +61,20 @@ import {
   RefundManagementPage,
   ReconciliationPage,
   GeneralLedgerPage,
+  PaymentPage,
+  TopUpPage,
+  WalletPage,
+  PaymentComplaintPage,
+  ComplaintQueuePage,
+  SepayLogPage,
 } from '@/features/finance'
+
+/** Link cũ /checkout/:orderId -> trang thanh toán chung của SV4 */
+function LegacyCheckoutRedirect() {
+  const { orderId } = useParams<{ orderId: string }>()
+  const order = mockStore.getState().orders.find((o) => o.id === orderId)
+  return <Navigate to={`/payment/${order?.orderCode ?? orderId}`} replace />
+}
 
 // Admin
 import {
@@ -130,7 +142,12 @@ export const router = createBrowserRouter([
       { path: 'article/:slug', element: <ArticleDetailPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'premium', element: <PremiumPlansPage /> },
-      { path: 'checkout/:orderId', element: <CheckoutPage /> },
+      // Trang thanh toán chung & Ví LocalPress (SV4). CheckoutPage cũ của SV3 không còn route, chuyển hướng sang /payment.
+      { path: 'checkout/:orderId', element: <LegacyCheckoutRedirect /> },
+      { path: 'payment/:orderCode', element: <PaymentPage /> },
+      { path: 'wallet', element: <WalletPage /> },
+      { path: 'wallet/topup', element: <TopUpPage /> },
+      { path: 'wallet/complaints', element: <PaymentComplaintPage /> },
       { path: 'payments/:paymentId', element: <PaymentResultPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
@@ -263,6 +280,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'finance/complaints',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <ComplaintQueuePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'finance/orders/:id',
         element: (
           <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
@@ -283,6 +308,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
             <ReconciliationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/sepay',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <SepayLogPage />
           </ProtectedRoute>
         ),
       },

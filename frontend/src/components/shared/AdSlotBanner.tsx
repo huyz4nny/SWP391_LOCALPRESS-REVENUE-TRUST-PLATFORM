@@ -20,8 +20,8 @@ export function AdSlotBanner({ slotCode, className = '' }: AdSlotBannerProps) {
   if (activeCreative && campaign) {
     return (
       <div className={`relative overflow-hidden rounded border border-slate-200 bg-white group ${className}`}>
-        <div className="absolute top-1 right-1 z-10 bg-slate-900/70 text-[10px] text-white px-1.5 py-0.5 rounded tracking-wider uppercase font-medium backdrop-blur-xs">
-          Được tài trợ • {booking?.companyName}
+        <div className="absolute top-1 right-1 z-10 bg-slate-900/80 text-[11px] text-white px-1.5 py-0.5 rounded font-medium">
+          Quảng cáo · {booking?.companyName}
         </div>
         <a
           href={activeCreative.targetUrl}

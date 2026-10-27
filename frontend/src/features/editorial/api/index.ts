@@ -6,8 +6,10 @@ import {
   SubscriptionPlan,
 } from '@/features/reader/types'
 import { AdBooking, AdCreative, AdSlot, AdCampaign } from '@/features/advertising/types'
-import type { CoverImageInfoRequest } from '@/features/content/types'
-
+import type {
+  CoverImageInfoRequest,
+  ArticleVersionReviewStatus,
+} from '@/features/content/types'
 export type EditorialCategoryOption = Pick<Category, 'id' | 'name' | 'slug'> & { apiId?: string }
 
 function coverUploadBody(partName: 'article' | 'request', payload: unknown, file: File, info: CoverImageInfoRequest): FormData {
@@ -18,9 +20,23 @@ function coverUploadBody(partName: 'article' | 'request', payload: unknown, file
   return body
 }
 
-export type ArticleListItem = Pick<Article,
-  'id' | 'title' | 'authorId' | 'authorName' | 'categoryName' | 'isPremium'
-  | 'status' | 'currentVersion' | 'updatedAt' | 'reviewNotes'> & Partial<Pick<Article, 'sapo' | 'content' | 'versions'>>
+export type ArticleListItem = Pick<
+    Article,
+    | 'id'
+    | 'title'
+    | 'authorId'
+    | 'authorName'
+    | 'categoryName'
+    | 'isPremium'
+    | 'status'
+    | 'currentVersion'
+    | 'updatedAt'
+    | 'reviewNotes'
+> &
+    Partial<Pick<Article, 'sapo' | 'content' | 'versions'>> & {
+  latestReviewStatus?: ArticleVersionReviewStatus
+  publishedVersion?: number | null
+}
 
 export const editorialApi = {
   getMyArticles: () => httpClient.get<ArticleListItem[]>('/articles/mine'),

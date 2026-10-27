@@ -9,12 +9,26 @@ export interface AuthMeResponse extends User {
 export const authApi = {
   getMe: () => httpClient.get<AuthMeResponse>('/auth/me'),
 
+  getGoogleNonce: () => httpClient.get<{ nonce: string }>('/auth/google/nonce', {
+    skipAuth: true, credentials: 'include',
+  }),
+
+  googleLogin: (idToken: string) => httpClient.post<LoginResponse>(
+    '/auth/google', { idToken }, { skipAuth: true, credentials: 'include' },
+  ),
+
   register: (request: RegisterReaderRequest) =>
       httpClient.post<RegisterReaderResponse>(
           '/auth/register',
           request,
           { skipAuth: true },
       ),
+}
+
+export interface LoginResponse {
+  accessToken: string
+  tokenType: 'Bearer'
+  expiresIn: number
 }
 
 export interface RegisterReaderRequest {
