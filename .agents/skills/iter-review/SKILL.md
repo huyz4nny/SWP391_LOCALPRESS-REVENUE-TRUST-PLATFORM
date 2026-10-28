@@ -111,7 +111,7 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
 
 **Bước đầu tiên: khách tạo đơn.**
 1. Tab 1 (khách): đăng nhập `reader.an@gmail.com` / `password`, mở bài Premium `/articles/khai-thac-tiem-nang-cang-nuoc-sau-lach-huyen` (15.000 ₫), bấm **Mua bài**.
-   - SV3 gọi `POST /api/v1/finance/orders` (UC047) -> transaction `PENDING` + `orderCode` -> navigate `/payment/:orderCode`.
+   - Backend SV3 tạo bản ghi chờ, giá từ DB, gọi `PaymentProcessingService.createOrder` từ server (UC047) -> transaction `PENDING` + `orderCode` -> navigate `/payment/:orderCode`. Trình duyệt gọi thẳng `POST /api/v1/finance/orders` bị 403 (Rule 4). SV3 chưa làm phần này (xem `docs/sv4/01_output/AUDIT_ITER_1_2.md`).
 2. Chọn **QR SePay**, khách chuyển khoản (demo: coi như đã chuyển nhưng **không** bấm "Chuyển đủ tiền" — giả lập webhook bị lỡ). Đơn vẫn `PENDING`, chưa đọc được bài (Rule 4).
 3. Bấm link **"Đã chuyển hơn 15 phút mà chưa được ghi nhận? Gửi khiếu nại"** (có trên `/payment/:orderCode` và `/wallet`) -> `/wallet/complaints` (`PaymentComplaintPage.tsx`).
 4. Điền form: mã đơn (không bắt buộc), số tiền 15.000, thời gian chuyển, **mã giao dịch ngân hàng** (bắt buộc, vd `FT26293001`), ghi chú -> `POST /api/v1/finance/complaints` -> khiếu nại `OPEN`, hiện ở "Khiếu nại của tôi" (`GET /complaints/me`).
@@ -136,7 +136,7 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
 
 **Bước đầu tiên: Guest mở bài Premium.**
 1. Tab ẩn danh (Guest): mở `/articles/tham-nhap-duong-day-buon-lau-qua-duong-bien-bach-long-vi` -> chỉ thấy preview 30% (Rule 3).
-2. Bấm **Mua bài (25.000 ₫)** -> được yêu cầu đăng nhập (`reader.mai@gmail.com`) -> SV3 gọi `POST /api/v1/finance/orders` (UC047) -> navigate `/payment/:orderCode`.
+2. Bấm **Mua bài (25.000 ₫)** -> được yêu cầu đăng nhập (`reader.mai@gmail.com`) -> backend SV3 tạo đơn từ server (UC047, như SV1) -> navigate `/payment/:orderCode`.
 3. Trang thanh toán (`PaymentPage.tsx`) chỉ cho thầy: số tiền, mô tả đơn, 2 phương thức **Ví LocalPress** và **QR SePay**.
 4. Chọn **QR SePay**: ảnh `qrCodeUrl`, nội dung CK = `orderCode`, đếm ngược 15 phút từ `expiresAt`.
    - F12 tab Network: polling `GET /api/v1/finance/orders/code/{code}/status` mỗi 3s (UC050).
