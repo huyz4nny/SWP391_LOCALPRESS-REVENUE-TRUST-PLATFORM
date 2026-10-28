@@ -95,7 +95,7 @@ public class Transaction {
     private String currency = "VND";
 
     /**
-     * Phương thức thanh toán: 'MANUAL_BANK_TRANSFER', 'VIETQR', 'MOMO', 'VNPAY', v.v.
+     * Phương thức thanh toán: 'SEPAY' (chuyển khoản QR, ghi nhận qua webhook) hoặc 'WALLET' (trừ Ví LocalPress).
      */
     @Column(name = "payment_method", nullable = false, length = 50)
     private String paymentMethod;

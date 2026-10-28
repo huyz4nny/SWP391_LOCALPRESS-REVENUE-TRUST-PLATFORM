@@ -1,6 +1,8 @@
 export type OrderType = 'SUBSCRIPTION' | 'ARTICLE_PURCHASE' | 'AD_CAMPAIGN' | 'TOPUP' | 'REFUND'
 
-export type PaymentMethod = 'SEPAY' | 'VIETQR' | 'BANK_TRANSFER' | 'MANUAL_BANK_TRANSFER' | 'VNPAY' | 'MOMO'
+// Luồng hiện tại chỉ có SEPAY (QR chuyển khoản) và WALLET (Ví LocalPress).
+// VIETQR / BANK_TRANSFER / MOMO chỉ còn vì CheckoutPage cũ của SV3 (không còn route) và mock store; bỏ khi SV3 xóa trang đó.
+export type PaymentMethod = 'SEPAY' | 'WALLET' | 'VIETQR' | 'BANK_TRANSFER' | 'MOMO'
 
 export type OrderPaymentStatus =
   | 'PENDING'

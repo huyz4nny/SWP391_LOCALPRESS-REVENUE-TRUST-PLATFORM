@@ -44,14 +44,6 @@ public class FinanceLedgerService {
     private final FinanceReconciliationService reconciliationService;
 
     /**
-     * Danh sách phương thức thanh toán chuyển khoản thủ công.
-     */
-    private static final List<String> MANUAL_PAYMENT_METHODS = List.of(
-            "BANK_TRANSFER",
-            "MANUAL_BANK_TRANSFER"
-    );
-
-    /**
      * UC047: Tra cứu danh sách chứng từ & sổ quỹ theo các tiêu chí lọc.
      *
      * @param filter Bộ lọc theo trạng thái, loại hình, phương thức, thời gian, từ khóa.
@@ -107,8 +99,6 @@ public class FinanceLedgerService {
                 .pendingCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
                 .successCount(transactionRepository.countByStatus(TransactionStatus.SUCCESS))
                 .failedCount(transactionRepository.countByStatus(TransactionStatus.FAILED))
-                .pendingManualTransfersCount(transactionRepository.countByStatusAndPaymentMethodIn(
-                        TransactionStatus.PENDING, MANUAL_PAYMENT_METHODS))
                 .build();
     }
 

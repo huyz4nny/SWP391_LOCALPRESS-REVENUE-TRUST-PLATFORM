@@ -152,15 +152,15 @@ INSERT INTO ad_stats (stat_id, campaign_id, creative_id, stat_date, impressions,
 -- 14. TRANSACTIONS (Sổ cái thu tiền)
 -- Giao dịch 1: Độc giả Mai mua gói năm 480k
 INSERT INTO transactions (transaction_id, user_id, subscription_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES
-(1, 7, 1, 'SUBSCRIPTION', 480000.00, 'VND', 'VIETQR', 'VNPAY_TXN_SUB_001', 'VCB', 'SUCCESS', '2026-09-01 08:30:00', '2026-09-01 17:00:00', 2);
+(1, 7, 1, 'SUBSCRIPTION', 480000.00, 'VND', 'SEPAY', 'LP2609010830S001', 'VCB', 'SUCCESS', '2026-09-01 08:30:00', '2026-09-01 17:00:00', 2);
 
 -- Giao dịch 2: Độc giả An mua bài điều tra Bạch Long Vĩ 25k
 INSERT INTO transactions (transaction_id, user_id, purchase_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES
-(2, 6, 1, 'ARTICLE', 25000.00, 'VND', 'MOMO', 'MOMO_TXN_ART_002', 'MOMO', 'SUCCESS', '2026-09-23 14:20:00', '2026-09-23 18:00:00', 2);
+(2, 6, 1, 'ARTICLE', 25000.00, 'VND', 'SEPAY', 'LP2609231420A002', 'VCB', 'SUCCESS', '2026-09-23 14:20:00', '2026-09-23 18:00:00', 2);
 
 -- Giao dịch 3: Doanh nghiệp thanh toán hợp đồng quảng cáo 45tr
 INSERT INTO transactions (transaction_id, user_id, campaign_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES
-(3, 5, 1, 'AD', 45000000.00, 'VND', 'VNPAY', 'VNPAY_TXN_AD_003', 'TCB', 'SUCCESS', '2026-08-31 17:00:00', '2026-08-31 18:00:00', 2);
+(3, 5, 1, 'AD', 45000000.00, 'VND', 'SEPAY', 'LP2608311700D003', 'VCB', 'SUCCESS', '2026-08-31 17:00:00', '2026-08-31 18:00:00', 2);
 
 -- 15. REFUND REQUESTS (Dữ liệu mẫu cho SV4 demo luồng Hoàn tiền 4 mắt)
 INSERT INTO refund_requests (refund_id, transaction_id, user_id, refund_amount, reason, evidence_url, status, proposed_by, reviewed_by, review_notes) VALUES

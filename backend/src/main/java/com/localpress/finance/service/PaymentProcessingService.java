@@ -97,16 +97,7 @@ public class PaymentProcessingService {
         Transaction savedTx = transactionRepository.save(txBuilder.build());
         log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(), savedTx.getGatewayTransactionId());
 
-        OrderCreateResponse response = toPaymentView(savedTx);
-        response.setCheckoutFields(sePayService.buildOneTimePaymentFields(
-                savedTx.getGatewayTransactionId(),
-                savedTx.getAmount(),
-                description,
-                request.getSuccessUrl(),
-                request.getErrorUrl(),
-                request.getCancelUrl()
-        ));
-        return response;
+        return toPaymentView(savedTx);
     }
 
     /**
@@ -513,7 +504,6 @@ public class PaymentProcessingService {
                 .expired(expired)
                 .paymentMethod(tx.getPaymentMethod())
                 .description(tx.getDescription())
-                .checkoutUrl(sePayService.getCheckoutUrl())
                 // Chỉ trả QR khi đơn còn chờ thanh toán và chưa hết hạn
                 .qrCodeUrl(tx.getStatus() == TransactionStatus.PENDING && !expired ? sePayService.generateVietQrUrl(tx.getGatewayTransactionId(), tx.getAmount()) : null)
                 .bankCode(sePayService.getBankCode())

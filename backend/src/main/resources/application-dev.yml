@@ -39,9 +39,6 @@ localpress:
   # Giá trị thật đặt ở backend/config/application-secrets.yml (đã .gitignore) hoặc biến môi trường SEPAY_*.
   # Mẫu: backend/config/application-secrets.example.yml
   sepay:
-    merchant-id: ${SEPAY_MERCHANT_ID:}
-    secret-key: ${SEPAY_SECRET_KEY:}
-    env: ${SEPAY_ENV:sandbox}
     bank-code: ${SEPAY_BANK_CODE:VCB}
     bank-short-name: ${SEPAY_BANK_SHORT_NAME:vietcombank}
     account-number: ${SEPAY_ACCOUNT_NUMBER:}

@@ -35,7 +35,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -73,7 +72,7 @@ class FinanceLedgerServiceTest {
                 .transactionType(TransactionType.AD)
                 .amount(new BigDecimal("5000000.00"))
                 .currency("VND")
-                .paymentMethod("BANK_TRANSFER")
+                .paymentMethod("SEPAY")
                 .gatewayTransactionId("MB-998811")
                 .bankCode("MB")
                 .status(TransactionStatus.SUCCESS)
@@ -93,7 +92,7 @@ class FinanceLedgerServiceTest {
             when(transactionRepository.searchLedger(
                     eq(TransactionStatus.SUCCESS),
                     eq(TransactionType.AD),
-                    eq("BANK_TRANSFER"),
+                    eq("SEPAY"),
                     any(),
                     any(),
                     eq("MB-998811"),
@@ -103,7 +102,7 @@ class FinanceLedgerServiceTest {
             LedgerFilterRequest filter = LedgerFilterRequest.builder()
                     .status(TransactionStatus.SUCCESS)
                     .transactionType(TransactionType.AD)
-                    .paymentMethod("BANK_TRANSFER")
+                    .paymentMethod("SEPAY")
                     .keyword("MB-998811")
                     .page(0)
                     .size(10)
@@ -158,8 +157,6 @@ class FinanceLedgerServiceTest {
             when(transactionRepository.countByStatus(TransactionStatus.PENDING)).thenReturn(5L);
             when(transactionRepository.countByStatus(TransactionStatus.SUCCESS)).thenReturn(20L);
             when(transactionRepository.countByStatus(TransactionStatus.FAILED)).thenReturn(2L);
-            when(transactionRepository.countByStatusAndPaymentMethodIn(eq(TransactionStatus.PENDING), anyCollection()))
-                    .thenReturn(3L);
 
             LedgerSummaryResponse summary = financeLedgerService.getLedgerSummary();
 
@@ -169,7 +166,6 @@ class FinanceLedgerServiceTest {
             assertThat(summary.getPendingCount()).isEqualTo(5L);
             assertThat(summary.getSuccessCount()).isEqualTo(20L);
             assertThat(summary.getFailedCount()).isEqualTo(2L);
-            assertThat(summary.getPendingManualTransfersCount()).isEqualTo(3L);
         }
     }
 
