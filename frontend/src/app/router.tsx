@@ -50,6 +50,7 @@ import {
   BookingManagementPage,
   CreativeReviewPage,
   CommentModerationPage,
+  AdvertisingInventoryCalendarPage,
 } from '@/features/editorial'
 
 // Finance
@@ -233,6 +234,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <BookingManagementPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/calendar',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <AdvertisingInventoryCalendarPage />
           </ProtectedRoute>
         ),
       },

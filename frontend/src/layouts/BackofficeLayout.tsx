@@ -104,6 +104,7 @@ export function BackofficeLayout() {
     { label: currentUser.role === 'AUTHOR' ? 'Bài viết của tôi' : 'Bài viết', path: '/backoffice/editorial/articles', icon: FileText },
     { label: 'Soạn bài mới', path: '/backoffice/editorial/articles/new', icon: PlusCircle },
     { label: 'Booking quảng cáo', path: '/backoffice/editorial/bookings', icon: Calendar },
+    { label: 'Lịch tồn kho slot (UC017)', path: '/backoffice/editorial/calendar', icon: Calendar },
     { label: 'Duyệt banner', path: '/backoffice/editorial/creatives', icon: ImageIcon },
     { label: 'Kiểm duyệt bình luận', path: '/backoffice/editorial/comments', icon: MessageSquare },
   ].filter((item) => currentUser.role !== 'AUTHOR'

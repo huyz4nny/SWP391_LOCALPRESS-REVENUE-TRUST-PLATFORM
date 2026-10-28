@@ -901,6 +901,19 @@ class MockStore {
     return booking
   }
 
+  public rejectBooking(bookingId: string, reason: string): AdBooking {
+    const booking = this.state.bookings.find((b) => b.id === bookingId)
+    if (!booking) throw new Error('Không tìm thấy booking')
+
+    booking.bookingStatus = 'REJECTED'
+    booking.rejectionReason = reason
+    booking.updatedAt = new Date().toISOString()
+
+    this.logAudit('TỪ CHỐI BOOKING QUẢNG CÁO', 'ADVERTISING', `Từ chối booking ${booking.id}. Lý do: ${reason}`)
+    this.persist()
+    return booking
+  }
+
   public acceptQuotation(bookingId: string, quoteVersion?: number): AdBooking {
     const booking = this.state.bookings.find((b) => b.id === bookingId)
     if (!booking) throw new Error('Không tìm thấy booking')

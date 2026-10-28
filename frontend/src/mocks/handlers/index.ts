@@ -200,8 +200,47 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return mockStore.getState().articles
   }
 
+  if (pathname.startsWith('/editorial/articles/') && method === 'GET') {
+    const id = pathname.replace('/editorial/articles/', '')
+    const article = mockStore.getState().articles.find((a) => a.id === id)
+    if (!article) {
+      throw new AppApiError({
+        timestamp: new Date().toISOString(),
+        status: 404,
+        error: 'Not Found',
+        message: 'Không tìm thấy bài viết',
+        path: pathname,
+      })
+    }
+    return article
+  }
+
+  if (pathname === '/editorial/bookings' && method === 'GET') {
+    return mockStore.getState().bookings
+  }
+
+  if (pathname === '/editorial/campaigns' && method === 'GET') {
+    return mockStore.getState().campaigns
+  }
+
+  if (pathname.startsWith('/editorial/bookings/') && pathname.endsWith('/reject') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    return mockStore.rejectBooking(id, body.reason)
+  }
+
   if (pathname === '/editorial/articles' && method === 'POST') {
     return mockStore.createArticle(body)
+  }
+
+  if (pathname.endsWith('/policy') && method === 'PUT') {
+    const id = pathname.split('/')[3]
+    const article = mockStore.getState().articles.find((a) => a.id === id)
+    if (!article) throw new Error('Không tìm thấy bài viết')
+    article.isPremium = body.accessType === 'PREMIUM'
+    if (body.singlePrice !== undefined) {
+      article.price = body.singlePrice
+    }
+    return article
   }
 
   if (pathname.startsWith('/editorial/articles/') && method === 'PUT') {
@@ -224,11 +263,23 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return mockStore.reviewCreative(creativeId, body.approved, body.notes)
   }
 
+  if ((pathname === '/editorial/subscription-plans' || pathname === '/subscription-plans') && method === 'GET') {
+    return mockStore.getState().subscriptionPlans
+  }
+
+  if (pathname.startsWith('/editorial/subscription-plans/') && pathname.endsWith('/toggle-status') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const plan = mockStore.getState().subscriptionPlans.find((p) => p.id === id)
+    if (!plan) throw new Error('Không tìm thấy gói cước')
+    plan.isActive = !plan.isActive
+    return plan
+  }
+
   if (pathname === '/editorial/comments' && method === 'GET') {
     return mockStore.getState().comments
   }
 
-  if (pathname.endsWith('/moderate-comment') && method === 'POST') {
+  if ((pathname.endsWith('/moderate') || pathname.endsWith('/moderate-comment')) && method === 'POST') {
     const commentId = pathname.split('/')[3]
     const cmt = mockStore.getState().comments.find((c) => c.id === commentId)
     if (cmt) {
