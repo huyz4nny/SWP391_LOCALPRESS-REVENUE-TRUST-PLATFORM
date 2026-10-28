@@ -20,7 +20,7 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
 
 ### 1.1. Phân hệ SV4: Kế toán, Thanh toán & Đối soát (Huy - Leader)
 *Tài khoản demo:* Kế toán (mắt 1) `ketoan@localpress.vn` / `password` (`ACCOUNTANT`) | Người duyệt mắt 2 `admin@localpress.vn` / `password` | Độc giả `reader.an@gmail.com` | Doanh nghiệp `adv.canghaiphong@gmail.com`  
-*Swimlane:* `docs/sv4/01_output/SWIMLANE_SV4.md` (7 sơ đồ tiếng Anh, PNG trong `docs/sv4/01_output/diagrams/`, mỗi sơ đồ 1 điểm kết thúc) | *Use case:* `docs/sv4/01_output/USECASE_SV4.md` | *DB:* `docs/sv4/01_output/DB_CHANGES_SV4.md`
+*Cây kiến thức Iter 1 → 3 (mỗi nút → API → bảng DB, SQL kiểm chứng):* `docs/sv4/01_output/CAY_KIEN_THUC_SV4.md`; bản Word để học: `docs/sv4/01_output/SWIMLANE_SV4_THEO_ITER.docx` | *Swimlane:* `docs/sv4/01_output/SWIMLANE_SV4.md` (7 sơ đồ tiếng Anh, PNG trong `docs/sv4/01_output/diagrams/`, mỗi sơ đồ 1 điểm kết thúc) | *Use case:* `docs/sv4/01_output/USECASE_SV4.md` | *DB:* `docs/sv4/01_output/DB_CHANGES_SV4.md`
 
 **Màn hình khách hàng (dùng chung cho SV1/SV3, luồng SV4 bắt đầu tại đây):**
 
@@ -39,11 +39,11 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
 | **UC057, UC058** | **II.4.1 Financial Documents and Ledger** | 1 | `/backoffice/finance/ledger` | `GeneralLedgerPage.tsx` | `GET /api/v1/finance/ledger`<br>`GET /api/v1/finance/ledger/{id}`<br>`GET /api/v1/finance/ledger/summary` | `FinanceLedgerController.java`<br>`FinanceLedgerService.java` | `transactions` |
 | **UC051** (include UC049) | **II.4.2 Hàng chờ khiếu nại thanh toán** (Handle Unrecorded Payment Complaint) | 1 | `/backoffice/finance/complaints` (menu "Khiếu nại thanh toán") | `ComplaintQueuePage.tsx` | `GET /api/v1/finance/complaints?status=OPEN`<br>`POST /api/v1/finance/complaints/{id}/resolve?target=ORDER\|WALLET`<br>`POST /api/v1/finance/complaints/{id}/reject` | `PaymentComplaintController.java`<br>`PaymentComplaintService.java`<br>(ghi nhận vào đơn gọi `PaymentProcessingService.processSepayIpn`) | `payment_complaints`<br>`transactions`<br>`wallet_entries` |
 | **UC047, UC048, UC049, UC050** | **II.4.3 Payment Processing** | 2 | `/payment/:orderCode` (bảng trên) | `PaymentPage.tsx` | xem bảng trên | `PaymentProcessingController.java` | `transactions` |
-| **UC053** | **II.4.4 Advertiser Receivables** | 2 | `/backoffice/finance/orders?type=AD` *(chưa có trang riêng)* | `OrderListPage.tsx` | `GET /api/v1/finance/receivables` | `AdvertiserReceivablesController.java`<br>`AdvertiserReceivablesService.java` | `transactions`<br>`ad_campaigns` (chỉ đọc) |
+| **UC053** | **II.4.10 Advertiser Receivables** | 3 | `/backoffice/finance/receivables` (menu "Công nợ quảng cáo") | `ReceivablesPage.tsx` | `GET /api/v1/finance/receivables`<br>`POST /api/v1/finance/receivables/{campaignId}/reminders` | `AdvertiserReceivablesController.java`<br>`AdvertiserReceivablesService.java` | `transactions`, `ad_campaigns` + `advertisers` (chỉ đọc)<br>`receivable_reminders` (V10) |
 | **UC052** | **II.4.5 Cash Flow Dashboard** | 3 | `/backoffice/finance` | `FinanceDashboard.tsx` | `GET /api/v1/finance/dashboard` | `FinanceDashboardController.java` | `transactions` |
-| **UC054** | **II.4.6 Payment Reconciliation** | 3 | `/backoffice/finance/reconciliation` | `ReconciliationPage.tsx` | `GET /api/v1/finance/reconciliation`<br>`POST /api/v1/finance/reconciliation/resolve`<br>`POST /api/v1/finance/reconciliation/close` | `FinanceReconciliationController.java`<br>`FinanceReconciliationService.java` | `transactions`<br>`audit_logs` |
+| **UC054** | **II.4.9 Payment Reconciliation** | 3 | `/backoffice/finance/reconciliation` | `ReconciliationPage.tsx` | `GET /api/v1/finance/reconciliation?month=yyyy-MM`<br>`POST /api/v1/finance/reconciliation/resolve`<br>`POST /api/v1/finance/reconciliation/close` (chỉ Kế toán trưởng) | `FinanceReconciliationController.java`<br>`FinanceReconciliationService.java` | `sepay_webhook_logs` (sao kê)<br>`transactions`<br>`reconciliation_periods`, `reconciliation_items` (V10) |
 | **UC055, UC056** | **II.4.7 Refund and Rights Management** | 3 | `/backoffice/finance/refunds` | `RefundManagementPage.tsx` | `GET /api/v1/finance/refunds`<br>`POST /api/v1/finance/refunds/propose`<br>`POST /api/v1/finance/refunds/{id}/review-refund` | `RefundManagementController.java`<br>`RefundManagementService.java` | `refund_requests`<br>`transactions` |
-| **UC059, UC060** | **II.4.8 Financial Reports and Alerts** | 3 | *(chưa có route FE, gọi API trực tiếp)* | — | `GET /api/v1/finance/reports/export` (CSV)<br>`GET /api/v1/finance/alerts` | `FinanceReportController.java` | `transactions`<br>`refund_requests`<br>`audit_logs` |
+| **UC059, UC060** | **II.4.12 Financial Reports and Alerts** | 3 | `/backoffice/finance/reports` (menu "Cảnh báo và báo cáo") | `FinanceReportsPage.tsx` | `GET /api/v1/finance/reports/export?fromDate&toDate` (CSV)<br>`GET /api/v1/finance/alerts` | `FinanceReportController.java` | `transactions`<br>`refund_requests`<br>`payment_complaints`<br>`reconciliation_items` |
 
 ---
 
@@ -101,6 +101,9 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
 
 ## 2. TRÌNH TỰ ĐIỀU HƯỚNG & KỊCH BẢN THAO TÁC (LUỒNG NGHIỆP VỤ)
 
+> Số iter theo `docs/sv4/01_output/TRACKING_SV4.md` (26/10/2026): **Iter 1 = thu tiền** (kịch bản 2.2), **Iter 2 = khiếu nại, dashboard, sổ quỹ, chứng từ** (kịch bản 2.1), **Iter 3 = cuối kỳ** (kịch bản 2.3). Tiêu đề 2.1 / 2.2 bên dưới còn đánh số cũ.
+> Từ 22/10 mọi đơn trả bằng ví: trang thanh toán không cho chọn "QR SePay" cho đơn mua, ví thiếu thì QR là mã nạp bù. Rule 6: chỉ booking quảng cáo có hạn giữ chỗ; đơn bài / gói còn PENDING là còn trả được.
+
 ### 2.1. Kịch bản Iter 1 (SV4): Webhook bị lỡ -> Khách khiếu nại -> Kế toán đối chiếu sao kê -> Ghi nhận -> Sổ quỹ -> Hóa đơn
 *Swimlane:* `swimlane_sv4_03_complaint.png` | *UC:* UC051 (include UC049), UC058, UC057 | *Màn hình:* II.4.2 Hàng chờ khiếu nại, II.4.1
 
@@ -118,7 +121,9 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
 7. Đối chiếu sao kê ngân hàng theo **mã GD + số tiền**.
 8. Bấm **Ghi nhận vào đơn** -> ConfirmDialog "Đã khớp sao kê, ghi nhận" -> `POST /complaints/{id}/resolve?target=ORDER`.
    - Backend gọi CHÍNH `PaymentProcessingService.processSepayIpn` với mã GD của khách -> đơn `SUCCESS`, `PaymentSuccessEvent` -> SV3 mở khóa. Khiếu nại `RESOLVED`.
-   - Bấm lại trên khiếu nại đã đóng -> `409`. Webhook thật về sau với cùng mã GD -> `ALREADY_PROCESSED`.
+   - Bấm lại trên khiếu nại đã đóng -> `409`. Webhook thật về sau với cùng mã GD -> `RECORDED_BY_COMPLAINT` (tra `payment_complaints.bank_reference`), không ghi lần 2.
+   - Mã GD đã có trong `sepay_webhook_logs` với kết quả đã ghi tiền (SUCCESS / UNDERPAID / LATE) -> `409`, cả Ghi nhận vào đơn lẫn Cộng vào ví.
+   - Đơn mua còn mã nạp bù đang chờ (QR khách quét mang mã TOPUP): ghi nhận vào mã nạp bù, ghi chú "Ghi nhận qua mã nạp bù ..."; webhook mã nạp bù về sau -> `ALREADY_PROCESSED`.
 9. Mở `/backoffice/finance/ledger` (`GeneralLedgerPage.tsx`): dòng Credit mới; 3 KPI Credit, Debit, Net = Credit - Debit.
 10. Mở đơn ở `/backoffice/finance/orders/:id` -> **In chứng từ / hóa đơn** (UC057). Tab 1 reload bài: đọc được toàn văn.
 11. Demo thêm **Từ chối**: khách gửi khiếu nại với mã GD không có trên sao kê -> kế toán bấm **Từ chối**, để trống lý do -> `400`; nhập lý do -> `POST /complaints/{id}/reject` -> `REJECTED`, khách thấy lý do ở "Khiếu nại của tôi".
@@ -156,15 +161,20 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
    - Đối chiếu: đơn ARTICLE/SUBSCRIPTION về muộn vẫn cấp quyền bình thường (bài/gói không giới hạn số lượng). Nạp ví về muộn sau hạn QR vẫn cộng ví.
    - Chuyển thừa: đơn `SUCCESS`, phần dư vào ví (`{orderCode}-EXCESS`).
 2. Bắn IPN với `orderCode` không tồn tại -> `ORDER_NOT_FOUND`; dòng này kế toán xử lý bằng sao kê ở bước 3.
-3. Kế toán mở `/backoffice/finance/reconciliation` (`ReconciliationPage.tsx`, UC054): tổng tiền hệ thống = giao dịch `SUCCESS`, loại `REFUND`, bỏ `payment_method = WALLET` (TOPUP nạp qua QR vẫn tính), so với tổng sao kê. Xử lý dòng lệch **Gán đơn** / **Cộng ví** / **Hoàn** -> `POST /reconciliation/resolve` (ghi `audit_logs`) -> người duyệt `POST /reconciliation/close` chốt kỳ.
+3. Kế toán mở `/backoffice/finance/reconciliation` (`ReconciliationPage.tsx`, UC054), chọn tháng. Số liệu thật, không còn dữ liệu mẫu:
+   - **Sao kê** = tiền SePay báo về trong tháng (`sepay_webhook_logs`, mỗi mã GD ngân hàng tính 1 lần, bỏ sai khóa / gửi lại / tiền ra).
+   - **Hệ thống** = `transactions` SUCCESS / REFUNDED, bỏ `REFUND` và đơn `payment_method = WALLET`, theo `paid_at`.
+   - **Khoản lệch** lưu ở `reconciliation_items`, sinh khi mở kỳ: `BANK_NOT_RECORDED` (ORDER_NOT_FOUND, AMOUNT_MISSING, chuyển thêm vào đơn đã trả) và `RECORDED_WITHOUT_BANK` (ghi theo khiếu nại mà SePay chưa báo).
+   - Bấm **Xử lý**: **Gán vào đơn** (chạy `processSepayIpn`, đơn còn mã nạp bù thì vào mã nạp bù), **Cộng vào ví** (TOPUP `REC-{mãGD}`), hoặc **Giải trình**; bắt buộc ghi chú. Mã GD đã ghi ở webhook / khiếu nại / khoản lệch khác -> `409`. SePay không báo số tiền -> phải nhập theo sao kê.
+   - **Chốt kỳ**: chỉ Kế toán trưởng (`admin@localpress.vn`, kế toán viên bị `403`); còn khoản lệch thì phải xác nhận (thiếu xác nhận -> `409`); lưu ảnh chụp `bank_total`, `system_total`, `unresolved_count`, kỳ CLOSED khóa mọi xử lý.
 4. **Hoàn tiền 4 mắt (UC055):** kế toán `ketoan@localpress.vn` mở `/backoffice/finance/refunds`, chọn giao dịch `SUCCESS`, đề xuất hoàn -> `POST /refunds/propose`.
    - Thử đề xuất vượt số tiền thực thu (cộng cả đề xuất đang `PENDING`) -> bị chặn (Rule 11).
 5. **Thử cùng người duyệt:** vẫn tài khoản `ketoan` bấm Duyệt -> `403` "Vi phạm nguyên tắc 4 mắt".
 6. Đăng nhập `admin@localpress.vn` (Finance Manager, mắt 2) -> Duyệt -> refund `COMPLETED`, giao dịch `REFUND` mới, gốc `REFUNDED`; SV4 phát `RefundCompletedEvent`, listener của SV3 thu hồi quyền đọc (UC056, Rule 17: SV4 không tự sửa bảng `article_purchases`). Tab khách reload: bài quay lại preview 30% (chỉ khi SV3 đã viết listener).
 7. `/backoffice/finance/ledger`: dòng Debit, Net giảm đúng số hoàn.
 8. **Dashboard (UC052):** `/backoffice/finance` — thu B2B / B2C, hoàn, nạp ví tách riêng.
-9. **Xuất báo cáo (UC059):** `GET /api/v1/finance/reports/export` -> file CSV; số liệu khớp Dashboard (Rule 16).
-10. **Cảnh báo (UC060):** `GET /api/v1/finance/alerts` -> `REFUND_PENDING` (refund chờ mắt 2), `DEBT_OVERDUE` (công nợ AD quá hạn); mỗi cảnh báo có `actionUrl` mở đúng màn hình xử lý. Webhook sai khóa (bước 8 Iter 2) tra trong log AUDIT.
+9. **Công nợ (UC053):** `/backoffice/finance/receivables`: chiến dịch đã có báo giá, nhóm Quá hạn / Trong hạn / Đã tất toán. **Gửi nhắc nợ** -> lưu `receivable_reminders` + phát `ReceivableReminderEvent` (SV1 tự báo doanh nghiệp, Rule 17); đã tất toán -> `400`, nhắc lại trong 24 giờ -> `409`.
+10. **Cảnh báo và báo cáo (UC060, UC059):** `/backoffice/finance/reports`: `REFUND_PENDING`, `COMPLAINT_OPEN`, `DEBT_OVERDUE`, `RECONCILIATION_UNRESOLVED`, mỗi cảnh báo có nút mở hàng chờ. **Tải CSV** theo khoảng ngày (`fromDate` > `toDate` -> `400`); cuối file có khối tổng hợp; bỏ trống ngày thì "Doanh thu thuần" khớp đúng Dashboard (Rule 16).
 
 ---
 
@@ -311,6 +321,7 @@ Bảng tra cứu nhanh "Thầy hỏi chức năng nào — mở link nào — co
   9. `backend/src/main/resources/db/migration/V3__wallet_and_topup.sql` (`UNIQUE(transaction_id, direction)`, `CHECK balance >= 0`), `V4__payment_complaints.sql` (`UNIQUE bank_reference`)
 - [ ] **Postman/curl:** chuẩn bị sẵn request IPN `POST /api/v1/finance/webhook/sepay` (khóa đúng, khóa sai, bắn lại lần 2, orderCode không tồn tại, lệch tiền).
 - [ ] **Tab Trình duyệt 3 (Mắt 2):** đăng nhập `admin@localpress.vn` để duyệt hoàn tiền 4 mắt.
+- [ ] **Cửa sổ MySQL (DB Proof, AGENTS.md mục 8.6):** mở sẵn MySQL Workbench / `mysql -u root -p localpress_db`, dán sẵn các câu SQL ở mục 7 để chạy trước và sau mỗi lần bấm nút.
 
 ---
 
@@ -333,7 +344,7 @@ Giảng viên review chuyên môn rất thích phát hiện thiếu sót hoặc 
   *"Dạ đây là quyết định có chủ đích. Nút PAID tay là một đường ghi nhận tiền thứ hai, song song với webhook, nên phải tự lặp lại toàn bộ logic: so số tiền, chuyển thiếu, chuyển thừa, tiền về muộn của booking quảng cáo, chống trùng. Chỉ cần lệch một nhánh là cấp quyền sai hoặc cộng tiền 2 lần.  
   Bọn em cho **mọi ghi nhận vào đơn đi qua cùng một hàm idempotent với webhook**: nút Ghi nhận vào đơn gọi chính `processSepayIpn` với mã giao dịch của khách. Vì vậy:
   1. Thiếu tiền thì vào ví và đơn giữ PENDING, thừa thì phần dư vào ví, đơn AD quá hạn thì vào ví — giống hệt IPN thật.
-  2. Webhook thật về sau với cùng mã GD trả `ALREADY_PROCESSED`, không ghi lần 2 (Rule 5).
+  2. Chống ghi 2 lần theo cả 2 chiều (Rule 5): mã GD đã được webhook ghi tiền thì khiếu nại bị chặn `409` (tra `sepay_webhook_logs.reference_code`); webhook về sau khi khiếu nại đã ghi nhận thì bỏ qua, log `RECORDED_BY_COMPLAINT`. Đơn còn mã nạp bù thì ghi nhận vào mã nạp bù, nên webhook của mã đó về sau gặp `ALREADY_PROCESSED`.
   3. Kế toán chỉ quyết định 'khớp sao kê hay không', không quyết định trạng thái đơn (Rule 4)."*
 
 ---
@@ -540,3 +551,96 @@ $\rightarrow$ Sinh viên trình bày theo đúng **3 lớp kiến trúc** sau:
    - Nhãn chứng thực số: *"Chứng từ ký số hợp lệ bởi LocalPress CA"*.
 3. **Thao tác in (`window.print()`):**  
    Khi người dùng bấm **"In chứng từ ngay (Print / PDF)"** $\rightarrow$ Trình duyệt mở hộp thoại in của hệ điều hành để xuất PDF hoặc in ra giấy.
+
+---
+
+## 7. CHỨNG MINH BẰNG DATABASE (DB PROOF, AGENTS.md mục 8.6)
+
+Nguyên tắc: mỗi nút bấm khi review đều trả lời được 3 câu: **ghi vào bảng nào, cột nào đổi từ gì sang gì, ràng buộc nào chặn dữ liệu sai**. Cách làm: chạy câu `SELECT` trước khi bấm, bấm trên UI, chạy lại đúng câu đó, chỉ cho thầy dòng mới / cột đổi. Thử thêm 1 thao tác sai để thầy thấy DB từ chối.
+
+Tiền không bao giờ xóa cứng: "hủy / từ chối / hoàn" là đổi `status` hoặc thêm bút toán đảo. Bảng tiền đều `ON DELETE RESTRICT`.
+
+Mở DB: `mysql -u root -p localpress_db` (hoặc Workbench). Đặt biến trước khi demo:
+
+```sql
+SET @code  = 'LP2610...';            -- mã đơn copy từ trang /payment/:orderCode
+SET @email = 'docgia@localpress.vn'; -- tài khoản khách đang demo
+SELECT user_id INTO @uid FROM users WHERE email = @email;
+```
+
+### 7.1. Tạo đơn thanh toán (UC047) — INSERT `transactions`
+
+```sql
+SELECT transaction_id, transaction_type, amount, payment_method, status, expires_at, topup_for_order
+FROM transactions WHERE gateway_transaction_id = @code;
+```
+- Sau khi module nguồn gọi `POST /finance/orders`: có 1 dòng mới `status = PENDING`, `payment_method = SEPAY`, `expires_at` = hạn QR.
+- Ràng buộc: `chk_transactions_targets` (đơn ARTICLE phải có `purchase_id`, không có `campaign_id`...), `uk_transactions_gateway_id` (mã đơn không trùng), `chk_transactions_amount` (không âm).
+
+### 7.2. Trả bằng ví / nạp bù (UC047, UC049) — UPDATE `wallets`, INSERT `wallet_entries`
+
+```sql
+SELECT balance FROM wallets WHERE user_id = @uid;
+SELECT e.entry_id, t.gateway_transaction_id, e.direction, e.amount, e.balance_after, e.reason, e.created_at
+FROM wallet_entries e JOIN transactions t ON t.transaction_id = e.transaction_id
+WHERE e.wallet_id = (SELECT wallet_id FROM wallets WHERE user_id = @uid)
+ORDER BY e.entry_id DESC LIMIT 5;
+```
+- Đủ tiền: `wallets.balance` giảm, thêm 1 dòng `DEBIT` gắn đơn, đơn chuyển `SUCCESS`, `payment_method = WALLET`, có `paid_at`.
+- Thiếu tiền: thêm 1 đơn `TOPUP` có `topup_for_order = @code`. Tiền nạp về: dòng `CREDIT` cho đơn TOPUP rồi dòng `DEBIT` cho đơn gốc.
+- Ràng buộc: `chk_wallets_balance` (số dư không âm), `uk_wallet_entries_tx_direction` (1 đơn chỉ trừ / cộng 1 lần).
+- Thử sai: `UPDATE wallets SET balance = -1 WHERE user_id = @uid;` → lỗi CHECK.
+
+### 7.3. Webhook SePay & idempotency (UC048, UC049) — INSERT `sepay_webhook_logs`
+
+```sql
+SELECT log_id, source, sepay_id, auth_ok, transfer_amount, order_code, result_status, received_at
+FROM sepay_webhook_logs ORDER BY log_id DESC LIMIT 5;
+```
+- Mỗi lần gọi (kể cả sai khóa) là 1 dòng log; sai khóa: `auth_ok = 0`, `result_status = INVALID_SIGNATURE`, không có `sepay_id`.
+- Bắn lại cùng `id`: dòng mới `DUPLICATE_DELIVERY`, số dư ví và `wallet_entries` không đổi (chạy lại 7.2 để chứng minh).
+- Chuyển thừa / thiếu / về muộn: thêm đơn TOPUP con mã `@code-EXCESS`, `@code-PART-<ref>`, `@code-LATE` và dòng `CREDIT` tương ứng.
+
+```sql
+SELECT gateway_transaction_id, transaction_type, amount, status
+FROM transactions WHERE gateway_transaction_id LIKE CONCAT(@code, '%');
+```
+
+### 7.4. Khiếu nại chuyển khoản (UC051) — INSERT / UPDATE `payment_complaints`
+
+```sql
+SELECT complaint_id, order_code, amount, bank_reference, status, resolution, resolution_note, resolved_by, resolved_at
+FROM payment_complaints ORDER BY complaint_id DESC LIMIT 5;
+```
+- Khách gửi: dòng mới `status = OPEN`.
+- Kế toán "Ghi nhận vào đơn": `status = RESOLVED`, `resolution` = kết quả xử lý, đơn `@code` chuyển `SUCCESS` (chạy lại 7.1).
+- "Cộng vào ví": thêm đơn TOPUP mã `CMP-<bank_reference>` + dòng `CREDIT`.
+- "Từ chối": `status = REJECTED`, `resolution_note` = lý do bắt buộc. Không xóa dòng nào.
+- Ràng buộc: `uk_payment_complaints_bank_ref` (1 mã giao dịch ngân hàng chỉ khiếu nại 1 lần), `chk_payment_complaints_amount`.
+
+### 7.5. Hoàn tiền 4 mắt (UC055, UC056) — INSERT `refund_requests`, INSERT bút toán `REFUND`
+
+```sql
+SELECT refund_id, transaction_id, refund_amount, status, proposed_by, reviewed_by, review_notes, resolved_at
+FROM refund_requests ORDER BY refund_id DESC LIMIT 5;
+SELECT transaction_id, gateway_transaction_id, transaction_type, amount, status, original_transaction_id, reconciled_by
+FROM transactions WHERE transaction_id = <id đơn gốc> OR original_transaction_id = <id đơn gốc>;
+```
+- Mắt 1 đề xuất: dòng `refund_requests` mới `PENDING`, `proposed_by` = kế toán.
+- Mắt 2 duyệt: `COMPLETED`, `reviewed_by` khác `proposed_by`; thêm dòng `transactions` loại `REFUND` có `original_transaction_id` = đơn gốc; hoàn đủ thì đơn gốc thành `REFUNDED`. Đơn trả bằng ví thì có thêm dòng `CREDIT` (chạy lại 7.2).
+- Từ chối: `REJECTED`, không có bút toán REFUND.
+- Ràng buộc: `chk_transactions_targets` (REFUND bắt buộc có `original_transaction_id`); Rule 11 (tổng hoàn ≤ tiền thu) chặn ở service, chứng minh bằng:
+
+```sql
+SELECT t.amount AS da_thu, COALESCE(SUM(r.refund_amount), 0) AS da_hoan_hoac_cho
+FROM transactions t LEFT JOIN refund_requests r
+  ON r.transaction_id = t.transaction_id AND r.status IN ('PENDING', 'APPROVED', 'COMPLETED')
+WHERE t.transaction_id = <id đơn gốc> GROUP BY t.amount;
+```
+
+### 7.6. Thử xóa để chứng minh không mất dấu vết tiền
+
+```sql
+DELETE FROM transactions WHERE gateway_transaction_id = @code;  -- lỗi FK: wallet_entries / refund_requests đang trỏ tới
+```
+Câu trả lời mẫu: "Dữ liệu tiền chỉ thêm, không xóa. Muốn hủy thì đổi trạng thái hoặc ghi bút toán đảo, nên sổ quỹ luôn truy vết được."

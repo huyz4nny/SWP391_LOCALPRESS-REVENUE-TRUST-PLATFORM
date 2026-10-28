@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * ==============================================================================
@@ -80,4 +81,10 @@ public class AdvertiserReceivableResponse {
      * Nhóm tuổi nợ: PAID_IN_FULL (Đã tất toán), IN_TERM (Trong hạn), OVERDUE (Quá hạn).
      */
     private String debtGroup;
+
+    /** Số lần kế toán đã gửi nhắc nợ (receivable_reminders). */
+    private long reminderCount;
+
+    /** Lần nhắc nợ gần nhất, null nếu chưa nhắc. */
+    private LocalDateTime lastReminderAt;
 }

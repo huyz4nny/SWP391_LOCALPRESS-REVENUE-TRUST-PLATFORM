@@ -13,6 +13,8 @@ import { PageHeader, Panel, KeyValue, Notice, tableCls, LoadingBlock } from '../
 
 export function RefundManagementPage() {
   const currentUser = mockStore.getCurrentUser()
+  // Mắt 2 là Kế toán trưởng (API thật: SYSTEM_ADMIN); backend trả 403 cho vai trò khác
+  const isManager = currentUser.role === 'FINANCE_MANAGER' || currentUser.role === 'SYSTEM_ADMIN'
 
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
   const [paidOrders, setPaidOrders] = useState<Order[]>([])
@@ -306,6 +308,10 @@ export function RefundManagementPage() {
               {selectedRefund.reviewNotes && <KeyValue label="Ý kiến duyệt">{selectedRefund.reviewNotes}</KeyValue>}
             </dl>
 
+            {selectedRefund.status === 'UNDER_REVIEW' && !isManager && selectedRefund.proposedBy !== currentUser.id && (
+              <Notice tone="note">Chỉ Kế toán trưởng được duyệt hoặc từ chối hoàn tiền (mắt 2).</Notice>
+            )}
+
             {selectedRefund.proposedBy === currentUser.id && (
               <Notice tone="warning">
                 Bạn là người lập đề xuất này nên không được tự duyệt (nguyên tắc 4 mắt). Đổi sang tài khoản kế toán trưởng để duyệt.
@@ -337,7 +343,7 @@ export function RefundManagementPage() {
                     size="sm"
                     className="text-negative"
                     onClick={() => handleReviewRefund(false)}
-                    disabled={selectedRefund.proposedBy === currentUser.id}
+                    disabled={!isManager || selectedRefund.proposedBy === currentUser.id}
                     isLoading={isSubmittingReview}
                   >
                     Từ chối
@@ -345,7 +351,7 @@ export function RefundManagementPage() {
                   <Button
                     size="sm"
                     onClick={() => handleReviewRefund(true)}
-                    disabled={selectedRefund.proposedBy === currentUser.id}
+                    disabled={!isManager || selectedRefund.proposedBy === currentUser.id}
                     isLoading={isSubmittingReview}
                   >
                     Duyệt hoàn {formatCurrency(selectedRefund.refundAmount)}

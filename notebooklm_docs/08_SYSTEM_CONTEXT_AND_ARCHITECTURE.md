@@ -146,6 +146,44 @@ Kiến trúc triển khai và mã nguồn hệ thống được tổ chức tr�
 ### 3.4. Phân hệ SV4 — Luồng Kế toán: Thanh toán, Công nợ & Đối soát (Huy - Leader phụ trách)
 *Mục tiêu: Đảm bảo toàn vẹn dòng tiền, minh bạch đối soát ngân hàng, xử lý hoàn tiền an toàn và chuẩn hóa sổ quỹ kép.*
 
+#### Sơ đồ Swimlane Luồng Kế toán & Duyệt Chuyển khoản (SV4 Activity Flow):
+*(Xem tài liệu đặc tả chi tiết tại [`docs/SWIMLANE_SV4_MANUAL_TRANSFER.md`](SWIMLANE_SV4_MANUAL_TRANSFER.md) và ảnh sơ đồ gốc tại [`docs/diagrams/swimlane_sv4.png`](diagrams/swimlane_sv4.png))*
+
+```mermaid
+flowchart TD
+    subgraph Lane1["LÀN 1: KHÁCH HÀNG (ĐỘC GIẢ / DOANH NGHIỆP)"]
+        K1["1. Chọn Chuyển khoản ngân hàng<br/><i>(Nhận STK, Cú pháp, Mã đơn)</i>"]
+        K2["2. Mở App Ngân hàng chuyển tiền<br/><i>(Lấy Bank Ref & Chụp ảnh biên lai)</i>"]
+        K3["3. Nộp mã Bank Ref & Tải ảnh biên lai lên hệ thống"]
+    end
+
+    subgraph Lane2["LÀN 2: HỆ THỐNG LOCALPRESS (CORE)"]
+        S1["4. Tạo bản ghi transactions<br/><i>(status = PENDING)</i>"]
+        S2["5. Đưa đơn vào Hàng đợi chuyển khoản chờ duyệt<br/><i>(GET /api/v1/finance/manual-transfers/pending)</i>"]
+    end
+
+    subgraph Lane3["LÀN 3: KẾ TOÁN VIÊN (SV4)"]
+        A1["6. Mở chi tiết đơn hàng OrderDetailPage.tsx"]
+        A2["7. Mở Sao kê Ngân hàng Tòa soạn đối chiếu"]
+        A3{"8. Tiền thực nhận đã vào TK<br/>đúng số tiền và cú pháp?"}
+        A4["9. Bấm TỪ CHỐI (Reject)<br/><i>(Nhập lý do sai lệch/chưa có tiền)</i>"]
+        A5["10. Nhập mã bút toán thật (FT Code)<br/>Bấm XÁC NHẬN TIỀN ĐÃ VÀO TK"]
+    end
+
+    subgraph Lane4["LÀN 4: HỆ THỐNG SỰ KIỆN & SỔ CÁI"]
+        E1["11. Cập nhật Transaction: status = FAILED<br/><i>(Lưu vết lý do từ chối & người duyệt)</i>"]
+        E2["12. Kiểm tra Idempotency:<br/><i>Mã bút toán chưa từng tồn tại trên đơn khác</i>"]
+        E3["13. Cập nhật Transaction: status = SUCCESS<br/><i>(Gán paid_at = now, reconciled_by = accountantId)</i>"]
+        E4["14. Ghi nhận bút toán Sổ cái General Ledger<br/><i>(Credit tăng, Net Balance tăng)</i>"]
+        E5["15. Phát tán Domain Event: PaymentSuccessEvent"]
+        E6["16. Module SV1 / SV3 bắt Event<br/><i>(Mở khóa bài viết hoặc kích hoạt chiến dịch)</i>"]
+    end
+
+    K1 --> K2 --> K3 --> S1 --> S2 --> A1 --> A2 --> A3
+    A3 -- "KHÔNG (Tiền chưa về/Sai số)" --> A4 --> E1
+    A3 -- "CÓ (Khớp 100% tiền thực nhận)" --> A5 --> E2 --> E3 --> E4 --> E5 --> E6
+```
+
 1. **[P0] SV4_01: Dashboard tài chính & Dòng tiền tòa soạn.** Tổng hợp: Doanh thu B2C (bán gói/bài lẻ), Doanh thu B2B (quảng cáo), số tiền đã thực thu, tổng công nợ và biểu đồ tăng trưởng doanh thu theo ngày.
 2. **[P0] SV4_02: Quản lý danh sách đơn hàng toàn hệ thống (`transactions`).** Xem toàn bộ đơn hàng phát sinh từ cả mua báo lẫn booking quảng cáo; lọc theo trạng thái (`PENDING`, `SUCCESS`, `FAILED`, `REFUNDED`).
 3. **[P0] SV4_03: Chi tiết đơn hàng & Lịch sử thanh toán.** Tra cứu chi tiết nguồn gốc đơn hàng, mã tham chiếu cổng thanh toán, thời gian ghi nhận và tài khoản thực hiện.
@@ -192,7 +230,7 @@ Kiến trúc triển khai và mã nguồn hệ thống được tổ chức tr�
 13. **[P0] SV5_13: Quản lý cây danh mục & Thẻ bài viết (Taxonomy & Tags).** Quản lý chuyên mục phân cấp cha - con; tạo slug đường dẫn chuẩn SEO; quản lý các thẻ tag chủ đề nóng.
 14. **[P0] SV5_14: Quy trình gửi duyệt & Phê duyệt bài viết nhiều bước.** Trạng thái bài: `DRAFT` $\rightarrow$ `PENDING` $\rightarrow$ `APPROVED` $\rightarrow$ `PUBLISHED` $\rightarrow$ `ARCHIVED`.
 15. **[P0] SV5_15: Thư viện quản lý tệp tin truyền thông (Media Assets Library).** Quản lý hình ảnh, banner; tối ưu hóa dung lượng ảnh tự động; gắn thẻ bản quyền và alt-text mô tả ảnh.
-16. **[P0] SV5_16: Quản trị người dùng & Phân quyền RBAC.** Tạo tài khoản, gán vai trò (`READER`, `AUTHOR`, `EDITOR`, `STAFF`, `ADVERTISER`, `SYSTEM_ADMIN`); khóa tài khoản khi có vi phạm.
+16. **[P0] SV5_16: Quản trị người dùng & Phân quyền RBAC.** Tạo tài khoản, gán vai trò (`READER`, `EDITOR`, `STAFF`, `ADVERTISER`, `SYSTEM_ADMIN`); khóa tài khoản khi có vi phạm.
 17. **[P0] SV5_17: Động cơ lựa chọn quảng cáo tối ưu (Ad Selection Engine).** Thuật toán tìm kiếm banner phù hợp nhất theo slot, thời gian thực, trạng thái duyệt và ngân sách còn lại; tự động hiển thị banner mặc định của tòa soạn nếu slot trống.
 18. **[P0] SV5_18: Thu thập & Tổng hợp sự kiện Impression/Click.** API nhận sự kiện hiển thị và click; lưu vào bảng `ad_stats`; cung cấp dữ liệu báo cáo thống nhất cho cả doanh nghiệp và tòa soạn.
 19. **[P1] SV5_19: Giám sát URL đích của quảng cáo sau khi duyệt.** Tự động kiểm tra định kỳ liên kết đích của banner; nếu link bị chết (404/500) hoặc chuyển hướng sang web độc hại thì tạm dừng và cảnh báo.

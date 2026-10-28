@@ -83,8 +83,13 @@ export interface RefundRequest {
   resolvedAt?: string
 }
 
+/** BANK_NOT_RECORDED: SePay báo có tiền, hệ thống chưa ghi · RECORDED_WITHOUT_BANK: ghi theo khiếu nại, SePay chưa báo */
+export type DiscrepancyType = 'BANK_NOT_RECORDED' | 'RECORDED_WITHOUT_BANK'
+export type DiscrepancyAction = 'ASSIGN_ORDER' | 'CREDIT_WALLET' | 'EXPLAINED'
+
 export interface ReconciliationDiscrepancy {
   id: string
+  itemType?: DiscrepancyType
   transactionCode: string
   orderCode: string
   systemAmount: number
@@ -92,6 +97,9 @@ export interface ReconciliationDiscrepancy {
   discrepancyAmount: number
   reason: string
   status: 'UNRESOLVED' | 'RESOLVED'
+  action?: DiscrepancyAction
+  actionRef?: string
+  actionResult?: string
   resolutionNote?: string
   resolvedBy?: string
   resolvedAt?: string
@@ -99,16 +107,63 @@ export interface ReconciliationDiscrepancy {
 
 export interface ReconciliationPeriod {
   id: string
+  month?: string // yyyy-MM
   periodName: string // e.g. "Kỳ đối soát Tháng 09/2026"
   startDate: string
   endDate: string
   totalSystemRevenue: number
   totalGatewayRevenue: number
   discrepancyTotal: number
+  unresolvedCount?: number
   status: 'OPEN' | 'RECONCILED' | 'CLOSED'
   discrepancies: ReconciliationDiscrepancy[]
   closedAt?: string
   closedByName?: string
+  closeNote?: string
+  recentMonths?: string[]
+}
+
+export interface ResolveDiscrepancyInput {
+  discrepancyId: string
+  note: string
+  action: DiscrepancyAction
+  orderCode?: string
+  userId?: number
+  amount?: number
+}
+
+/** UC053: công nợ quảng cáo theo chiến dịch */
+export interface AdvertiserReceivable {
+  campaignId: number
+  campaignName: string
+  advertiserId: number
+  companyName: string
+  taxCode?: string
+  contactPerson?: string
+  email?: string
+  phone?: string
+  contractReference?: string
+  contractValue: number
+  paidAmount: number
+  remainingDebt: number
+  startDate: string
+  dueDate: string
+  overdueDays: number
+  paymentStatus?: string
+  campaignStatus?: string
+  debtGroup: 'PAID_IN_FULL' | 'IN_TERM' | 'OVERDUE'
+  reminderCount: number
+  lastReminderAt?: string
+}
+
+/** UC060: cảnh báo tài chính */
+export interface FinanceAlert {
+  type: 'REFUND_PENDING' | 'COMPLAINT_OPEN' | 'DEBT_OVERDUE' | 'RECONCILIATION_UNRESOLVED' | string
+  severity: 'HIGH' | 'MEDIUM' | 'LOW' | string
+  title: string
+  message: string
+  count?: number
+  actionUrl: string
 }
 
 export interface GeneralLedgerEntry {

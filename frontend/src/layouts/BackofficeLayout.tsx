@@ -26,6 +26,8 @@ import {
   Menu,
   X,
   Webhook,
+  Receipt,
+  BellRing,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -116,8 +118,10 @@ export function BackofficeLayout() {
     { label: 'Nhật ký SePay', path: '/backoffice/finance/sepay', icon: Webhook },
     { label: 'Khiếu nại thanh toán', path: '/backoffice/finance/complaints', icon: MessageSquare },
     { label: 'Hoàn tiền', path: '/backoffice/finance/refunds', icon: RotateCcw },
-    { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
     { label: 'Sổ quỹ', path: '/backoffice/finance/ledger', icon: BookMarked },
+    { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
+    { label: 'Công nợ quảng cáo', path: '/backoffice/finance/receivables', icon: Receipt },
+    { label: 'Cảnh báo và báo cáo', path: '/backoffice/finance/reports', icon: BellRing },
   ]
 
   const adminItems: NavItem[] = [

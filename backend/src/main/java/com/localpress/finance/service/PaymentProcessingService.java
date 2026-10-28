@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -177,7 +178,7 @@ public class PaymentProcessingService {
         if (tx.getStatus() == TransactionStatus.SUCCESS) {
             return toStatus(tx);
         }
-        if (tx.isExpired(LocalDateTime.now())) {
+        if (tx.getStatus() != TransactionStatus.PENDING || tx.isPaymentWindowClosed(LocalDateTime.now())) {
             throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
         }
 
@@ -197,7 +198,7 @@ public class PaymentProcessingService {
             throw new AppException("Đơn " + orderCode + " đã được thanh toán", HttpStatus.CONFLICT);
         }
         LocalDateTime now = LocalDateTime.now();
-        if (order.getStatus() != TransactionStatus.PENDING || order.isExpired(now)) {
+        if (order.getStatus() != TransactionStatus.PENDING || order.isPaymentWindowClosed(now)) {
             throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
         }
 
@@ -229,6 +230,7 @@ public class PaymentProcessingService {
      * Xử lý IPN đã qua xác thực khóa ở Controller. Các nhánh:
      * 1. Không có mã đơn / đơn không tồn tại  -> ORDER_NOT_FOUND (Kế toán đối soát bằng sao kê, UC054).
      * 2. Đơn đã SUCCESS                       -> ALREADY_PROCESSED (Rule 5).
+     *    Không có số tiền                     -> AMOUNT_MISSING, không đổi gì (Rule 4).
      * 3. Đơn TOPUP                            -> cộng ví đúng số tiền thực nhận.
      * 4. Đơn hết hiệu lực / quảng cáo quá hạn -> tiền vào ví, không cấp quyền (Rule 6).
      * 5. Chuyển thiếu                         -> tiền vào ví, đơn vẫn PENDING để khách bù.
@@ -255,9 +257,11 @@ public class PaymentProcessingService {
             return result(true, "ALREADY_PROCESSED", orderCode, "Giao dịch đã được ghi nhận trước đó");
         }
 
+        // Rule 4: không biết khách chuyển bao nhiêu thì không cấp quyền; log lại để kế toán đối soát (UC054)
         BigDecimal paidAmount = ipnRequest.resolveAmount();
         if (paidAmount == null || paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            paidAmount = tx.getAmount();
+            log.warn("Webhook cho đơn {} không có số tiền, không ghi nhận", orderCode);
+            return result(false, "AMOUNT_MISSING", orderCode, "Thông báo tiền về không có số tiền, chờ kế toán đối soát");
         }
         String reference = ipnRequest.getReferenceCode();
 
@@ -280,7 +284,7 @@ public class PaymentProcessingService {
         }
 
         // 4. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ: không cấp quyền, tiền vào ví
-        boolean adHoldExpired = tx.getTransactionType() == TransactionType.AD && tx.isExpired(LocalDateTime.now());
+        boolean adHoldExpired = tx.getTransactionType() == TransactionType.AD && tx.isPaymentWindowClosed(LocalDateTime.now());
         if (tx.getStatus() != TransactionStatus.PENDING || adHoldExpired) {
             tx.markExpired();
             transactionRepository.save(tx);
@@ -322,6 +326,28 @@ public class PaymentProcessingService {
     public Map<String, Object> creditUnmatchedTransfer(Long userId, BigDecimal amount, String code, String reason) {
         Transaction carrier = Transaction.builder().userId(userId).gatewayTransactionId(code).build();
         return creditToWallet(carrier, amount, null, reason, "CREDITED_WALLET");
+    }
+
+    /**
+     * Ghi nhận tay một khoản tiền vào đơn (khiếu nại UC051, đối soát UC054) phải đi đúng đường tiền thật đã đi.
+     * Luồng mọi đơn trả bằng ví: QR khách quét mang mã nạp bù (TOPUP gắn topup_for_order), không phải mã đơn.
+     * Đơn mua còn mã nạp bù đang chờ -> trả về mã nạp bù (ưu tiên mã đúng số tiền) để tiền cộng ví rồi tự trả đơn,
+     * và webhook thật của mã đó về sau gặp ALREADY_PROCESSED. Ngược lại giữ nguyên mã được khai.
+     */
+    @Transactional(readOnly = true)
+    public String resolvePaymentCode(String orderCode, BigDecimal amount) {
+        Transaction order = transactionRepository.findByGatewayTransactionId(orderCode).orElse(null);
+        if (order == null || !order.getTransactionType().isPurchase() || order.getStatus() != TransactionStatus.PENDING) {
+            return orderCode;
+        }
+        List<Transaction> topups = transactionRepository
+                .findByTopupForOrderAndStatusOrderByCreatedAtDesc(orderCode, TransactionStatus.PENDING);
+        return topups.stream()
+                .filter(t -> amount != null && t.getAmount().compareTo(amount) == 0)
+                .findFirst()
+                .or(() -> topups.stream().findFirst())
+                .map(Transaction::getGatewayTransactionId)
+                .orElse(orderCode);
     }
 
     // =========================================================================
@@ -378,7 +404,7 @@ public class PaymentProcessingService {
         Transaction order = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode).orElse(null);
         if (order == null || !order.getUserId().equals(userId)) return "ORDER_NOT_FOUND";
         if (order.getStatus() == TransactionStatus.SUCCESS) return "ALREADY_PAID";
-        if (order.getStatus() != TransactionStatus.PENDING || order.isExpired(LocalDateTime.now())) return "ORDER_EXPIRED";
+        if (order.getStatus() != TransactionStatus.PENDING || order.isPaymentWindowClosed(LocalDateTime.now())) return "ORDER_EXPIRED";
         if (walletService.lockedBalance(userId).compareTo(order.getAmount()) < 0) return "INSUFFICIENT";
         debitAndMarkPaid(order);
         log.info("Tự trả đơn {} bằng ví sau khi nạp bù", orderCode);
