@@ -17,6 +17,8 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+    # Chỉ ở dev: migration số nhỏ hơn merge về sau (từ nhánh khác) vẫn được chạy bù thay vì báo lỗi.
+    out-of-order: true
   servlet:
     multipart:
       max-file-size: 5MB

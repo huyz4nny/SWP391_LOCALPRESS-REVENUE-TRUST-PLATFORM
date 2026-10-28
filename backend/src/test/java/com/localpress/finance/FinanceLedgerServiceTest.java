@@ -13,6 +13,7 @@ import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceLedgerService;
+import com.localpress.finance.service.FinanceReconciliationService;
 import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,6 +55,9 @@ class FinanceLedgerServiceTest {
 
     @Mock
     private PaymentComplaintRepository paymentComplaintRepository;
+
+    @Mock
+    private FinanceReconciliationService reconciliationService;
 
     @InjectMocks
     private FinanceLedgerService financeLedgerService;

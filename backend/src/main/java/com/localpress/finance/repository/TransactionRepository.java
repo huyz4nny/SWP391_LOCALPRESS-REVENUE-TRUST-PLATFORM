@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -55,6 +56,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     /** Mã nạp bù mới nhất còn chờ của 1 đơn, để mở lại trang thanh toán không tạo QR mới mỗi lần. */
     Optional<Transaction> findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
+
+    /** Mọi mã nạp bù còn chờ của 1 đơn (kể cả đã quá hạn QR, vì tiền nạp về muộn vẫn được cộng ví). */
+    List<Transaction> findByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
 
     /**
      * UC047: Tra cứu sổ quỹ tài chính (Ledger) với bộ lọc linh hoạt (Status, Type, Khoảng thời gian, Keyword).

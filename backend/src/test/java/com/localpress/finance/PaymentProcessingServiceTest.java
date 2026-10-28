@@ -441,4 +441,73 @@ class PaymentProcessingServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         verify(transactionRepository, never()).findMyOrders(any(), any(), any());
     }
+
+    @Test
+    @DisplayName("Rule 4: webhook không có số tiền -> AMOUNT_MISSING, không đổi đơn, không cộng ví, không bắn event")
+    void webhook_missingAmount_notRecorded() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        stubLockedOrder(tx);
+        SepayIpnRequest noAmount = SepayIpnRequest.builder().content("LOCALPRESS " + ORDER_CODE).referenceCode("FT124").build();
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(noAmount);
+
+        assertEquals("AMOUNT_MISSING", result.get("status"));
+        assertEquals(TransactionStatus.PENDING, tx.getStatus());
+        verify(transactionRepository, never()).save(any());
+        verify(walletService, never()).credit(any(), any(), anyString());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Rule 6: đơn bài quá 15 phút vẫn trả bằng ví được (giống nhánh webhook)")
+    void payWithWallet_lateArticleStillPayable() {
+        Transaction tx = pending(TransactionType.ARTICLE, "15000");
+        tx.setExpiresAt(LocalDateTime.now().minusMinutes(5));
+        stubLockedOrder(tx);
+        stubSaveEcho();
+
+        paymentProcessingService.payWithWallet(reader, ORDER_CODE);
+
+        assertEquals(TransactionStatus.SUCCESS, tx.getStatus());
+        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
+    }
+
+    @Test
+    @DisplayName("Rule 6: booking quảng cáo quá hạn giữ chỗ -> trả bằng ví bị chặn 410")
+    void payWithWallet_expiredAdHold_gone() {
+        Transaction tx = pending(TransactionType.AD, "500000");
+        tx.setExpiresAt(LocalDateTime.now().minusMinutes(5));
+        stubLockedOrder(tx);
+
+        AppException ex = assertThrows(AppException.class, () -> paymentProcessingService.payWithWallet(reader, ORDER_CODE));
+
+        assertEquals(HttpStatus.GONE, ex.getStatus());
+        verify(walletService, never()).debit(any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Ghi nhận tay vào đơn mua còn mã nạp bù chờ -> dùng mã nạp bù đúng số tiền")
+    void resolvePaymentCode_prefersMatchingShortfallTopUp() {
+        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(pending(TransactionType.ARTICLE, "15000")));
+        Transaction other = Transaction.builder().transactionType(TransactionType.TOPUP).amount(new BigDecimal("5000"))
+                .gatewayTransactionId("LP2610201205TOP2").topupForOrder(ORDER_CODE).status(TransactionStatus.PENDING).build();
+        Transaction matching = Transaction.builder().transactionType(TransactionType.TOPUP).amount(new BigDecimal("11000"))
+                .gatewayTransactionId("LP2610201201TOP1").topupForOrder(ORDER_CODE).status(TransactionStatus.PENDING).build();
+        when(transactionRepository.findByTopupForOrderAndStatusOrderByCreatedAtDesc(ORDER_CODE, TransactionStatus.PENDING))
+                .thenReturn(List.of(other, matching));
+
+        assertEquals("LP2610201201TOP1", paymentProcessingService.resolvePaymentCode(ORDER_CODE, new BigDecimal("11000")));
+        assertEquals("LP2610201205TOP2", paymentProcessingService.resolvePaymentCode(ORDER_CODE, new BigDecimal("9999")));
+    }
+
+    @Test
+    @DisplayName("Ghi nhận tay: đơn không còn chờ -> giữ nguyên mã đơn")
+    void resolvePaymentCode_keepsOrderCode() {
+        Transaction paid = pending(TransactionType.ARTICLE, "15000");
+        paid.setStatus(TransactionStatus.SUCCESS);
+        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(paid));
+
+        assertEquals(ORDER_CODE, paymentProcessingService.resolvePaymentCode(ORDER_CODE, new BigDecimal("15000")));
+        verify(transactionRepository, never()).findByTopupForOrderAndStatusOrderByCreatedAtDesc(any(), any());
+    }
 }

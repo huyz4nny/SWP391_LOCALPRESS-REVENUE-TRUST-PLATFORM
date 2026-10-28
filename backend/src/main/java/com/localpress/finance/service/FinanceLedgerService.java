@@ -41,6 +41,7 @@ public class FinanceLedgerService {
     private final TransactionRepository transactionRepository;
     private final RefundRequestRepository refundRequestRepository;
     private final PaymentComplaintRepository paymentComplaintRepository;
+    private final FinanceReconciliationService reconciliationService;
 
     /**
      * Danh sách phương thức thanh toán chuyển khoản thủ công.
@@ -113,7 +114,9 @@ public class FinanceLedgerService {
 
     /**
      * Lấy dữ liệu tổng quan cho trang Dashboard tài chính (FinanceDashboard.tsx).
+     * Không readOnly: mở dashboard thì quét khoản lệch đối soát tháng hiện tại (UC054) để số liệu luôn mới.
      */
+    @Transactional
     public FinanceDashboardResponse getFinanceDashboard() {
         log.info("Lấy dữ liệu tổng quan Dashboard tài chính");
 
@@ -131,7 +134,7 @@ public class FinanceLedgerService {
                 .pendingOrdersCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
                 .refundReviewCount(refundRequestRepository.countByStatus(RefundStatus.PENDING))
                 .openComplaintCount(paymentComplaintRepository.countByStatus(PaymentComplaint.Status.OPEN))
-                .reconciliationDiscrepancy(BigDecimal.ZERO)
+                .reconciliationDiscrepancy(reconciliationService.currentUnresolvedAmount())
                 .recentOrders(recentTransactions)
                 .build();
     }

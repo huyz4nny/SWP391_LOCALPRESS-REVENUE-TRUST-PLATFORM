@@ -2,10 +2,13 @@ package com.localpress.finance;
 
 import com.localpress.finance.dto.request.CreateComplaintRequest;
 import com.localpress.finance.model.PaymentComplaint;
+import com.localpress.finance.model.SepayWebhookLog;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.PaymentComplaintRepository;
+import com.localpress.finance.repository.ReconciliationItemRepository;
+import com.localpress.finance.repository.SepayWebhookLogRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.PaymentComplaintService;
 import com.localpress.finance.service.PaymentProcessingService;
@@ -38,6 +41,8 @@ class PaymentComplaintServiceTest {
     @Mock private PaymentComplaintRepository complaintRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private PaymentProcessingService paymentProcessingService;
+    @Mock private SepayWebhookLogRepository sepayLogRepository;
+    @Mock private ReconciliationItemRepository reconciliationItemRepository;
     @InjectMocks private PaymentComplaintService service;
 
     private Transaction order(long ownerId, TransactionStatus status) {
@@ -78,6 +83,7 @@ class PaymentComplaintServiceTest {
     void resolve_order_runsWebhookFlow() {
         PaymentComplaint c = open(ORDER);
         when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(paymentProcessingService.resolvePaymentCode(ORDER, new BigDecimal("15000"))).thenReturn(ORDER);
         when(paymentProcessingService.processSepayIpn(argThat(ipn ->
                 ORDER.equals(ipn.resolveOrderCode()) && "FT123".equals(ipn.getReferenceCode()))))
                 .thenReturn(Map.of("status", "SUCCESS"));
@@ -95,6 +101,7 @@ class PaymentComplaintServiceTest {
     void resolve_order_alreadyPaid() {
         PaymentComplaint c = open(ORDER);
         when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(paymentProcessingService.resolvePaymentCode(any(), any())).thenReturn(ORDER);
         when(paymentProcessingService.processSepayIpn(any())).thenReturn(Map.of("status", "ALREADY_PROCESSED"));
 
         AppException ex = assertThrows(AppException.class, () -> service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER, null));
@@ -142,5 +149,52 @@ class PaymentComplaintServiceTest {
 
         AppException again = assertThrows(AppException.class, () -> service.reject(9L, 2L, "lần 2"));
         assertEquals(HttpStatus.CONFLICT, again.getStatus());
+    }
+
+    @Test
+    @DisplayName("Rule 5: mã GD đã được webhook ghi tiền -> 409, không ghi nhận lần 2 (cả vào đơn lẫn vào ví)")
+    void resolve_referenceAlreadyRecordedByWebhook() {
+        PaymentComplaint c = open(ORDER);
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(sepayLogRepository.findFirstByReferenceCodeAndResultStatusInOrderByReceivedAtAsc(
+                eq("FT123"), eq(SepayWebhookLog.MONEY_RECORDED_STATUSES)))
+                .thenReturn(Optional.of(SepayWebhookLog.builder().referenceCode("FT123")
+                        .resultStatus("UNDERPAID_CREDITED_TO_WALLET").orderCode(ORDER).build()));
+
+        for (PaymentComplaintService.Target target : PaymentComplaintService.Target.values()) {
+            AppException ex = assertThrows(AppException.class, () -> service.resolve(9L, 2L, target, null));
+            assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        }
+        assertEquals(PaymentComplaint.Status.OPEN, c.getStatus());
+        verify(paymentProcessingService, never()).processSepayIpn(any());
+        verify(paymentProcessingService, never()).creditUnmatchedTransfer(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Ghi nhận vào đơn đi theo mã nạp bù mà PaymentProcessingService trả về, ghi chú lại mã đó")
+    void resolve_order_usesMappedTopUpCode() {
+        PaymentComplaint c = open(ORDER);
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(paymentProcessingService.resolvePaymentCode(ORDER, new BigDecimal("15000"))).thenReturn("LP2610201201TOP1");
+        when(paymentProcessingService.processSepayIpn(argThat(ipn -> "LP2610201201TOP1".equals(ipn.resolveOrderCode()))))
+                .thenReturn(Map.of("status", "SUCCESS"));
+        when(complaintRepository.save(c)).thenReturn(c);
+
+        service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER, "Khớp sao kê");
+
+        assertEquals("SUCCESS", c.getResolution());
+        assertTrue(c.getResolutionNote().startsWith("Ghi nhận qua mã nạp bù LP2610201201TOP1"));
+    }
+
+    @Test
+    @DisplayName("Rule 5: mã GD đã được gán khi đối soát kỳ -> 409, không ghi nhận lần 2")
+    void resolve_referenceAlreadyRecordedByReconciliation() {
+        PaymentComplaint c = open(null);
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(reconciliationItemRepository.existsByReferenceCodeAndStatusAndActionIn(eq("FT123"), any(), any())).thenReturn(true);
+
+        AppException ex = assertThrows(AppException.class, () -> service.resolve(9L, 2L, null, null));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        verify(paymentProcessingService, never()).creditUnmatchedTransfer(any(), any(), any(), any());
     }
 }

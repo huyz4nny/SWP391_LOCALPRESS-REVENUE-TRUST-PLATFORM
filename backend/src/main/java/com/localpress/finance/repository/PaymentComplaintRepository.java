@@ -22,6 +22,9 @@ public interface PaymentComplaintRepository extends JpaRepository<PaymentComplai
 
     boolean existsByBankReference(String bankReference);
 
+    /** Webhook về sau: mã GD này đã được kế toán ghi nhận qua khiếu nại chưa (chặn ghi nhận lần 2). */
+    Optional<PaymentComplaint> findByBankReferenceAndStatus(String bankReference, PaymentComplaint.Status status);
+
     long countByStatus(PaymentComplaint.Status status);
 
     /** Khóa dòng khiếu nại: 2 kế toán bấm xử lý cùng lúc thì người sau nhận 409. */
