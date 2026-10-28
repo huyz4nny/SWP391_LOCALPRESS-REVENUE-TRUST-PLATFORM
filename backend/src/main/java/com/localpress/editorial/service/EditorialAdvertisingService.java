@@ -281,20 +281,20 @@ public class EditorialAdvertisingService {
                     ? BigDecimal.valueOf(clicks * 100.0).divide(BigDecimal.valueOf(impressions), 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            BigDecimal budget = (BigDecimal) row.get("accepted_amount");
+            BigDecimal budget = toBigDecimal(row.get("accepted_amount"));
             if (budget == null) {
-                budget = (BigDecimal) row.get("quoted_amount");
+                budget = toBigDecimal(row.get("quoted_amount"));
             }
 
-            LocalDate startDate = ((java.sql.Date) row.get("start_date")).toLocalDate();
-            LocalDate endDate = ((java.sql.Date) row.get("end_date")).toLocalDate();
+            LocalDate startDate = toLocalDate(row.get("start_date"));
+            LocalDate endDate = toLocalDate(row.get("end_date"));
 
             result.add(EditorialCampaignDto.builder()
                     .id(String.valueOf(campaignId))
                     .bookingId(String.valueOf(campaignId))
-                    .advertiserId(String.valueOf(row.get("advertiser_id")))
+                    .advertiserId(row.get("advertiser_id") != null ? String.valueOf(row.get("advertiser_id")) : null)
                     .companyName((String) row.get("company_name"))
-                    .slotId(String.valueOf(row.get("slot_id")))
+                    .slotId(row.get("slot_id") != null ? String.valueOf(row.get("slot_id")) : null)
                     .slotName((String) row.get("slot_name"))
                     .name((String) row.get("campaign_name"))
                     .startDate(startDate)
@@ -307,8 +307,8 @@ public class EditorialAdvertisingService {
                     .clicks(clicks)
                     .ctr(ctr)
                     .dailyStats(new ArrayList<>())
-                    .createdAt(toLocalDateTime((Timestamp) row.get("created_at")))
-                    .updatedAt(toLocalDateTime((Timestamp) row.get("updated_at")))
+                    .createdAt(toLocalDateTime(row.get("created_at")))
+                    .updatedAt(toLocalDateTime(row.get("updated_at")))
                     .build());
         }
         return result;
@@ -553,7 +553,26 @@ public class EditorialAdvertisingService {
         }
     }
 
-    private static LocalDateTime toLocalDateTime(Timestamp ts) {
-        return ts != null ? ts.toLocalDateTime() : null;
+    private static LocalDateTime toLocalDateTime(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof LocalDateTime ldt) return ldt;
+        if (obj instanceof Timestamp ts) return ts.toLocalDateTime();
+        if (obj instanceof java.util.Date d) return new Timestamp(d.getTime()).toLocalDateTime();
+        return null;
+    }
+
+    private static LocalDate toLocalDate(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof LocalDate ld) return ld;
+        if (obj instanceof java.sql.Date d) return d.toLocalDate();
+        if (obj instanceof java.util.Date d) return new java.sql.Date(d.getTime()).toLocalDate();
+        return null;
+    }
+
+    private static BigDecimal toBigDecimal(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof BigDecimal bd) return bd;
+        if (obj instanceof Number num) return BigDecimal.valueOf(num.doubleValue());
+        return null;
     }
 }

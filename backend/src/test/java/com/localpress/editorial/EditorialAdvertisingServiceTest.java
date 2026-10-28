@@ -1,6 +1,7 @@
 package com.localpress.editorial;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.localpress.editorial.dto.EditorialCampaignDto;
 import com.localpress.editorial.dto.RejectBookingRequest;
 import com.localpress.editorial.dto.ReviewCreativeRequest;
 import com.localpress.editorial.dto.SendQuotationRequest;
@@ -17,6 +18,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -244,5 +249,85 @@ class EditorialAdvertisingServiceTest {
                 () -> service.sendQuotation(402L, req, "unknown@test.com"));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+    }
+
+    // =========================================================================
+    // 5. getCampaigns tests (Rule: Driver trả created_at/updated_at dạng LocalDateTime không bị ClassCastException)
+    // =========================================================================
+
+    @Test
+    @DisplayName("getCampaigns: Xử lý đúng kiểu LocalDateTime từ MySQL Connector-J mà không bị ClassCastException")
+    void getCampaigns_withLocalDateTimeFromDriver_parsesSuccessfully() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 10, 20, 10, 0, 0);
+        LocalDateTime updatedAt = LocalDateTime.of(2026, 10, 25, 14, 30, 0);
+        LocalDate startDate = LocalDate.of(2026, 11, 1);
+        LocalDate endDate = LocalDate.of(2026, 11, 30);
+
+        Map<String, Object> campaignRow = new HashMap<>();
+        campaignRow.put("campaign_id", 1L);
+        campaignRow.put("advertiser_id", 2L);
+        campaignRow.put("slot_id", 3L);
+        campaignRow.put("campaign_name", "Chiến dịch Tết 2027");
+        campaignRow.put("start_date", startDate);
+        campaignRow.put("end_date", endDate);
+        campaignRow.put("quoted_amount", new BigDecimal("50000000"));
+        campaignRow.put("accepted_amount", new BigDecimal("45000000"));
+        campaignRow.put("status", "ACTIVE");
+        campaignRow.put("slot_name", "Top Leaderboard");
+        campaignRow.put("company_name", "Công ty ABC");
+        campaignRow.put("created_at", createdAt);
+        campaignRow.put("updated_at", updatedAt);
+
+        when(jdbc.queryForList(contains("FROM ad_campaigns c"))).thenReturn(List.of(campaignRow));
+
+        List<EditorialCampaignDto> campaigns = service.getCampaigns();
+
+        assertNotNull(campaigns);
+        assertEquals(1, campaigns.size());
+        EditorialCampaignDto dto = campaigns.get(0);
+        assertEquals("1", dto.getId());
+        assertEquals("Chiến dịch Tết 2027", dto.getName());
+        assertEquals(createdAt, dto.getCreatedAt());
+        assertEquals(updatedAt, dto.getUpdatedAt());
+        assertEquals(startDate, dto.getStartDate());
+        assertEquals(endDate, dto.getEndDate());
+        assertEquals(new BigDecimal("45000000"), dto.getTotalBudget());
+    }
+
+    @Test
+    @DisplayName("getCampaigns: Xử lý đúng kiểu Timestamp và java.sql.Date mà không bị lỗi")
+    void getCampaigns_withTimestampAndSqlDate_parsesSuccessfully() {
+        Timestamp createdTs = Timestamp.valueOf("2026-09-29 14:38:38");
+        Timestamp updatedTs = Timestamp.valueOf("2026-10-27 23:57:10");
+        java.sql.Date startDate = java.sql.Date.valueOf("2026-10-01");
+        java.sql.Date endDate = java.sql.Date.valueOf("2026-10-31");
+
+        Map<String, Object> campaignRow = new HashMap<>();
+        campaignRow.put("campaign_id", 2L);
+        campaignRow.put("advertiser_id", 2L);
+        campaignRow.put("slot_id", 3L);
+        campaignRow.put("campaign_name", "Chiến dịch Thu");
+        campaignRow.put("start_date", startDate);
+        campaignRow.put("end_date", endDate);
+        campaignRow.put("quoted_amount", new BigDecimal("20000000"));
+        campaignRow.put("accepted_amount", null);
+        campaignRow.put("status", "PENDING");
+        campaignRow.put("slot_name", "Sidebar Slot");
+        campaignRow.put("company_name", "Công ty XYZ");
+        campaignRow.put("created_at", createdTs);
+        campaignRow.put("updated_at", updatedTs);
+
+        when(jdbc.queryForList(contains("FROM ad_campaigns c"))).thenReturn(List.of(campaignRow));
+
+        List<EditorialCampaignDto> campaigns = service.getCampaigns();
+
+        assertNotNull(campaigns);
+        assertEquals(1, campaigns.size());
+        EditorialCampaignDto dto = campaigns.get(0);
+        assertEquals("2", dto.getId());
+        assertEquals(createdTs.toLocalDateTime(), dto.getCreatedAt());
+        assertEquals(updatedTs.toLocalDateTime(), dto.getUpdatedAt());
+        assertEquals(startDate.toLocalDate(), dto.getStartDate());
+        assertEquals(new BigDecimal("20000000"), dto.getTotalBudget());
     }
 }
