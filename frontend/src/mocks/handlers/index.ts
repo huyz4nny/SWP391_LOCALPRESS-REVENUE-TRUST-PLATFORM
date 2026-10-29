@@ -131,6 +131,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   const isLibraryPath = pathname.startsWith('/reader/purchased-articles')
     || pathname.startsWith('/reader/subscriptions')
     || pathname.startsWith('/reader/article-reports')
+    || pathname.startsWith('/reader/devices')
     || pathname.startsWith('/reader/saved-articles')
     || pathname.startsWith('/reader/followed-categories')
     || pathname.startsWith('/reader/reading-history')
@@ -177,6 +178,30 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     }
     ent.subscriptionAutoRenew = false
     return { ...item, autoRenew: false }
+  }
+
+  if (pathname === '/reader/devices' && method === 'GET') {
+    return mockStore.getEntitlements(currentUser.id).activeDevices.map((device) => ({
+      deviceId: device.id,
+      deviceName: device.deviceName,
+      deviceType: 'DESKTOP',
+      ipAddress: device.ipAddress,
+      lastActiveAt: device.lastActive,
+      createdAt: device.lastActive,
+      current: device.isCurrent,
+    }))
+  }
+
+  const revokeDevice = pathname.match(/^\/reader\/devices\/([^/]+)$/)
+  if (revokeDevice && method === 'DELETE') {
+    const ent = mockStore.getEntitlements(currentUser.id)
+    const deviceId = decodeURIComponent(revokeDevice[1])
+    const next = ent.activeDevices.filter((device) => device.id !== deviceId)
+    if (next.length === ent.activeDevices.length) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy phiên đăng nhập của bạn', path: pathname })
+    }
+    ent.activeDevices = next
+    return { revoked: true }
   }
 
   if (pathname === '/reader/article-reports' && method === 'POST') {

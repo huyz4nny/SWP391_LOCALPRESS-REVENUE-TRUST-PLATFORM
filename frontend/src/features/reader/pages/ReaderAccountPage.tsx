@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { APP_CONFIG } from '@/app/config'
 import { formatDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +8,7 @@ import { authApi } from '@/features/identity/api'
 import { mockStore } from '@/mocks/store'
 import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { useReaderSubscription } from '../hooks/useReaderSubscription'
+import { useReaderDevices } from '../hooks/useReaderDevices'
 
 function phoneError(raw: string): string | null {
   const compact = raw.trim().replace(/[\s.-]/g, '')
@@ -24,6 +24,7 @@ export function ReaderAccountPage() {
   const session = mockStore.getCurrentUser()
   const library = useReaderLibrary()
   const subscription = useReaderSubscription()
+  const devices = useReaderDevices()
   const [name, setName] = useState(session.name)
   const [email, setEmail] = useState(session.email)
   const [phone, setPhone] = useState(session.phone || '')
@@ -151,7 +152,7 @@ export function ReaderAccountPage() {
         </div>
         <div className="rounded-lg bg-slate-50 p-3 text-center">
           <div className="text-lg font-semibold text-slate-900 num">
-            {APP_CONFIG.useMockApi ? mockStore.getEntitlements(session.id).activeDevices.length : '—'}
+            {devices.loaded ? devices.items.length : '—'}
           </div>
           <div className="text-xs text-slate-500">Thiết bị</div>
         </div>

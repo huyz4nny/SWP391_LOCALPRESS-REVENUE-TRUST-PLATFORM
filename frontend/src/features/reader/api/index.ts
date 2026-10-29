@@ -70,6 +70,28 @@ type ReaderSubscriptionDto = {
   inEffect?: boolean
 }
 
+export type ReaderDevice = {
+  deviceId: string
+  deviceName: string
+  deviceType: string
+  ipAddress: string | null
+  lastActiveAt: string
+  createdAt: string
+  current: boolean
+}
+
+function mapDevice(dto: Partial<ReaderDevice> | null | undefined): ReaderDevice {
+  return {
+    deviceId: String(dto?.deviceId ?? ''),
+    deviceName: dto?.deviceName ?? '',
+    deviceType: dto?.deviceType ?? 'DESKTOP',
+    ipAddress: dto?.ipAddress ?? null,
+    lastActiveAt: dto?.lastActiveAt ?? '',
+    createdAt: dto?.createdAt ?? '',
+    current: Boolean(dto?.current),
+  }
+}
+
 function mapSubscription(dto: Partial<ReaderSubscriptionDto> | null | undefined): ReaderSubscription {
   return {
     subscriptionId: String(dto?.subscriptionId ?? ''),
@@ -457,6 +479,16 @@ export const readerApi = {
       `/reader/comments/${idSegment(commentId)}/report`,
       { reason },
     )
+  },
+
+  // UC043 phiên còn hiệu lực của user đang đăng nhập
+  listDevices: async (): Promise<ReaderDevice[]> => {
+    const data = await httpClient.get<Array<Partial<ReaderDevice>>>('/reader/devices')
+    return (data ?? []).map(mapDevice)
+  },
+
+  revokeDevice: (deviceId: string) => {
+    return httpClient.delete<void>(`/reader/devices/${idSegment(deviceId)}`)
   },
 
   // UC042 báo lỗi nội dung bài đang xuất bản, server tự gắn user và status PENDING

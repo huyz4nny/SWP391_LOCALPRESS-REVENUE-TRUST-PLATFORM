@@ -20,9 +20,9 @@ import {
   LogOut,
 } from 'lucide-react'
 import { logout } from '@/features/identity/authSession'
-import { APP_CONFIG } from '@/app/config'
 import { useReaderLibrary } from '@/features/reader/hooks/useReaderLibrary'
 import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
+import { useReaderDevices } from '@/features/reader/hooks/useReaderDevices'
 
 export function ReaderAccountLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
@@ -30,6 +30,7 @@ export function ReaderAccountLayout() {
   const navigate = useNavigate()
   const library = useReaderLibrary()
   const subscription = useReaderSubscription()
+  const devices = useReaderDevices()
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -64,9 +65,7 @@ export function ReaderAccountLayout() {
     )
   }
 
-  const deviceBadge = APP_CONFIG.useMockApi
-    ? `${mockStore.getEntitlements(currentUser.id).activeDevices.length}/2`
-    : undefined
+  const deviceBadge = devices.loaded ? `${devices.items.length}/2` : undefined
 
   const navItems = [
     { label: 'Hồ sơ tài khoản', path: '/account', icon: UserIcon },

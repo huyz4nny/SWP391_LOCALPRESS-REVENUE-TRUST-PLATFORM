@@ -20,7 +20,8 @@ import java.util.Map;
         ReaderFollowController.class,
         ReaderCommentWriteController.class,
         ReaderSubscriptionController.class,
-        ReaderArticleReportController.class
+        ReaderArticleReportController.class,
+        ReaderDeviceController.class
 })
 public class ReaderPurchaseExceptionHandler {
 
