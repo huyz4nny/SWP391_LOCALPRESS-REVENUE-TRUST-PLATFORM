@@ -97,7 +97,7 @@ export const financeApi = {
       paymentAttempts: [{
         id: `att-${tx.transactionId || tx.id}`,
         orderId: String(tx.transactionId || tx.id),
-        method: tx.paymentMethod || 'BANK_TRANSFER',
+        method: tx.paymentMethod || 'SEPAY',
         transactionCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
         amount: Number(tx.amount || 0),
         status: tx.status === 'SUCCESS' ? 'SUCCESS' : tx.status,
@@ -130,7 +130,7 @@ export const financeApi = {
       paymentAttempts: [{
         id: `att-${tx.transactionId || tx.id}`,
         orderId: String(tx.transactionId || tx.id),
-        method: tx.paymentMethod || 'BANK_TRANSFER',
+        method: tx.paymentMethod || 'SEPAY',
         transactionCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
         amount: Number(tx.amount || 0),
         status: tx.status === 'SUCCESS' ? 'SUCCESS' : tx.status,
@@ -267,31 +267,6 @@ export const financeApi = {
       blob: new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
       filename: `Bao_cao_tai_chinh_${fromDate || 'dau'}_${toDate || 'nay'}.csv`,
     }
-  },
-
-  createOrder: async (data: {
-    orderType: string
-    targetId: number
-    amount: number
-    paymentMethod?: string
-    bankCode?: string
-    description?: string
-    successUrl?: string
-    errorUrl?: string
-    cancelUrl?: string
-  }) => {
-    const res = await httpClient.post<any>('/finance/orders', data)
-    return res?.data || res
-  },
-
-  getOrderStatus: async (orderId: string | number) => {
-    const res = await httpClient.get<any>(`/finance/orders/${orderId}`)
-    return res?.data || res
-  },
-
-  getOrderStatusByCode: async (orderCode: string) => {
-    const res = await httpClient.get<any>(`/finance/orders/code/${orderCode}/status`)
-    return res?.data || res
   },
 }
 

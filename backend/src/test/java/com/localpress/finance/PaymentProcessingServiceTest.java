@@ -73,10 +73,7 @@ class PaymentProcessingServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(sePayService, "merchantId", "SP-TEST");
-        ReflectionTestUtils.setField(sePayService, "secretKey", "test-secret");
         ReflectionTestUtils.setField(sePayService, "webhookApiKey", "test-webhook-key");
-        ReflectionTestUtils.setField(sePayService, "env", "sandbox");
         ReflectionTestUtils.setField(sePayService, "bankCode", "VCB");
         ReflectionTestUtils.setField(sePayService, "bankShortName", "vietcombank");
         ReflectionTestUtils.setField(sePayService, "accountNumber", "9981");
@@ -144,7 +141,6 @@ class PaymentProcessingServiceTest {
         assertEquals(response.getOrderCode(), response.getTransferContent());
         assertTrue(response.getQrCodeUrl().contains("vietcombank-9981"));
         assertNotNull(response.getExpiresAt());
-        assertTrue(response.getCheckoutFields().containsKey("signature"));
     }
 
     @Test

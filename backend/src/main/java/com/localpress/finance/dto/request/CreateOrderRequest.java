@@ -47,18 +47,6 @@ public class CreateOrderRequest {
     private BigDecimal amount;
 
     /**
-     * Phương thức thanh toán: 'SEPAY', 'VIETQR', 'MANUAL_BANK_TRANSFER'. Mặc định: 'SEPAY'.
-     */
-    @Builder.Default
-    private String paymentMethod = "SEPAY";
-
-    /**
-     * Ngân hàng thụ hưởng (mặc định VCB).
-     */
-    @Builder.Default
-    private String bankCode = "VCB";
-
-    /**
      * Diễn giải / ghi chú đơn hàng hiển thị trên cổng thanh toán.
      */
     private String description;
@@ -68,19 +56,4 @@ public class CreateOrderRequest {
      * dùng làm mô tả mặc định trên trang thanh toán khi không có description.
      */
     private String targetTitle;
-
-    /**
-     * URL chuyển hướng trên trình duyệt khi thanh toán thành công.
-     */
-    private String successUrl;
-
-    /**
-     * URL chuyển hướng khi phát sinh lỗi.
-     */
-    private String errorUrl;
-
-    /**
-     * URL chuyển hướng khi người dùng hủy giao dịch.
-     */
-    private String cancelUrl;
 }

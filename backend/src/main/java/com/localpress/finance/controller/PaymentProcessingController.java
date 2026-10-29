@@ -11,7 +11,9 @@ import com.localpress.finance.service.SepayGatewayService;
 import com.localpress.finance.model.SepayWebhookLog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import com.localpress.shared.exception.AppException;
 import com.localpress.shared.response.ApiResponse;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +52,10 @@ public class PaymentProcessingController {
     private final SepayGatewayService sepayGatewayService;
     private final ObjectMapper objectMapper;
 
+    /** Chỉ bật khi chạy script E2E của SV4 (tạo đơn thử không qua module); mặc định tắt. */
+    @Value("${localpress.payment.client-orders-enabled:false}")
+    private boolean clientOrdersEnabled;
+
     /**
      * UC047: Tạo đơn hàng thanh toán tập trung (hỗ trợ cả alias /checkout từ Paywall/Reader).
      * Module nguồn gọi khi khách bấm "Mua gói", "Mua bài" hoặc "Thanh toán booking",
@@ -60,6 +66,12 @@ public class PaymentProcessingController {
         FinanceCurrentUser.Principal principal = currentUser.require();
         log.info("API POST /api/v1/finance/orders - User #{}, loại: {}, số tiền: {}",
                 principal.userId(), request.getOrderType(), request.getAmount());
+        // Rule 4 / Rule 14: giá và targetId từ trình duyệt không đáng tin (sửa được bằng F12).
+        // Đơn có đối tượng phải do module sở hữu tạo từ server, giá lấy từ DB (mẫu: AdBookingService).
+        if (!clientOrdersEnabled) {
+            throw new AppException("Đơn thanh toán phải được tạo từ phân hệ sở hữu (bài viết, gói, quảng cáo), "
+                    + "không tạo trực tiếp từ trình duyệt", HttpStatus.FORBIDDEN);
+        }
 
         OrderCreateResponse response = paymentProcessingService.createOrder(principal.userId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Khởi tạo đơn hàng thanh toán thành công", response));
