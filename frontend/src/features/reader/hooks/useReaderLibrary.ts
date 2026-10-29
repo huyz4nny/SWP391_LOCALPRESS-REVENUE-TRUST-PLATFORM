@@ -11,10 +11,19 @@ type LibrarySnapshot = {
   userId: string | null
   savedIds: string[]
   followedCategoryIds: string[]
+  historyCount: number
+  purchasedCount: number
   loaded: boolean
 }
 
-const EMPTY: LibrarySnapshot = { userId: null, savedIds: [], followedCategoryIds: [], loaded: false }
+const EMPTY: LibrarySnapshot = {
+  userId: null,
+  savedIds: [],
+  followedCategoryIds: [],
+  historyCount: 0,
+  purchasedCount: 0,
+  loaded: false,
+}
 
 let snapshot: LibrarySnapshot = EMPTY
 let loadingFor: string | null = null
@@ -39,16 +48,25 @@ function subscribeUser(listener: () => void) {
 async function load(userId: string) {
   loadingFor = userId
   try {
-    const [savedIds, followed] = await Promise.all([
+    const [savedIds, followed, historyCount, purchased] = await Promise.all([
       readerApi.getSavedArticleIds(),
       readerApi.getFollowedCategories(),
+      readerApi.getReadingHistoryCount(),
+      readerApi.getPurchasedArticlesPage(0, 1),
     ])
     // user đã đổi trong lúc chờ thì bỏ kết quả cũ
     if (loadingFor !== userId) return
-    emit({ userId, savedIds, followedCategoryIds: followed.map((c) => c.id), loaded: true })
+    emit({
+      userId,
+      savedIds,
+      followedCategoryIds: followed.map((c) => c.id),
+      historyCount,
+      purchasedCount: purchased.total,
+      loaded: true,
+    })
   } catch {
     if (loadingFor !== userId) return
-    emit({ userId, savedIds: [], followedCategoryIds: [], loaded: true })
+    emit({ userId, savedIds: [], followedCategoryIds: [], historyCount: 0, purchasedCount: 0, loaded: true })
   }
 }
 
@@ -71,7 +89,7 @@ export function useReaderLibrary() {
     if (snapshot.userId === userId || loadingFor === userId) return
     if (isGuest) {
       loadingFor = userId
-      emit({ userId, savedIds: [], followedCategoryIds: [], loaded: true })
+      emit({ userId, savedIds: [], followedCategoryIds: [], historyCount: 0, purchasedCount: 0, loaded: true })
       return
     }
     void load(userId)
@@ -137,6 +155,8 @@ export function useReaderLibrary() {
     loaded: current.loaded,
     savedIds: current.savedIds,
     followedCategoryIds: current.followedCategoryIds,
+    historyCount: current.historyCount,
+    purchasedCount: current.purchasedCount,
     isSaved: (articleId: string) => current.savedIds.includes(articleId),
     isFollowing: (categoryId: string) => current.followedCategoryIds.includes(categoryId),
     toggleSaved,

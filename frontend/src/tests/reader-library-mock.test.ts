@@ -72,4 +72,36 @@ describe('Mock UC038 lưu bài và UC040 theo dõi chuyên mục', () => {
 
     await expect(handleMockRequest('PUT', '/api/v1/reader/followed-categories/khong-co')).rejects.toMatchObject({ status: 404 })
   })
+
+  it('tủ sách chỉ trả bài đã mua còn xuất bản', async () => {
+    mockStore.setCurrentUser('user-guest')
+    await expect(handleMockRequest('GET', '/api/v1/reader/purchased-articles')).rejects.toMatchObject({ status: 401 })
+
+    mockStore.setCurrentUser('user-reader-premium')
+    const owned = new Set(mockStore.getEntitlements('user-reader-premium').purchasedArticleIds)
+    const list: Array<{ id: string; status: string }> = await handleMockRequest('GET', '/api/v1/reader/purchased-articles')
+    expect(list.length).toBeGreaterThan(0)
+    list.forEach((article) => {
+      expect(owned.has(article.id)).toBe(true)
+      expect(article.status).toBe('PUBLISHED')
+    })
+  })
+
+  it('lịch sử đọc: khách 401, đọc lại đưa lên đầu, xóa thì biến khỏi danh sách', async () => {
+    mockStore.setCurrentUser('user-guest')
+    await expect(handleMockRequest('GET', '/api/v1/reader/reading-history')).rejects.toMatchObject({ status: 401 })
+
+    mockStore.setCurrentUser('user-reader-free')
+    const article = mockStore.getState().articles.find((a) => a.status === 'PUBLISHED')!
+    mockStore.recordReadingHistory('user-reader-free', article)
+    const count = await handleMockRequest('GET', '/api/v1/reader/reading-history/count')
+    expect(count).toBeGreaterThan(0)
+
+    const list: Array<{ articleId: string }> = await handleMockRequest('GET', '/api/v1/reader/reading-history')
+    expect(list[0].articleId).toBe(article.id)
+
+    await handleMockRequest('DELETE', `/api/v1/reader/reading-history/${article.id}`)
+    const after: Array<{ articleId: string }> = await handleMockRequest('GET', '/api/v1/reader/reading-history')
+    expect(after.map((h) => h.articleId)).not.toContain(article.id)
+  })
 })

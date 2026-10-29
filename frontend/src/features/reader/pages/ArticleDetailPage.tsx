@@ -6,6 +6,7 @@ import { mockStore } from '@/mocks/store'
 import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { PaywallPrompt } from '../components/PaywallPrompt'
 import { CommentSection } from '../components/CommentSection'
+import { ArticleReportBox } from '../components/ArticleReportBox'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
 import { ArticleCard } from '../components/ArticleCard'
 import { formatDate, formatDateTime, formatCurrency } from '@/lib/format'
@@ -46,6 +47,7 @@ export function ArticleDetailPage() {
       setError(null)
       const data = await readerApi.getArticleBySlug(articleSlug)
       setArticle(data)
+      library.refresh()
 
       // Load related in same category
       const allArticles = await readerApi.getArticles({ category: data.categorySlug })
@@ -226,6 +228,8 @@ export function ArticleDetailPage() {
               ))}
             </div>
           )}
+
+          <ArticleReportBox articleId={article.id} />
 
           {/* Comments section */}
           <CommentSection articleId={article.id} />

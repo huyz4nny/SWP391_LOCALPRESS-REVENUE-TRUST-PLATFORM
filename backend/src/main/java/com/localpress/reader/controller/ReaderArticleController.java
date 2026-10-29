@@ -4,6 +4,8 @@ package com.localpress.reader.controller;
 import com.localpress.reader.dto.ArticleReaderResponse;
 import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.service.ReaderArticleService;
+import com.localpress.reader.service.ReaderCurrentUser;
+import com.localpress.reader.service.ReaderHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +30,8 @@ public class ReaderArticleController {
 
     // service xử lý nghiệp vụ được spring tự tiêm vào qua constructor
     private final ReaderArticleService readerArticleService;
+    private final ReaderHistoryService readerHistoryService;
+    private final ReaderCurrentUser readerCurrentUser;
 
     // block lấy danh sách bài có phân trang kèm lọc chuyên mục và tìm kiếm
     // phục vụ UC029 duyệt trang chủ chuyên mục và UC030 tìm kiếm ở màn hình II.3.1
@@ -59,7 +63,10 @@ public class ReaderArticleController {
     // luồng đi là nhận slug -> gọi service getArticleBySlug -> service tự áp paywall -> trả chi tiết về frontend
     @GetMapping("/{slug:.*\\D.*}")
     public ResponseEntity<ArticleReaderResponse> getArticleBySlug(@PathVariable String slug) {
+        ArticleReaderResponse body = readerArticleService.getArticleBySlug(slug);
+        // UC039 ghi lịch sử khi độc giả đã đăng nhập mở được bài, khách thì bỏ qua (rule 1)
+        readerCurrentUser.findUserId().ifPresent(userId -> readerHistoryService.recordQuietly(userId, body.getId()));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).varyBy("Authorization")
-                .body(readerArticleService.getArticleBySlug(slug));
+                .body(body);
     }
 }

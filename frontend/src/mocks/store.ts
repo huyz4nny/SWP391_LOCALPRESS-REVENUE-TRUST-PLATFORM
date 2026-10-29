@@ -462,6 +462,12 @@ class MockStore {
     return following
   }
 
+  public removeReadingHistory(userId: string, articleId: string) {
+    const ent = this.getEntitlements(userId)
+    ent.readingHistory = ent.readingHistory.filter((h) => h.articleId !== articleId)
+    this.persist()
+  }
+
   public recordReadingHistory(userId: string, article: Article) {
     const ent = this.getEntitlements(userId)
     ent.readingHistory = [
@@ -565,6 +571,7 @@ class MockStore {
       ent.hasSubscription = true
       ent.subscriptionPlanId = order.targetId
       ent.subscriptionPlanName = plan?.name || 'Gói Độc Giả'
+      ent.subscriptionAutoRenew = true
       const expires = new Date()
       expires.setDate(expires.getDate() + (plan?.durationDays || 30))
       ent.subscriptionExpiresAt = expires.toISOString()

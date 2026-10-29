@@ -17,8 +17,24 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   const currentUser = mockStore.getCurrentUser()
 
   // ---------------- AUTH / IDENTITY ----------------
-  if (pathname === '/auth/me') {
+  if (pathname === '/auth/me' && method === 'GET') {
     return currentUser
+  }
+  if (pathname === '/auth/me' && method === 'PATCH') {
+    if (currentUser.role === 'GUEST') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Chưa đăng nhập', path: pathname })
+    }
+    const name = String(body?.fullName ?? '').trim()
+    if (!name || name.length > 150) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 400, error: 'Bad Request', message: 'Họ tên tối đa 150 ký tự', path: pathname })
+    }
+    const phone = String(body?.phone ?? '').trim()
+    const stored = mockStore.getState().users.find((user) => user.id === currentUser.id)
+    if (stored) {
+      stored.name = name
+      stored.phone = phone
+    }
+    return { ...currentUser, name, phone }
   }
   if (pathname === '/auth/register' && method === 'POST') {
     const newUser = {
@@ -111,16 +127,73 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return article
   }
 
-  if (pathname === '/reader/entitlements' && method === 'GET') {
-    return mockStore.getEntitlements(currentUser.id)
-  }
-
   // UC038 và UC040 mock giống backend thật: khách chưa đăng nhập bị 401
-  const isLibraryPath = pathname.startsWith('/reader/saved-articles')
+  const isLibraryPath = pathname.startsWith('/reader/purchased-articles')
+    || pathname.startsWith('/reader/subscriptions')
+    || pathname.startsWith('/reader/article-reports')
+    || pathname.startsWith('/reader/saved-articles')
     || pathname.startsWith('/reader/followed-categories')
+    || pathname.startsWith('/reader/reading-history')
     || pathname === '/reader/feed'
   if (isLibraryPath && currentUser.role === 'GUEST') {
     throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập để dùng chức năng này', path: pathname })
+  }
+
+  const mockSubscription = () => {
+    const ent = mockStore.getEntitlements(currentUser.id)
+    if (!ent.hasSubscription) return null
+    const plan = mockStore.getState().subscriptionPlans.find((item) => item.id === ent.subscriptionPlanId)
+    const end = ent.subscriptionExpiresAt ? ent.subscriptionExpiresAt.slice(0, 10) : ''
+    const start = new Date(`${end}T00:00:00`)
+    if (!Number.isNaN(start.getTime())) start.setDate(start.getDate() - (plan?.durationDays || 30))
+    const startDate = Number.isNaN(start.getTime()) ? '' : start.toISOString().slice(0, 10)
+    return {
+      subscriptionId: 1,
+      planName: ent.subscriptionPlanName || plan?.name || 'Gói đọc',
+      price: plan?.price ?? 0,
+      accessScope: 'ALL',
+      categoryId: null,
+      categoryName: null,
+      startDate,
+      endDate: end,
+      autoRenew: ent.subscriptionAutoRenew !== false,
+      hasAdFree: (plan?.features ?? []).some((feature) => feature.toLowerCase().includes('quảng cáo')),
+      hasAudio: false,
+      inEffect: true,
+    }
+  }
+
+  if (pathname === '/reader/subscriptions/me' && method === 'GET') {
+    const item = mockSubscription()
+    return item ? [item] : []
+  }
+
+  const cancelMatch = pathname.match(/^\/reader\/subscriptions\/(\d+)\/cancel-auto-renew$/)
+  if (cancelMatch && method === 'POST') {
+    const ent = mockStore.getEntitlements(currentUser.id)
+    const item = mockSubscription()
+    if (!item || cancelMatch[1] !== String(item.subscriptionId)) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy gói của bạn', path: pathname })
+    }
+    ent.subscriptionAutoRenew = false
+    return { ...item, autoRenew: false }
+  }
+
+  if (pathname === '/reader/article-reports' && method === 'POST') {
+    const reason = String(body?.reason ?? '')
+    const allowed = ['INCORRECT_INFO', 'TYPO', 'IMAGE_ERROR', 'OTHER']
+    if (!allowed.includes(reason)) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 400, error: 'Bad Request', message: 'Lý do không hợp lệ', path: pathname })
+    }
+    return { reportId: Date.now(), status: 'PENDING' }
+  }
+
+  if (pathname === '/reader/purchased-articles' && method === 'GET') {
+    const articles = mockStore.getState().articles
+    const ids = mockStore.getEntitlements(currentUser.id).purchasedArticleIds
+    return ids
+      .map((id) => articles.find((a) => a.id === id && a.status === 'PUBLISHED'))
+      .filter((a): a is Article => Boolean(a))
   }
 
   if (pathname === '/reader/saved-articles/ids' && method === 'GET') {
@@ -166,6 +239,35 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return { categoryId, following: mockStore.setCategoryFollow(currentUser.id, categoryId, method === 'PUT') }
   }
 
+  if (pathname === '/reader/reading-history/count' && method === 'GET') {
+    return mockStore.getEntitlements(currentUser.id).readingHistory.length
+  }
+
+  if (pathname === '/reader/reading-history' && method === 'GET') {
+    const articles = mockStore.getState().articles
+    return mockStore.getEntitlements(currentUser.id).readingHistory
+      .map((h) => {
+        const article = articles.find((a) => a.id === h.articleId && a.status === 'PUBLISHED')
+        if (!article) return null
+        return {
+          articleId: article.id,
+          title: article.title,
+          slug: article.slug,
+          isPremium: article.isPremium,
+          categoryName: article.categoryName,
+          categorySlug: article.categorySlug,
+          lastReadAt: h.readAt,
+        }
+      })
+      .filter(Boolean)
+  }
+
+  if (pathname.startsWith('/reader/reading-history/') && method === 'DELETE') {
+    const articleId = decodeURIComponent(pathname.replace('/reader/reading-history/', ''))
+    mockStore.removeReadingHistory(currentUser.id, articleId)
+    return { articleId, saved: false }
+  }
+
   if (pathname === '/reader/feed' && method === 'GET') {
     const followed = new Set(mockStore.getEntitlements(currentUser.id).followedCategoryIds)
     return mockStore.getState().articles
@@ -197,26 +299,97 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name }
   }
 
+  if (pathname === '/reader/comments/mine' && method === 'GET') {
+    if (currentUser.role === 'GUEST') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập', path: pathname })
+    }
+    const articleId = params.get('articleId')
+    return mockStore.getState().comments.filter((c) => c.articleId === articleId && c.userId === currentUser.id)
+  }
+
   if (pathname.startsWith('/reader/comments/') && method === 'GET') {
     const articleId = pathname.replace('/reader/comments/', '')
     return mockStore.getState().comments.filter((c) => c.articleId === articleId && c.status === 'APPROVED')
   }
 
   if (pathname === '/reader/comments' && method === 'POST') {
+    if (currentUser.role === 'GUEST') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập', path: pathname })
+    }
+    const text = String(body?.content ?? '').trim()
+    if (!text) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 400, error: 'Bad Request', message: 'Nội dung bình luận không được để trống', path: pathname })
+    }
+    if (text.length > 1000) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 400, error: 'Bad Request', message: 'Bình luận tối đa 1000 ký tự', path: pathname })
+    }
+    const article = mockStore.getState().articles.find((a) => a.id === body.articleId && a.status === 'PUBLISHED')
+    if (!article) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy bài viết đang phát hành', path: pathname })
+    }
     const newComment = {
       id: `cmt-${Date.now()}`,
       articleId: body.articleId,
       userId: currentUser.id,
       userName: currentUser.name,
       userAvatar: currentUser.avatarUrl,
-      content: body.content,
-      status: 'APPROVED' as const, // auto-approve non-spam comments for demo
+      content: text,
+      status: 'PENDING' as const,
       createdAt: new Date().toISOString(),
       likeCount: 0,
       reported: false,
     }
-    mockStore.getState().comments.push(newComment)
+    mockStore.getState().comments = [...mockStore.getState().comments, newComment]
     return newComment
+  }
+
+  if (method === 'PUT' && /^\/reader\/comments\/[^/]+$/.test(pathname)) {
+    if (currentUser.role === 'GUEST') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập', path: pathname })
+    }
+    const commentId = pathname.split('/')[3]
+    const comments = mockStore.getState().comments
+    const index = comments.findIndex((c) => c.id === commentId)
+    if (index < 0) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy bình luận', path: pathname })
+    }
+    const comment = comments[index]
+    if (comment.userId !== currentUser.id) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 403, error: 'Forbidden', message: 'Chỉ sửa được bình luận của chính mình', path: pathname })
+    }
+    const text = String(body?.content ?? '').trim()
+    if (!text) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 400, error: 'Bad Request', message: 'Nội dung bình luận không được để trống', path: pathname })
+    }
+    const updated = { ...comment, content: text, status: 'PENDING' as const }
+    mockStore.getState().comments = comments.map((item, i) => (i === index ? updated : item))
+    return updated
+  }
+
+  if (method === 'POST' && /^\/reader\/comments\/[^/]+\/report$/.test(pathname)) {
+    if (currentUser.role === 'GUEST') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập', path: pathname })
+    }
+    const commentId = pathname.split('/')[3]
+    const comments = mockStore.getState().comments
+    const index = comments.findIndex((c) => c.id === commentId)
+    if (index < 0) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy bình luận', path: pathname })
+    }
+    const comment = comments[index]
+    const reason = String(body?.reason ?? '').trim()
+    if (!reason) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 400, error: 'Bad Request', message: 'Cần ghi lý do báo cáo', path: pathname })
+    }
+    if (comment.userId === currentUser.id) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 409, error: 'Conflict', message: 'Không báo cáo bình luận của chính mình', path: pathname })
+    }
+    if (comment.status !== 'APPROVED') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 409, error: 'Conflict', message: 'Chỉ báo cáo được bình luận đang hiển thị', path: pathname })
+    }
+    const updated = { ...comment, status: 'PENDING' as const, reported: true, reportReason: reason }
+    mockStore.getState().comments = comments.map((item, i) => (i === index ? updated : item))
+    return { commentId: comment.id, status: 'PENDING' }
   }
 
   // ---------------- ADVERTISING / ADVERTISER ----------------

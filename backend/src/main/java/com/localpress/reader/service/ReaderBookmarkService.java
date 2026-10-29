@@ -26,6 +26,11 @@ public class ReaderBookmarkService {
     private final ReaderArticleRepository readerArticleRepository;
 
     // block danh sách bài đã lưu có phân trang, bài vừa lưu lên đầu
+    public Page<ArticleSummaryResponse> getPurchasedArticles(Long userId, Pageable pageable) {
+        return readerArticleRepository.findPurchasedArticles(userId, pageable)
+                .map(ReaderArticleServiceImpl::mapToSummary);
+    }
+
     public Page<ArticleSummaryResponse> getSavedArticles(Long userId, Pageable pageable) {
         return readerArticleRepository.findSavedArticles(userId, pageable)
                 .map(ReaderArticleServiceImpl::mapToSummary);

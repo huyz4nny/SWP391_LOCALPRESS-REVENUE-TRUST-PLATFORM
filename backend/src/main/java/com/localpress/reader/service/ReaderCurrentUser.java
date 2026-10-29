@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 // helper lấy độc giả đang đăng nhập cho các api cần biết người dùng của SV3
 // không dùng CurrentUserService của identity vì class đó chỉ cho tác giả và biên tập viên
@@ -40,5 +41,17 @@ public class ReaderCurrentUser {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản đang bị khóa");
         }
         return user.getId();
+    }
+
+    // block lấy id nếu đang đăng nhập, khách thì trả rỗng để api đọc bài công khai không bị 401
+    public Optional<Long> findUserId() {
+        try {
+            return Optional.of(requireUserId());
+        } catch (ResponseStatusException exception) {
+            if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                return Optional.empty();
+            }
+            throw exception;
+        }
     }
 }

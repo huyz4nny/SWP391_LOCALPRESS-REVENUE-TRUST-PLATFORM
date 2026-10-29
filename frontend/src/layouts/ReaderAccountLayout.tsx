@@ -20,13 +20,16 @@ import {
   LogOut,
 } from 'lucide-react'
 import { logout } from '@/features/identity/authSession'
+import { APP_CONFIG } from '@/app/config'
 import { useReaderLibrary } from '@/features/reader/hooks/useReaderLibrary'
+import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
 
 export function ReaderAccountLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
   const location = useLocation()
   const navigate = useNavigate()
   const library = useReaderLibrary()
+  const subscription = useReaderSubscription()
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -61,17 +64,19 @@ export function ReaderAccountLayout() {
     )
   }
 
-  const entitlement = mockStore.getEntitlements(currentUser.id)
+  const deviceBadge = APP_CONFIG.useMockApi
+    ? `${mockStore.getEntitlements(currentUser.id).activeDevices.length}/2`
+    : undefined
 
   const navItems = [
     { label: 'Hồ sơ tài khoản', path: '/account', icon: UserIcon },
-    { label: 'Tủ sách & bài đã mua', path: '/account/library', icon: BookOpen, badge: entitlement.purchasedArticleIds.length },
+    { label: 'Tủ sách & bài đã mua', path: '/account/library', icon: BookOpen, badge: library.purchasedCount },
     { label: 'Bài viết đã lưu', path: '/account/bookmarks', icon: Bookmark, badge: library.savedIds.length },
     { label: 'Chuyên mục theo dõi', path: '/account/following', icon: Rss, badge: library.followedCategoryIds.length },
-    { label: 'Lịch sử đọc tin', path: '/account/history', icon: History },
+    { label: 'Lịch sử đọc tin', path: '/account/history', icon: History, badge: library.historyCount },
     { label: 'Gói hội viên', path: '/account/subscription', icon: Crown, isVip: true },
     { label: 'Giao dịch & hóa đơn', path: '/account/orders', icon: Receipt },
-    { label: 'Thiết bị (tối đa 2)', path: '/account/devices', icon: Smartphone, badge: `${entitlement.activeDevices.length}/2` },
+    { label: 'Thiết bị (tối đa 2)', path: '/account/devices', icon: Smartphone, badge: deviceBadge },
     { label: 'Hỗ trợ & hoàn tiền', path: '/account/support', icon: HelpCircle },
   ]
 
@@ -87,7 +92,7 @@ export function ReaderAccountLayout() {
           </div>
 
           <div className="flex flex-none items-center gap-2.5">
-            {entitlement.hasSubscription ? (
+            {!subscription.loaded ? null : subscription.hasInEffect ? (
               <Badge variant="gold">Hội viên Premium</Badge>
             ) : (
               <Link

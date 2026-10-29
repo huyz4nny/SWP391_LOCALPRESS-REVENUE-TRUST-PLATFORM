@@ -9,6 +9,7 @@ import com.localpress.reader.dto.FollowedCategoryResponse;
 import com.localpress.reader.service.ReaderBookmarkService;
 import com.localpress.reader.service.ReaderCurrentUser;
 import com.localpress.reader.service.ReaderFollowService;
+import com.localpress.reader.service.ReaderHistoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReaderLibraryFollowControllerTest {
 
     private ReaderBookmarkService bookmarkService;
+    private ReaderHistoryService historyService;
     private ReaderFollowService followService;
     private ReaderCurrentUser currentUser;
     private MockMvc mvc;
@@ -40,11 +42,12 @@ class ReaderLibraryFollowControllerTest {
     @BeforeEach
     void setUp() {
         bookmarkService = mock(ReaderBookmarkService.class);
+        historyService = mock(ReaderHistoryService.class);
         followService = mock(ReaderFollowService.class);
         currentUser = mock(ReaderCurrentUser.class);
         mvc = MockMvcBuilders
                 .standaloneSetup(
-                        new ReaderLibraryController(bookmarkService, currentUser),
+                        new ReaderLibraryController(bookmarkService, historyService, currentUser),
                         new ReaderFollowController(followService, currentUser))
                 .setControllerAdvice(new ReaderPurchaseExceptionHandler())
                 .build();
@@ -136,5 +139,44 @@ class ReaderLibraryFollowControllerTest {
         mvc.perform(delete("/api/v1/reader/followed-categories/2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.following").value(false));
+    }
+
+    @Test
+    void purchasedArticlesUsesUserFromSession() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(6L);
+        when(bookmarkService.getPurchasedArticles(6L, PageRequest.of(0, 20)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(com.localpress.reader.dto.ArticleSummaryResponse.builder()
+                                .id(1L).slug("bai-da-mua").title("Bài đã mua").isPremium(true).build()),
+                        PageRequest.of(0, 20), 1));
+
+        mvc.perform(get("/api/v1/reader/purchased-articles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].slug").value("bai-da-mua"));
+    }
+
+    @Test
+    void readingHistoryUsesUserFromSession() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(6L);
+        when(historyService.getHistory(6L, PageRequest.of(0, 20)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(com.localpress.reader.dto.ReadingHistoryItemResponse.builder()
+                                .articleId(1L).slug("bai-1").title("Bài 1").build()),
+                        PageRequest.of(0, 20), 1));
+
+        mvc.perform(get("/api/v1/reader/reading-history"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].slug").value("bai-1"));
+    }
+
+    @Test
+    void removeReadingHistoryReturnsSavedFalse() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(6L);
+
+        mvc.perform(delete("/api/v1/reader/reading-history/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleId").value(1))
+                .andExpect(jsonPath("$.saved").value(false));
+        verify(historyService).remove(6L, 1L);
     }
 }

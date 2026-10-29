@@ -17,7 +17,10 @@ import java.util.Map;
 @RestControllerAdvice(assignableTypes = {
         ReaderPurchaseController.class,
         ReaderLibraryController.class,
-        ReaderFollowController.class
+        ReaderFollowController.class,
+        ReaderCommentWriteController.class,
+        ReaderSubscriptionController.class,
+        ReaderArticleReportController.class
 })
 public class ReaderPurchaseExceptionHandler {
 

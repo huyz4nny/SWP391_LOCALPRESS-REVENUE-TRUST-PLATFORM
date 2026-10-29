@@ -1,13 +1,27 @@
 import React, { useState } from 'react'
+import { APP_CONFIG } from '@/app/config'
 import { mockStore } from '@/mocks/store'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Smartphone, Laptop, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react'
+import { Smartphone, Laptop, Trash2, AlertCircle } from 'lucide-react'
 
 export function ReaderDevicesPage() {
   const currentUser = mockStore.getCurrentUser()
-  const entitlement = mockStore.getEntitlements(currentUser.id)
-  const [devices, setDevices] = useState(entitlement.activeDevices)
+  const entitlement = APP_CONFIG.useMockApi ? mockStore.getEntitlements(currentUser.id) : null
+  const [devices, setDevices] = useState(entitlement?.activeDevices ?? [])
+
+  if (!APP_CONFIG.useMockApi) {
+    return (
+      <div className="space-y-3">
+        <h2 className="font-serif text-2xl font-bold text-slate-900">Thiết bị đăng nhập</h2>
+        <p className="text-sm leading-6 text-slate-600">
+          Danh sách thiết bị chưa nối được. Chưa chốt ai ghi phiên vào bảng user_devices và thiết bị thứ ba thì phiên nào bị đẩy ra.
+        </p>
+      </div>
+    )
+  }
+
+  if (!entitlement) return null
 
   const handleRevokeDevice = (deviceId: string) => {
     if (window.confirm('Đăng xuất phiên đăng nhập trên thiết bị này?')) {

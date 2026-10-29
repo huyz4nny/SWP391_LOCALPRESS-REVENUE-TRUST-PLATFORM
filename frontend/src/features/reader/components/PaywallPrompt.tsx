@@ -117,14 +117,13 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
               <div className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
                 Lựa chọn 2: Gói Độc Giả VIP
               </div>
-              <div className="mt-1 flex items-baseline">
-                <span className="text-2xl font-extrabold text-amber-400">59.000 ₫</span>
-                <span className="text-xs text-stone-300 ml-1">/ tháng (từ 1.900đ/ngày)</span>
+              <div className="mt-1 text-sm text-amber-100">
+                Giá và phạm vi theo từng gói đang bán
               </div>
               <ul className="mt-3 space-y-1.5 text-xs text-stone-200">
                 <li className="flex items-center">
                   <Check className="w-3.5 h-3.5 text-amber-400 mr-1.5 shrink-0" />
-                  Mở khóa 100% bài viết Premium toàn tòa soạn
+                  Đọc các bài thuộc phạm vi của gói đã mua
                 </li>
                 <li className="flex items-center">
                   <Check className="w-3.5 h-3.5 text-amber-400 mr-1.5 shrink-0" />

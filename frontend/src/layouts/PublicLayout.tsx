@@ -15,6 +15,7 @@ import {
   Building2,
 } from 'lucide-react'
 import { logout } from '@/features/identity/authSession'
+import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
 
 export function PublicLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
@@ -40,8 +41,8 @@ export function PublicLayout() {
     }
   }
 
-  const entitlement = mockStore.getEntitlements(currentUser.id)
-  const isPremiumUser = entitlement.hasSubscription
+  const subscription = useReaderSubscription()
+  const isPremiumUser = subscription.hasInEffect
 
   const latestBreakingNews = {
     title: 'HĐND thành phố Hải Phòng thông qua Nghị quyết 150 tỷ đồng hỗ trợ ngư dân nâng cấp tàu cá Bạch Long Vĩ',
@@ -106,7 +107,7 @@ export function PublicLayout() {
                     className="w-5 h-5 rounded-full object-cover border border-stone-200"
                   />
                   <span className="font-semibold text-xs">{currentUser.name.split(' ')[0]}</span>
-                  {isPremiumUser && (
+                  {subscription.loaded && isPremiumUser && (
                     <span className="bg-amber-100 text-amber-900 text-[11px] font-semibold px-1.5 rounded">
                       VIP
                     </span>

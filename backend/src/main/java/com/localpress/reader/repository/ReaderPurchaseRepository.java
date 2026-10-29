@@ -37,7 +37,8 @@ public class ReaderPurchaseRepository {
     }
 
     // một gói đang có hiệu lực của độc giả dùng để xem gói đó có bao trùm bài định mua không
-    public record ActiveSubscription(Long subscriptionId, Long planId, LocalDate startDate, LocalDate endDate) {
+    public record ActiveSubscription(Long subscriptionId, Long planId, LocalDate startDate, LocalDate endDate,
+                                     String accessScope, Long categoryId) {
     }
 
     // block lấy thông tin bán lẻ của bài kèm tên bản đã xuất bản
@@ -106,15 +107,18 @@ public class ReaderPurchaseRepository {
     // gói gia hạn nối tiếp có ngày bắt đầu ở tương lai nên bị loại ra đúng như mong muốn
     public List<ActiveSubscription> findActiveSubscriptions(Long userId, LocalDate today) {
         return jdbcTemplate.query("""
-                        SELECT subscription_id, plan_id, start_date, end_date
-                        FROM subscriptions
-                        WHERE user_id = ? AND status = 'ACTIVE' AND start_date <= ? AND end_date >= ?
+                        SELECT s.subscription_id, s.plan_id, s.start_date, s.end_date, p.access_scope, p.category_id
+                        FROM subscriptions s
+                        JOIN subscription_plans p ON p.plan_id = s.plan_id
+                        WHERE s.user_id = ? AND s.status = 'ACTIVE' AND s.start_date <= ? AND s.end_date >= ?
                         """,
                 (rs, i) -> new ActiveSubscription(
                         rs.getLong("subscription_id"),
                         rs.getLong("plan_id"),
                         rs.getObject("start_date", LocalDate.class),
-                        rs.getObject("end_date", LocalDate.class)),
+                        rs.getObject("end_date", LocalDate.class),
+                        rs.getString("access_scope"),
+                        rs.getObject("category_id", Long.class)),
                 userId, Date.valueOf(today), Date.valueOf(today));
     }
 
@@ -130,19 +134,20 @@ public class ReaderPurchaseRepository {
         return rows.stream().findFirst();
     }
 
-    // block tạo bản ghi gói mới ở trạng thái PENDING
+    // block tạo bản ghi gói mới ở trạng thái PENDING và bật gia hạn
+    // cột auto_renew mặc định false, nếu không bật ở đây thì độc giả không có gì để tắt sau khi trả tiền
     // start_date và end_date là cột bắt buộc nên ghi tạm bằng ngày tạo và sẽ được ghi đè bằng ngày thật khi thanh toán xong
     public Long insertPendingSubscription(Long userId, Long planId, LocalDate today) {
         return insertAndReturnId("""
-                INSERT INTO subscriptions (user_id, plan_id, start_date, end_date, status)
-                VALUES (?, ?, ?, ?, 'PENDING')
+                INSERT INTO subscriptions (user_id, plan_id, start_date, end_date, status, auto_renew)
+                VALUES (?, ?, ?, ?, 'PENDING', TRUE)
                 """, userId, planId, Date.valueOf(today), Date.valueOf(today));
     }
 
     // block làm mới ngày tạm của bản ghi chờ cũ và chỉ động vào bản ghi vẫn còn PENDING
     public int refreshPendingSubscription(Long subscriptionId, LocalDate today) {
         return jdbcTemplate.update("""
-                UPDATE subscriptions SET start_date = ?, end_date = ?
+                UPDATE subscriptions SET start_date = ?, end_date = ?, auto_renew = TRUE
                 WHERE subscription_id = ? AND status = 'PENDING'
                 """, Date.valueOf(today), Date.valueOf(today), subscriptionId);
     }

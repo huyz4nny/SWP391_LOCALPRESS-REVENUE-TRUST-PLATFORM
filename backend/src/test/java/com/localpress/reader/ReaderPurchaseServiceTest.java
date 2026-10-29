@@ -105,10 +105,23 @@ class ReaderPurchaseServiceTest {
     void rejectsArticleCoveredByActiveSubscription() {
         when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
         when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class)))
-                .thenReturn(List.of(new ActiveSubscription(1L, 3L, LocalDate.now().minusDays(1), LocalDate.now().plusDays(30))));
+                .thenReturn(List.of(new ActiveSubscription(1L, 3L, LocalDate.now().minusDays(1), LocalDate.now().plusDays(30), "ALL", null)));
 
         assertStatus(HttpStatus.CONFLICT, () -> service.createArticlePurchase(USER, ARTICLE));
         verify(repository, never()).insertPendingPurchase(any(), any(), any());
+    }
+
+    @Test
+    void categoryPlanOnAnotherCategoryDoesNotBlockSinglePurchase() {
+        when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
+        when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class)))
+                .thenReturn(List.of(new ActiveSubscription(1L, 3L, LocalDate.now().minusDays(1), LocalDate.now().plusDays(30), "CATEGORY", 9L)));
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.empty());
+        when(repository.insertPendingPurchase(USER, ARTICLE, PRICE)).thenReturn(88L);
+
+        PendingOrderTargetResponse res = service.createArticlePurchase(USER, ARTICLE);
+
+        assertEquals(88L, res.getTargetId());
     }
 
     @Test

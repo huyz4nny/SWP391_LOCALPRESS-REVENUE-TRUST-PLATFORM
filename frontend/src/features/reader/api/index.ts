@@ -1,6 +1,6 @@
 import { httpClient } from '@/lib/http/client'
 import { APP_CONFIG } from '@/app/config'
-import { Article, Category, SubscriptionPlan, Comment, ReaderEntitlement } from '../types'
+import { Article, Category, SubscriptionPlan, Comment } from '../types'
 
 // file này là cầu nối giữa giao diện reader và backend của SV3
 // chạy mock hay gọi backend thật tùy cờ APP_CONFIG.useMockApi
@@ -40,6 +40,50 @@ export type ArticlePage = {
   page: number
   hasMore: boolean
   total: number
+}
+
+export type ReaderSubscription = {
+  subscriptionId: string
+  planName: string
+  price: number
+  accessScope: string
+  categoryName: string | null
+  startDate: string
+  endDate: string
+  autoRenew: boolean
+  hasAdFree: boolean
+  hasAudio: boolean
+  inEffect: boolean
+}
+
+type ReaderSubscriptionDto = {
+  subscriptionId?: string | number
+  planName?: string
+  price?: number
+  accessScope?: string
+  categoryName?: string | null
+  startDate?: string
+  endDate?: string
+  autoRenew?: boolean
+  hasAdFree?: boolean
+  hasAudio?: boolean
+  inEffect?: boolean
+}
+
+function mapSubscription(dto: Partial<ReaderSubscriptionDto> | null | undefined): ReaderSubscription {
+  return {
+    subscriptionId: String(dto?.subscriptionId ?? ''),
+    planName: dto?.planName ?? '',
+    price: Number(dto?.price ?? 0),
+    accessScope: dto?.accessScope ?? 'ALL',
+    categoryName: dto?.categoryName ?? null,
+    startDate: dto?.startDate ?? '',
+    endDate: dto?.endDate ?? '',
+    autoRenew: Boolean(dto?.autoRenew),
+    hasAdFree: Boolean(dto?.hasAdFree),
+    hasAudio: Boolean(dto?.hasAudio),
+    inEffect: Boolean(dto?.inEffect),
+  }
 }
 
 // hàm lấy ra mảng dữ liệu cho cả hai chế độ mock và backend thật
@@ -121,6 +165,30 @@ function idSegment(id: string) {
   return encodeURIComponent(APP_CONFIG.useMockApi ? id : String(Number(id)))
 }
 
+export type ReadingHistoryItem = {
+  articleId: string
+  title: string
+  slug: string
+  isPremium: boolean
+  categoryName: string
+  categorySlug: string
+  lastReadAt: string | null
+}
+
+type ReadingHistoryItemDto = Partial<ReadingHistoryItem> & { articleId?: string | number }
+
+function mapHistoryItem(dto: ReadingHistoryItemDto): ReadingHistoryItem {
+  return {
+    articleId: String(dto.articleId ?? ''),
+    title: dto.title ?? '',
+    slug: dto.slug ?? '',
+    isPremium: Boolean(dto.isPremium),
+    categoryName: dto.categoryName ?? '',
+    categorySlug: dto.categorySlug ?? '',
+    lastReadAt: dto.lastReadAt ?? null,
+  }
+}
+
 function mapCategory(dto: Partial<Category> & { id?: string | number; description?: string; articleCount?: number }): Category {
   return {
     id: String(dto.id ?? ''),
@@ -130,6 +198,52 @@ function mapCategory(dto: Partial<Category> & { id?: string | number; descriptio
     articleCount: dto.articleCount ?? 0,
     iconName: dto.iconName,
     isFeatured: dto.isFeatured,
+  }
+}
+
+function scopeLine(dto: { accessScope?: string; categoryName?: string | null }): string {
+  if (dto.accessScope === 'CATEGORY' && dto.categoryName) {
+    return `Đọc bài Premium thuộc chuyên mục ${dto.categoryName}`
+  }
+  return 'Đọc bài Premium toàn trang'
+}
+
+function mapPublicPlan(dto: Partial<SubscriptionPlan> & {
+  id?: string | number
+  accessScope?: string
+  categoryName?: string | null
+  hasAdFree?: boolean
+  hasAudio?: boolean
+  status?: string
+}): SubscriptionPlan {
+  // mock đã có sẵn mô tả, backend thật trả phạm vi gói để không ghi nhầm gói chuyên mục thành toàn trang
+  if (dto.features && dto.features.length > 0 && !dto.accessScope) {
+    return {
+      id: String(dto.id ?? ''),
+      name: dto.name ?? '',
+      code: dto.code ?? `PLAN_${dto.id}`,
+      price: Number(dto.price ?? 0),
+      durationDays: Number(dto.durationDays ?? 0),
+      description: dto.description ?? '',
+      features: dto.features,
+      isPopular: dto.isPopular,
+      isActive: dto.isActive ?? true,
+    }
+  }
+  const line = scopeLine(dto)
+  const features = [line]
+  if (dto.hasAdFree) features.push('Không hiện quảng cáo')
+  if (dto.hasAudio) features.push('Nghe audio')
+  features.push(`Thời hạn ${Number(dto.durationDays ?? 0)} ngày`)
+  return {
+    id: String(dto.id ?? ''),
+    name: dto.name ?? '',
+    code: dto.code ?? `PLAN_${dto.id}`,
+    price: Number(dto.price ?? 0),
+    durationDays: Number(dto.durationDays ?? 0),
+    description: line,
+    features,
+    isActive: dto.status === 'ACTIVE' || dto.isActive === true,
   }
 }
 
@@ -193,12 +307,31 @@ export const readerApi = {
     return unwrapList(data).map(mapCategory)
   },
 
-  getSubscriptionPlans: () => {
-    return httpClient.get<SubscriptionPlan[]>('/subscription-plans')
+  getSubscriptionPlans: async () => {
+    const data = await httpClient.get<Array<Partial<SubscriptionPlan>>>('/subscription-plans')
+    return (data ?? []).map(mapPublicPlan)
   },
 
-  getEntitlements: () => {
-    return httpClient.get<ReaderEntitlement>('/reader/entitlements')
+  // UC044 gói ACTIVE chưa hết hạn của user đang đăng nhập
+  getMySubscriptions: async (): Promise<ReaderSubscription[]> => {
+    const data = await httpClient.get<Array<Partial<ReaderSubscriptionDto>>>('/reader/subscriptions/me')
+    return (data ?? []).map(mapSubscription)
+  },
+
+  // UC044 tắt gia hạn kỳ sau, quyền đọc giữ đến endDate
+  cancelAutoRenew: async (subscriptionId: string): Promise<ReaderSubscription> => {
+    const data = await httpClient.post<Partial<ReaderSubscriptionDto>>(
+      `/reader/subscriptions/${idSegment(subscriptionId)}/cancel-auto-renew`,
+    )
+    return mapSubscription(data)
+  },
+
+  // UC037 danh sách bài đã mua lẻ còn hiệu lực, bài mới mua lên đầu
+  getPurchasedArticlesPage: async (page = 0, size = 20): Promise<ArticlePage> => {
+    const data = await httpClient.get<ArticleDto[] | SpringPage<ArticleDto>>('/reader/purchased-articles', {
+      params: { page, size },
+    })
+    return toArticlePage(data, page)
   },
 
   // UC038 id các bài đã lưu để tô icon lưu trên thẻ bài và đếm số bài ở menu tài khoản
@@ -254,6 +387,38 @@ export const readerApi = {
     return toArticlePage(data, page)
   },
 
+  // UC039 một dòng lịch sử đọc, lastReadAt để hiện "đã đọc lúc"
+  getReadingHistoryPage: async (page = 0, size = 20): Promise<{
+    items: ReadingHistoryItem[]
+    page: number
+    hasMore: boolean
+    total: number
+  }> => {
+    const data = await httpClient.get<ReadingHistoryItem[] | SpringPage<ReadingHistoryItemDto>>('/reader/reading-history', {
+      params: { page, size },
+    })
+    const raw = unwrapList(data)
+    const items = raw.map(mapHistoryItem)
+    if (Array.isArray(data)) {
+      return { items, page: 0, hasMore: false, total: items.length }
+    }
+    return {
+      items,
+      page: data?.number ?? page,
+      hasMore: data?.last === false,
+      total: data?.totalElements ?? items.length,
+    }
+  },
+
+  getReadingHistoryCount: async (): Promise<number> => {
+    const data = await httpClient.get<number>('/reader/reading-history/count')
+    return Number(data ?? 0)
+  },
+
+  removeReadingHistory: async (articleId: string): Promise<void> => {
+    await httpClient.delete(`/reader/reading-history/${idSegment(articleId)}`)
+  },
+
   // UC031 lấy bình luận đã duyệt của bài (rule 12) cho CommentSection
   // đường dẫn mock và backend thật khác nhau nên chọn theo cờ useMockApi
   getComments: async (articleId: string) => {
@@ -264,8 +429,43 @@ export const readerApi = {
     return unwrapList(data).map(mapComment)
   },
 
-  postComment: (articleId: string, content: string) => {
-    return httpClient.post<Comment>('/reader/comments', { articleId, content })
+  postComment: async (articleId: string, content: string) => {
+    const data = await httpClient.post<Partial<Comment>>('/reader/comments', {
+      articleId: APP_CONFIG.useMockApi ? articleId : Number(articleId),
+      content,
+    })
+    return mapComment(data)
+  },
+
+  // sửa bình luận của chính mình, backend đưa status về PENDING
+  updateComment: async (commentId: string, content: string) => {
+    const data = await httpClient.put<Partial<Comment>>(`/reader/comments/${idSegment(commentId)}`, { content })
+    return mapComment(data)
+  },
+
+  // bình luận của user đang đăng nhập, kể cả đang chờ duyệt
+  getMyComments: async (articleId: string) => {
+    const data = await httpClient.get<Array<Partial<Comment>>>('/reader/comments/mine', {
+      params: { articleId: APP_CONFIG.useMockApi ? articleId : Number(articleId) },
+    })
+    return unwrapList(data).map(mapComment)
+  },
+
+  // chỉ comment đang APPROVED mới báo cáo được
+  reportComment: (commentId: string, reason: string) => {
+    return httpClient.post<{ commentId: string | number; status: string }>(
+      `/reader/comments/${idSegment(commentId)}/report`,
+      { reason },
+    )
+  },
+
+  // UC042 báo lỗi nội dung bài đang xuất bản, server tự gắn user và status PENDING
+  reportArticle: (articleId: string, reason: string, description: string) => {
+    return httpClient.post<{ reportId: number; status: string }>('/reader/article-reports', {
+      articleId: APP_CONFIG.useMockApi ? articleId : Number(articleId),
+      reason,
+      description,
+    })
   },
 
   // UC034 tạo bản ghi mua lẻ chờ thanh toán (PENDING) trước khi tạo đơn bên SV4

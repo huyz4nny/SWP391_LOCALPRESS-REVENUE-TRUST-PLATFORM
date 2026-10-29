@@ -121,10 +121,13 @@ public class ReaderPurchaseService {
         return existing.purchaseId();
     }
 
-    // block kiểm tra một gói có bao trùm chuyên mục của bài không
-    // hiện chỉ có gói toàn trang nên luôn trả true
-    // khi migration V8 của SV5 có cột access_scope và category_id vào main thì sửa đúng một chỗ này để so chuyên mục
+    // cùng quy tắc với PaywallEngine: gói ALL bao mọi bài, gói CATEGORY chỉ đúng chuyên mục của bài
     private boolean subscriptionCoversArticle(ActiveSubscription subscription, Long articleCategoryId) {
-        return true;
+        if ("ALL".equals(subscription.accessScope()) && subscription.categoryId() == null) {
+            return true;
+        }
+        return "CATEGORY".equals(subscription.accessScope())
+                && subscription.categoryId() != null
+                && subscription.categoryId().equals(articleCategoryId);
     }
 }

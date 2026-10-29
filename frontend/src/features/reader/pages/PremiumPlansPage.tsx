@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SEED_SUBSCRIPTION_PLANS } from '@/mocks/data/seed'
+import { SubscriptionPlan } from '../types'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { httpClient } from '@/lib/http/client'
@@ -11,12 +11,20 @@ import { Crown, Check, Sparkles, HelpCircle, ShieldCheck, Zap } from 'lucide-rea
 
 export function PremiumPlansPage() {
   const navigate = useNavigate()
-  const [plans] = useState(SEED_SUBSCRIPTION_PLANS)
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const currentUser = mockStore.getCurrentUser()
 
-  const handleSelectPlan = async (plan: (typeof SEED_SUBSCRIPTION_PLANS)[0]) => {
+  useEffect(() => {
+    readerApi.getSubscriptionPlans()
+      .then(setPlans)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Không tải được danh sách gói'))
+      .finally(() => setLoadingPlans(false))
+  }, [])
+
+  const handleSelectPlan = async (plan: SubscriptionPlan) => {
     if (currentUser.role === 'GUEST') {
       navigate('/login', { state: { from: { pathname: '/premium' } } })
       return
@@ -67,7 +75,15 @@ export function PremiumPlansPage() {
         </p>
       )}
 
-      {/* Pricing Cards */}
+      {loadingPlans ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-pulse">
+          <div className="h-72 rounded-2xl bg-stone-200" />
+          <div className="h-72 rounded-2xl bg-stone-200" />
+          <div className="h-72 rounded-2xl bg-stone-200" />
+        </div>
+      ) : plans.length === 0 ? (
+        <p className="text-center text-sm text-stone-500">Hiện chưa có gói hội viên đang mở bán.</p>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
         {plans.map((plan) => {
           const isPopular = plan.isPopular
@@ -139,6 +155,7 @@ export function PremiumPlansPage() {
           )
         })}
       </div>
+      )}
 
       {/* Trust factors */}
       <div className="bg-stone-100 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs text-stone-600">

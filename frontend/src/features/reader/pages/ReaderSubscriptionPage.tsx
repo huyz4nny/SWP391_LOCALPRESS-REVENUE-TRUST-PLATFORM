@@ -1,97 +1,157 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { mockStore } from '@/mocks/store'
-import { formatDate } from '@/lib/format'
+import { formatCurrency, formatDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Crown, CheckCircle2, ShieldAlert, Sparkles, ArrowRight } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { ReaderSubscription } from '../api'
+import { useReaderSubscription } from '../hooks/useReaderSubscription'
+
+function scopeText(item: ReaderSubscription) {
+  if (item.accessScope === 'CATEGORY' && item.categoryName) {
+    return `Đọc bài Premium thuộc chuyên mục ${item.categoryName}`
+  }
+  return 'Đọc bài Premium toàn trang'
+}
+
+function PlanFacts({ item }: { item: ReaderSubscription }) {
+  const facts = [scopeText(item)]
+  if (item.hasAdFree) facts.push('Không hiện quảng cáo khi đọc bài')
+  if (item.hasAudio) facts.push('Gói có bản nghe')
+  return (
+    <ul className="space-y-1 text-sm text-slate-700">
+      {facts.map((fact) => (
+        <li key={fact}>{fact}</li>
+      ))}
+    </ul>
+  )
+}
 
 export function ReaderSubscriptionPage() {
-  const currentUser = mockStore.getCurrentUser()
-  const entitlement = mockStore.getEntitlements(currentUser.id)
+  const subscription = useReaderSubscription()
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const cancel = async () => {
+    if (!confirmId) return
+    setSaving(true)
+    setActionError('')
+    try {
+      await subscription.cancelAutoRenew(confirmId)
+      setConfirmId(null)
+    } catch (err) {
+      setActionError(err instanceof Error && err.message ? err.message : 'Không tắt được gia hạn')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!subscription.loaded) {
+    return <p className="text-sm text-slate-500">Đang tải gói đang dùng...</p>
+  }
+
+  if (subscription.error) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-crimson">{subscription.error}</p>
+        <Button variant="outline" size="sm" onClick={subscription.reload}>Tải lại</Button>
+      </div>
+    )
+  }
+
+  const primary = subscription.primary
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-serif text-2xl font-bold text-stone-900">Gói đọc & Đặc quyền VIP</h2>
-        <p className="text-xs text-stone-500 mt-1">
-          Quản lý thời hạn và các đặc quyền hội viên của tài khoản
+        <h2 className="font-serif text-2xl font-bold text-slate-900">Gói hội viên</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Gói đang hiệu lực, ngày hết hạn và gia hạn kỳ sau
         </p>
       </div>
 
-      {entitlement.hasSubscription ? (
-        <div className="bg-gradient-to-br from-stone-900 via-primary-950 to-stone-900 text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-amber-500/40 relative overflow-hidden">
-          <div className="relative z-10 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="bg-amber-500 text-stone-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center">
-                <Crown className="w-3.5 h-3.5 mr-1" />
-                Gói Đang Hoạt Động
-              </span>
-              <span className="text-xs text-stone-400">
-                Hiệu lực đến: <strong className="text-amber-300 font-bold">{formatDate(entitlement.subscriptionExpiresAt)}</strong>
-              </span>
-            </div>
-
-            <h3 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-              {entitlement.subscriptionPlanName}
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs text-stone-200">
-              <div className="flex items-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 mr-2 shrink-0" />
-                Đọc không giới hạn toàn bộ bài viết điều tra
-              </div>
-              <div className="flex items-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 mr-2 shrink-0" />
-                Loại bỏ quảng cáo xen kẽ trong bài viết
-              </div>
-              <div className="flex items-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 mr-2 shrink-0" />
-                Giới hạn tối đa 2 thiết bị cá nhân đồng thời
-              </div>
-              <div className="flex items-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 mr-2 shrink-0" />
-                Được ưu tiên kiểm duyệt bình luận nhanh
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-stone-800 flex flex-wrap items-center justify-between gap-4">
-              <Link
-                to="/premium"
-                className="bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow-2xs"
-              >
-                Gia hạn hoặc nâng cấp gói
-              </Link>
-              <Link
-                to="/account/support"
-                className="text-xs text-stone-400 hover:text-stone-200 underline"
-              >
-                Yêu cầu khiếu nại hoặc hoàn tiền gói
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="p-8 rounded-2xl bg-stone-50 border border-stone-200 text-center space-y-4">
-          <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
-            <Crown className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="font-serif text-xl font-bold text-stone-900">
-              Bạn chưa có gói Hội Viên Premium
-            </h3>
-            <p className="text-xs sm:text-sm text-stone-500 mt-1 max-w-md mx-auto">
-              Đăng ký ngay hôm nay từ 59.000 ₫/tháng để ủng hộ báo chí địa phương độc lập và đọc trọn vẹn mọi chuyên đề điều tra.
-            </p>
-          </div>
+      {!primary && subscription.others.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 p-6 text-center">
+          <h3 className="font-serif text-xl font-bold text-slate-900">Chưa có gói đang dùng</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            Bạn vẫn đọc được bài miễn phí và bản xem trước. Mua gói để đọc bài Premium trong phạm vi của gói.
+          </p>
           <Link
             to="/premium"
-            className="inline-flex items-center bg-primary-900 hover:bg-primary-800 text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow-sm"
+            className="mt-4 inline-flex h-9 items-center rounded-md bg-primary-900 px-4 text-sm font-medium text-white hover:bg-primary-800"
           >
-            <Crown className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-            Xem các gói đọc & Đăng ký ngay
+            Xem các gói đọc
           </Link>
         </div>
+      ) : primary ? (
+        <section className="rounded-lg border border-slate-200 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Badge variant="gold">Đang hiệu lực</Badge>
+            <span className="text-sm text-slate-600">
+              Đến hết ngày <span className="font-medium text-slate-900">{formatDate(primary.endDate)}</span>
+            </span>
+          </div>
+          <h3 className="mt-3 font-serif text-2xl font-bold text-slate-900">{primary.planName}</h3>
+          <p className="mt-1 text-sm text-slate-500 num">{formatCurrency(primary.price)}</p>
+          <div className="mt-4">
+            <PlanFacts item={primary} />
+          </div>
+          <p className="mt-4 text-sm text-slate-600">
+            Từ {formatDate(primary.startDate)} đến {formatDate(primary.endDate)}.
+            {primary.autoRenew
+              ? ' Gia hạn tự động đang bật cho kỳ sau.'
+              : ' Gia hạn tự động đang tắt. Bạn vẫn đọc được đến hết ngày trên.'}
+          </p>
+          {actionError && <p className="mt-3 text-sm text-crimson">{actionError}</p>}
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
+            <Link to="/premium" className="text-sm font-medium text-primary-900 hover:underline">
+              Mua hoặc đổi gói
+            </Link>
+            {primary.autoRenew && (
+              <Button variant="outline" size="sm" onClick={() => setConfirmId(primary.subscriptionId)}>
+                Tắt gia hạn
+              </Button>
+            )}
+            <Link to="/account/support" className="text-sm text-slate-500 hover:text-slate-800 hover:underline">
+              Khiếu nại thanh toán
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {subscription.others.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium text-slate-900">Kỳ khác còn hiệu lực hoặc sắp bắt đầu</h3>
+          {subscription.others.map((item) => (
+            <div key={item.subscriptionId} className="rounded-lg border border-slate-200 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-slate-900">{item.planName}</span>
+                <span className="text-xs text-slate-500">{item.inEffect ? 'Đang hiệu lực' : 'Chưa tới ngày bắt đầu'}</span>
+              </div>
+              <p className="mt-1 text-sm text-slate-600">{scopeText(item)}</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {formatDate(item.startDate)} – {formatDate(item.endDate)}. {item.autoRenew ? 'Có gia hạn' : 'Không gia hạn'}
+              </p>
+              {item.autoRenew && (
+                <Button className="mt-2" variant="outline" size="sm" onClick={() => setConfirmId(item.subscriptionId)}>
+                  Tắt gia hạn kỳ này
+                </Button>
+              )}
+            </div>
+          ))}
+        </section>
       )}
+
+      <ConfirmDialog
+        open={confirmId !== null}
+        onClose={() => setConfirmId(null)}
+        onConfirm={cancel}
+        title="Tắt gia hạn tự động"
+        message="Kỳ đã trả tiền vẫn đọc được đến hết ngày hết hạn. Kỳ sau sẽ không tự tạo."
+        confirmText="Tắt gia hạn"
+        isLoading={saving}
+      />
     </div>
   )
 }
