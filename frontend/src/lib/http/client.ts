@@ -27,7 +27,7 @@ function writeStoredAuth(value: string) {
         // storage unavailable: login only lasts until reload
     }
 }
-
+  
 class HttpClient {
     private baseUrl: string
     private useMock: boolean

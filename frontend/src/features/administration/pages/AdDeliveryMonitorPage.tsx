@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { AdDeliveryLiveStatus } from '../types'
 import { adminApi } from '../api'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { formatDateTime } from '@/lib/format'
 import { Activity, Megaphone, CheckCircle2, PauseCircle, Clock } from 'lucide-react'
 
 export function AdDeliveryMonitorPage() {
   const [stats, setStats] = useState<AdDeliveryLiveStatus[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadStats()
@@ -15,8 +18,11 @@ export function AdDeliveryMonitorPage() {
   const loadStats = async () => {
     try {
       setLoading(true)
+      setError('')
       const data = await adminApi.getAdDeliveryStatus()
       setStats(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được trạng thái quảng cáo')
     } finally {
       setLoading(false)
     }
@@ -24,12 +30,15 @@ export function AdDeliveryMonitorPage() {
 
   return (
     <div className="space-y-6">
+      {error && <p role="alert" className="text-red-700">{error}</p>}
+      {loading && <p role="status">Đang tải trạng thái quảng cáo...</p>}
+      {!loading && !error && stats.length === 0 && <EmptyState title="Chưa có vị trí quảng cáo" />}
       <div className="pb-4 border-b border-slate-200">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
           Giám sát Động cơ Phân phối Quảng cáo (Ad Delivery Engine)
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Theo dõi trạng thái phục vụ banner theo thời gian thực, kiểm soát xoay vòng slot và thống kê click fraud
+          Trạng thái chiến dịch đủ điều kiện và số lượt hiển thị, lượt nhấp đã ghi nhận trong ngày.
         </p>
       </div>
 
@@ -45,22 +54,14 @@ export function AdDeliveryMonitorPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-bold text-slate-500">{slot.slotCode}</span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center ${
-                    isServing
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isServing ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
-                  {isServing ? 'ĐANG PHỤC VỤ (ONLINE)' : 'CHỜ CHIẾN DỊCH (IDLE)'}
-                </span>
+                <StatusBadge type="delivery" status={isServing ? 'ELIGIBLE' : slot.status === 'OVER_CAPACITY' ? 'PAUSED' : 'NOT_STARTED'} />
               </div>
 
               <div>
                 <h3 className="font-bold text-base text-slate-900">{slot.slotName}</h3>
                 <div className="text-xs text-slate-500 mt-1">
                   Sức chứa hiện tại: <strong>{slot.currentActiveCampaigns} / {slot.maxCapacity}</strong> chiến dịch luân phiên
+                  {slot.status === 'OVER_CAPACITY' && <p className="mt-1 text-red-700">Số chiến dịch vượt sức chứa; cần kiểm tra lịch đặt chỗ.</p>}
                 </div>
               </div>
 

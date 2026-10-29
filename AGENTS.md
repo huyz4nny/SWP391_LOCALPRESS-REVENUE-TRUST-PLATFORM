@@ -129,7 +129,7 @@ Ma trận CRUD trong [`project_tracking_group2.xlsx`](project_tracking_group2.xl
    - SV1/SV3 tự viết `@EventListener PaymentSuccessEvent` trong module của mình để kích hoạt campaign / mở khóa bài / kích hoạt gói. `targetId` phải là id bản ghi thật (`purchase_id`, `subscription_id`, `campaign_id`) do module nguồn tạo ở trạng thái chờ trước khi gọi tạo đơn.
    - **Hoàn tiền (UC055 -> UC056):** Kế toán trưởng duyệt hoàn xong, SV4 chỉ ghi bút toán `REFUND` (đơn trả bằng ví thì hoàn lại vào ví) rồi phát `RefundCompletedEvent` (`com.localpress.shared.event`: `transactionType`, `targetId`, `refundAmount`, `fullRefund`...). SV4 KHÔNG sửa bảng `article_purchases` / `subscriptions` / `ad_campaigns` (Rule 17). SV3 tự viết `@EventListener RefundCompletedEvent` để thu hồi bài / gói, SV1 để tạm dừng chiến dịch; quy định: **hoàn toàn bộ thì thu hồi quyền, hoàn một phần thì khách giữ quyền** (listener chỉ thu hồi khi `shouldRevokeRights()` = `fullRefund` = true).
 2. **Cổng bảo vệ nội dung (`com.localpress.delivery` & `reader`):**
-   - Kiểm tra: `PaywallEngine.checkAccess(userId, articleId)` trước khi trả dữ liệu bài viết.
+   - API đọc bài đang dùng `com.localpress.delivery.service.PaywallEngine.checkCurrentAccess(articleId)`, lấy user đã xác thực từ Spring Security. `checkAccess(userId, articleId)` chỉ dành cho service nội bộ với userId đáng tin cậy; không nhận userId từ frontend.
 3. **Phê duyệt quảng cáo (`com.localpress.advertising` & `editorial`):**
    - Khi upload banner mới, trạng thái là `PENDING_REVIEW`, xuất hiện tại trang duyệt của SV2.
 4. **Phân phối banner (`com.localpress.delivery`):**
