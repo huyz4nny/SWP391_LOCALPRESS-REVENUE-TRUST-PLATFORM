@@ -70,7 +70,8 @@ class EditorialModerationControllerTest {
                 .status("APPROVED")
                 .build();
 
-        when(moderationService.moderateComment(eq(1L), any(ModerateCommentRequest.class))).thenReturn(commentDto);
+        when(moderationService.moderateComment(eq(1L), any(ModerateCommentRequest.class), any()))
+                .thenReturn(commentDto);
 
         ModerateCommentRequest req = new ModerateCommentRequest("APPROVED", "Hợp lệ");
 
@@ -79,6 +80,17 @@ class EditorialModerationControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "AUTHOR")
+    void moderateComment_forbiddenForAuthor() throws Exception {
+        ModerateCommentRequest req = new ModerateCommentRequest("APPROVED", "Hợp lệ");
+
+        mvc.perform(post("/api/v1/editorial/comments/1/moderate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -92,7 +104,7 @@ class EditorialModerationControllerTest {
                 .status("PUBLISHED")
                 .build();
 
-        when(moderationService.updateArticlePolicy(eq(1L), any(UpdateArticlePolicyRequest.class)))
+        when(moderationService.updateArticlePolicy(eq(1L), any(UpdateArticlePolicyRequest.class), any()))
                 .thenReturn(articleDto);
 
         UpdateArticlePolicyRequest req = new UpdateArticlePolicyRequest("PREMIUM", new BigDecimal("15000.00"));
@@ -103,6 +115,17 @@ class EditorialModerationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isPremium").value(true))
                 .andExpect(jsonPath("$.price").value(15000.00));
+    }
+
+    @Test
+    @WithMockUser(roles = "AUTHOR")
+    void updateArticlePolicy_forbiddenForAuthor() throws Exception {
+        UpdateArticlePolicyRequest req = new UpdateArticlePolicyRequest("PREMIUM", new BigDecimal("15000.00"));
+
+        mvc.perform(put("/api/v1/editorial/articles/1/policy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -139,7 +162,7 @@ class EditorialModerationControllerTest {
                 .status("ACTIVE")
                 .build();
 
-        when(moderationService.createPlan(any(SaveSubscriptionPlanRequest.class))).thenReturn(planDto);
+        when(moderationService.createPlan(any(SaveSubscriptionPlanRequest.class), any())).thenReturn(planDto);
 
         SaveSubscriptionPlanRequest req = SaveSubscriptionPlanRequest.builder()
                 .name("Gói Năm VIP")
@@ -159,6 +182,24 @@ class EditorialModerationControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "AUTHOR")
+    void createSubscriptionPlan_forbiddenForAuthor() throws Exception {
+        SaveSubscriptionPlanRequest req = SaveSubscriptionPlanRequest.builder()
+                .name("Gói Năm VIP")
+                .price(new BigDecimal("480000.00"))
+                .durationDays(365)
+                .hasAdFree(true)
+                .hasAudio(true)
+                .status("ACTIVE")
+                .build();
+
+        mvc.perform(post("/api/v1/editorial/subscription-plans")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(roles = "EDITOR")
     void toggleSubscriptionPlanStatus_togglesSuccessfully() throws Exception {
         SubscriptionPlanDto planDto = SubscriptionPlanDto.builder()
@@ -168,11 +209,18 @@ class EditorialModerationControllerTest {
                 .status("INACTIVE")
                 .build();
 
-        when(moderationService.togglePlanStatus(eq(1L))).thenReturn(planDto);
+        when(moderationService.togglePlanStatus(eq(1L), any())).thenReturn(planDto);
 
         mvc.perform(post("/api/v1/editorial/subscription-plans/1/toggle-status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isActive").value(false))
                 .andExpect(jsonPath("$.status").value("INACTIVE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "AUTHOR")
+    void toggleSubscriptionPlanStatus_forbiddenForAuthor() throws Exception {
+        mvc.perform(post("/api/v1/editorial/subscription-plans/1/toggle-status"))
+                .andExpect(status().isForbidden());
     }
 }

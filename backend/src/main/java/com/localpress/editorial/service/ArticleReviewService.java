@@ -6,7 +6,9 @@ import com.localpress.content.entity.Category;
 import com.localpress.content.repository.ArticleRepository;
 import com.localpress.content.repository.ArticleVersionRepository;
 import com.localpress.content.repository.CategoryRepository;
+import com.localpress.content.service.ImageStorageService;
 import com.localpress.editorial.dto.EditorialArticleDto;
+import com.localpress.editorial.dto.SaveEditorialArticleRequest;
 import com.localpress.editorial.dto.UpdateArticleStatusRequest;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.repository.UserRepository;
@@ -16,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,16 +41,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ArticleReviewService {
 
-    /**
-     * ID mặc định của Biên tập viên SV2 trong seed_data.sql (Nguyễn Văn Biên Tập - user_id = 3)
-     */
-    private static final Long DEFAULT_EDITOR_USER_ID = 3L;
-
     private final ArticleRepository articleRepository;
     private final ArticleVersionRepository versionRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final ImageStorageService imageStorageService;
 
     /**
      * Lấy danh sách toàn bộ bài viết trong tòa soạn kèm phiên bản mới nhất và lịch sử phiên bản.
@@ -71,14 +71,16 @@ public class ArticleReviewService {
 
     /**
      * Duyệt bài / Yêu cầu sửa / Xuất bản / Gỡ bài (UC025).
-     *
-     * Input:
-     * - articleId: ID bài viết cần chuyển trạng thái
-     * - request: chứa status đích (APPROVED, CHANGES_REQUESTED/REJECTED, PUBLISHED, UNPUBLISHED/TAKEN_DOWN)
-     *            và reviewNotes (nhận xét của biên tập viên SV2).
      */
     @Transactional
     public EditorialArticleDto updateArticleStatus(Long articleId, UpdateArticleStatusRequest request) {
+        return updateArticleStatus(articleId, request, null);
+    }
+
+    @Transactional
+    public EditorialArticleDto updateArticleStatus(Long articleId, UpdateArticleStatusRequest request, String email) {
+        Long editorUserId = resolveUserId(email);
+
         Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
 
@@ -111,7 +113,7 @@ public class ArticleReviewService {
 
             case "APPROVED":
                 // Bước 1 của SV2: Duyệt nội dung phiên bản mới nhất (chờ bấm Xuất bản)
-                latestVersion.approve(DEFAULT_EDITOR_USER_ID, notes);
+                latestVersion.approve(editorUserId, notes);
                 article.approveReview();
                 break;
 
@@ -121,13 +123,13 @@ public class ArticleReviewService {
                 if (notes.isEmpty()) {
                     throw new AppException("Vui lòng nhập ghi chú hướng dẫn sửa bài khi từ chối/yêu cầu chỉnh sửa", HttpStatus.BAD_REQUEST);
                 }
-                latestVersion.reject(DEFAULT_EDITOR_USER_ID, notes);
+                latestVersion.reject(editorUserId, notes);
                 article.rejectReview();
                 break;
 
             case "PUBLISHED":
                 // Bước 2 của SV2: Xuất bản chính thức lên báo
-                latestVersion.approve(DEFAULT_EDITOR_USER_ID, notes);
+                latestVersion.approve(editorUserId, notes);
                 article.publish(latestVersion.getVersionNumber(), request.getAccessType(), request.getSinglePrice());
                 break;
 
@@ -136,7 +138,7 @@ public class ArticleReviewService {
                 // SV2 gỡ bài khỏi trang báo công khai
                 article.unpublish();
                 if (!notes.isEmpty()) {
-                    latestVersion.reject(DEFAULT_EDITOR_USER_ID, notes);
+                    latestVersion.reject(editorUserId, notes);
                 }
                 break;
 
@@ -147,15 +149,15 @@ public class ArticleReviewService {
         versionRepository.save(latestVersion);
         Article savedArticle = articleRepository.save(article);
 
-        // Ghi vết vào bảng audit_logs
+        // Ghi vết vào bảng audit_logs với cột chuẩn (user_id, action, target_type, target_id)
         String oldJson = String.format("{\"status\":\"%s\"}", oldStatus);
         String newJson = String.format("{\"status\":\"%s\",\"uiTarget\":\"%s\",\"version\":%d}",
                 savedArticle.getStatus().name(), targetStatus, latestVersion.getVersionNumber());
         try {
             jdbcTemplate.update(
-                    "INSERT INTO audit_logs (actor_user_id, action, entity_name, entity_id, old_values_json, new_values_json, created_at) " +
+                    "INSERT INTO audit_logs (user_id, action, target_type, target_id, old_value, new_value, created_at) " +
                             "VALUES (?, ?, 'articles', ?, ?, ?, NOW())",
-                    DEFAULT_EDITOR_USER_ID,
+                    editorUserId,
                     "ARTICLE_STATUS_" + targetStatus,
                     savedArticle.getId(),
                     oldJson,
@@ -166,6 +168,240 @@ public class ArticleReviewService {
         }
 
         return mapToDto(savedArticle);
+    }
+
+    /**
+     * Soạn bài mới từ phía Tòa soạn (POST /api/v1/editorial/articles)
+     */
+    @Transactional
+    public EditorialArticleDto createArticle(
+            SaveEditorialArticleRequest request,
+            MultipartFile file,
+            String infoJson,
+            String email
+    ) {
+        Long authorId = resolveUserId(email);
+        Long categoryId = resolveCategoryId(request.resolveCategoryId());
+        String title = request.resolveTitle();
+        String sapo = request.resolveSapo();
+        String content = request.resolveContent();
+        String slug = generateUniqueSlug(title);
+
+        Article article = Article.createDraft(categoryId, authorId, slug);
+        boolean isPremium = request.resolveIsPremium();
+        BigDecimal price = isPremium ? request.resolvePrice() : BigDecimal.ZERO;
+        if (isPremium && price.compareTo(BigDecimal.ZERO) <= 0) {
+            price = BigDecimal.valueOf(15000);
+        }
+        article.configureDraftAccess(isPremium, price);
+        article.advanceDraftVersion(1);
+        Article savedArticle = articleRepository.save(article);
+
+        ArticleVersion version = ArticleVersion.createDraft(
+                savedArticle.getId(),
+                authorId,
+                1,
+                title,
+                sapo,
+                content,
+                "Khởi tạo bản thảo tòa soạn"
+        );
+
+        String coverUrl = null;
+        if (file != null && !file.isEmpty()) {
+            String filename = imageStorageService.store(file);
+            coverUrl = "/api/v1/content/images/" + filename;
+            version.updateDraftCoverImage(coverUrl, "Ảnh bìa", title, "LocalPress");
+        } else if (request.resolveCoverImageUrl() != null) {
+            coverUrl = request.resolveCoverImageUrl();
+            version.updateDraftPresentation(coverUrl, request.resolveTags());
+        }
+
+        String targetStatus = request.resolveStatus();
+        if ("IN_REVIEW".equalsIgnoreCase(targetStatus) || "PENDING".equalsIgnoreCase(targetStatus)) {
+            version.submitForReview();
+            savedArticle.setStatus(Article.Status.PENDING);
+            savedArticle = articleRepository.save(savedArticle);
+        }
+
+        versionRepository.save(version);
+
+        // Lưu tags nếu có
+        List<String> tags = request.resolveTags();
+        if (tags != null && !tags.isEmpty()) {
+            for (String tag : tags) {
+                if (tag == null || tag.isBlank()) continue;
+                String tagName = tag.trim();
+                String tagSlug = toSlug(tagName);
+                try {
+                    jdbcTemplate.update("INSERT IGNORE INTO tags (name, slug) VALUES (?, ?)", tagName, tagSlug);
+                    List<Long> tagIds = jdbcTemplate.query("SELECT tag_id FROM tags WHERE slug = ?", (rs, r) -> rs.getLong(1), tagSlug);
+                    if (!tagIds.isEmpty()) {
+                        jdbcTemplate.update("INSERT IGNORE INTO article_tags (article_id, tag_id) VALUES (?, ?)", savedArticle.getId(), tagIds.get(0));
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        // Ghi log audit
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
+                            "VALUES (?, 'ARTICLE_CREATE', 'articles', ?, ?, NOW())",
+                    authorId,
+                    savedArticle.getId(),
+                    String.format("{\"title\":\"%s\",\"status\":\"%s\"}", title, savedArticle.getStatus().name())
+            );
+        } catch (Exception ignored) {
+        }
+
+        return mapToDto(savedArticle);
+    }
+
+    /**
+     * Sửa bài viết / bản thảo (PUT /api/v1/editorial/articles/{id})
+     */
+    @Transactional
+    public EditorialArticleDto updateArticle(
+            Long articleId,
+            SaveEditorialArticleRequest request,
+            MultipartFile file,
+            String infoJson,
+            String email
+    ) {
+        Long userId = resolveUserId(email);
+        Article article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
+
+        if (request.resolveCategoryId() != null) {
+            Long newCatId = resolveCategoryId(request.resolveCategoryId());
+            article.updateDraftMetadata(newCatId, article.getSlug());
+        }
+
+        boolean isPremium = request.resolveIsPremium();
+        BigDecimal price = isPremium ? request.resolvePrice() : BigDecimal.ZERO;
+        if (isPremium && price.compareTo(BigDecimal.ZERO) <= 0) {
+            price = BigDecimal.valueOf(15000);
+        }
+        if (article.getStatus() == Article.Status.DRAFT) {
+            article.configureDraftAccess(isPremium, price);
+        }
+
+        Optional<ArticleVersion> latestVersionOpt = versionRepository
+                .findByArticleIdAndVersionNumber(article.getId(), article.getLatestVersion());
+
+        ArticleVersion latestVersion = latestVersionOpt.orElseGet(() -> {
+            List<ArticleVersion> all = versionRepository.findByArticleIdOrderByVersionNumberDesc(article.getId());
+            if (all.isEmpty()) {
+                throw new AppException("Bài viết chưa có phiên bản nào", HttpStatus.BAD_REQUEST);
+            }
+            return all.get(0);
+        });
+
+        try {
+            latestVersion.updateDraftContent(
+                    request.resolveTitle(),
+                    request.resolveSapo(),
+                    request.resolveContent(),
+                    request.resolveChangelog()
+            );
+        } catch (Exception ignored) {
+        }
+
+        if (file != null && !file.isEmpty()) {
+            String filename = imageStorageService.store(file);
+            latestVersion.updateDraftCoverImage("/api/v1/content/images/" + filename, "Ảnh bìa", request.resolveTitle(), "LocalPress");
+        } else if (request.resolveCoverImageUrl() != null) {
+            latestVersion.updateDraftPresentation(request.resolveCoverImageUrl(), request.resolveTags());
+        }
+
+        String targetStatus = request.resolveStatus();
+        if ("IN_REVIEW".equalsIgnoreCase(targetStatus) || "PENDING".equalsIgnoreCase(targetStatus)) {
+            latestVersion.submitForReview();
+            if (article.getStatus() != Article.Status.PUBLISHED) {
+                article.setStatus(Article.Status.PENDING);
+            }
+        }
+
+        versionRepository.save(latestVersion);
+        Article savedArticle = articleRepository.save(article);
+
+        // Ghi vết vào audit_logs
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
+                            "VALUES (?, 'ARTICLE_UPDATE', 'articles', ?, ?, NOW())",
+                    userId,
+                    savedArticle.getId(),
+                    String.format("{\"version\":%d,\"status\":\"%s\"}", latestVersion.getVersionNumber(), savedArticle.getStatus().name())
+            );
+        } catch (Exception ignored) {
+        }
+
+        return mapToDto(savedArticle);
+    }
+
+    private Long resolveUserId(String email) {
+        if (email == null || email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa xác thực danh tính người dùng");
+        }
+        List<Long> ids = jdbcTemplate.query(
+                "SELECT user_id FROM users WHERE email = ? AND status = 'ACTIVE'",
+                (rs, r) -> rs.getLong(1),
+                email
+        );
+        if (ids.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản không tồn tại hoặc không có quyền truy cập");
+        }
+        return ids.get(0);
+    }
+
+    private Long resolveCategoryId(Object catIdObj) {
+        if (catIdObj == null) {
+            return 1L;
+        }
+        String str = String.valueOf(catIdObj).trim();
+        if (str.startsWith("cat-")) {
+            str = str.substring(4);
+        }
+        Optional<Category> bySlug = categoryRepository.findBySlug(str);
+        if (bySlug.isPresent()) {
+            return bySlug.get().getId();
+        }
+        try {
+            Long numericId = Long.parseLong(str);
+            if (categoryRepository.existsById(numericId)) {
+                return numericId;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        List<Category> all = categoryRepository.findAll();
+        return all.isEmpty() ? 1L : all.get(0).getId();
+    }
+
+    private String generateUniqueSlug(String title) {
+        String base = title == null || title.isBlank() ? "bai-viet" : toSlug(title);
+        String candidate = base;
+        int count = 1;
+        while (articleRepository.existsBySlug(candidate)) {
+            candidate = base + "-" + count;
+            count++;
+            if (count > 50) {
+                candidate = base + "-" + System.currentTimeMillis();
+                break;
+            }
+        }
+        return candidate;
+    }
+
+    private static String toSlug(String input) {
+        if (input == null) return "";
+        String normalized = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFD);
+        String slug = java.util.regex.Pattern.compile("\\p{InCombiningDiacriticalMarks}+").matcher(normalized).replaceAll("");
+        slug = slug.toLowerCase().replaceAll("[^a-z0-9\\s-]", "");
+        slug = slug.replaceAll("[\\s-]+", " ").trim().replaceAll(" ", "-");
+        return slug.length() > 200 ? slug.substring(0, 200) : slug;
     }
 
     /**
