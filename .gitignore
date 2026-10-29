@@ -57,7 +57,6 @@ desktop.ini
 # --- Root Local Workspace Helper Scripts & Raw Export Files ---
 /*.docx
 /*.xlsx
-!LocalPress_Danh_muc_chuc_nang.xlsx
 !project_tracking_group2.xlsx
 /*.html
 /*.puml
@@ -70,6 +69,7 @@ __pycache__/
 
 # --- SePay / payment secrets (SV4) ---
 backend/config/application-secrets.yml
+backend/config/application-local.yml
 
 # --- taste-skill working files ---
 frontend/.taste-skill/
@@ -77,8 +77,13 @@ frontend/.taste-skill/
 # --- SV4 (Huy) personal docs & tools, not shared ---
 /AI_REPORT_SV4_HUY.md
 /backend/scripts/sv4_finance_e2e.sh
-/docs/diagrams/swimlane_sv4.png
-/docs/sv4/
-/notebooklm_docs/02_CHUYEN_SAU_LUONG_4_KE_TOAN_THANH_TOAN_DOI_SOAT.md
-/notebooklm_docs/*sv4*
-/notebooklm_docs/*SV4*
+
+# --- Internal planning docs & agent memory, kept local only ---
+/AGENTS.md
+/CLAUDE.md
+/LOCALPRESS_CODING_PLAN.md
+/LOCALPRESS_MASTER_ROADMAP.md
+/LocalPress_Danh_muc_chuc_nang.xlsx
+/docs/
+/notebooklm_docs/
+/.agents/skills/iter-review/
