@@ -115,9 +115,4 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * Đếm số lượng giao dịch theo trạng thái cụ thể.
      */
     long countByStatus(TransactionStatus status);
-
-    /**
-     * Đếm số lượng giao dịch chuyển khoản thủ công đang chờ Kế toán duyệt (UC050).
-     */
-    long countByStatusAndPaymentMethodIn(TransactionStatus status, Collection<String> paymentMethods);
 }

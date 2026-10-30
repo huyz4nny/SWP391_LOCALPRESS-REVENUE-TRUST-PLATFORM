@@ -2,6 +2,7 @@
 KIỂM THỬ ĐẦU CUỐI WEBHOOK SEPAY (SV4 - UC048, UC049) với backend thật + MySQL.
 
 Cần: MySQL80 đang chạy, backend profile dev ở cổng 8080, seed_data.sql đã nạp (reader.an@gmail.com / ketoan@localpress.vn, mật khẩu "password").
+Backend phải bật localpress.payment.client-orders-enabled=true (ví dụ trong config/application-secrets.yml) vì script tạo đơn thử trực tiếp, mặc định bị chặn (Rule 4).
 Chạy ở thư mục gốc repo:
     python backend/scripts/sepay_webhook_e2e.py backend/config/application-secrets.yml
 Gửi payload đúng định dạng webhook của SePay (camelCase) vào /api/v1/finance/webhook/sepay và kiểm tra:

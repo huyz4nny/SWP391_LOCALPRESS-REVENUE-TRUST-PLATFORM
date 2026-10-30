@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Map;
 
 /**
  * ==============================================================================
@@ -15,8 +14,7 @@ import java.util.Map;
  * ==============================================================================
  * Cung cấp đầy đủ:
  * 1. Mã đơn và trạng thái lưu trong CSDL `transactions`.
- * 2. Cấu hình chuyển hướng sang Cổng thanh toán SePay PG (`checkoutUrl` + `checkoutFields`).
- * 3. Link ảnh VietQR chuẩn Napas (`qrCodeUrl`) để render trực tiếp tại popup của LocalPress.
+ * 2. Link ảnh VietQR chuẩn Napas (`qrCodeUrl`) để render trực tiếp tại popup của LocalPress.
  */
 @Data
 @Builder
@@ -37,19 +35,6 @@ public class OrderCreateResponse {
     private String paymentMethod;
 
     private String description;
-
-    /**
-     * URL chuyển hướng hoặc action form sang Cổng thanh toán SePay:
-     * - Production: https://pay.sepay.vn/v1/checkout/init
-     * - Sandbox: https://pay-sandbox.sepay.vn/v1/checkout/init
-     */
-    private String checkoutUrl;
-
-    /**
-     * Các trường dữ liệu form kèm chữ ký số HMAC-SHA256 (signature)
-     * để Frontend render hidden inputs và tự động submit sang SePay.
-     */
-    private Map<String, Object> checkoutFields;
 
     /**
      * Link ảnh VietQR chuẩn Napas sinh động (quét được bằng app ngân hàng thật).

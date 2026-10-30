@@ -1320,12 +1320,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 499000,
     paymentStatus: 'PAID',
-    paymentMethod: 'VIETQR',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-101-1',
         orderId: 'ORD-101',
-        method: 'VIETQR',
+        method: 'SEPAY',
         transactionCode: 'VQR-20260915-8832',
         amount: 499000,
         status: 'SUCCESS',
@@ -1352,12 +1352,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 15000,
     paymentStatus: 'PAID',
-    paymentMethod: 'MOMO',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-102-1',
         orderId: 'ORD-102',
-        method: 'MOMO',
+        method: 'SEPAY',
         transactionCode: 'MOMO-20260922-4412',
         amount: 15000,
         status: 'SUCCESS',
@@ -1384,12 +1384,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 30000000,
     paymentStatus: 'PAID',
-    paymentMethod: 'BANK_TRANSFER',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-103-1',
         orderId: 'ORD-103',
-        method: 'BANK_TRANSFER',
+        method: 'SEPAY',
         transactionCode: 'VCB-20260909-1192',
         amount: 30000000,
         status: 'SUCCESS',
@@ -1418,12 +1418,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 24000000,
     paymentStatus: 'PAID',
-    paymentMethod: 'BANK_TRANSFER',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-104-1',
         orderId: 'ORD-104',
-        method: 'BANK_TRANSFER',
+        method: 'SEPAY',
         transactionCode: 'BIDV-20260924-8841',
         amount: 24000000,
         status: 'SUCCESS',
@@ -1452,12 +1452,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 59000,
     paymentStatus: 'PROCESSING',
-    paymentMethod: 'BANK_TRANSFER',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-105-1',
         orderId: 'ORD-105',
-        method: 'BANK_TRANSFER',
+        method: 'SEPAY',
         transactionCode: 'MB-20260927-9912',
         amount: 59000,
         status: 'PROCESSING',
@@ -1482,7 +1482,7 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 15000,
     paymentStatus: 'PENDING',
-    paymentMethod: 'VIETQR',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [],
     createdAt: '2026-09-27T11:20:00Z',
     updatedAt: '2026-09-27T11:20:00Z',
@@ -1500,12 +1500,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 59000,
     paymentStatus: 'FAILED',
-    paymentMethod: 'VIETQR',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-107-1',
         orderId: 'ORD-107',
-        method: 'VIETQR',
+        method: 'SEPAY',
         transactionCode: 'VQR-20260926-0012',
         amount: 59000,
         status: 'EXPIRED',
@@ -1529,12 +1529,12 @@ export const SEED_ORDERS: Order[] = [
     discount: 0,
     finalAmount: 159000,
     paymentStatus: 'REFUNDED',
-    paymentMethod: 'VIETQR',
+    paymentMethod: 'SEPAY',
     paymentAttempts: [
       {
         id: 'ATT-108-1',
         orderId: 'ORD-108',
-        method: 'VIETQR',
+        method: 'SEPAY',
         transactionCode: 'VQR-20260918-7712',
         amount: 159000,
         status: 'SUCCESS',
