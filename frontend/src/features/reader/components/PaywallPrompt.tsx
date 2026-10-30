@@ -13,6 +13,7 @@ interface PaywallPromptProps {
   article: Article
 }
 
+// UC034 khung mua le khi bai Premium con khoa. 2 nut: mua le (SV3+SV4) va xem goi (qua /premium)
 export function PaywallPrompt({ article }: PaywallPromptProps) {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
@@ -20,6 +21,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
   const currentUser = mockStore.getCurrentUser()
 
   const handlePurchaseSingleArticle = async () => {
+    // chua login thi sang /login, xong quay lai dung bai nay
     if (currentUser.role === 'GUEST') {
       navigate('/login', { state: { from: { pathname: `/articles/${article.slug}` } } })
       return
@@ -28,9 +30,9 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
     setIsLoading(true)
     setError('')
     try {
-      // bước 1 UC034 là nhờ backend của SV3 tạo bản ghi mua lẻ chờ thanh toán và trả purchase_id kèm giá thật
+      // phan SV3: tao article_purchases PENDING, gia lay tu DB khong lay tu nut
       const target = await readerApi.createArticlePurchase(article.id)
-      // bước 2 là tạo đơn bên SV4 với targetId là purchase_id chứ không phải id bài
+      // phan SV4: tao don, targetId = purchase_id
       const order = await httpClient.post<any>('/finance/checkout', {
         orderType: 'ARTICLE_PURCHASE',
         targetId: target.targetId,

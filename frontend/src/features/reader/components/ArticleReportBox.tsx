@@ -12,6 +12,7 @@ const REASONS = [
   { value: 'OTHER', label: 'Khác' },
 ]
 
+// UC042 bao loi noi dung bai, 1 PENDING / user+bai, Phan duyet chu khong phai SV3
 export function ArticleReportBox({ articleId }: { articleId: string }) {
   const location = useLocation()
   const signedIn = mockStore.getCurrentUser().role !== 'GUEST'

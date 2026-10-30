@@ -35,6 +35,7 @@ export function ArticleDetailPage() {
   const library = useReaderLibrary()
   const isBookmarked = article ? library.isSaved(article.id) : false
 
+  // doi slug hoac user (login xong) thi load lai bai, paywall se khac neu da mua
   useEffect(() => {
     if (slug) {
       loadArticle(slug)
@@ -45,11 +46,12 @@ export function ArticleDetailPage() {
     try {
       setLoading(true)
       setError(null)
+      // UC036: GET /articles/{slug}, server chi tra full khi duoc phep, khong thi preview + content null
       const data = await readerApi.getArticleBySlug(articleSlug)
       setArticle(data)
       library.refresh()
 
-      // Load related in same category
+      // 3 bai cung chuyen muc de viet sidebar, bo bai dang doc
       const allArticles = await readerApi.getArticles({ category: data.categorySlug })
       setRelatedArticles(allArticles.filter((a) => a.id !== data.id).slice(0, 3))
     } catch (err: any) {
@@ -86,6 +88,7 @@ export function ArticleDetailPage() {
     )
   }
 
+  // khoa khi server bao isLocked (hoac premium ma khong co content)
   const isUnlocked = !(article.isLocked ?? (article.isPremium && !article.content))
 
   return (
@@ -192,7 +195,7 @@ export function ArticleDetailPage() {
           {/* Article Body Content */}
           <div className="font-serif text-stone-800 text-sm sm:text-base leading-relaxed space-y-4">
             {isUnlocked ? (
-              // Full content
+              // cat content theo doan de ve <p>, khong tu ghep preview
               article.content?.split('\n\n').map((paragraph, idx) => {
                 if (paragraph.startsWith('### ')) {
                   return (

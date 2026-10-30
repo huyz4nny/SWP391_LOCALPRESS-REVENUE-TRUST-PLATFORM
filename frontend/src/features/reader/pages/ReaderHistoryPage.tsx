@@ -30,6 +30,7 @@ export function ReaderHistoryPage() {
       setLoading(true)
       setLoadError(null)
       const res = await readerApi.getReadingHistoryPage(nextPage, PAGE_SIZE)
+      // trang dau thay list, Xem them thi append
       setItems((prev) => (nextPage === 0 ? res.items : [...prev, ...res.items]))
       setPage(res.page)
       setHasMore(res.hasMore)
@@ -45,6 +46,7 @@ export function ReaderHistoryPage() {
     setBusyId(articleId)
     try {
       await readerApi.removeReadingHistory(articleId)
+      // xoa xong an dung dong do, khong reload ca trang
       setItems((prev) => prev.filter((item) => item.articleId !== articleId))
       library.refresh()
       setActionError(null)
@@ -86,6 +88,7 @@ export function ReaderHistoryPage() {
         />
       ) : (
         <div className="space-y-2">
+          {/* vong lap for lay tung dong de display ls doc tin */}
           {items.map((item) => (
             <div
               key={item.articleId}

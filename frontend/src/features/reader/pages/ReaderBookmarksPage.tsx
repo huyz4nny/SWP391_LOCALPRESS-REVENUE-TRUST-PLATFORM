@@ -80,6 +80,7 @@ export function ReaderBookmarksPage() {
         />
       ) : (
         <div className="space-y-3">
+          {/* vong lap ve the bai da luu, bam bookmark lan nua thi DROP khoi list */}
           {visible.map((art) => (
             <ArticleCard
               key={art.id}

@@ -30,6 +30,7 @@ export function ReaderLibraryPage() {
       setLoading(true)
       setLoadError(null)
       const res = await readerApi.getPurchasedArticlesPage(nextPage, PAGE_SIZE)
+      // trang 0 thi thay ds, bam Xem them thi noi vao cuoi
       setArticles((prev) => (nextPage === 0 ? res.items : [...prev, ...res.items]))
       setPage(res.page)
       setHasMore(res.hasMore)
@@ -72,6 +73,7 @@ export function ReaderLibraryPage() {
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* vong lap ve the tung bai da mua le */}
             {articles.map((art) => (
               <ArticleCard
                 key={art.id}

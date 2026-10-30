@@ -9,6 +9,7 @@ import { mockStore } from '@/mocks/store'
 import { readerApi } from '../api'
 import { Crown, Check, Sparkles, HelpCircle, ShieldCheck, Zap } from 'lucide-react'
 
+// UC035 trang /premium: ve 3 the goi, bam Dang ky thi tao dong PENDING roi dua sang trang thanh toan cua Huy
 export function PremiumPlansPage() {
   const navigate = useNavigate()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
@@ -17,6 +18,7 @@ export function PremiumPlansPage() {
   const [error, setError] = useState('')
   const currentUser = mockStore.getCurrentUser()
 
+  // vao trang la lay ds goi ACTIVE, khach chua login van xem duoc
   useEffect(() => {
     readerApi.getSubscriptionPlans()
       .then(setPlans)
@@ -25,6 +27,7 @@ export function PremiumPlansPage() {
   }, [])
 
   const handleSelectPlan = async (plan: SubscriptionPlan) => {
+    // chua login thi bat sang /login, xong quay lai /premium bam lai
     if (currentUser.role === 'GUEST') {
       navigate('/login', { state: { from: { pathname: '/premium' } } })
       return
@@ -33,9 +36,9 @@ export function PremiumPlansPage() {
     setLoadingPlanId(plan.id)
     setError('')
     try {
-      // bước 1 UC035 là nhờ backend của SV3 tạo bản ghi gói chờ thanh toán và trả subscription_id kèm giá thật của gói
+      // phan SV3: tao dong subscriptions PENDING, lay subscription_id + gia that
       const target = await readerApi.createSubscription(plan.id)
-      // bước 2 là tạo đơn bên SV4 với targetId là subscription_id chứ không phải id gói
+      // phan SV4: tao don tien, targetId phai la subscription_id chu khong phai planId
       const order = await httpClient.post<any>('/finance/checkout', {
         orderType: 'SUBSCRIPTION',
         targetId: target.targetId,
@@ -43,6 +46,7 @@ export function PremiumPlansPage() {
         amount: target.amount,
         paymentMethod: 'VIETQR',
       })
+      // sang trang QR/vi cua Huy, khong tu ve checkout rieng
       navigate(paymentPath(order), { state: { returnUrl: '/account/subscription' } })
     } catch (err) {
       // hiện lý do lỗi cho khách thay vì chỉ ghi console
@@ -85,6 +89,7 @@ export function PremiumPlansPage() {
         <p className="text-center text-sm text-stone-500">Hiện chưa có gói hội viên đang mở bán.</p>
       ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        {/* vong lap ve tung the goi: ten, gia, dac quyen, nut Dang ky */}
         {plans.map((plan) => {
           const isPopular = plan.isPopular
           return (

@@ -41,6 +41,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
 
   const loadComments = async () => {
     try {
+      // list cong khai chi APPROVED, list cua minh de hien cau dang cho duyet
       const approved = await readerApi.getComments(articleId)
       setComments(approved)
       if (mockStore.getCurrentUser().role !== 'GUEST') {
@@ -53,6 +54,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
     }
   }
 
+  // loc comment cua minh chua duyet de ve khoi rieng, khong tron vao list cong khai
   const waiting = mine.filter((c) => c.status !== 'APPROVED')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,6 +207,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
           </p>
         ) : (
           comments.map((c) => {
+            // sua chi hien tren comment cua minh, bao cao chi hien tren comment nguoi khac
             const own = String(c.userId) === String(currentUser.id)
             return (
               <div key={c.id} className="p-4 rounded-lg bg-white border border-stone-100 shadow-2xs">
