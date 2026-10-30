@@ -48,6 +48,30 @@ public class PaywallEngine {
 
     public int previewWordLimit() {return policies == null ? 120 : policies.read().previewWordLimit();}
 
+    /**
+     * Reader integration for locked plain-text content. Returns at most 30% of
+     * the input and also respects the configured preview word cap.
+     * This does not grant access or query caller identity.
+     */
+    public String buildLockedPreview(String rawContent) {
+        if (rawContent == null || rawContent.isEmpty()) return "";
+        int cut = (int) Math.floor(rawContent.length() * 0.3d);
+        if (cut <= 0) return "";
+        int lastBreak = Math.max(rawContent.lastIndexOf(' ', cut), rawContent.lastIndexOf('\n', cut));
+        if (lastBreak > cut / 2) cut = lastBreak;
+        if (cut > 0 && Character.isHighSurrogate(rawContent.charAt(cut - 1))
+                && Character.isLowSurrogate(rawContent.charAt(cut))) cut--;
+        String preview = rawContent.substring(0, cut);
+        int limit = Math.max(1, Math.min(500, previewWordLimit()));
+        var words = java.util.regex.Pattern.compile("\\S+", java.util.regex.Pattern.UNICODE_CHARACTER_CLASS)
+                .matcher(preview);
+        int count = 0;
+        while (words.find()) {
+            if (++count > limit) return preview.substring(0, words.start()).stripTrailing();
+        }
+        return preview.stripTrailing();
+    }
+
     /** Trusted service contract; never accept userId from reader query parameters. */
     public Decision checkAccess(Long userId, Long articleId) {
         PublishedArticle article = published(articleId);

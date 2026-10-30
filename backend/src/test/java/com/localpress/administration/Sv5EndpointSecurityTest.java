@@ -43,7 +43,7 @@ class Sv5EndpointSecurityTest {
     }
     @AfterEach void cleanup(){context.close();}
     @Test void guestsCanRequestBannerAndReportAnIssuedToken() throws Exception {
-        when(delivery.serve("TOP",null)).thenReturn(new AdServingService.Offer(new Slot("1","TOP","Top","970x90",1),null,null));
+        when(delivery.serve("TOP",null,"127.0.0.1")).thenReturn(new AdServingService.Offer(new Slot("1","TOP","Top","970x90",1),null,null));
         mvc.perform(get("/api/v1/delivery/ad-slots/TOP/serve")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
         mvc.perform(post("/api/v1/delivery/impressions").contentType("application/json").content("{\"token\":\"issued-ticket\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.recorded").value(false));
