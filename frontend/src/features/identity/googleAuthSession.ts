@@ -1,9 +1,10 @@
 import { authApi } from './api'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
-import { logout } from './authSession'
+import { cancelLogin } from './authSession'
 
 export async function loginWithGoogle(idToken: string) {
+  httpClient.beginLogin()
   try {
     const session = await authApi.googleLogin(idToken)
     httpClient.setBearerToken(session.accessToken)
@@ -12,7 +13,7 @@ export async function loginWithGoogle(idToken: string) {
     httpClient.shareLoginWithOtherTabs()
     return user
   } catch (error) {
-    logout()
+    cancelLogin()
     throw error
   }
 }

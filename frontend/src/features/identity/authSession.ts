@@ -7,6 +7,11 @@ export function logout(): void {
     mockStore.setCurrentUser('user-guest')
 }
 
+/** Failed login: this tab goes back to the login it had before; other tabs are not logged out. */
+export function cancelLogin(): void {
+    if (!httpClient.cancelLogin()) mockStore.setCurrentUser('user-guest')
+}
+
 /**
  * Real API mode: a tab without credentials first borrows them from another open tab;
  * if none is logged in, the remembered user is shown as Guest.

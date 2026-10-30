@@ -13,7 +13,7 @@ import { httpClient } from '@/lib/http/client'
 import { AppApiError } from '@/lib/http/errors'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import { loginWithGoogle } from '../googleAuthSession'
-import { logout } from '../authSession'
+import { cancelLogin } from '../authSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -54,6 +54,7 @@ export function LoginPage() {
     if (!APP_CONFIG.useMockApi) {
       try {
         const normalizedEmail = email.trim().toLowerCase()
+        httpClient.beginLogin()
         httpClient.setBasicAuth(normalizedEmail, password)
         // 1. Gọi endpoint định danh chung /api/v1/auth/me (xác thực bất kỳ role nào từ MySQL)
         const user = await authApi.getMe()
@@ -70,7 +71,7 @@ export function LoginPage() {
           navigate(from === '/login' ? '/' : from, { replace: true })
         }
       } catch (error: unknown) {
-        logout()
+        cancelLogin()
 
         if (error instanceof AppApiError) {
           if (error.status === 401) {

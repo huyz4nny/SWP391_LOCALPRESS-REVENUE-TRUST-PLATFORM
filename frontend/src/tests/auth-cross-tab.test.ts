@@ -86,3 +86,25 @@ it('only a confirmed login switches the other tabs to the new account', async ()
   await settle()
   expect(await authOf(first)).toBe(await authOf(second))
 })
+
+it('a failed login in one tab does not log out the other tabs', async () => {
+  const first = await openTab()
+  first.setBasicAuth('ketoan@example.test', 'test-password')
+  const before = await authOf(first)
+  const second = await openTab()
+  second.beginLogin()
+  second.setBasicAuth('ketoan@example.test', 'wrong-password')
+  expect(second.cancelLogin()).toBe(true)
+  await settle()
+  expect(await authOf(first)).toBe(before)
+  expect(await authOf(second)).toBe(before)
+})
+
+it('a tab mid-login does not hand out the credentials being checked', async () => {
+  const first = await openTab()
+  first.beginLogin()
+  first.setBasicAuth('reader@example.test', 'not-yet-checked')
+  const second = await openTab()
+  second.clearBasicAuth() // the stub shares one sessionStorage; a real new tab starts empty
+  expect(await second.requestAuthFromOtherTabs(50)).toBe(false)
+})

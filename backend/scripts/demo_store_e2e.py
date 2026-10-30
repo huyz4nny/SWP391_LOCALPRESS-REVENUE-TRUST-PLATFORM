@@ -102,6 +102,13 @@ check("Mua bài -> đơn ARTICLE PENDING gắn lượt mua PENDING của đúng 
       and row[3] == "PENDING" and row[4] == str(READER_ID), row)
 check("Giá lấy từ DB, bỏ qua amount trình duyệt gửi", row[2] == price, f"{row[2]} vs {price}")
 
+# 3b. Bấm Mua lần nữa khi đơn chưa trả -> trả lại đúng đơn cũ, không tạo đơn thứ 2
+s, again = call("POST", "/finance/dev/demo-store/purchase", {"type": "ARTICLE", "itemId": ARTICLE_ID})
+n_pending = sql(f"SELECT COUNT(*) FROM transactions WHERE purchase_id = (SELECT purchase_id FROM article_purchases "
+                f"WHERE user_id={READER_ID} AND article_id={ARTICLE_ID}) AND status='PENDING'")
+check("Mua lại khi đơn còn chờ -> dùng lại đơn cũ", s == 200 and again.get("orderCode") == code and n_pending == "1",
+      f"{again.get('orderCode') if isinstance(again, dict) else again} vs {code}; pending={n_pending}")
+
 # 4. Trả tiền -> PaymentSuccessEvent -> mở bài
 how = pay(code, float(price))
 st = sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code}'")
@@ -127,10 +134,16 @@ check("Paywall khóa lại: về bản preview", full_content_len() == before, f
 # 7. Mua gói hội viên
 s, order = call("POST", "/finance/dev/demo-store/purchase", {"type": "SUBSCRIPTION", "itemId": PLAN_ID})
 code = order.get("orderCode") if isinstance(order, dict) else None
+s, again = call("POST", "/finance/dev/demo-store/purchase", {"type": "SUBSCRIPTION", "itemId": PLAN_ID})
+check("Mua lại gói khi đơn còn chờ -> dùng lại đơn cũ", s == 200 and again.get("orderCode") == code, s)
 how = pay(code, float(order.get("amount", 0)) if isinstance(order, dict) else 0)
 row = sql(f"SELECT t.status, s.status, s.end_date > s.start_date FROM transactions t "
           f"JOIN subscriptions s ON s.subscription_id = t.subscription_id WHERE t.gateway_transaction_id='{code}'").split("\t")
 check("Mua gói -> đơn SUCCESS, gói ACTIVE có hạn dùng", row == ["SUCCESS", "ACTIVE", "1"], f"{how}; {row}")
+s, _ = call("POST", "/finance/dev/demo-store/purchase", {"type": "SUBSCRIPTION", "itemId": PLAN_ID})
+check("Mua lại gói đang dùng -> 409", s == 409, s)
+s, _ = call("POST", "/finance/dev/demo-store/purchase", {"type": "ARTICLE", "itemId": "abc"})
+check("Mã món hàng không phải số -> 400", s == 400, s)
 
 # 8. Kiểm tra sổ: ví không âm, ví = tổng bút toán
 neg = sql("SELECT COUNT(*) FROM wallets WHERE balance < 0")

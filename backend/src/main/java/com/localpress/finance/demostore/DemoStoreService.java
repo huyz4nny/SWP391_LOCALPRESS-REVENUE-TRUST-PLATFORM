@@ -29,7 +29,7 @@ import java.util.Map;
  * và chưa nghe sự kiện. Đóng vai module nguồn: tạo bản ghi chờ, lấy giá từ DB, gọi createOrder từ server (Rule 4),
  * nghe PaymentSuccessEvent / RefundCompletedEvent để mở / thu hồi quyền.
  *
- * Chỉ chạy ở profile dev khi bật localpress.demo-store.enabled=true (đặt trong config/application-secrets.yml, gitignored).
+ * Chỉ chạy ở profile dev khi bật localpress.demo-store.enabled=true (đặt trong config/application-local.yml, gitignored).
  * Chỉ đụng các đơn có mô tả bắt đầu bằng DEMO_PREFIX nên không lẫn với đơn thật của SV3.
  * Ghi article_purchases / subscriptions là việc của SV3 (Rule 17): xóa package này khi SV3 làm xong phần của mình.
  */
@@ -102,6 +102,12 @@ public class DemoStoreService {
         if ("ACTIVE".equals(current)) {
             throw new AppException("Bạn đã mua bài này", HttpStatus.CONFLICT);
         }
+        // Bấm Mua lần nữa khi đơn cũ chưa trả: dùng lại đơn cũ, không tạo đơn thứ 2 (trả cả 2 sẽ bị trừ tiền 2 lần)
+        if ("PENDING".equals(current)) {
+            OrderCreateResponse pending = pendingOrder("purchase_id", "ARTICLE", jdbc.queryForObject(
+                    "SELECT purchase_id FROM article_purchases WHERE user_id = ? AND article_id = ?", Long.class, userId, articleId));
+            if (pending != null) return pending;
+        }
         if (current == null) {
             jdbc.update("INSERT INTO article_purchases (user_id, article_id, purchase_price, access_status) VALUES (?, ?, ?, 'PENDING')",
                     userId, articleId, price);
@@ -127,6 +133,21 @@ public class DemoStoreService {
         BigDecimal price = (BigDecimal) plan.get("price");
         int days = ((Number) plan.get("duration_days")).intValue();
         LocalDate today = LocalDate.now();
+
+        // Khóa dòng gói để 2 lần bấm cùng lúc không tạo 2 đơn
+        jdbc.queryForList("SELECT plan_id FROM subscription_plans WHERE plan_id = ? FOR UPDATE", planId);
+        Map<String, Object> last = jdbc.queryForList(
+                "SELECT subscription_id, status, end_date >= CURDATE() AS in_period FROM subscriptions "
+                        + "WHERE user_id = ? AND plan_id = ? ORDER BY subscription_id DESC LIMIT 1", userId, planId)
+                .stream().findFirst().orElse(null);
+        if (last != null && "ACTIVE".equals(last.get("status")) && ((Number) last.get("in_period")).intValue() == 1) {
+            throw new AppException("Bạn đang dùng gói này", HttpStatus.CONFLICT);
+        }
+        // Bấm Mua lần nữa khi đơn cũ chưa trả: dùng lại đơn cũ
+        if (last != null && "PENDING".equals(last.get("status"))) {
+            OrderCreateResponse pending = pendingOrder("subscription_id", "SUBSCRIPTION", ((Number) last.get("subscription_id")).longValue());
+            if (pending != null) return pending;
+        }
 
         jdbc.update("INSERT INTO subscriptions (user_id, plan_id, start_date, end_date, status) VALUES (?, ?, ?, ?, 'PENDING')",
                 userId, planId, today, today.plusDays(days));
@@ -170,6 +191,21 @@ public class DemoStoreService {
             jdbc.update("UPDATE subscriptions SET status = 'CANCELLED' WHERE subscription_id = ?", event.getTargetId());
         }
         log.info("[Cửa hàng thử] Thu hồi quyền {} #{} sau hoàn tiền #{}", event.getTransactionType(), event.getTargetId(), event.getRefundId());
+    }
+
+    /** Đơn cửa hàng thử còn chờ trả của bản ghi này (đơn ARTICLE / SUBSCRIPTION không hết hạn, Rule 6). */
+    private OrderCreateResponse pendingOrder(String targetColumn, String type, Long targetId) {
+        return jdbc.queryForList("SELECT transaction_id FROM transactions WHERE " + targetColumn + " = ? AND transaction_type = ? "
+                        + "AND status = 'PENDING' ORDER BY transaction_id DESC LIMIT 1", Long.class, targetId, type)
+                .stream().findFirst()
+                .flatMap(transactionRepository::findById)
+                .filter(t -> t.getDescription() != null && t.getDescription().startsWith(DEMO_PREFIX))
+                .map(t -> OrderCreateResponse.builder()
+                        .transactionId(t.getTransactionId()).orderCode(t.getGatewayTransactionId())
+                        .amount(t.getAmount()).currency(t.getCurrency()).status(t.getStatus().name())
+                        .paymentMethod(t.getPaymentMethod()).description(t.getDescription()).createdAt(t.getCreatedAt())
+                        .build())
+                .orElse(null);
     }
 
     private Transaction demoOrder(Long transactionId) {

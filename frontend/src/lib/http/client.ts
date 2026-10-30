@@ -53,6 +53,8 @@ class HttpClient {
     private basicAuth = readStoredAuth()
     private bearerToken = ''
     private channel = openAuthChannel()
+    // Set while a login is being checked: the login this tab had before (empty strings if none)
+    private confirmedAuth: { basicAuth: string; bearerToken: string } | null = null
 
     constructor() {
         this.baseUrl = APP_CONFIG.apiBaseUrl
@@ -82,13 +84,29 @@ class HttpClient {
         this.bearerToken = token
     }
 
+    /** Call before trying new credentials: until the backend accepts them, other tabs keep seeing the previous login. */
+    public beginLogin() {
+        this.confirmedAuth = { basicAuth: this.basicAuth, bearerToken: this.bearerToken }
+    }
+
+    /** Failed login: only this tab goes back to its previous login (or none); other tabs are not touched. */
+    public cancelLogin(): boolean {
+        const previous = this.confirmedAuth
+        this.confirmedAuth = null
+        if (previous) this.adoptAuth(previous.basicAuth, previous.bearerToken)
+        else this.clearBasicAuth()
+        return this.hasAuth()
+    }
+
     /** Call after the backend accepted the login, so other open tabs switch to the same account. */
     public shareLoginWithOtherTabs() {
+        this.confirmedAuth = null
         if (this.hasAuth()) this.broadcast({ type: 'login', basicAuth: this.basicAuth, bearerToken: this.bearerToken })
     }
 
     /** Logs out this tab and every other open tab. */
     public logoutAllTabs() {
+        this.confirmedAuth = null
         this.clearBasicAuth()
         this.broadcast({ type: 'logout' })
     }
@@ -115,12 +133,20 @@ class HttpClient {
     }
 
     private onAuthMessage(message: AuthMessage) {
-        if (message?.type === 'request' && this.hasAuth()) {
-            this.broadcast({ type: 'share', basicAuth: this.basicAuth, bearerToken: this.bearerToken })
+        if (message?.type === 'request') {
+            // Never hand out credentials that are still being checked
+            const shared = this.confirmedAuth ?? { basicAuth: this.basicAuth, bearerToken: this.bearerToken }
+            if (shared.basicAuth || shared.bearerToken) this.broadcast({ type: 'share', ...shared })
         } else if (message?.type === 'login') {
+            if (this.confirmedAuth) {
+                // this tab is mid-login: the other tab's account becomes the one to fall back to
+                this.confirmedAuth = { basicAuth: message.basicAuth, bearerToken: message.bearerToken }
+                return
+            }
             if (message.basicAuth === this.basicAuth && message.bearerToken === this.bearerToken) return
             this.adoptAuth(message.basicAuth, message.bearerToken)
         } else if (message?.type === 'logout') {
+            this.confirmedAuth = null
             this.clearBasicAuth()
         }
     }
