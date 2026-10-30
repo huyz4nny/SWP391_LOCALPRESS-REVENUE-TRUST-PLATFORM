@@ -1,6 +1,7 @@
 spring:
   config:
-    import: "optional:file:./config/application-secrets.yml"
+    # application-local.yml (gitignored): cờ chỉ dùng trên máy mình, vd localpress.demo-store.enabled
+    import: "optional:file:./config/application-secrets.yml,optional:file:./config/application-local.yml"
   datasource:
     url: jdbc:mysql://localhost:3306/localpress_db?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: root
