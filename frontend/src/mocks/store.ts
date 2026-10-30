@@ -270,6 +270,14 @@ class MockStore {
 
   constructor() {
     this.state = getInitialState()
+    // Another tab of the same browser changed the store (login, logout, mock data): pick it up.
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('storage', (event) => {
+        if (event.key !== STORAGE_KEY || event.newValue === null) return
+        this.state = getInitialState()
+        this.notify()
+      })
+    }
   }
 
   private persist() {

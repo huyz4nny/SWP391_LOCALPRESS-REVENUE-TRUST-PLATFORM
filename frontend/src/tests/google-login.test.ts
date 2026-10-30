@@ -43,8 +43,14 @@ it('exchanges Google credential then uses LocalPress Bearer for me', async () =>
   expect(mockStore.getCurrentUser().id).toBe('42')
 })
 
-it('clears credentials and user when Google rejects the exchange', async () => {
+it('keeps the previous login when Google rejects the exchange', async () => {
   httpClient.setBasicAuth('reader@gmail.com', 'password')
+  fetchMock.mockResolvedValueOnce(json({ message: 'Email đã tồn tại' }, 409))
+  await expect(loginWithGoogle('bad-token')).rejects.toThrow('Email đã tồn tại')
+  expect(httpClient.hasAuth()).toBe(true)
+})
+
+it('clears credentials and user when Google rejects the exchange without a previous login', async () => {
   fetchMock.mockResolvedValueOnce(json({ message: 'Email đã tồn tại' }, 409))
   await expect(loginWithGoogle('bad-token')).rejects.toThrow('Email đã tồn tại')
   expect(httpClient.hasAuth()).toBe(false)
