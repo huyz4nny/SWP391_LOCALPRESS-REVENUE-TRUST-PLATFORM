@@ -6,6 +6,7 @@ import {
   RefundRequest,
   ReconciliationPeriod,
   GeneralLedgerEntry,
+  LedgerSummary,
   ResolveDiscrepancyInput,
   AdvertiserReceivable,
   FinanceAlert,
@@ -56,8 +57,8 @@ export const financeApi = {
           id: String(tx.transactionId),
           orderCode: tx.gatewayTransactionId || `TX-${tx.transactionId}`,
           userId: String(tx.userId),
-          userName: `Khách hàng #${tx.userId}`,
-          userEmail: `user${tx.userId}@localpress.vn`,
+          userName: tx.userName || `Khách hàng #${tx.userId}`,
+          userEmail: tx.userEmail || '',
           orderType: mapOrderType(tx.transactionType),
           targetId: String(tx.targetId || ''),
           targetTitle: titleOf(tx),
@@ -84,8 +85,8 @@ export const financeApi = {
       id: String(tx.transactionId || tx.id),
       orderCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
       userId: String(tx.userId),
-      userName: `Khách hàng #${tx.userId}`,
-      userEmail: `user${tx.userId}@localpress.vn`,
+      userName: tx.userName || `Khách hàng #${tx.userId}`,
+      userEmail: tx.userEmail || '',
       orderType: mapOrderType(tx.transactionType),
       targetId: String(tx.targetId || ''),
       targetTitle: titleOf(tx),
@@ -117,8 +118,8 @@ export const financeApi = {
       id: String(tx.transactionId || tx.id),
       orderCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
       userId: String(tx.userId),
-      userName: `Khách hàng #${tx.userId}`,
-      userEmail: `user${tx.userId}@localpress.vn`,
+      userName: tx.userName || `Khách hàng #${tx.userId}`,
+      userEmail: tx.userEmail || '',
       orderType: mapOrderType(tx.transactionType),
       targetId: String(tx.targetId || ''),
       targetTitle: titleOf(tx),
@@ -180,6 +181,19 @@ export const financeApi = {
   closeReconciliationPeriod: async (input: { month?: string; acknowledgeUnresolved?: boolean; note?: string } = {}) => {
     const res = await httpClient.post<any>('/finance/reconciliation/close', input)
     return res?.data || res
+  },
+
+  /** Tổng của toàn bộ sổ (cùng công thức dashboard, Rule 16). Mock không có endpoint này: trả null, trang tự cộng các dòng. */
+  getLedgerSummary: async (): Promise<LedgerSummary | null> => {
+    if (APP_CONFIG.useMockApi) return null
+    const res = await httpClient.get<any>('/finance/ledger/summary')
+    const d = res?.data || res
+    return {
+      grossRevenue: Number(d.totalGrossRevenue || 0),
+      refundedAmount: Number(d.totalRefundedAmount || 0),
+      netRevenue: Number(d.netRevenue || 0),
+      successCount: Number(d.successCount || 0),
+    }
   },
 
   getLedger: async (): Promise<GeneralLedgerEntry[]> => {
