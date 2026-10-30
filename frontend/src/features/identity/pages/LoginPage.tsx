@@ -13,6 +13,7 @@ import { httpClient } from '@/lib/http/client'
 import { AppApiError } from '@/lib/http/errors'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import { loginWithGoogle } from '../googleAuthSession'
+import { logout } from '../authSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -57,6 +58,7 @@ export function LoginPage() {
         // 1. Gọi endpoint định danh chung /api/v1/auth/me (xác thực bất kỳ role nào từ MySQL)
         const user = await authApi.getMe()
         mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
+        httpClient.shareLoginWithOtherTabs()
         setPassword('')
 
         // 2. Điều hướng chính xác theo vai trò người dùng (không phân biệt Doanh nghiệp hay Nội bộ)
@@ -68,8 +70,7 @@ export function LoginPage() {
           navigate(from === '/login' ? '/' : from, { replace: true })
         }
       } catch (error: unknown) {
-        httpClient.clearBasicAuth()
-        mockStore.setCurrentUser('user-guest')
+        logout()
 
         if (error instanceof AppApiError) {
           if (error.status === 401) {

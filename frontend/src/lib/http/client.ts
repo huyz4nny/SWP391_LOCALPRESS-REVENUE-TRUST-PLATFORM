@@ -28,16 +28,36 @@ function writeStoredAuth(value: string) {
     }
 }
 
+// Tabs of the same origin share the login through this channel: a new tab asks the open ones,
+// login and logout are announced. Nothing goes to localStorage, so closing every tab ends the session.
+const AUTH_CHANNEL = 'localpress-auth'
+
+type AuthMessage =
+    | { type: 'request' }
+    | { type: 'share'; basicAuth: string; bearerToken: string }
+    | { type: 'login'; basicAuth: string; bearerToken: string }
+    | { type: 'logout' }
+
+function openAuthChannel(): BroadcastChannel | null {
+    try {
+        return window.BroadcastChannel ? new window.BroadcastChannel(AUTH_CHANNEL) : null
+    } catch {
+        return null
+    }
+}
+
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
     // Preserve main's Basic session across reloads; Google Bearer remains in memory.
     private basicAuth = readStoredAuth()
     private bearerToken = ''
+    private channel = openAuthChannel()
 
     constructor() {
         this.baseUrl = APP_CONFIG.apiBaseUrl
         this.useMock = APP_CONFIG.useMockApi
+        this.channel?.addEventListener('message', (event: MessageEvent<AuthMessage>) => this.onAuthMessage(event.data))
     }
 
     public setUseMock(use: boolean) {
@@ -60,6 +80,63 @@ class HttpClient {
         this.basicAuth = ''
         writeStoredAuth('')
         this.bearerToken = token
+    }
+
+    /** Call after the backend accepted the login, so other open tabs switch to the same account. */
+    public shareLoginWithOtherTabs() {
+        if (this.hasAuth()) this.broadcast({ type: 'login', basicAuth: this.basicAuth, bearerToken: this.bearerToken })
+    }
+
+    /** Logs out this tab and every other open tab. */
+    public logoutAllTabs() {
+        this.clearBasicAuth()
+        this.broadcast({ type: 'logout' })
+    }
+
+    /** A tab opened without auth borrows it from an open tab; resolves false if none answers in time. */
+    public requestAuthFromOtherTabs(timeoutMs = 300): Promise<boolean> {
+        const channel = this.channel
+        if (this.hasAuth() || !channel) return Promise.resolve(this.hasAuth())
+        return new Promise((resolve) => {
+            const finish = (found: boolean) => {
+                clearTimeout(timer)
+                channel.removeEventListener('message', onMessage)
+                resolve(found)
+            }
+            const onMessage = (event: MessageEvent<AuthMessage>) => {
+                if (event.data?.type !== 'share') return
+                this.adoptAuth(event.data.basicAuth, event.data.bearerToken)
+                finish(this.hasAuth())
+            }
+            const timer = setTimeout(() => finish(false), timeoutMs)
+            channel.addEventListener('message', onMessage)
+            this.broadcast({ type: 'request' })
+        })
+    }
+
+    private onAuthMessage(message: AuthMessage) {
+        if (message?.type === 'request' && this.hasAuth()) {
+            this.broadcast({ type: 'share', basicAuth: this.basicAuth, bearerToken: this.bearerToken })
+        } else if (message?.type === 'login') {
+            if (message.basicAuth === this.basicAuth && message.bearerToken === this.bearerToken) return
+            this.adoptAuth(message.basicAuth, message.bearerToken)
+        } else if (message?.type === 'logout') {
+            this.clearBasicAuth()
+        }
+    }
+
+    private adoptAuth(basicAuth: string, bearerToken: string) {
+        this.basicAuth = basicAuth
+        this.bearerToken = bearerToken
+        writeStoredAuth(basicAuth)
+    }
+
+    private broadcast(message: AuthMessage) {
+        try {
+            this.channel?.postMessage(message)
+        } catch {
+            // channel closed: other tabs keep their own session
+        }
     }
 
     public hasAuth() {

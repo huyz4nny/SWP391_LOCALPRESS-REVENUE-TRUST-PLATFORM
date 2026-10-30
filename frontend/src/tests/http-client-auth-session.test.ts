@@ -77,10 +77,10 @@ it('auth synchronization keeps a Google user with an active Bearer token', async
   APP_CONFIG.useMockApi = false
   mockStore.setCurrentUser('user-reader-premium')
   current.setBearerToken('local-jwt')
-  syncAuthSession()
+  await syncAuthSession()
   expect(mockStore.getCurrentUser().id).toBe('user-reader-premium')
   current.clearBasicAuth()
-  syncAuthSession()
+  await syncAuthSession()
   expect(mockStore.getCurrentUser().id).toBe('user-guest')
 })
 
