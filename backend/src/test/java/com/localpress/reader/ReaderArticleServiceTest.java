@@ -198,20 +198,4 @@ class ReaderArticleServiceTest {
         verify(readerArticleRepository).findAllPublishedArticles(eq("kinh-te"), eq("FDI"), eq("FREE"), any(Pageable.class));
         verify(readerArticleRepository, org.mockito.Mockito.never()).findPublishedBySlug(isNull());
     }
-    @Test
-    void adminPreviewWordLimitCapsContentWithoutExceedingThirtyPercent() {
-        ArticleProjection projection=mock(ArticleProjection.class);
-        String full="Một hai ba bốn năm sáu bảy tám chín mười ".repeat(10);
-        when(projection.getId()).thenReturn(1L);
-        when(projection.getAccessType()).thenReturn("PREMIUM");
-        when(projection.getContent()).thenReturn(full);
-        when(readerArticleRepository.findPublishedBySlug("preview-limit")).thenReturn(Optional.of(projection));
-        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false,PaywallEngine.Reason.NO_ENTITLEMENT));
-        when(paywallEngine.previewWordLimit()).thenReturn(2);
-        var response=readerArticleService.getArticleBySlug("preview-limit");
-        assertEquals("Một hai",response.getPreviewContent());
-        assertNull(response.getContent());
-        assertTrue(response.getPreviewContent().length()<=Math.floor(full.length()*0.3));
-    }
-
 }

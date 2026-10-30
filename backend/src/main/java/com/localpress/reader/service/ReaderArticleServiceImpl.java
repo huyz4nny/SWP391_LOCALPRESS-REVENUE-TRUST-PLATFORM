@@ -61,16 +61,7 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
             response.setIsLocked(false);
             return response;
         }
-        String preview=rawContent == null ? "" : rawContent.substring(0, previewCut(rawContent));
-        int wordLimit=paywallEngine.previewWordLimit();
-        if(wordLimit>0) {
-            var words=java.util.regex.Pattern.compile("\\S+").matcher(preview);
-            int count=0;
-            while(words.find()) {
-                if(++count>wordLimit) {preview=preview.substring(0,words.start()).stripTrailing();break;}
-            }
-        }
-        response.setPreviewContent(preview);
+        response.setPreviewContent(rawContent == null ? "" : rawContent.substring(0, previewCut(rawContent)));
         response.setContent(null);
         response.setIsLocked(true);
         return response;

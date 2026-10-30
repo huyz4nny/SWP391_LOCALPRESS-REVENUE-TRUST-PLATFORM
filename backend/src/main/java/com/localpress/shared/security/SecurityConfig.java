@@ -81,6 +81,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/finance/wallet/**").authenticated()
                         // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
+                        // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
+                        .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)
