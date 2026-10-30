@@ -50,6 +50,7 @@ import {
   BookingManagementPage,
   CreativeReviewPage,
   CommentModerationPage,
+  AdvertisingInventoryCalendarPage,
 } from '@/features/editorial'
 
 // Finance
@@ -66,6 +67,8 @@ import {
   PaymentComplaintPage,
   ComplaintQueuePage,
   SepayLogPage,
+  ReceivablesPage,
+  FinanceReportsPage,
 } from '@/features/finance'
 
 /** Link cũ /checkout/:orderId -> trang thanh toán chung của SV4 */
@@ -237,6 +240,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'editorial/calendar',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <AdvertisingInventoryCalendarPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'editorial/creatives',
         element: (
           <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
@@ -307,6 +318,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
             <SepayLogPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/receivables',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <ReceivablesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/reports',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <FinanceReportsPage />
           </ProtectedRoute>
         ),
       },

@@ -4,13 +4,16 @@ import com.localpress.finance.dto.request.LedgerFilterRequest;
 import com.localpress.finance.dto.response.LedgerSummaryResponse;
 import com.localpress.finance.dto.response.TransactionDetailResponse;
 import com.localpress.finance.dto.response.TransactionLedgerResponse;
+import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.model.RefundStatus;
+import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceLedgerService;
+import com.localpress.finance.service.FinanceReconciliationService;
 import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +35,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -50,6 +52,12 @@ class FinanceLedgerServiceTest {
     @Mock
     private RefundRequestRepository refundRequestRepository;
 
+    @Mock
+    private PaymentComplaintRepository paymentComplaintRepository;
+
+    @Mock
+    private FinanceReconciliationService reconciliationService;
+
     @InjectMocks
     private FinanceLedgerService financeLedgerService;
 
@@ -64,7 +72,7 @@ class FinanceLedgerServiceTest {
                 .transactionType(TransactionType.AD)
                 .amount(new BigDecimal("5000000.00"))
                 .currency("VND")
-                .paymentMethod("BANK_TRANSFER")
+                .paymentMethod("SEPAY")
                 .gatewayTransactionId("MB-998811")
                 .bankCode("MB")
                 .status(TransactionStatus.SUCCESS)
@@ -84,7 +92,7 @@ class FinanceLedgerServiceTest {
             when(transactionRepository.searchLedger(
                     eq(TransactionStatus.SUCCESS),
                     eq(TransactionType.AD),
-                    eq("BANK_TRANSFER"),
+                    eq("SEPAY"),
                     any(),
                     any(),
                     eq("MB-998811"),
@@ -94,7 +102,7 @@ class FinanceLedgerServiceTest {
             LedgerFilterRequest filter = LedgerFilterRequest.builder()
                     .status(TransactionStatus.SUCCESS)
                     .transactionType(TransactionType.AD)
-                    .paymentMethod("BANK_TRANSFER")
+                    .paymentMethod("SEPAY")
                     .keyword("MB-998811")
                     .page(0)
                     .size(10)
@@ -149,8 +157,6 @@ class FinanceLedgerServiceTest {
             when(transactionRepository.countByStatus(TransactionStatus.PENDING)).thenReturn(5L);
             when(transactionRepository.countByStatus(TransactionStatus.SUCCESS)).thenReturn(20L);
             when(transactionRepository.countByStatus(TransactionStatus.FAILED)).thenReturn(2L);
-            when(transactionRepository.countByStatusAndPaymentMethodIn(eq(TransactionStatus.PENDING), anyCollection()))
-                    .thenReturn(3L);
 
             LedgerSummaryResponse summary = financeLedgerService.getLedgerSummary();
 
@@ -160,17 +166,17 @@ class FinanceLedgerServiceTest {
             assertThat(summary.getPendingCount()).isEqualTo(5L);
             assertThat(summary.getSuccessCount()).isEqualTo(20L);
             assertThat(summary.getFailedCount()).isEqualTo(2L);
-            assertThat(summary.getPendingManualTransfersCount()).isEqualTo(3L);
         }
     }
 
     @Test
-    @DisplayName("Dashboard: doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ), số hoàn chờ duyệt lấy từ DB")
+    @DisplayName("Dashboard: doanh thu thực thu = gộp - đã hoàn (khớp sổ quỹ), số hoàn chờ duyệt và khiếu nại mở lấy từ DB")
     void dashboardUsesNetRevenueAndRealPendingRefundCount() {
         when(transactionRepository.calculateTotalGrossRevenue()).thenReturn(new BigDecimal("30000"));
         when(transactionRepository.calculateTotalRefundedAmount()).thenReturn(new BigDecimal("15000"));
         when(transactionRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
         when(refundRequestRepository.countByStatus(RefundStatus.PENDING)).thenReturn(3L);
+        when(paymentComplaintRepository.countByStatus(PaymentComplaint.Status.OPEN)).thenReturn(2L);
 
         var dashboard = financeLedgerService.getFinanceDashboard();
         var summary = financeLedgerService.getLedgerSummary();
@@ -178,5 +184,6 @@ class FinanceLedgerServiceTest {
         assertThat(dashboard.getTotalRevenue()).isEqualByComparingTo("15000");
         assertThat(dashboard.getTotalRevenue()).isEqualByComparingTo(summary.getNetRevenue());
         assertThat(dashboard.getRefundReviewCount()).isEqualTo(3L);
+        assertThat(dashboard.getOpenComplaintCount()).isEqualTo(2L);
     }
 }

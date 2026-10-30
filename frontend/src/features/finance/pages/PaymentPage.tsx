@@ -378,8 +378,9 @@ export function PaymentPage() {
           <dl className="mt-3">
             <KeyValue label="Loại">{ORDER_TYPE_LABELS[order.orderType]}</KeyValue>
             <KeyValue label="Trạng thái"><StatusBadge type="payment" status={order.status} /></KeyValue>
-            {countdown && (
-              <KeyValue label={isTopUp ? 'Mã QR hết hạn sau' : 'Giữ đơn trong'}>
+            {/* Rule 6: chỉ booking quảng cáo giữ chỗ có hạn; bài / gói còn chờ là còn trả được */}
+            {countdown && (isTopUp || order.orderType === 'AD') && (
+              <KeyValue label={isTopUp ? 'Mã QR hết hạn sau' : 'Giữ chỗ trong'}>
                 <span className={`font-semibold num ${urgent ? 'text-negative' : ''}`}>{countdown.text}</span>
               </KeyValue>
             )}

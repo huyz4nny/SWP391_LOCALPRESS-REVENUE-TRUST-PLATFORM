@@ -27,9 +27,19 @@ public class FinanceCurrentUser {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Kế toán trưởng (mắt 2 duyệt hoàn tiền, chốt kỳ đối soát). Bảng users thuộc module identity nên SV4
+     * không tự thêm giá trị role mới: tài khoản quản trị (SYSTEM_ADMIN) giữ vai trò Kế toán trưởng.
+     */
+    private static final Set<String> FINANCE_MANAGER_ROLES = Set.of("SYSTEM_ADMIN");
+
     public record Principal(Long userId, String role) {
         public boolean isFinanceStaff() {
             return FINANCE_ROLES.contains(role);
+        }
+
+        public boolean isFinanceManager() {
+            return FINANCE_MANAGER_ROLES.contains(role);
         }
 
         /**
@@ -54,5 +64,23 @@ public class FinanceCurrentUser {
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new AppException("Tài khoản không tồn tại", HttpStatus.UNAUTHORIZED));
+    }
+
+    /** Chỉ Kế toán trưởng (duyệt hoàn tiền mắt 2, chốt kỳ đối soát), người khác nhận 403. */
+    public Principal requireFinanceManager(String forbiddenMessage) {
+        Principal principal = require();
+        if (!principal.isFinanceManager()) {
+            throw new AppException(forbiddenMessage, HttpStatus.FORBIDDEN);
+        }
+        return principal;
+    }
+
+    /** Như require() nhưng chỉ cho nhân sự tài chính, người khác nhận 403 với forbiddenMessage. */
+    public Principal requireFinanceStaff(String forbiddenMessage) {
+        Principal principal = require();
+        if (!principal.isFinanceStaff()) {
+            throw new AppException(forbiddenMessage, HttpStatus.FORBIDDEN);
+        }
+        return principal;
     }
 }

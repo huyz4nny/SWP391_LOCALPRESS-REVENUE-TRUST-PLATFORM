@@ -157,6 +157,30 @@ class HttpClient {
         return response.blob()
     }
 
+    /** Tải file (CSV, PDF...) từ API thật; trả về blob + tên file trong Content-Disposition. Chế độ mock không hỗ trợ. */
+    public async getFile(path: string, options?: RequestOptions): Promise<{ blob: Blob; filename: string }> {
+        if (this.useMock) {
+            throw new Error('Tải file cần dùng API thật')
+        }
+        const url = this.buildUrl(path, options?.params)
+        const headers = new Headers(this.headers(options))
+        headers.delete('Content-Type')
+        const response = await fetch(url, { method: 'GET', headers })
+        if (!response.ok) {
+            const errorJson = await response.json().catch(() => ({}))
+            throw new AppApiError({
+                timestamp: new Date().toISOString(),
+                status: response.status,
+                error: response.statusText,
+                message: errorJson.message || 'Không tải được file',
+                path,
+            })
+        }
+        const disposition = response.headers.get('Content-Disposition') ?? ''
+        const match = /filename="?([^";]+)"?/i.exec(disposition)
+        return { blob: await response.blob(), filename: match?.[1] ?? 'download' }
+    }
+
     public async post<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
         const url = this.buildUrl(path, options?.params)
 

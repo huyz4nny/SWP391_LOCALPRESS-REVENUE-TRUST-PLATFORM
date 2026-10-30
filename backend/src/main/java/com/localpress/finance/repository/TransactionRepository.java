@@ -15,18 +15,14 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * ==============================================================================
  * REPOSITORY: QUẢN LÝ DỮ LIỆU GIAO DỊCH TÀI CHÍNH & SỔ QUÝ (SV4 - HUY)
  * ==============================================================================
- * - Phục vụ các nghiệp vụ trong Iteration 1:
- *   + UC047: Tra cứu danh sách chứng từ & sổ quỹ theo bộ lọc đa tiêu chí.
- *   + UC048: Tra cứu chi tiết chứng từ giao dịch.
- *   + UC049: Tổng hợp số liệu sổ quỹ (Tổng thu, tổng chi/hoàn, số lượng đơn).
- *   + UC050: Hàng đợi giao dịch chuyển khoản thủ công cần xác nhận.
- *   + UC051: Xác nhận / Từ chối giao dịch chuyển khoản.
+ * - Sổ quỹ (tra cứu, chi tiết, tổng hợp), đơn thanh toán, khóa dòng khi xử lý tiền vào.
  */
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
@@ -61,14 +57,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     /** Mã nạp bù mới nhất còn chờ của 1 đơn, để mở lại trang thanh toán không tạo QR mới mỗi lần. */
     Optional<Transaction> findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
 
-    /**
-     * UC050: Lấy danh sách giao dịch chuyển khoản thủ công đang ở trạng thái PENDING để Kế toán đối soát.
-     */
-    Page<Transaction> findByStatusAndPaymentMethodIn(
-            TransactionStatus status,
-            Collection<String> paymentMethods,
-            Pageable pageable
-    );
+    /** Mọi mã nạp bù còn chờ của 1 đơn (kể cả đã quá hạn QR, vì tiền nạp về muộn vẫn được cộng ví). */
+    List<Transaction> findByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
 
     /**
      * UC047: Tra cứu sổ quỹ tài chính (Ledger) với bộ lọc linh hoạt (Status, Type, Khoảng thời gian, Keyword).
@@ -125,9 +115,4 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * Đếm số lượng giao dịch theo trạng thái cụ thể.
      */
     long countByStatus(TransactionStatus status);
-
-    /**
-     * Đếm số lượng giao dịch chuyển khoản thủ công đang chờ Kế toán duyệt (UC050).
-     */
-    long countByStatusAndPaymentMethodIn(TransactionStatus status, Collection<String> paymentMethods);
 }

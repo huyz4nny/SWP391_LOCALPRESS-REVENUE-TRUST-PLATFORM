@@ -95,7 +95,7 @@ public class Transaction {
     private String currency = "VND";
 
     /**
-     * Phương thức thanh toán: 'MANUAL_BANK_TRANSFER', 'VIETQR', 'MOMO', 'VNPAY', v.v.
+     * Phương thức thanh toán: 'SEPAY' (chuyển khoản QR, ghi nhận qua webhook) hoặc 'WALLET' (trừ Ví LocalPress).
      */
     @Column(name = "payment_method", nullable = false, length = 50)
     private String paymentMethod;
@@ -171,16 +171,12 @@ public class Transaction {
     /**
      * Xác nhận thanh toán tự động qua cổng thanh toán / Webhook IPN (UC049).
      */
-    public void markPaidByGateway(String gatewayTxId, String bankCode) {
+    public void markPaidByGateway(String bankCode) {
         if (this.status == TransactionStatus.SUCCESS) {
             return;
         }
-        LocalDateTime now = LocalDateTime.now();
         this.status = TransactionStatus.SUCCESS;
-        this.paidAt = now;
-        if (gatewayTxId != null && !gatewayTxId.isBlank() && this.gatewayTransactionId == null) {
-            this.gatewayTransactionId = gatewayTxId.trim();
-        }
+        this.paidAt = LocalDateTime.now();
         if (bankCode != null && !bankCode.isBlank()) {
             this.bankCode = bankCode.trim().toUpperCase();
         }
@@ -191,6 +187,23 @@ public class Transaction {
      */
     public boolean isExpired(LocalDateTime now) {
         return this.expiresAt != null && now.isAfter(this.expiresAt);
+    }
+
+    /**
+     * Rule 6: hạn chỉ ràng buộc khi có thứ bị giữ chỗ.
+     * - AD   : booking giữ slot 15 phút, quá hạn thì không trả được nữa (tiền về muộn vào ví).
+     * - TOPUP: hạn của mã QR nạp tiền (tiền nạp về muộn vẫn được cộng ví).
+     * - ARTICLE / SUBSCRIPTION: bài / gói không giới hạn số lượng, đơn còn PENDING là còn trả được
+     *   (bằng ví hoặc chuyển khoản), giống nhánh webhook.
+     */
+    public boolean isPaymentWindowClosed(LocalDateTime now) {
+        boolean bounded = this.transactionType == TransactionType.AD || this.transactionType == TransactionType.TOPUP;
+        return bounded && isExpired(now);
+    }
+
+    /** Đơn còn chờ nhưng đã đóng cửa thanh toán theo Rule 6 (trang thanh toán hiển thị "hết hạn"). */
+    public boolean isPendingExpired() {
+        return this.status == TransactionStatus.PENDING && isPaymentWindowClosed(LocalDateTime.now());
     }
 
     /**

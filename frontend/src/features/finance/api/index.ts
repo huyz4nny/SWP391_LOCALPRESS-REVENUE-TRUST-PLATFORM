@@ -6,7 +6,11 @@ import {
   RefundRequest,
   ReconciliationPeriod,
   GeneralLedgerEntry,
+  ResolveDiscrepancyInput,
+  AdvertiserReceivable,
+  FinanceAlert,
 } from '../types'
+import { complaintApi } from './payment'
 
 
 /** Loại giao dịch backend (ENUM transactions.transaction_type) -> loại đơn hiển thị. */
@@ -35,13 +39,18 @@ const titleOf = (tx: any): string =>
 export const financeApi = {
   getDashboard: async () => {
     const res = await httpClient.get<any>('/finance/dashboard')
-    if (APP_CONFIG.useMockApi) return res // mock đã trả recentOrders dạng Order
+    if (APP_CONFIG.useMockApi) {
+      // mock đã trả recentOrders dạng Order; khiếu nại mock nằm trong kho riêng của finance (payment.ts)
+      const openComplaints = await complaintApi.listForAccountant('OPEN')
+      return { ...res, openComplaintCount: openComplaints.length }
+    }
     if (res && res.totalRevenue !== undefined) {
       return {
         totalRevenue: Number(res.totalRevenue || 0),
         paidOrdersCount: Number(res.paidOrdersCount || 0),
         pendingOrdersCount: Number(res.pendingOrdersCount || 0),
         refundReviewCount: Number(res.refundReviewCount || 0),
+        openComplaintCount: Number(res.openComplaintCount || 0),
         reconciliationDiscrepancy: Number(res.reconciliationDiscrepancy || 0),
         recentOrders: (res.recentOrders || []).map((tx: any) => ({
           id: String(tx.transactionId),
@@ -88,7 +97,7 @@ export const financeApi = {
       paymentAttempts: [{
         id: `att-${tx.transactionId || tx.id}`,
         orderId: String(tx.transactionId || tx.id),
-        method: tx.paymentMethod || 'BANK_TRANSFER',
+        method: tx.paymentMethod || 'SEPAY',
         transactionCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
         amount: Number(tx.amount || 0),
         status: tx.status === 'SUCCESS' ? 'SUCCESS' : tx.status,
@@ -121,7 +130,7 @@ export const financeApi = {
       paymentAttempts: [{
         id: `att-${tx.transactionId || tx.id}`,
         orderId: String(tx.transactionId || tx.id),
-        method: tx.paymentMethod || 'BANK_TRANSFER',
+        method: tx.paymentMethod || 'SEPAY',
         transactionCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
         amount: Number(tx.amount || 0),
         status: tx.status === 'SUCCESS' ? 'SUCCESS' : tx.status,
@@ -155,18 +164,21 @@ export const financeApi = {
     return res?.data || res
   },
 
-  getReconciliation: async (): Promise<ReconciliationPeriod> => {
-    const res = await httpClient.get<any>('/finance/reconciliation')
+  /** UC054: kỳ đối soát theo tháng (yyyy-MM), mặc định tháng hiện tại. */
+  getReconciliation: async (month?: string): Promise<ReconciliationPeriod> => {
+    const res = await httpClient.get<any>('/finance/reconciliation', { params: { month } })
     return res?.data || res
   },
 
-  resolveDiscrepancy: async (discrepancyId: string, note: string) => {
-    const res = await httpClient.post<any>('/finance/reconciliation/resolve', { discrepancyId, note })
+  /** UC054: gán đơn / cộng ví / giải trình 1 khoản lệch (bắt buộc ghi chú). */
+  resolveDiscrepancy: async (input: ResolveDiscrepancyInput): Promise<ReconciliationPeriod> => {
+    const res = await httpClient.post<any>('/finance/reconciliation/resolve', input)
     return res?.data || res
   },
 
-  closeReconciliationPeriod: async () => {
-    const res = await httpClient.post<any>('/finance/reconciliation/close')
+  /** UC054: Kế toán trưởng chốt kỳ; còn khoản lệch thì phải xác nhận acknowledgeUnresolved. */
+  closeReconciliationPeriod: async (input: { month?: string; acknowledgeUnresolved?: boolean; note?: string } = {}) => {
+    const res = await httpClient.post<any>('/finance/reconciliation/close', input)
     return res?.data || res
   },
 
@@ -191,39 +203,70 @@ export const financeApi = {
     }))
   },
 
-  getReceivables: async () => {
+  /** UC053: công nợ quảng cáo theo chiến dịch. */
+  getReceivables: async (): Promise<AdvertiserReceivable[]> => {
     const res = await httpClient.get<any>('/finance/receivables')
-    return res?.data || (Array.isArray(res) ? res : [])
+    const list = res?.data || (Array.isArray(res) ? res : [])
+    return list.map((r: any) => ({
+      ...r,
+      contractValue: Number(r.contractValue || 0),
+      paidAmount: Number(r.paidAmount || 0),
+      remainingDebt: Number(r.remainingDebt || 0),
+      overdueDays: Number(r.overdueDays || 0),
+      reminderCount: Number(r.reminderCount || 0),
+    }))
   },
 
-  getAlerts: async () => {
+  /** UC053: gửi nhắc nợ (SV4 lưu lịch sử + phát ReceivableReminderEvent, SV1 báo doanh nghiệp). */
+  sendReceivableReminder: async (campaignId: number, note?: string): Promise<AdvertiserReceivable> => {
+    const res = await httpClient.post<any>(`/finance/receivables/${campaignId}/reminders`, { note })
+    return res?.data || res
+  },
+
+  /** UC060: cảnh báo cuối kỳ. */
+  getAlerts: async (): Promise<FinanceAlert[]> => {
     const res = await httpClient.get<any>('/finance/alerts')
     return res?.data || (Array.isArray(res) ? res : [])
   },
 
-  createOrder: async (data: {
-    orderType: string
-    targetId: number
-    amount: number
-    paymentMethod?: string
-    bankCode?: string
-    description?: string
-    successUrl?: string
-    errorUrl?: string
-    cancelUrl?: string
-  }) => {
-    const res = await httpClient.post<any>('/finance/orders', data)
-    return res?.data || res
-  },
-
-  getOrderStatus: async (orderId: string | number) => {
-    const res = await httpClient.get<any>(`/finance/orders/${orderId}`)
-    return res?.data || res
-  },
-
-  getOrderStatusByCode: async (orderCode: string) => {
-    const res = await httpClient.get<any>(`/finance/orders/code/${orderCode}/status`)
-    return res?.data || res
+  /**
+   * UC059: tải CSV giao dịch theo khoảng ngày (yyyy-MM-dd). API thật trả file từ backend;
+   * chế độ mock dựng CSV cùng định dạng từ dữ liệu đơn trong trình duyệt.
+   */
+  exportReport: async (fromDate?: string, toDate?: string): Promise<{ blob: Blob; filename: string }> => {
+    if (!APP_CONFIG.useMockApi) {
+      const file = await httpClient.getFile('/finance/reports/export', { params: { fromDate, toDate } })
+      // Backend cũ chưa expose Content-Disposition qua CORS: tự đặt tên theo khoảng ngày
+      return file.filename === 'download'
+        ? { ...file, filename: `Bao_cao_tai_chinh_${fromDate || 'dau'}_${toDate || 'nay'}.csv` }
+        : file
+    }
+    const orders = await httpClient.get<Order[]>('/finance/orders')
+    const inRange = (iso: string) => {
+      const day = iso.slice(0, 10)
+      return (!fromDate || day >= fromDate) && (!toDate || day <= toDate)
+    }
+    const rows = orders.filter((o) => inRange(o.createdAt))
+    const BOM = String.fromCharCode(0xfeff) // Excel đọc đúng tiếng Việt UTF-8
+    const cell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const gross = rows.filter((o) => o.paymentStatus === 'PAID' && o.orderType !== 'TOPUP' && o.orderType !== 'REFUND')
+      .reduce((sum, o) => sum + o.finalAmount, 0)
+    const refunded = rows.filter((o) => o.orderType === 'REFUND' && o.paymentStatus === 'PAID').reduce((sum, o) => sum + o.finalAmount, 0)
+    const lines = [
+      `Kỳ báo cáo,${cell(fromDate || 'Từ đầu')},${cell(toDate || 'Đến nay')}`,
+      'Mã giao dịch,Mã đơn hàng,Thời gian tạo,Loại dòng thu,Số tiền (VNĐ),Trạng thái,Mã khách hàng,Tên khách hàng',
+      ...rows.map((o) => [o.id, o.orderCode, o.createdAt, o.orderType, o.finalAmount, o.paymentStatus, o.userId, o.userName].map(cell).join(',')),
+      '',
+      'Tổng hợp (cùng công thức Dashboard / Sổ quỹ)',
+      `Số giao dịch,${rows.length}`,
+      `Tổng thu gộp,${gross}`,
+      `Đã hoàn,${refunded}`,
+      `Doanh thu thuần,${gross - refunded}`,
+    ]
+    return {
+      blob: new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
+      filename: `Bao_cao_tai_chinh_${fromDate || 'dau'}_${toDate || 'nay'}.csv`,
+    }
   },
 }
 

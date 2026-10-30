@@ -1,6 +1,7 @@
 import { mockStore } from '../store'
 import { AppApiError } from '@/lib/http/errors'
 import { Article, Category, SubscriptionPlan } from '@/features/reader/types'
+import type { ReconciliationPeriod } from '@/features/finance/types'
 
 // Helper for delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -161,7 +162,26 @@ export async function handleMockRequest(method: string, url: string, body?: any)
 
   if (pathname.endsWith('/accept-quote') && method === 'POST') {
     const id = pathname.split('/')[3]
-    return mockStore.acceptQuotation(id)
+    return mockStore.acceptQuotation(id, body?.quoteVersion)
+  }
+
+  if (pathname.startsWith('/advertiser/slots/') && pathname.endsWith('/availability') && method === 'GET') {
+    const slotId = pathname.split('/')[3]
+    const slot = mockStore.getState().adSlots.find((s) => s.id === slotId)
+    const fullDates = mockStore.getSlotFullDates(slotId, params.get('startDate') ?? '', params.get('endDate') ?? '')
+    return { available: fullDates.length === 0, capacity: slot?.maxCapacity ?? 1, inventoryMode: slot?.inventoryMode ?? 'EXCLUSIVE', fullDates }
+  }
+
+  // Mock của POST /advertiser/campaigns/:id/payment: số tiền lấy từ booking đã chốt, dùng lại đơn còn chờ.
+  if (pathname.startsWith('/advertiser/campaigns/') && pathname.endsWith('/payment') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const camp = mockStore.getState().campaigns.find((c) => c.id === id)
+    const booking = mockStore.getState().bookings.find((b) => b.id === (camp?.bookingId ?? id))
+    if (!booking || booking.bookingStatus !== 'CONFIRMED') throw new Error('Vui lòng xác nhận báo giá trước khi thanh toán')
+    if (booking.paymentStatus === 'PAID') throw new Error('Booking đã được thanh toán')
+    const pending = mockStore.getState().orders.find((o) => o.targetId === booking.id && o.paymentStatus === 'PENDING')
+    return pending ?? mockStore.createOrder(currentUser.id, 'AD_CAMPAIGN', booking.id,
+      `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'VIETQR')
   }
 
   if (pathname.startsWith('/advertiser/campaigns/') && method === 'GET') {
@@ -181,8 +201,47 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return mockStore.getState().articles
   }
 
+  if (pathname.startsWith('/editorial/articles/') && method === 'GET') {
+    const id = pathname.replace('/editorial/articles/', '')
+    const article = mockStore.getState().articles.find((a) => a.id === id)
+    if (!article) {
+      throw new AppApiError({
+        timestamp: new Date().toISOString(),
+        status: 404,
+        error: 'Not Found',
+        message: 'Không tìm thấy bài viết',
+        path: pathname,
+      })
+    }
+    return article
+  }
+
+  if (pathname === '/editorial/bookings' && method === 'GET') {
+    return mockStore.getState().bookings
+  }
+
+  if (pathname === '/editorial/campaigns' && method === 'GET') {
+    return mockStore.getState().campaigns
+  }
+
+  if (pathname.startsWith('/editorial/bookings/') && pathname.endsWith('/reject') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    return mockStore.rejectBooking(id, body.reason)
+  }
+
   if (pathname === '/editorial/articles' && method === 'POST') {
     return mockStore.createArticle(body)
+  }
+
+  if (pathname.endsWith('/policy') && method === 'PUT') {
+    const id = pathname.split('/')[3]
+    const article = mockStore.getState().articles.find((a) => a.id === id)
+    if (!article) throw new Error('Không tìm thấy bài viết')
+    article.isPremium = body.accessType === 'PREMIUM'
+    if (body.singlePrice !== undefined) {
+      article.price = body.singlePrice
+    }
+    return article
   }
 
   if (pathname.startsWith('/editorial/articles/') && method === 'PUT') {
@@ -205,11 +264,23 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return mockStore.reviewCreative(creativeId, body.approved, body.notes)
   }
 
+  if ((pathname === '/editorial/subscription-plans' || pathname === '/subscription-plans') && method === 'GET') {
+    return mockStore.getState().subscriptionPlans
+  }
+
+  if (pathname.startsWith('/editorial/subscription-plans/') && pathname.endsWith('/toggle-status') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const plan = mockStore.getState().subscriptionPlans.find((p) => p.id === id)
+    if (!plan) throw new Error('Không tìm thấy gói cước')
+    plan.isActive = !plan.isActive
+    return plan
+  }
+
   if (pathname === '/editorial/comments' && method === 'GET') {
     return mockStore.getState().comments
   }
 
-  if (pathname.endsWith('/moderate-comment') && method === 'POST') {
+  if ((pathname.endsWith('/moderate') || pathname.endsWith('/moderate-comment')) && method === 'POST') {
     const commentId = pathname.split('/')[3]
     const cmt = mockStore.getState().comments.find((c) => c.id === commentId)
     if (cmt) {
@@ -345,28 +416,78 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   }
 
   if (pathname === '/finance/reconciliation' && method === 'GET') {
-    return mockStore.getState().reconciliation
+    return withReconciliationCounts(mockStore.getState().reconciliation)
   }
 
   if (pathname === '/finance/reconciliation/resolve' && method === 'POST') {
     const rec = mockStore.getState().reconciliation
     const disc = rec.discrepancies.find((d) => d.id === body.discrepancyId)
-    if (disc) {
-      disc.status = 'RESOLVED'
-      disc.resolutionNote = body.note
-      disc.resolvedBy = currentUser.name
-      disc.resolvedAt = new Date().toISOString()
-      rec.discrepancyTotal = 0
-    }
-    return rec
+    if (!disc) throw mockError(404, 'Không tìm thấy khoản lệch')
+    if (rec.status === 'CLOSED') throw mockError(409, 'Kỳ đối soát đã chốt, không xử lý thêm được')
+    if (disc.status !== 'UNRESOLVED') throw mockError(409, 'Khoản lệch đã được xử lý')
+    if (!body.note?.trim()) throw mockError(400, 'Phải nhập ghi chú xử lý khoản lệch')
+    if (body.action === 'ASSIGN_ORDER' && !body.orderCode) throw mockError(400, 'Gán vào đơn cần mã đơn hàng')
+    disc.status = 'RESOLVED'
+    disc.action = body.action || 'EXPLAINED'
+    disc.actionRef = body.action === 'ASSIGN_ORDER' ? body.orderCode : body.action === 'CREDIT_WALLET' ? `REC-${disc.transactionCode}` : undefined
+    disc.resolutionNote = body.note
+    disc.resolvedBy = currentUser.name
+    disc.resolvedAt = new Date().toISOString()
+    disc.discrepancyAmount = 0
+    return withReconciliationCounts(rec)
   }
 
   if (pathname === '/finance/reconciliation/close' && method === 'POST') {
-    const rec = mockStore.getState().reconciliation
+    if (currentUser.role !== 'FINANCE_MANAGER' && currentUser.role !== 'SYSTEM_ADMIN') {
+      throw mockError(403, 'Chỉ Kế toán trưởng được chốt kỳ đối soát')
+    }
+    const rec = withReconciliationCounts(mockStore.getState().reconciliation)
+    if (rec.status === 'CLOSED') throw mockError(409, 'Kỳ đối soát đã chốt')
+    if ((rec.unresolvedCount ?? 0) > 0 && !body?.acknowledgeUnresolved) {
+      throw mockError(409, `Còn ${rec.unresolvedCount} khoản lệch chưa xử lý`)
+    }
     rec.status = 'CLOSED'
     rec.closedAt = new Date().toISOString()
     rec.closedByName = currentUser.name
+    rec.closeNote = body?.note
     return rec
+  }
+
+  // UC053: công nợ quảng cáo dựng từ chiến dịch + đơn AD trong kho mock
+  if (pathname === '/finance/receivables' && method === 'GET') {
+    return mockReceivables()
+  }
+
+  if (pathname.startsWith('/finance/receivables/') && pathname.endsWith('/reminders') && method === 'POST') {
+    const campaignId = Number(pathname.split('/')[3])
+    const r = mockReceivables().find((x) => x.campaignId === campaignId)
+    if (!r) throw mockError(404, `Không tìm thấy công nợ của chiến dịch #${campaignId}`)
+    if (r.remainingDebt <= 0) throw mockError(400, 'Chiến dịch đã thanh toán đủ, không cần nhắc nợ')
+    const sent = mockReminders[campaignId] || []
+    if (sent.length && Date.now() - Date.parse(sent[sent.length - 1]) < 24 * 3600 * 1000) {
+      throw mockError(409, 'Mỗi 24 giờ chỉ nhắc 1 lần')
+    }
+    mockReminders[campaignId] = [...sent, new Date().toISOString()]
+    return mockReceivables().find((x) => x.campaignId === campaignId)
+  }
+
+  // UC060: cảnh báo cùng logic với các màn hình tương ứng
+  if (pathname === '/finance/alerts' && method === 'GET') {
+    const state = mockStore.getState()
+    const alerts: any[] = []
+    const add = (count: number, type: string, severity: string, title: string, message: string, actionUrl: string) => {
+      if (count > 0) alerts.push({ type, severity, title, message: message.replace('%d', String(count)), count, actionUrl })
+    }
+    add(state.refunds.filter((r) => r.status === 'UNDER_REVIEW').length, 'REFUND_PENDING', 'HIGH',
+      'Yêu cầu hoàn tiền chờ duyệt', 'Có %d yêu cầu hoàn tiền đang chờ Kế toán trưởng phê duyệt theo nguyên tắc 4 mắt.',
+      '/backoffice/finance/refunds')
+    add(mockReceivables().filter((r) => r.debtGroup === 'OVERDUE').length, 'DEBT_OVERDUE', 'HIGH',
+      'Công nợ quảng cáo B2B quá hạn', 'Có %d chiến dịch quảng cáo đã quá hạn nhưng chưa thanh toán đủ.',
+      '/backoffice/finance/receivables')
+    add(withReconciliationCounts(state.reconciliation).unresolvedCount ?? 0, 'RECONCILIATION_UNRESOLVED', 'MEDIUM',
+      'Khoản lệch đối soát chưa xử lý', 'Có %d khoản tiền giữa sao kê SePay và hệ thống chưa khớp trong kỳ này.',
+      '/backoffice/finance/reconciliation')
+    return alerts
   }
 
   if (pathname === '/finance/ledger' && method === 'GET') {
@@ -409,4 +530,53 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     message: `Không tìm thấy endpoint mô phỏng: ${method} ${pathname}`,
     path: pathname,
   })
+}
+
+const mockError = (status: number, message: string) =>
+  new AppApiError({ timestamp: new Date().toISOString(), status, error: String(status), message, path: '' })
+
+/** Số khoản lệch / tổng tiền lệch còn mở, tính lại từ danh sách (giống backend). */
+function withReconciliationCounts(rec: ReconciliationPeriod): ReconciliationPeriod {
+  const open = rec.discrepancies.filter((d) => d.status === 'UNRESOLVED')
+  rec.unresolvedCount = open.length
+  rec.discrepancyTotal = open.reduce((sum, d) => sum + Math.abs(d.discrepancyAmount), 0)
+  rec.month = rec.month || rec.startDate.slice(0, 7)
+  if (rec.status !== 'CLOSED') rec.status = open.length ? 'OPEN' : 'RECONCILED'
+  return rec
+}
+
+/** Lịch sử nhắc nợ mock theo chiến dịch (chỉ trong phiên trình duyệt). */
+const mockReminders: Record<number, string[]> = {}
+
+function mockReceivables() {
+  const state = mockStore.getState()
+  const today = new Date().toISOString().slice(0, 10)
+  return state.campaigns
+    .filter((c) => c.totalBudget > 0 && c.status !== 'DRAFT' && c.status !== 'CANCELLED')
+    .map((c) => {
+      const campaignId = Number(String(c.id).replace(/\D/g, '')) || 0
+      const paid = state.orders
+        .filter((o) => o.orderType === 'AD_CAMPAIGN' && o.targetId === c.id && o.paymentStatus === 'PAID')
+        .reduce((sum, o) => sum + o.finalAmount, 0)
+      const remaining = Math.max(0, c.totalBudget - paid)
+      const overdueDays = remaining > 0 && today > c.endDate
+        ? Math.floor((Date.parse(today) - Date.parse(c.endDate)) / 86400000) : 0
+      const sent = mockReminders[campaignId] || []
+      return {
+        campaignId,
+        campaignName: c.name,
+        advertiserId: Number(String(c.advertiserId).replace(/\D/g, '')) || 0,
+        companyName: c.companyName,
+        contractValue: c.totalBudget,
+        paidAmount: paid,
+        remainingDebt: remaining,
+        startDate: c.startDate,
+        dueDate: c.endDate,
+        overdueDays,
+        campaignStatus: c.status,
+        debtGroup: remaining === 0 ? 'PAID_IN_FULL' : overdueDays > 0 ? 'OVERDUE' : 'IN_TERM',
+        reminderCount: sent.length,
+        lastReminderAt: sent[sent.length - 1],
+      }
+    })
 }

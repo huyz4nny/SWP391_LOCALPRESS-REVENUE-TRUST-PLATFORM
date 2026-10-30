@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 /**
  * ==============================================================================
@@ -23,6 +24,16 @@ import java.time.LocalDateTime;
 public class SepayWebhookLog {
 
     public enum Source { WEBHOOK, API_SYNC, SIMULATION }
+
+    /**
+     * Kết quả cho biết khoản tiền đã thực sự được ghi vào hệ thống (đơn SUCCESS hoặc cộng ví).
+     * ALREADY_PROCESSED / ORDER_NOT_FOUND / ERROR không nằm ở đây: tiền chưa được ghi, khách còn khiếu nại được.
+     */
+    public static final Set<String> MONEY_RECORDED_STATUSES = Set.of(
+            "SUCCESS", "UNDERPAID_CREDITED_TO_WALLET", "LATE_PAYMENT_CREDITED_TO_WALLET");
+
+    /** Webhook về sau khi kế toán đã ghi nhận chính khoản này qua khiếu nại (UC051): không ghi lần 2. */
+    public static final String RECORDED_BY_COMPLAINT = "RECORDED_BY_COMPLAINT";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -2,7 +2,9 @@ package com.localpress.finance;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localpress.finance.dto.request.SepayIpnRequest;
+import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.model.SepayWebhookLog;
+import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.SepayWebhookLogRepository;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.SepayGatewayService;
@@ -14,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +38,7 @@ class SepayGatewayServiceTest {
 
     private PaymentProcessingService processing;
     private SepayWebhookLogRepository logs;
+    private PaymentComplaintRepository complaints;
     private SepayGatewayService gateway;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -42,7 +46,9 @@ class SepayGatewayServiceTest {
     void setUp() {
         processing = mock(PaymentProcessingService.class);
         logs = mock(SepayWebhookLogRepository.class);
-        gateway = new SepayGatewayService(processing, logs, mapper);
+        complaints = mock(PaymentComplaintRepository.class);
+        when(complaints.findByBankReferenceAndStatus(any(), any())).thenReturn(Optional.empty());
+        gateway = new SepayGatewayService(processing, logs, complaints, mapper);
     }
 
     @Test
@@ -142,5 +148,23 @@ class SepayGatewayServiceTest {
         m.put("orderCode", ORDER);
         m.put("message", status);
         return m;
+    }
+
+    @Test
+    @DisplayName("Rule 5: webhook về sau khi kế toán đã ghi nhận cùng mã GD qua khiếu nại -> không xử lý lại")
+    void referenceAlreadyRecordedByComplaintIsSkipped() throws Exception {
+        SepayIpnRequest ipn = mapper.readValue(REAL_PAYLOAD, SepayIpnRequest.class);
+        when(complaints.findByBankReferenceAndStatus("MBVCB.3278907687", PaymentComplaint.Status.RESOLVED))
+                .thenReturn(Optional.of(PaymentComplaint.builder().complaintId(9L).bankReference("MBVCB.3278907687").build()));
+
+        SepayGatewayService.Outcome out = gateway.receive(SepayWebhookLog.Source.WEBHOOK, ipn, REAL_PAYLOAD, true, "1.2.3.4");
+
+        assertThat(out.httpStatus()).isEqualTo(200);
+        assertThat(out.body().get("status")).isEqualTo(SepayWebhookLog.RECORDED_BY_COMPLAINT);
+        verify(processing, never()).processSepayIpn(any());
+        ArgumentCaptor<SepayWebhookLog> saved = ArgumentCaptor.forClass(SepayWebhookLog.class);
+        verify(logs).save(saved.capture());
+        assertThat(saved.getValue().getSepayId()).isEqualTo(92704L);
+        assertThat(saved.getValue().getResultStatus()).isEqualTo(SepayWebhookLog.RECORDED_BY_COMPLAINT);
     }
 }

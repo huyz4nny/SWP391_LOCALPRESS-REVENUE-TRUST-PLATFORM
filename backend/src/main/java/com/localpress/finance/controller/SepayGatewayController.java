@@ -5,10 +5,8 @@ import com.localpress.finance.model.SepayWebhookLog;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.SepayGatewayService;
-import com.localpress.shared.exception.AppException;
 import com.localpress.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -74,8 +72,6 @@ public class SepayGatewayController {
     }
 
     private void requireFinanceStaff() {
-        if (!currentUser.require().isFinanceStaff()) {
-            throw new AppException("Chỉ kế toán mới xem được nhật ký SePay", HttpStatus.FORBIDDEN);
-        }
+        currentUser.requireFinanceStaff("Chỉ kế toán mới xem được nhật ký SePay");
     }
 }

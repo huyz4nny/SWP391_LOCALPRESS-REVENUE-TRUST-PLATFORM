@@ -1,12 +1,14 @@
 package com.localpress.finance.service;
 
 import com.localpress.finance.dto.request.LedgerFilterRequest;
+import com.localpress.finance.dto.response.FinanceDashboardResponse;
 import com.localpress.finance.dto.response.LedgerSummaryResponse;
 import com.localpress.finance.dto.response.TransactionDetailResponse;
 import com.localpress.finance.dto.response.TransactionLedgerResponse;
-import com.localpress.finance.model.Transaction;
+import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.RefundStatus;
+import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.shared.exception.AppException;
@@ -38,14 +40,8 @@ public class FinanceLedgerService {
 
     private final TransactionRepository transactionRepository;
     private final RefundRequestRepository refundRequestRepository;
-
-    /**
-     * Danh sách phương thức thanh toán chuyển khoản thủ công.
-     */
-    private static final List<String> MANUAL_PAYMENT_METHODS = List.of(
-            "BANK_TRANSFER",
-            "MANUAL_BANK_TRANSFER"
-    );
+    private final PaymentComplaintRepository paymentComplaintRepository;
+    private final FinanceReconciliationService reconciliationService;
 
     /**
      * UC047: Tra cứu danh sách chứng từ & sổ quỹ theo các tiêu chí lọc.
@@ -60,25 +56,15 @@ public class FinanceLedgerService {
         int size = filter.getSize() <= 0 ? 20 : Math.min(filter.getSize(), 100);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        String keyword = (filter.getKeyword() != null && !filter.getKeyword().isBlank())
-                ? filter.getKeyword().trim()
-                : null;
-
-        String paymentMethod = (filter.getPaymentMethod() != null && !filter.getPaymentMethod().isBlank())
-                ? filter.getPaymentMethod().trim()
-                : null;
-
-        Page<Transaction> pageResult = transactionRepository.searchLedger(
+        return transactionRepository.searchLedger(
                 filter.getStatus(),
                 filter.getTransactionType(),
-                paymentMethod,
+                trimToNull(filter.getPaymentMethod()),
                 filter.getFromDate(),
                 filter.getToDate(),
-                keyword,
+                trimToNull(filter.getKeyword()),
                 pageable
-        );
-
-        return pageResult.map(TransactionLedgerResponse::fromEntity);
+        ).map(TransactionLedgerResponse::fromEntity);
     }
 
     /**
@@ -90,13 +76,9 @@ public class FinanceLedgerService {
     public TransactionDetailResponse getTransactionDetail(Long transactionId) {
         log.info("Xem chi tiết chứng từ giao dịch ID: {}", transactionId);
 
-        Transaction tx = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new AppException(
-                        "Không tìm thấy chứng từ giao dịch #" + transactionId,
-                        HttpStatus.NOT_FOUND
-                ));
-
-        return TransactionDetailResponse.fromEntity(tx);
+        return transactionRepository.findById(transactionId)
+                .map(TransactionDetailResponse::fromEntity)
+                .orElseThrow(() -> new AppException("Không tìm thấy chứng từ giao dịch #" + transactionId, HttpStatus.NOT_FOUND));
     }
 
     /**
@@ -109,52 +91,46 @@ public class FinanceLedgerService {
 
         BigDecimal grossRevenue = transactionRepository.calculateTotalGrossRevenue();
         BigDecimal refundedAmount = transactionRepository.calculateTotalRefundedAmount();
-        BigDecimal netRevenue = grossRevenue.subtract(refundedAmount);
-
-        long pendingCount = transactionRepository.countByStatus(TransactionStatus.PENDING);
-        long successCount = transactionRepository.countByStatus(TransactionStatus.SUCCESS);
-        long failedCount = transactionRepository.countByStatus(TransactionStatus.FAILED);
-        long pendingManualTransfersCount = transactionRepository.countByStatusAndPaymentMethodIn(
-                TransactionStatus.PENDING,
-                MANUAL_PAYMENT_METHODS
-        );
 
         return LedgerSummaryResponse.builder()
                 .totalGrossRevenue(grossRevenue)
                 .totalRefundedAmount(refundedAmount)
-                .netRevenue(netRevenue)
-                .pendingCount(pendingCount)
-                .successCount(successCount)
-                .failedCount(failedCount)
-                .pendingManualTransfersCount(pendingManualTransfersCount)
+                .netRevenue(grossRevenue.subtract(refundedAmount))
+                .pendingCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
+                .successCount(transactionRepository.countByStatus(TransactionStatus.SUCCESS))
+                .failedCount(transactionRepository.countByStatus(TransactionStatus.FAILED))
                 .build();
     }
 
     /**
      * Lấy dữ liệu tổng quan cho trang Dashboard tài chính (FinanceDashboard.tsx).
+     * Không readOnly: mở dashboard thì quét khoản lệch đối soát tháng hiện tại (UC054) để số liệu luôn mới.
      */
-    public com.localpress.finance.dto.response.FinanceDashboardResponse getFinanceDashboard() {
+    @Transactional
+    public FinanceDashboardResponse getFinanceDashboard() {
         log.info("Lấy dữ liệu tổng quan Dashboard tài chính");
 
         // "Doanh thu thực thu" = doanh thu thuần, cùng công thức với sổ quỹ (Rule 16): gộp - tiền đã hoàn
         BigDecimal netRevenue = transactionRepository.calculateTotalGrossRevenue()
                 .subtract(transactionRepository.calculateTotalRefundedAmount());
-        long successCount = transactionRepository.countByStatus(TransactionStatus.SUCCESS);
-        long pendingCount = transactionRepository.countByStatus(TransactionStatus.PENDING);
-
         List<TransactionLedgerResponse> recentTransactions = transactionRepository
                 .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .map(TransactionLedgerResponse::fromEntity)
                 .getContent();
 
-        return com.localpress.finance.dto.response.FinanceDashboardResponse.builder()
+        return FinanceDashboardResponse.builder()
                 .totalRevenue(netRevenue)
-                .paidOrdersCount(successCount)
-                .pendingOrdersCount(pendingCount)
+                .paidOrdersCount(transactionRepository.countByStatus(TransactionStatus.SUCCESS))
+                .pendingOrdersCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
                 .refundReviewCount(refundRequestRepository.countByStatus(RefundStatus.PENDING))
-                .reconciliationDiscrepancy(BigDecimal.ZERO)
+                .openComplaintCount(paymentComplaintRepository.countByStatus(PaymentComplaint.Status.OPEN))
+                .reconciliationDiscrepancy(reconciliationService.currentUnresolvedAmount())
                 .recentOrders(recentTransactions)
                 .build();
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }
 

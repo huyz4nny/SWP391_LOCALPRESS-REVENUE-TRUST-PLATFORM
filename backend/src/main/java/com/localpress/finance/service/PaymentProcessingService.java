@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,7 +76,7 @@ public class PaymentProcessingService {
                 userId, request.getOrderType(), request.getTargetId(), request.getAmount());
 
         TransactionType type = parseOrderType(request.getOrderType());
-        if (type == TransactionType.REFUND || type == TransactionType.TOPUP) {
+        if (!type.isPurchase()) {
             throw new AppException("Không thể tạo đơn loại " + type + " qua API này", HttpStatus.BAD_REQUEST);
         }
 
@@ -83,9 +84,7 @@ public class PaymentProcessingService {
                 ? request.getDescription()
                 : request.getTargetTitle();
 
-        Transaction.TransactionBuilder txBuilder = newPendingOrder(userId, type, request.getAmount(), description)
-                // Mọi khoản tiền vào đều qua SePay (QR) hoặc ví; không còn chuyển khoản thủ công do kế toán duyệt
-                .paymentMethod("SEPAY");
+        Transaction.TransactionBuilder txBuilder = newPendingOrder(userId, type, request.getAmount(), description);
 
         // Gán đúng Scalar Foreign Key theo từng phân hệ (khớp CHECK chk_transactions_targets)
         switch (type) {
@@ -98,16 +97,7 @@ public class PaymentProcessingService {
         Transaction savedTx = transactionRepository.save(txBuilder.build());
         log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(), savedTx.getGatewayTransactionId());
 
-        OrderCreateResponse response = toPaymentView(savedTx);
-        response.setCheckoutFields(sePayService.buildOneTimePaymentFields(
-                savedTx.getGatewayTransactionId(),
-                savedTx.getAmount(),
-                description != null ? description : "Thanh toan don " + savedTx.getGatewayTransactionId(),
-                request.getSuccessUrl(),
-                request.getErrorUrl(),
-                request.getCancelUrl()
-        ));
-        return response;
+        return toPaymentView(savedTx);
     }
 
     /**
@@ -124,9 +114,7 @@ public class PaymentProcessingService {
         }
 
         Transaction savedTx = transactionRepository.save(
-                newPendingOrder(userId, TransactionType.TOPUP, amount, "Nạp tiền vào Ví LocalPress")
-                        .paymentMethod("SEPAY")
-                        .build());
+                newPendingOrder(userId, TransactionType.TOPUP, amount, "Nạp tiền vào Ví LocalPress").build());
         log.info("User #{} tạo đơn nạp ví {} VND, mã {}", userId, amount, savedTx.getGatewayTransactionId());
         return toPaymentView(savedTx);
     }
@@ -137,9 +125,7 @@ public class PaymentProcessingService {
 
     @Transactional(readOnly = true)
     public OrderCreateResponse getPaymentView(FinanceCurrentUser.Principal principal, String orderCode) {
-        Transaction tx = findByCode(orderCode);
-        principal.assertCanAccess(tx.getUserId());
-        return toPaymentView(tx);
+        return toPaymentView(findViewable(principal, orderCode));
     }
 
     @Transactional(readOnly = true)
@@ -164,9 +150,7 @@ public class PaymentProcessingService {
 
     @Transactional(readOnly = true)
     public OrderStatusResponse getOrderStatusByCode(FinanceCurrentUser.Principal principal, String orderCode) {
-        Transaction tx = findByCode(orderCode);
-        principal.assertCanAccess(tx.getUserId());
-        return toStatus(tx);
+        return toStatus(findViewable(principal, orderCode));
     }
 
     // =========================================================================
@@ -180,18 +164,12 @@ public class PaymentProcessingService {
     @Transactional
     public OrderStatusResponse payWithWallet(FinanceCurrentUser.Principal principal, String orderCode) {
         Transaction tx = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode)
-                .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng với mã: " + orderCode, HttpStatus.NOT_FOUND));
-
-        if (!tx.getUserId().equals(principal.userId())) {
-            throw new AppException("Bạn không có quyền thanh toán đơn hàng này", HttpStatus.FORBIDDEN);
-        }
-        if (tx.getTransactionType() == TransactionType.TOPUP || tx.getTransactionType() == TransactionType.REFUND) {
-            throw new AppException("Đơn nạp ví không thể thanh toán bằng chính số dư ví", HttpStatus.BAD_REQUEST);
-        }
+                .orElseThrow(() -> orderNotFound(orderCode));
+        assertOwnPurchase(principal, tx, "Đơn nạp ví không thể thanh toán bằng chính số dư ví");
         if (tx.getStatus() == TransactionStatus.SUCCESS) {
             return toStatus(tx);
         }
-        if (tx.isExpired(LocalDateTime.now())) {
+        if (tx.getStatus() != TransactionStatus.PENDING || tx.isPaymentWindowClosed(LocalDateTime.now())) {
             throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
         }
 
@@ -206,17 +184,12 @@ public class PaymentProcessingService {
     @Transactional
     public OrderCreateResponse createShortfallTopUp(FinanceCurrentUser.Principal principal, String orderCode) {
         Transaction order = findByCode(orderCode);
-        if (!order.getUserId().equals(principal.userId())) {
-            throw new AppException("Bạn không có quyền thanh toán đơn hàng này", HttpStatus.FORBIDDEN);
-        }
-        if (order.getTransactionType() == TransactionType.TOPUP || order.getTransactionType() == TransactionType.REFUND) {
-            throw new AppException("Đơn nạp ví không cần nạp bù", HttpStatus.BAD_REQUEST);
-        }
+        assertOwnPurchase(principal, order, "Đơn nạp ví không cần nạp bù");
         if (order.getStatus() == TransactionStatus.SUCCESS) {
             throw new AppException("Đơn " + orderCode + " đã được thanh toán", HttpStatus.CONFLICT);
         }
         LocalDateTime now = LocalDateTime.now();
-        if (order.getStatus() != TransactionStatus.PENDING || order.isExpired(now)) {
+        if (order.getStatus() != TransactionStatus.PENDING || order.isPaymentWindowClosed(now)) {
             throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
         }
 
@@ -234,7 +207,6 @@ public class PaymentProcessingService {
 
         Transaction topup = transactionRepository.save(
                 newPendingOrder(order.getUserId(), TransactionType.TOPUP, shortfall, "Nạp bù cho đơn " + orderCode)
-                        .paymentMethod("SEPAY")
                         .topupForOrder(orderCode)
                         .build());
         log.info("User #{} nạp bù {} VND cho đơn {}, mã nạp {}", order.getUserId(), shortfall, orderCode, topup.getGatewayTransactionId());
@@ -249,6 +221,7 @@ public class PaymentProcessingService {
      * Xử lý IPN đã qua xác thực khóa ở Controller. Các nhánh:
      * 1. Không có mã đơn / đơn không tồn tại  -> ORDER_NOT_FOUND (Kế toán đối soát bằng sao kê, UC054).
      * 2. Đơn đã SUCCESS                       -> ALREADY_PROCESSED (Rule 5).
+     *    Không có số tiền                     -> AMOUNT_MISSING, không đổi gì (Rule 4).
      * 3. Đơn TOPUP                            -> cộng ví đúng số tiền thực nhận.
      * 4. Đơn hết hiệu lực / quảng cáo quá hạn -> tiền vào ví, không cấp quyền (Rule 6).
      * 5. Chuyển thiếu                         -> tiền vào ví, đơn vẫn PENDING để khách bù.
@@ -275,16 +248,18 @@ public class PaymentProcessingService {
             return result(true, "ALREADY_PROCESSED", orderCode, "Giao dịch đã được ghi nhận trước đó");
         }
 
+        // Rule 4: không biết khách chuyển bao nhiêu thì không cấp quyền; log lại để kế toán đối soát (UC054)
         BigDecimal paidAmount = ipnRequest.resolveAmount();
         if (paidAmount == null || paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            paidAmount = tx.getAmount();
+            log.warn("Webhook cho đơn {} không có số tiền, không ghi nhận", orderCode);
+            return result(false, "AMOUNT_MISSING", orderCode, "Thông báo tiền về không có số tiền, chờ kế toán đối soát");
         }
         String reference = ipnRequest.getReferenceCode();
 
         // 3. Nạp ví: cộng đúng số tiền thực nhận, kể cả khi về sau hạn QR (không có gì để mất chỗ)
         if (tx.getTransactionType() == TransactionType.TOPUP) {
             tx.setAmount(paidAmount);
-            tx.markPaidByGateway(orderCode, sePayService.getBankCode());
+            tx.markPaidByGateway(sePayService.getBankCode());
             transactionRepository.save(tx);
             walletService.credit(tx, paidAmount, tx.getTopupForOrder() != null
                     ? "Nạp bù qua SePay cho đơn " + tx.getTopupForOrder() + ", mã " + orderCode
@@ -300,7 +275,7 @@ public class PaymentProcessingService {
         }
 
         // 4. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ: không cấp quyền, tiền vào ví
-        boolean adHoldExpired = tx.getTransactionType() == TransactionType.AD && tx.isExpired(LocalDateTime.now());
+        boolean adHoldExpired = tx.getTransactionType() == TransactionType.AD && tx.isPaymentWindowClosed(LocalDateTime.now());
         if (tx.getStatus() != TransactionStatus.PENDING || adHoldExpired) {
             tx.markExpired();
             transactionRepository.save(tx);
@@ -319,7 +294,7 @@ public class PaymentProcessingService {
         }
 
         // 6. Đủ hoặc thừa
-        tx.markPaidByGateway(orderCode, sePayService.getBankCode());
+        tx.markPaidByGateway(sePayService.getBankCode());
         Transaction savedTx = transactionRepository.save(tx);
         publishPaymentSuccess(savedTx);
 
@@ -340,12 +315,30 @@ public class PaymentProcessingService {
      */
     @Transactional
     public Map<String, Object> creditUnmatchedTransfer(Long userId, BigDecimal amount, String code, String reason) {
-        if (transactionRepository.existsByGatewayTransactionId(code)) {
-            return result(true, "ALREADY_PROCESSED", code, "Khoản tiền này đã được cộng vào ví trước đó");
-        }
         Transaction carrier = Transaction.builder().userId(userId).gatewayTransactionId(code).build();
-        Map<String, Object> body = creditToWallet(carrier, amount, null, reason, "CREDITED_WALLET");
-        return body;
+        return creditToWallet(carrier, amount, null, reason, "CREDITED_WALLET");
+    }
+
+    /**
+     * Ghi nhận tay một khoản tiền vào đơn (khiếu nại UC051, đối soát UC054) phải đi đúng đường tiền thật đã đi.
+     * Luồng mọi đơn trả bằng ví: QR khách quét mang mã nạp bù (TOPUP gắn topup_for_order), không phải mã đơn.
+     * Đơn mua còn mã nạp bù đang chờ -> trả về mã nạp bù (ưu tiên mã đúng số tiền) để tiền cộng ví rồi tự trả đơn,
+     * và webhook thật của mã đó về sau gặp ALREADY_PROCESSED. Ngược lại giữ nguyên mã được khai.
+     */
+    @Transactional(readOnly = true)
+    public String resolvePaymentCode(String orderCode, BigDecimal amount) {
+        Transaction order = transactionRepository.findByGatewayTransactionId(orderCode).orElse(null);
+        if (order == null || !order.getTransactionType().isPurchase() || order.getStatus() != TransactionStatus.PENDING) {
+            return orderCode;
+        }
+        List<Transaction> topups = transactionRepository
+                .findByTopupForOrderAndStatusOrderByCreatedAtDesc(orderCode, TransactionStatus.PENDING);
+        return topups.stream()
+                .filter(t -> amount != null && t.getAmount().compareTo(amount) == 0)
+                .findFirst()
+                .or(() -> topups.stream().findFirst())
+                .map(Transaction::getGatewayTransactionId)
+                .orElse(orderCode);
     }
 
     // =========================================================================
@@ -402,7 +395,7 @@ public class PaymentProcessingService {
         Transaction order = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode).orElse(null);
         if (order == null || !order.getUserId().equals(userId)) return "ORDER_NOT_FOUND";
         if (order.getStatus() == TransactionStatus.SUCCESS) return "ALREADY_PAID";
-        if (order.getStatus() != TransactionStatus.PENDING || order.isExpired(LocalDateTime.now())) return "ORDER_EXPIRED";
+        if (order.getStatus() != TransactionStatus.PENDING || order.isPaymentWindowClosed(LocalDateTime.now())) return "ORDER_EXPIRED";
         if (walletService.lockedBalance(userId).compareTo(order.getAmount()) < 0) return "INSUFFICIENT";
         debitAndMarkPaid(order);
         log.info("Tự trả đơn {} bằng ví sau khi nạp bù", orderCode);
@@ -426,6 +419,8 @@ public class PaymentProcessingService {
                 .transactionType(type)
                 .amount(amount)
                 .currency("VND")
+                // Mọi khoản tiền vào đều qua SePay (QR) hoặc ví; không còn chuyển khoản thủ công do kế toán duyệt
+                .paymentMethod("SEPAY")
                 .bankCode(sePayService.getBankCode())
                 .gatewayTransactionId(generateOrderCode(now))
                 .description(description)
@@ -455,8 +450,28 @@ public class PaymentProcessingService {
     }
 
     private Transaction findByCode(String orderCode) {
-        return transactionRepository.findByGatewayTransactionId(orderCode)
-                .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng với mã: " + orderCode, HttpStatus.NOT_FOUND));
+        return transactionRepository.findByGatewayTransactionId(orderCode).orElseThrow(() -> orderNotFound(orderCode));
+    }
+
+    /** Chủ đơn hoặc nhân sự tài chính mới xem được đơn (Rule 14). */
+    private Transaction findViewable(FinanceCurrentUser.Principal principal, String orderCode) {
+        Transaction tx = findByCode(orderCode);
+        principal.assertCanAccess(tx.getUserId());
+        return tx;
+    }
+
+    /** Chỉ chủ đơn mới được trả, và chỉ trả đơn mua (không phải TOPUP / REFUND). */
+    private static void assertOwnPurchase(FinanceCurrentUser.Principal principal, Transaction order, String notPurchaseMessage) {
+        if (!order.getUserId().equals(principal.userId())) {
+            throw new AppException("Bạn không có quyền thanh toán đơn hàng này", HttpStatus.FORBIDDEN);
+        }
+        if (!order.getTransactionType().isPurchase()) {
+            throw new AppException(notPurchaseMessage, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private static AppException orderNotFound(String orderCode) {
+        return new AppException("Không tìm thấy đơn hàng với mã: " + orderCode, HttpStatus.NOT_FOUND);
     }
 
     private void publishPaymentSuccess(Transaction tx) {
@@ -476,8 +491,7 @@ public class PaymentProcessingService {
     }
 
     private OrderCreateResponse toPaymentView(Transaction tx) {
-        boolean pending = tx.getStatus() == TransactionStatus.PENDING;
-        boolean expired = pending && tx.isExpired(LocalDateTime.now());
+        boolean expired = tx.isPendingExpired();
         return OrderCreateResponse.builder()
                 .transactionId(tx.getTransactionId())
                 .orderCode(tx.getGatewayTransactionId())
@@ -490,9 +504,8 @@ public class PaymentProcessingService {
                 .expired(expired)
                 .paymentMethod(tx.getPaymentMethod())
                 .description(tx.getDescription())
-                .checkoutUrl(sePayService.getCheckoutUrl())
                 // Chỉ trả QR khi đơn còn chờ thanh toán và chưa hết hạn
-                .qrCodeUrl(pending && !expired ? sePayService.generateVietQrUrl(tx.getGatewayTransactionId(), tx.getAmount()) : null)
+                .qrCodeUrl(tx.getStatus() == TransactionStatus.PENDING && !expired ? sePayService.generateVietQrUrl(tx.getGatewayTransactionId(), tx.getAmount()) : null)
                 .bankCode(sePayService.getBankCode())
                 .accountNumber(sePayService.getAccountNumber())
                 .accountName(sePayService.getAccountName())
@@ -511,7 +524,7 @@ public class PaymentProcessingService {
                 .orderType(tx.getTransactionType().name())
                 .status(tx.getStatus().name())
                 .isPaid(tx.getStatus() == TransactionStatus.SUCCESS)
-                .expired(tx.getStatus() == TransactionStatus.PENDING && tx.isExpired(LocalDateTime.now()))
+                .expired(tx.isPendingExpired())
                 .amount(tx.getAmount())
                 .currency(tx.getCurrency())
                 .paymentMethod(tx.getPaymentMethod())
@@ -523,7 +536,8 @@ public class PaymentProcessingService {
                 .build();
     }
 
-    private Map<String, Object> result(boolean success, String status, String orderCode, String message) {
+    /** Body kết quả xử lý tiền vào, dùng chung với SepayGatewayService. */
+    static Map<String, Object> result(boolean success, String status, String orderCode, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", success);
         body.put("status", status);
