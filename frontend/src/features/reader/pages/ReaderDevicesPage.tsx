@@ -1,100 +1,132 @@
+// Tác dụng: trang `/account/devices` (UC043) — list tối đa 2 phiên, nút thu hồi. Login chưa ghi phiên thì danh sách trống.
 import React, { useState } from 'react'
-import { mockStore } from '@/mocks/store'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { Smartphone, Laptop, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { logout } from '@/features/identity/authSession'
+import { useNavigate } from 'react-router-dom'
+import { useReaderDevices } from '../hooks/useReaderDevices'
+import { ReaderDevice } from '../api'
 
+function typeLabel(deviceType: string) {
+  if (deviceType === 'MOBILE') return 'Điện thoại'
+  if (deviceType === 'TABLET') return 'Máy tính bảng'
+  return 'Máy tính'
+}
+
+// trang /account/devices: list phien + nut Thu hoi, toi da 2
 export function ReaderDevicesPage() {
-  const currentUser = mockStore.getCurrentUser()
-  const entitlement = mockStore.getEntitlements(currentUser.id)
-  const [devices, setDevices] = useState(entitlement.activeDevices)
+  const devices = useReaderDevices()
+  const navigate = useNavigate()
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const target = devices.items.find((item) => item.deviceId === confirmId) ?? null
 
-  const handleRevokeDevice = (deviceId: string) => {
-    if (window.confirm('Đăng xuất phiên đăng nhập trên thiết bị này?')) {
-      const updated = devices.filter((d) => d.id !== deviceId)
-      entitlement.activeDevices = updated
-      setDevices([...updated])
+  const revoke = async () => {
+    if (!target) return
+    setSaving(true)
+    setActionError('')
+    const wasCurrent = target.current
+    try {
+      await devices.revoke(target.deviceId)
+      setConfirmId(null)
+      if (wasCurrent) {
+        logout()
+        navigate('/login')
+      }
+    } catch (err) {
+      setActionError(err instanceof Error && err.message ? err.message : 'Không thu hồi được phiên')
+    } finally {
+      setSaving(false)
     }
+  }
+
+  if (!devices.loaded) {
+    return <p className="text-sm text-slate-500">Đang tải thiết bị đăng nhập...</p>
+  }
+
+  if (devices.error) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-crimson">{devices.error}</p>
+        <Button variant="outline" size="sm" onClick={devices.reload}>Tải lại</Button>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* tieu de + so phien dang mo / 2 */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-serif text-2xl font-bold text-stone-900">Quản lý phiên thiết bị</h2>
-          <p className="text-xs text-stone-500 mt-1">
-            Quy định tòa soạn: Mỗi tài khoản độc giả được đăng nhập tối đa <strong>2 thiết bị cá nhân</strong> đồng thời
+          <h2 className="font-serif text-2xl font-bold text-slate-900">Thiết bị đăng nhập</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Mỗi tài khoản tối đa 2 phiên còn hiệu lực. Đăng nhập thiết bị thứ ba bị từ chối cho đến khi bạn thu hồi một phiên.
           </p>
         </div>
-        <div className="px-3 py-1 rounded-full bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-700 w-fit">
-          Đang sử dụng: {devices.length} / 2 thiết bị
-        </div>
+        <p className="text-sm font-medium text-slate-700 num">{devices.items.length} / 2 phiên</p>
       </div>
 
-      {devices.length >= 2 && (
-        <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start space-x-2.5">
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <strong>Đã đạt giới hạn 2 thiết bị tối đa:</strong> Nếu bạn đăng nhập trên thiết bị thứ 3, hệ thống Paywall sẽ yêu cầu đăng xuất một trong hai thiết bị dưới đây để bảo vệ bản quyền nội dung.
-          </div>
+      {actionError && <p className="text-sm text-crimson">{actionError}</p>}
+
+      {devices.items.length === 0 ? (
+        <EmptyState
+          title="Chưa có phiên đang hiệu lực"
+          description="Phiên xuất hiện sau khi đăng nhập được ghi nhận. Phiên đã thu hồi hoặc hết hạn không còn trong danh sách."
+        />
+      ) : (
+        <div className="space-y-3">
+          {/* vong lap ve tung dong thiet bi */}
+          {devices.items.map((device) => (
+            <DeviceRow key={device.deviceId} device={device} onRevoke={() => setConfirmId(device.deviceId)} />
+          ))}
         </div>
       )}
 
-      <div className="space-y-3">
-        {devices.map((dev) => (
-          <div
-            key={dev.id}
-            className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${
-              dev.isCurrent
-                ? 'bg-blue-50/40 border-blue-200'
-                : 'bg-white border-stone-200 hover:border-stone-300'
-            }`}
-          >
-            <div className="flex items-center space-x-3.5">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                  dev.isCurrent ? 'bg-primary-900 text-white' : 'bg-stone-100 text-stone-600'
-                }`}
-              >
-                {dev.deviceName.toLowerCase().includes('phone') || dev.deviceName.toLowerCase().includes('ios') ? (
-                  <Smartphone className="w-5 h-5" />
-                ) : (
-                  <Laptop className="w-5 h-5" />
-                )}
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h4 className="text-sm font-bold text-stone-900">{dev.deviceName}</h4>
-                  {dev.isCurrent && (
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded border border-emerald-300">
-                      Thiết bị này
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-stone-500 mt-0.5 space-x-2">
-                  <span>Trình duyệt: {dev.browser}</span>
-                  <span>•</span>
-                  <span>IP: {dev.ipAddress}</span>
-                  <span>•</span>
-                  <span>Hoạt động: {formatDateTime(dev.lastActive)}</span>
-                </div>
-              </div>
-            </div>
+      {/* hop xac nhan thu hoi phien */}
+      <ConfirmDialog
+        open={target !== null}
+        onClose={() => setConfirmId(null)}
+        onConfirm={revoke}
+        title={target?.current ? 'Đăng xuất thiết bị này?' : 'Thu hồi phiên này?'}
+        message={target?.current
+          ? 'Phiên hiện tại sẽ dừng. Bạn cần đăng nhập lại trên thiết bị này.'
+          : 'Thiết bị đó sẽ phải đăng nhập lại. Bạn vẫn dùng được phiên đang mở.'}
+        confirmText="Thu hồi"
+        isDestructive
+        isLoading={saving}
+      />
+    </div>
+  )
+}
 
-            {!dev.isCurrent && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRevokeDevice(dev.id)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1" />
-                Đăng xuất
-              </Button>
-            )}
-          </div>
-        ))}
+// 1 dong: ten may, nhan Thiet bi nay, nut Thu hoi
+function DeviceRow({ device, onRevoke }: { device: ReaderDevice; onRevoke: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">{device.deviceName}</h3>
+          {device.current && (
+            <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">
+              Thiết bị này
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          {typeLabel(device.deviceType)}
+          {' · '}
+          {device.ipAddress || '—'}
+          {' · '}
+          {formatDateTime(device.lastActiveAt)}
+        </p>
       </div>
+      {/* nut Thu hoi phien nay */}
+      <Button variant="outline" size="sm" onClick={onRevoke}>
+        Thu hồi
+      </Button>
     </div>
   )
 }

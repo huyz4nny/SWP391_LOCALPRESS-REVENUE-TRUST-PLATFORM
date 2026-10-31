@@ -1,3 +1,4 @@
+// Tác dụng: khung cổng tài khoản độc giả — sidebar tủ sách, gói, đơn, thiết bị, hỗ trợ. Guest thì mời login.
 import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
@@ -10,6 +11,7 @@ import {
   User as UserIcon,
   BookOpen,
   Bookmark,
+  Rss,
   History,
   Crown,
   Receipt,
@@ -19,11 +21,17 @@ import {
   LogOut,
 } from 'lucide-react'
 import { logout } from '@/features/identity/authSession'
+import { useReaderLibrary } from '@/features/reader/hooks/useReaderLibrary'
+import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
+import { useReaderDevices } from '@/features/reader/hooks/useReaderDevices'
 
 export function ReaderAccountLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
   const location = useLocation()
   const navigate = useNavigate()
+  const library = useReaderLibrary()
+  const subscription = useReaderSubscription()
+  const devices = useReaderDevices()
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -32,7 +40,7 @@ export function ReaderAccountLayout() {
     return unsub
   }, [])
 
-  // Guard: If guest, prompt to login
+  // khach chua login: hop canh bao + 2 nut demo dang nhap
   if (currentUser.role === 'GUEST') {
     return (
       <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center p-4 font-sans text-slate-900">
@@ -58,21 +66,24 @@ export function ReaderAccountLayout() {
     )
   }
 
-  const entitlement = mockStore.getEntitlements(currentUser.id)
+  const deviceBadge = devices.loaded ? `${devices.items.length}/2` : undefined
 
+  // list muc sidebar: ho so, tu sach, bookmark, follow, ls doc, goi, don, thiet bi, ho tro
   const navItems = [
     { label: 'Hồ sơ tài khoản', path: '/account', icon: UserIcon },
-    { label: 'Tủ sách & bài đã mua', path: '/account/library', icon: BookOpen, badge: entitlement.purchasedArticleIds.length },
-    { label: 'Bài viết đã lưu', path: '/account/bookmarks', icon: Bookmark, badge: entitlement.bookmarkedArticleIds.length },
-    { label: 'Lịch sử đọc tin', path: '/account/history', icon: History },
+    { label: 'Tủ sách & bài đã mua', path: '/account/library', icon: BookOpen, badge: library.purchasedCount },
+    { label: 'Bài viết đã lưu', path: '/account/bookmarks', icon: Bookmark, badge: library.savedIds.length },
+    { label: 'Chuyên mục theo dõi', path: '/account/following', icon: Rss, badge: library.followedCategoryIds.length },
+    { label: 'Lịch sử đọc tin', path: '/account/history', icon: History, badge: library.historyCount },
     { label: 'Gói hội viên', path: '/account/subscription', icon: Crown, isVip: true },
     { label: 'Giao dịch & hóa đơn', path: '/account/orders', icon: Receipt },
-    { label: 'Thiết bị (tối đa 2)', path: '/account/devices', icon: Smartphone, badge: `${entitlement.activeDevices.length}/2` },
+    { label: 'Thiết bị (tối đa 2)', path: '/account/devices', icon: Smartphone, badge: deviceBadge },
     { label: 'Hỗ trợ & hoàn tiền', path: '/account/support', icon: HelpCircle },
   ]
 
   return (
     <div className="min-h-screen bg-[#fafaf9] font-sans text-slate-900">
+      {/* thanh ngang tren: logo + badge VIP/nut nang cap + vi + dark mode + nut Trang bao */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-4">
@@ -83,7 +94,7 @@ export function ReaderAccountLayout() {
           </div>
 
           <div className="flex flex-none items-center gap-2.5">
-            {entitlement.hasSubscription ? (
+            {!subscription.loaded ? null : subscription.hasInEffect ? (
               <Badge variant="gold">Hội viên Premium</Badge>
             ) : (
               <Link
@@ -106,6 +117,7 @@ export function ReaderAccountLayout() {
 
       <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:py-8">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
+          {/* cot trai: avatar + ten + vong lap menu */}
           <aside>
             <div className="flex items-center gap-3 px-2.5 pb-4">
               <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#dfe7f5] text-sm font-semibold text-primary-900">
@@ -118,6 +130,7 @@ export function ReaderAccountLayout() {
             </div>
 
             <nav className="space-y-0.5" aria-label="Tài khoản độc giả">
+              {/* vong lap ve tung dong menu, so dem o ben phai */}
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive =
@@ -144,6 +157,7 @@ export function ReaderAccountLayout() {
                   </Link>
                 )
               })}
+              {/* nut Dang xuat o cuoi menu */}
               <button
                 onClick={() => {
                   logout()
@@ -157,6 +171,7 @@ export function ReaderAccountLayout() {
             </nav>
           </aside>
 
+          {/* cot phai: noi dung trang con (tu sach, goi, don...) */}
           <main className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
             <Outlet />
           </main>

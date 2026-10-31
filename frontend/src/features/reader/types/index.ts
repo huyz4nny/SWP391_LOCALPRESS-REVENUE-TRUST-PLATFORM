@@ -1,3 +1,4 @@
+// Tác dụng: kiểu FE độc giả (Article, Category, gói, comment). Không render UI.
 export type ArticleStatus =
   | 'DRAFT'
   | 'IN_REVIEW'
@@ -67,7 +68,7 @@ export interface Comment {
   userName: string
   userAvatar?: string
   content: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN'
   createdAt: string
   likeCount: number
   reported: boolean
@@ -101,6 +102,7 @@ export interface ReaderEntitlement {
   subscriptionPlanId?: string
   subscriptionPlanName?: string
   subscriptionExpiresAt?: string | null
+  subscriptionAutoRenew?: boolean
   purchasedArticleIds: string[]
   bookmarkedArticleIds: string[]
   readingHistory: { articleId: string; articleTitle: string; slug: string; readAt: string }[]

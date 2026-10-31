@@ -1,196 +1,106 @@
-import React, { useState } from 'react'
-import { mockStore } from '@/mocks/store'
-import { httpClient } from '@/lib/http/client'
+// Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form Huy `/wallet/complaints`.
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { complaintApi } from '@/features/finance/api/payment'
+import type { PaymentComplaint } from '@/features/finance/types'
 import { formatCurrency, formatDateTime } from '@/lib/format'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import { Input, Textarea } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { StatusBadge } from '@/components/shared/StatusBadge'
-import { HelpCircle, Send, CheckCircle2, RotateCcw } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { HelpCircle } from 'lucide-react'
 
+function statusLabel(status: PaymentComplaint['status']) {
+  if (status === 'OPEN') return <Badge variant="warning">Chờ đối soát</Badge>
+  if (status === 'RESOLVED') return <Badge variant="success">Đã ghi nhận</Badge>
+  return <Badge variant="destructive">Từ chối</Badge>
+}
+
+// UC046 danh sách khiếu nại thanh toán của độc giả ở màn hình II.3.10
+// form gửi khiếu nại nằm ở trang /wallet/complaints của SV4, trang này chỉ liệt kê và dẫn sang đó
 export function ReaderSupportPage() {
-  const currentUser = mockStore.getCurrentUser()
-  const myRefunds = mockStore.getState().refunds.filter((r) => r.userId === currentUser.id)
-  const myPaidOrders = mockStore.getState().orders.filter(
-    (o) => o.userId === currentUser.id && o.paymentStatus === 'PAID'
-  )
+  const navigate = useNavigate()
+  const [items, setItems] = useState<PaymentComplaint[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  const [selectedOrderId, setSelectedOrderId] = useState(myPaidOrders[0]?.id || '')
-  const [reason, setReason] = useState('')
-  const [refundAmount, setRefundAmount] = useState(
-    myPaidOrders[0]?.finalAmount ? String(myPaidOrders[0].finalAmount) : '0'
-  )
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
-
-  const handleOrderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value
-    setSelectedOrderId(id)
-    const matched = myPaidOrders.find((o) => o.id === id)
-    if (matched) {
-      setRefundAmount(String(matched.finalAmount))
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedOrderId || !reason.trim()) return
-
-    setIsSubmitting(true)
+  const load = async () => {
     try {
-      const order = myPaidOrders.find((o) => o.id === selectedOrderId)
-      await httpClient.post('/finance/refunds/propose', {
-        orderId: selectedOrderId,
-        refundAmount: Number(refundAmount),
-        reason: reason.trim(),
-        affectedBenefit: `Khiếu nại từ độc giả ${currentUser.name}: ${order?.targetTitle}`,
-      })
-      setIsSuccess(true)
-      setReason('')
-    } catch (err: any) {
-      alert(err.message || 'Lỗi gửi yêu cầu')
+      setLoading(true)
+      setLoadError(null)
+      setItems(await complaintApi.listMine())
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Không tải được danh sách khiếu nại')
+      setItems([])
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
+
+  useEffect(() => {
+    void load()
+  }, [])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* tieu de ho tro thanh toan */}
       <div>
-        <h2 className="font-serif text-2xl font-bold text-stone-900">Trung tâm Hỗ trợ & Khiếu nại</h2>
+        <h2 className="font-serif text-2xl font-bold text-stone-900">Hỗ trợ thanh toán</h2>
         <p className="text-xs text-stone-500 mt-1">
-          Gửi yêu cầu hỗ trợ kỹ thuật hoặc đề nghị hoàn tiền theo quy định tòa soạn
+          Khi đã chuyển tiền mà đơn hoặc ví chưa được ghi nhận, gửi khiếu nại để kế toán đối chiếu sao kê. Không chuyển tiền lại.
         </p>
       </div>
 
-      {/* Refund request history */}
-      {myRefunds.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-serif text-sm font-bold text-stone-900 flex items-center">
-            <RotateCcw className="w-4 h-4 mr-1.5 text-primary-900" />
-            Yêu cầu hoàn tiền đã gửi ({myRefunds.length})
-          </h3>
-
-          <div className="space-y-2">
-            {myRefunds.map((r) => (
-              <div
-                key={r.id}
-                className="p-4 rounded-xl border border-stone-200 bg-stone-50/70 text-xs space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono font-bold text-stone-900">{r.id}</span>
-                    <span>•</span>
-                    <span>Đơn hàng: <strong className="font-mono">{r.orderCode}</strong></span>
-                  </div>
-                  <StatusBadge type="refund" status={r.status} />
-                </div>
-
-                <div className="flex justify-between text-stone-600">
-                  <span>Số tiền yêu cầu hoàn: <strong>{formatCurrency(r.refundAmount)}</strong></span>
-                  <span>Ngày gửi: {formatDateTime(r.requestedAt)}</span>
-                </div>
-
-                <p className="text-stone-700 bg-white p-2.5 rounded border border-stone-200">
-                  Lý do: {r.reason}
-                </p>
-
-                {r.reviewNotes && (
-                  <div className="p-2.5 bg-blue-50 border border-blue-200 rounded text-blue-900">
-                    <strong>Phản hồi từ Ban Tài chính:</strong> {r.reviewNotes}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* New Refund / Support Request Form */}
-      <div className="bg-stone-50 rounded-xl border border-stone-200 p-6 space-y-4 max-w-lg">
-        <h3 className="font-serif text-base font-bold text-stone-900">
-          Gửi đề xuất hoàn tiền / Khiếu nại dịch vụ
-        </h3>
-
-        {isSuccess ? (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs space-y-2">
-            <div className="flex items-center space-x-1.5 font-bold">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Yêu cầu đã được tiếp nhận thành công!</span>
-            </div>
-            <p>
-              Bộ phận Kế toán (Finance Staff) và Kế toán trưởng sẽ kiểm tra hồ sơ, đối chiếu sao kê và phản hồi trong vòng 24 giờ làm việc.
-            </p>
-            <Button size="sm" variant="outline" onClick={() => setIsSuccess(false)}>
-              Gửi thêm yêu cầu khác
-            </Button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            <div>
-              <Label htmlFor="orderSelect" required>
-                Chọn đơn hàng cần khiếu nại / hoàn tiền
-              </Label>
-              {myPaidOrders.length === 0 ? (
-                <p className="text-stone-500 italic py-2">
-                  Bạn chưa có đơn hàng đã thanh toán nào để yêu cầu hoàn tiền.
-                </p>
-              ) : (
-                <select
-                  id="orderSelect"
-                  value={selectedOrderId}
-                  onChange={handleOrderChange}
-                  className="w-full h-10 px-3 rounded-md border border-stone-300 bg-white text-xs focus:ring-2 focus:ring-primary-900"
-                >
-                  {myPaidOrders.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.orderCode} — {o.targetTitle} ({formatCurrency(o.finalAmount)})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="refundAmount" required>
-                Số tiền đề xuất hoàn (VND)
-              </Label>
-              <Input
-                id="refundAmount"
-                type="number"
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value)}
-                required
-                min={1000}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="reason" required>
-                Lý do chi tiết
-              </Label>
-              <Textarea
-                id="reason"
-                placeholder="Nêu rõ lý do (VD: Thanh toán trùng, mua nhầm gói, lỗi không đọc được bài)..."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={3}
-                required
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={myPaidOrders.length === 0}
-              isLoading={isSubmitting}
-              className="w-full"
-            >
-              <Send className="w-3.5 h-3.5 mr-1" />
-              Gửi đề xuất hoàn tiền
-            </Button>
-          </form>
-        )}
+      {/* nut Gui khieu nai (sang trang Huy) + nut Xem lich su giao dich */}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => navigate('/wallet/complaints')}>
+          Gửi khiếu nại thanh toán
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => navigate('/account/orders')}>
+          Xem lịch sử giao dịch
+        </Button>
       </div>
+
+      {loadError ? (
+        <EmptyState
+          title="Không tải được khiếu nại"
+          description={loadError}
+          actionLabel="Thử lại"
+          onAction={() => load()}
+        />
+      ) : loading ? (
+        <div className="space-y-2 animate-pulse">
+          <div className="h-20 bg-stone-200 rounded-lg" />
+          <div className="h-20 bg-stone-200 rounded-lg" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<HelpCircle className="w-12 h-12 text-stone-300 mx-auto mb-3" />}
+          title="Chưa có khiếu nại nào"
+          description="Nếu đã chuyển tiền mà hệ thống chưa ghi nhận sau 15 phút, bấm Gửi khiếu nại thanh toán."
+        />
+      ) : (
+        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200">
+          {/* vong lap ve tung khieu nai: so tien + badge trang thai */}
+          {items.map((c) => (
+            <li key={c.complaintId} className="px-4 py-3 space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold num">{formatCurrency(c.amount)}</span>
+                {statusLabel(c.status)}
+              </div>
+              <div className="text-xs text-slate-500">
+                <span className="font-mono">{c.bankReference}</span>
+                {c.orderCode ? <> · đơn <span className="font-mono">{c.orderCode}</span></> : null}
+              </div>
+              <div className="text-xs text-slate-500 num">Chuyển lúc {formatDateTime(c.transferredAt)}</div>
+              {c.resolutionNote && (
+                <p className={`text-xs ${c.status === 'REJECTED' ? 'text-red-800' : 'text-slate-700'}`}>
+                  Kế toán: {c.resolutionNote}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

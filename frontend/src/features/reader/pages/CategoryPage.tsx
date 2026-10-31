@@ -1,3 +1,4 @@
+// Tác dụng: trang chuyên mục `/categories/:slug` (UC029, UC040) — list bài + nút theo dõi.
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Article, Category } from '../types'
@@ -5,9 +6,11 @@ import { readerApi } from '../api'
 import { ArticleCard } from '../components/ArticleCard'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { mockStore } from '@/mocks/store'
-import { ChevronRight, Filter } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useReaderLibrary } from '../hooks/useReaderLibrary'
+import { Check, ChevronRight, Filter, Plus } from 'lucide-react'
 
+// trang /categories/:slug: thanh loc + list the bai ngang + nut theo doi
 export function CategoryPage() {
   const { slug } = useParams<{ slug: string }>()
   const [articles, setArticles] = useState<Article[]>([])
@@ -16,7 +19,22 @@ export function CategoryPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<'all' | 'free' | 'premium'>('all')
 
-  const entitlements = mockStore.getEntitlements(mockStore.getCurrentUser().id)
+  const library = useReaderLibrary()
+  const [followBusy, setFollowBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  // UC040 theo dõi hoặc bỏ theo dõi chuyên mục đang xem
+  const handleToggleFollow = async () => {
+    if (!category || followBusy) return
+    setFollowBusy(true)
+    setActionError(await library.toggleFollow(category.id))
+    setFollowBusy(false)
+  }
+
+  // UC038 lưu hoặc bỏ lưu bài ngay trên danh sách chuyên mục
+  const handleToggleBookmark = async (articleId: string) => {
+    setActionError(await library.toggleSaved(articleId))
+  }
 
   useEffect(() => {
     if (slug) loadCategoryArticles(slug, filterType)
@@ -48,7 +66,7 @@ export function CategoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
+      {/* thanh breadcrumb: Trang chu > ten chuyen muc */}
       <nav className="flex items-center space-x-2 text-xs text-stone-500">
         <Link to="/" className="hover:text-primary-900">
           Trang chủ
@@ -57,18 +75,36 @@ export function CategoryPage() {
         <span className="font-semibold text-stone-900">{category?.name || 'Chuyên mục'}</span>
       </nav>
 
-      {/* Category Header */}
+      {/* hop dau trang: ten chuyen muc + nut Theo doi / Dang theo doi */}
       <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-2xs">
-        <h1 className="font-serif text-3xl font-black text-primary-950 uppercase tracking-tight">
-          {category?.name || 'Chuyên mục'}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="font-serif text-3xl font-black text-primary-950 uppercase tracking-tight">
+            {category?.name || 'Chuyên mục'}
+          </h1>
+          {category && (
+            <Button
+              size="sm"
+              variant={library.isFollowing(category.id) ? 'outline' : 'primary'}
+              onClick={handleToggleFollow}
+              isLoading={followBusy}
+              aria-pressed={library.isFollowing(category.id)}
+            >
+              {library.isFollowing(category.id) ? (
+                <><Check className="h-3.5 w-3.5" /> Đang theo dõi</>
+              ) : (
+                <><Plus className="h-3.5 w-3.5" /> Theo dõi chuyên mục</>
+              )}
+            </Button>
+          )}
+        </div>
+        {actionError && <p className="mt-2 text-xs text-red-700">{actionError}</p>}
         {category?.description && (
           <p className="mt-2 text-sm text-stone-600 max-w-2xl leading-relaxed">
             {category.description}
           </p>
         )}
 
-        {/* Filter buttons */}
+        {/* hang nut loc: Tat ca / Mien phi / Premium */}
         <div className="mt-4 pt-4 border-t border-stone-100 flex items-center space-x-2 text-xs">
           <span className="text-stone-500 flex items-center">
             <Filter className="w-3.5 h-3.5 mr-1" /> Bộ lọc:
@@ -106,7 +142,7 @@ export function CategoryPage() {
         </div>
       </div>
 
-      {/* Articles Grid */}
+      {/* cot trai list bai, cot phai banner */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-8">
           {loading ? (
@@ -127,19 +163,21 @@ export function CategoryPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* vong lap ve the bai ngang + nut bookmark tren the */}
               {filteredArticles.map((art) => (
                 <ArticleCard
                   key={art.id}
                   article={art}
                   variant="horizontal"
-                  isBookmarked={entitlements.bookmarkedArticleIds.includes(art.id)}
+                  isBookmarked={library.isSaved(art.id)}
+                  onToggleBookmark={handleToggleBookmark}
                 />
               ))}
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
+        {/* banner sticky ben phai */}
         <aside className="lg:col-span-4 sticky top-20">
           <AdSlotBanner slotCode="SLOT-SIDEBAR-STICKY" />
         </aside>

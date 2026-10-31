@@ -1,8 +1,9 @@
+// Tác dụng: trang chủ `/` (UC029) — tin mới, khối Premium, chuyên mục. Guest đọc không bắt login.
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Article, Category } from '../types'
 import { readerApi } from '../api'
-import { mockStore } from '@/mocks/store'
+import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { ArticleCard, getCategoryBadgeStyle } from '../components/ArticleCard'
 import { AdSlotBanner } from '@/components/shared/AdSlotBanner'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -19,21 +20,18 @@ import {
   Compass,
 } from 'lucide-react'
 
+// trang chu / : hero + dong su kien + khoi premium + list chuyen muc + sidebar
 export function HomePage() {
   const [articles, setArticles] = useState<Article[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [entitlements, setEntitlements] = useState(mockStore.getEntitlements(mockStore.getCurrentUser().id))
+  const library = useReaderLibrary()
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false)
 
   useEffect(() => {
     loadData()
-    const unsub = mockStore.subscribe(() => {
-      setEntitlements(mockStore.getEntitlements(mockStore.getCurrentUser().id))
-    })
-    return unsub
   }, [])
 
   const loadData = async () => {
@@ -56,12 +54,8 @@ export function HomePage() {
   }
 
   const handleToggleBookmark = async (articleId: string) => {
-    try {
-      await readerApi.toggleBookmark(articleId)
-      setEntitlements(mockStore.getEntitlements(mockStore.getCurrentUser().id))
-    } catch (err) {
-      console.error(err)
-    }
+    const error = await library.toggleSaved(articleId)
+    if (error) console.error(error)
   }
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
@@ -73,6 +67,7 @@ export function HomePage() {
     }
   }
 
+  // khung xuong xam khi chua load xong
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse py-8">
@@ -107,21 +102,21 @@ export function HomePage() {
 
   return (
     <div className="space-y-12">
-      {/* 1. Hero Showcase: 1 Big Main Lead + 3 Secondary Top Stories */}
+      {/* hang tren: 1 the bai lon ben trai + 3 the ngang tieu diem ben phai */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Main Feature Story (7 cols) */}
+        {/* the bai tieu diem (anh lon) */}
         <div className="lg:col-span-7">
           {featuredArticle && (
             <ArticleCard
               article={featuredArticle}
               variant="featured"
-              isBookmarked={entitlements.bookmarkedArticleIds.includes(featuredArticle.id)}
+              isBookmarked={library.isSaved(featuredArticle.id)}
               onToggleBookmark={handleToggleBookmark}
             />
           )}
         </div>
 
-        {/* Secondary Stories Column (5 cols) */}
+        {/* cot tieu diem nong: tieu de thanh ngang + vong lap 3 the ngang */}
         <div className="lg:col-span-5 flex flex-col space-y-3.5">
           <div className="flex items-center justify-between pb-2.5 border-b-2 border-stone-900 text-stone-900">
             <div className="flex items-center space-x-2">
@@ -134,12 +129,13 @@ export function HomePage() {
           </div>
 
           <div className="space-y-3">
+            {/* vong lap ve 3 the bai ngang */}
             {secondaryArticles.map((art) => (
               <ArticleCard
                 key={art.id}
                 article={art}
                 variant="horizontal"
-                isBookmarked={entitlements.bookmarkedArticleIds.includes(art.id)}
+                isBookmarked={library.isSaved(art.id)}
                 onToggleBookmark={handleToggleBookmark}
               />
             ))}
@@ -147,13 +143,14 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* 2. Fast Editorial Timeline (Dòng sự kiện 24/7) */}
+      {/* khoi Dong su kien: 4 o nho theo hang */}
       <section className="bg-white rounded-xl border border-stone-200/90 p-4 sm:p-5 shadow-2xs">
         <div className="flex items-center space-x-2 mb-3.5 pb-2 border-b border-stone-100 text-xs font-bold text-stone-900 uppercase tracking-wider">
           <Compass className="w-4 h-4 text-primary-900" />
           <span>Dòng sự kiện nhanh trong ngày</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* vong lap ve tung o su kien: badge chuyen muc + tieu de + nut Xem */}
           {liveTimelineArticles.map((art, idx) => (
             <div
               key={art.id}
@@ -186,7 +183,7 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* 3. Luxury Premium VIP Showcase Box */}
+      {/* khoi Premium den: tieu de + nut Kham pha goi + 3 the bai tra phi */}
       <section className="bg-gradient-to-br from-stone-950 via-slate-950 to-stone-900 text-white rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden border border-amber-500/30">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -204,6 +201,7 @@ export function HomePage() {
             </p>
           </div>
 
+          {/* nut vang sang /premium */}
           <Link
             to="/premium"
             className="inline-flex items-center bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 shrink-0 cursor-pointer"
@@ -215,6 +213,7 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* vong lap 3 the bai premium: gia + link Doc thu */}
           {premiumArticles.map((art) => (
             <div
               key={art.id}
@@ -253,15 +252,15 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* 4. Inline Banner Placement */}
+      {/* banner ngang xen giua trang */}
       <div className="w-full">
         <AdSlotBanner slotCode="SLOT-ARTICLE-INLINE" />
       </div>
 
-      {/* 5. Magazine Category Sections + Sidebar Layout */}
+      {/* duoi: khoi chuyen muc ben trai + sidebar doc nhieu ben phai */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: All 6 Categories with Editorial Asymmetric Layout (8 cols) */}
         <div className="lg:col-span-8 space-y-12">
+          {/* vong lap tung chuyen muc: thanh tieu de + 1 the lon + 3 the nho */}
           {categories.map((cat) => {
             const catArticles = articles.filter(
               (a) => a.categoryId === cat.id || a.categorySlug === cat.slug
@@ -273,7 +272,7 @@ export function HomePage() {
 
             return (
               <section key={cat.id} className="space-y-5">
-                {/* Editorial Section Header */}
+                {/* thanh ngang ten chuyen muc + link Xem tat ca */}
                 <div className="flex items-center justify-between pb-3 border-b-2 border-stone-900">
                   <div className="flex items-center space-x-2.5">
                     <span className="w-3 h-3 rounded-full bg-crimson" />
@@ -298,7 +297,7 @@ export function HomePage() {
                       <ArticleCard
                         article={leadStory}
                         variant="lead"
-                        isBookmarked={entitlements.bookmarkedArticleIds.includes(leadStory.id)}
+                        isBookmarked={library.isSaved(leadStory.id)}
                         onToggleBookmark={handleToggleBookmark}
                       />
                     )}
@@ -311,7 +310,7 @@ export function HomePage() {
                         key={art.id}
                         article={art}
                         variant="compact"
-                        isBookmarked={entitlements.bookmarkedArticleIds.includes(art.id)}
+                        isBookmarked={library.isSaved(art.id)}
                         onToggleBookmark={handleToggleBookmark}
                       />
                     ))}
@@ -322,9 +321,8 @@ export function HomePage() {
           })}
         </div>
 
-        {/* Right Column: Sticky Sidebar (4 cols) */}
+        {/* cot phai dinh: top 5 doc nhieu + form email + hop B2B */}
         <aside className="lg:col-span-4 space-y-8 sticky top-20">
-          {/* 1. Trending Top 5 Stories */}
           <div className="bg-white rounded-2xl border border-stone-200/90 p-5 shadow-2xs">
             <div className="flex items-center space-x-2 pb-3.5 border-b border-stone-200 text-stone-950 font-black text-xs uppercase tracking-wider mb-4">
               <TrendingUp className="w-4 h-4 text-crimson" />
@@ -332,6 +330,7 @@ export function HomePage() {
             </div>
 
             <div className="space-y-3">
+              {/* vong lap 5 dong: so thu tu + tieu de */}
               {trendingArticles.map((art, idx) => (
                 <div
                   key={art.id}
@@ -360,7 +359,7 @@ export function HomePage() {
             </div>
           </div>
 
-          {/* 2. Newsletter Signup Box */}
+          {/* hop dang ky ban tin: o email + nut Dang ky mien phi */}
           <div className="bg-gradient-to-br from-primary-950 to-stone-900 text-white rounded-2xl p-6 shadow-sm border border-stone-800">
             <div className="w-10 h-10 rounded-xl bg-primary-800/50 flex items-center justify-center mb-3">
               <Mail className="w-5 h-5 text-amber-400" />
@@ -397,7 +396,7 @@ export function HomePage() {
             )}
           </div>
 
-          {/* 3. B2B Advertiser Direct Callout */}
+          {/* hop vang dan sang cong advertiser */}
           <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-5 text-stone-800">
             <div className="flex items-center space-x-2 text-amber-900 font-bold text-xs uppercase mb-1">
               <Sparkles className="w-4 h-4 text-amber-600" />

@@ -1,3 +1,4 @@
+// Tác dụng: trang `/search` (UC030) — ô từ khóa, list kết quả bài PUBLISHED, Guest được tìm.
 import React, { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { Article } from '../types'
@@ -8,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search } from 'lucide-react'
 
+// trang /search: o nhap tu khoa + list ket qua + nut Xem them
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') || ''
@@ -74,6 +76,7 @@ export function SearchPage() {
           Tìm kiếm tin tức & bài viết
         </h1>
 
+        {/* o nhap tu khoa + nut Tim kiem */}
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={searchTerm}
@@ -114,11 +117,13 @@ export function SearchPage() {
           />
         ) : (
           <>
+            {/* vong lap ve the ket qua tim kiem */}
             {articles.map((art) => (
               <ArticleCard key={art.id} article={art} variant="horizontal" />
             ))}
             {hasMore && (
               <div className="text-center pt-2">
+                {/* nut tai them trang sau */}
                 <Button variant="outline" onClick={handleLoadMore} disabled={loadingMore}>
                   {loadingMore ? 'Đang tải...' : 'Xem thêm'}
                 </Button>

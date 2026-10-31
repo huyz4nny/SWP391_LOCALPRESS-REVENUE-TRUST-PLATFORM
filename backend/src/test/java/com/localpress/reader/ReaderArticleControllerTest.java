@@ -6,6 +6,8 @@ import com.localpress.reader.controller.ReaderArticleController;
 import com.localpress.reader.dto.ArticleReaderResponse;
 import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.service.ReaderArticleService;
+import com.localpress.reader.service.ReaderCurrentUser;
+import com.localpress.reader.service.ReaderHistoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,13 +58,17 @@ class ReaderArticleControllerTest {
     }
 
     private ReaderArticleService readerService;
+    private ReaderHistoryService historyService;
+    private ReaderCurrentUser currentUser;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         readerService = mock(ReaderArticleService.class);
+        historyService = mock(ReaderHistoryService.class);
+        currentUser = mock(ReaderCurrentUser.class);
         mvc = MockMvcBuilders
-                .standaloneSetup(new ReaderArticleController(readerService), new CmsDraftContractStub())
+                .standaloneSetup(new ReaderArticleController(readerService, historyService, currentUser), new CmsDraftContractStub())
                 .build();
     }
 
@@ -104,12 +111,11 @@ class ReaderArticleControllerTest {
      * nên Spring ném IllegalStateException "Ambiguous handler methods mapped" với mọi slug.
      * Chỉ bật lại test này sau khi SV5 đổi mapping thành "/{id:\\d+}" (đã báo Leader/Tùng).
      */
-    @Disabled("Chờ SV5 đổi GET /api/v1/articles/{id} thành /{id:\\d+} - xem comment PR #8")
     @Test
     void realCmsControllerDoesNotClashWithReaderSlugRoute() throws Exception {
         ArticleDraftService draftService = mock(ArticleDraftService.class);
         MockMvc real = MockMvcBuilders
-                .standaloneSetup(new ReaderArticleController(readerService), new ArticleDraftController(draftService))
+                .standaloneSetup(new ReaderArticleController(readerService, historyService, currentUser), new ArticleDraftController(draftService))
                 .build();
         when(readerService.getArticleBySlug("bai-viet-2026")).thenReturn(ArticleReaderResponse.builder().build());
 
@@ -145,5 +151,27 @@ class ReaderArticleControllerTest {
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(readerService).getArticles(any(), any(), any(), pageable.capture());
         assertTrue(pageable.getValue().getSort().isUnsorted());
+    }
+
+    @Test
+    void loggedInReaderRecordsHistoryAfterReading() throws Exception {
+        ArticleReaderResponse body = ArticleReaderResponse.builder().id(3L).slug("bai-viet").build();
+        when(readerService.getArticleBySlug("bai-viet")).thenReturn(body);
+        when(currentUser.findUserId()).thenReturn(Optional.of(6L));
+
+        mvc.perform(get("/api/v1/articles/bai-viet")).andExpect(status().isOk());
+
+        verify(historyService).recordQuietly(6L, 3L);
+    }
+
+    @Test
+    void guestDoesNotRecordHistory() throws Exception {
+        ArticleReaderResponse body = ArticleReaderResponse.builder().id(3L).slug("bai-viet").build();
+        when(readerService.getArticleBySlug("bai-viet")).thenReturn(body);
+        when(currentUser.findUserId()).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/articles/bai-viet")).andExpect(status().isOk());
+
+        verify(historyService, never()).recordQuietly(any(), any());
     }
 }
