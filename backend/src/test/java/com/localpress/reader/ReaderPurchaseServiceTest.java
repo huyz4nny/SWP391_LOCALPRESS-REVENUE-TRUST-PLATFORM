@@ -11,7 +11,6 @@ import com.localpress.reader.repository.ReaderPurchaseRepository.PendingSubscrip
 import com.localpress.reader.repository.ReaderPurchaseRepository.PlanRow;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PurchaseRow;
 import com.localpress.reader.service.ReaderPurchaseService;
-import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -269,19 +268,6 @@ class ReaderPurchaseServiceTest {
 
         assertEquals(41L, response.getTargetId());
         verify(repository, never()).findActiveSubscriptions(any(), any());
-    }
-
-    @Test
-    void createsNewOrderWhenStoredFinanceOrderIsMissing() {
-        when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
-        when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.of(new PendingSubscriptionRow(33L, "LP-GONE")));
-        when(payments.getPaymentView(PRINCIPAL, "LP-GONE"))
-                .thenThrow(new AppException("Không tìm thấy đơn hàng với mã: LP-GONE", HttpStatus.NOT_FOUND));
-
-        PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
-
-        assertEquals("LP-NEW", response.getOrderCode());
-        verify(repository).updateSubscriptionOrderCode(33L, "LP-NEW");
     }
 
     @Test

@@ -11,7 +11,6 @@ import com.localpress.reader.repository.ReaderPurchaseRepository.ArticleForSale;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PendingSubscriptionRow;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PlanRow;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PurchaseRow;
-import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -122,28 +121,23 @@ public class ReaderPurchaseService {
                 .build();
     }
 
+    // Không bắt NOT_FOUND của getPaymentView: method đó readOnly, ném lỗi sẽ rollback-only cả transaction cha.
+    // Mã đơn luôn do createOrder ghi vào payment_order_code; đơn mất thì để lỗi hiện ra cho finance xử lý.
     private OrderCreateResponse reuseOpenOrder(String storedOrderCode, BigDecimal amount) {
         if (storedOrderCode == null || storedOrderCode.isBlank()) {
             return null;
         }
-        try {
-            OrderCreateResponse current = payments.getPaymentView(financeUser.require(), storedOrderCode);
-            if (current.isPaid()) {
-                return current;
-            }
-            if ("PENDING".equals(current.getStatus())
-                    && !current.isExpired()
-                    && current.getAmount() != null
-                    && current.getAmount().compareTo(amount) == 0) {
-                return current;
-            }
-            return null;
-        } catch (AppException missing) {
-            if (missing.getStatus() == HttpStatus.NOT_FOUND) {
-                return null;
-            }
-            throw missing;
+        OrderCreateResponse current = payments.getPaymentView(financeUser.require(), storedOrderCode);
+        if (current.isPaid()) {
+            return current;
         }
+        if ("PENDING".equals(current.getStatus())
+                && !current.isExpired()
+                && current.getAmount() != null
+                && current.getAmount().compareTo(amount) == 0) {
+            return current;
+        }
+        return null;
     }
 
     private PurchaseRow preparePendingPurchase(Long userId, Long articleId, BigDecimal price) {
