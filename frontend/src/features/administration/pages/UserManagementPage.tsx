@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { User } from '@/types'
-import { UserRole, ROLE_LABELS } from '@/app/config'
+import { APP_CONFIG, UserRole, ROLE_LABELS } from '@/app/config'
 import { adminApi } from '../api'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
@@ -11,6 +12,7 @@ import { Users, Edit, ShieldCheck, Check, X } from 'lucide-react'
 export function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   // Edit Role Modal
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -24,8 +26,11 @@ export function UserManagementPage() {
   const loadUsers = async () => {
     try {
       setLoading(true)
+      setError('')
       const data = await adminApi.getUsers()
       setUsers(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được danh sách tài khoản')
     } finally {
       setLoading(false)
     }
@@ -44,8 +49,9 @@ export function UserManagementPage() {
     try {
       await adminApi.updateUserRole(editingUser.id, selectedRole)
       setEditingUser(null)
-      loadUsers()
-      alert('Đã cập nhật vai trò người dùng thành công!')
+      await loadUsers()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không cập nhật được vai trò')
     } finally {
       setIsUpdating(false)
     }
@@ -71,6 +77,9 @@ export function UserManagementPage() {
 
   return (
     <div className="space-y-8">
+      {error && <p role="alert" className="text-red-700">{error}</p>}
+      {loading && <p role="status">Đang tải tài khoản...</p>}
+      {!loading && !error && users.length === 0 && <EmptyState title="Chưa có tài khoản" />}
       <div className="pb-4 border-b border-slate-200">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
           Quản trị Tài khoản & Phân quyền (RBAC)
@@ -196,7 +205,7 @@ export function UserManagementPage() {
                 onChange={(e) => setSelectedRole(e.target.value as UserRole)}
                 className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-xs font-semibold focus:ring-2 focus:ring-primary-900"
               >
-                {Object.entries(ROLE_LABELS).map(([rKey, rLabel]) => (
+                {Object.entries(ROLE_LABELS).filter(([role]) => APP_CONFIG.useMockApi || ['READER', 'AUTHOR', 'EDITOR', 'STAFF', 'ACCOUNTANT', 'ADVERTISER', 'SYSTEM_ADMIN'].includes(role)).map(([rKey, rLabel]) => (
                   <option key={rKey} value={rKey}>
                     {rLabel} ({rKey})
                   </option>

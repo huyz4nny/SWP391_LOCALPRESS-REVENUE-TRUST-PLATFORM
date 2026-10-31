@@ -3,6 +3,7 @@ package com.localpress.delivery.service;
 import com.localpress.delivery.repository.ContentAccessRepository;
 import com.localpress.delivery.repository.ContentAccessRepository.PublishedArticle;
 import com.localpress.identity.entity.User;
+import com.localpress.administration.service.PaywallPolicyService;
 import com.localpress.identity.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,19 +25,51 @@ public class PaywallEngine {
     private final ContentAccessRepository access;
     private final UserRepository users;
     private final Clock clock;
+    private final PaywallPolicyService policies;
 
     public enum Reason { FREE, ARTICLE_PURCHASE, SUBSCRIPTION, LOGIN_REQUIRED, NO_ENTITLEMENT, ACCOUNT_UNAVAILABLE }
     public record Decision(boolean allowed, Reason reason) {}
 
     @Autowired
-    public PaywallEngine(ContentAccessRepository access, UserRepository users) {
-        this(access, users, Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")));
+    public PaywallEngine(ContentAccessRepository access, UserRepository users, PaywallPolicyService policies) {
+        this(access, users, Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")), policies);
     }
 
     PaywallEngine(ContentAccessRepository access, UserRepository users, Clock clock) {
+        this(access, users, clock, null);
+    }
+
+    private PaywallEngine(ContentAccessRepository access, UserRepository users, Clock clock, PaywallPolicyService policies) {
         this.access = access;
         this.users = users;
         this.clock = clock;
+        this.policies = policies;
+    }
+
+    public int previewWordLimit() {return policies == null ? 120 : policies.read().previewWordLimit();}
+
+    /**
+     * Reader integration for locked plain-text content. Returns at most 30% of
+     * the input and also respects the configured preview word cap.
+     * This does not grant access or query caller identity.
+     */
+    public String buildLockedPreview(String rawContent) {
+        if (rawContent == null || rawContent.isEmpty()) return "";
+        int cut = (int) Math.floor(rawContent.length() * 0.3d);
+        if (cut <= 0) return "";
+        int lastBreak = Math.max(rawContent.lastIndexOf(' ', cut), rawContent.lastIndexOf('\n', cut));
+        if (lastBreak > cut / 2) cut = lastBreak;
+        if (cut > 0 && Character.isHighSurrogate(rawContent.charAt(cut - 1))
+                && Character.isLowSurrogate(rawContent.charAt(cut))) cut--;
+        String preview = rawContent.substring(0, cut);
+        int limit = Math.max(1, Math.min(500, previewWordLimit()));
+        var words = java.util.regex.Pattern.compile("\\S+", java.util.regex.Pattern.UNICODE_CHARACTER_CLASS)
+                .matcher(preview);
+        int count = 0;
+        while (words.find()) {
+            if (++count > limit) return preview.substring(0, words.start()).stripTrailing();
+        }
+        return preview.stripTrailing();
     }
 
     /** Trusted service contract; never accept userId from reader query parameters. */
