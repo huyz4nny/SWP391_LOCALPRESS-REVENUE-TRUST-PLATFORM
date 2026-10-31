@@ -28,8 +28,12 @@ public class ReaderPurchaseRepository {
                                  BigDecimal singlePrice, Long categoryId, String title) {
     }
 
-    // một dòng trong article_purchases
-    public record PurchaseRow(Long purchaseId, String accessStatus) {
+    // một dòng trong article_purchases; paymentOrderCode là mã đơn SV4 đã gắn, không đọc bảng transactions
+    public record PurchaseRow(Long purchaseId, String accessStatus, String paymentOrderCode) {
+    }
+
+    // bản ghi gói PENDING kèm mã đơn đã gắn lần trước
+    public record PendingSubscriptionRow(Long subscriptionId, String paymentOrderCode) {
     }
 
     // một gói cước trong subscription_plans
@@ -66,8 +70,11 @@ public class ReaderPurchaseRepository {
     // bảng có ràng buộc duy nhất user_id và article_id nên chỉ có tối đa một dòng
     public Optional<PurchaseRow> findPurchase(Long userId, Long articleId) {
         List<PurchaseRow> rows = jdbcTemplate.query(
-                "SELECT purchase_id, access_status FROM article_purchases WHERE user_id = ? AND article_id = ?",
-                (rs, i) -> new PurchaseRow(rs.getLong("purchase_id"), rs.getString("access_status")),
+                "SELECT purchase_id, access_status, payment_order_code FROM article_purchases WHERE user_id = ? AND article_id = ?",
+                (rs, i) -> new PurchaseRow(
+                        rs.getLong("purchase_id"),
+                        rs.getString("access_status"),
+                        rs.getString("payment_order_code")),
                 userId, articleId);
         return rows.stream().findFirst();
     }
@@ -123,15 +130,29 @@ public class ReaderPurchaseRepository {
     }
 
     // block tìm gói đang chờ thanh toán của người này với đúng gói này để dùng lại thay vì tạo thêm
-    public Optional<Long> findPendingSubscriptionId(Long userId, Long planId) {
-        List<Long> rows = jdbcTemplate.query("""
-                        SELECT subscription_id FROM subscriptions
+    public Optional<PendingSubscriptionRow> findPendingSubscription(Long userId, Long planId) {
+        List<PendingSubscriptionRow> rows = jdbcTemplate.query("""
+                        SELECT subscription_id, payment_order_code FROM subscriptions
                         WHERE user_id = ? AND plan_id = ? AND status = 'PENDING'
                         ORDER BY subscription_id DESC
                         """,
-                (rs, i) -> rs.getLong("subscription_id"),
+                (rs, i) -> new PendingSubscriptionRow(
+                        rs.getLong("subscription_id"),
+                        rs.getString("payment_order_code")),
                 userId, planId);
         return rows.stream().findFirst();
+    }
+
+    public int updatePurchaseOrderCode(Long purchaseId, String orderCode) {
+        return jdbcTemplate.update(
+                "UPDATE article_purchases SET payment_order_code = ? WHERE purchase_id = ?",
+                orderCode, purchaseId);
+    }
+
+    public int updateSubscriptionOrderCode(Long subscriptionId, String orderCode) {
+        return jdbcTemplate.update(
+                "UPDATE subscriptions SET payment_order_code = ? WHERE subscription_id = ?",
+                orderCode, subscriptionId);
     }
 
     // block tạo bản ghi gói mới ở trạng thái PENDING và bật gia hạn
@@ -169,20 +190,5 @@ public class ReaderPurchaseRepository {
         return key.longValue();
     }
 
-    // đơn PENDING chưa hết hạn của đúng bài/gói — trả lại mã cũ, không tạo đơn thứ hai
-    public Optional<String> findPendingOrderCode(Long userId, String orderType, Long targetId) {
-        if (!"ARTICLE".equals(orderType) && !"SUBSCRIPTION".equals(orderType)) {
-            throw new IllegalArgumentException("Loại đơn không hợp lệ");
-        }
-        String column = "ARTICLE".equals(orderType) ? "purchase_id" : "subscription_id";
-        List<String> rows = jdbcTemplate.query("""
-                        SELECT gateway_transaction_id FROM transactions
-                        WHERE user_id = ? AND status = 'PENDING' AND %s = ?
-                          AND (expires_at IS NULL OR expires_at > NOW())
-                        ORDER BY transaction_id DESC
-                        """.formatted(column),
-                (rs, i) -> rs.getString("gateway_transaction_id"),
-                userId, targetId);
-        return rows.stream().findFirst();
-    }
 }
+

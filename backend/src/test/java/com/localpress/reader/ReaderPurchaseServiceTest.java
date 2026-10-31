@@ -1,14 +1,17 @@
 package com.localpress.reader;
 
 import com.localpress.finance.dto.response.OrderCreateResponse;
+import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.reader.dto.PendingOrderTargetResponse;
 import com.localpress.reader.repository.ReaderPurchaseRepository;
 import com.localpress.reader.repository.ReaderPurchaseRepository.ActiveSubscription;
 import com.localpress.reader.repository.ReaderPurchaseRepository.ArticleForSale;
+import com.localpress.reader.repository.ReaderPurchaseRepository.PendingSubscriptionRow;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PlanRow;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PurchaseRow;
 import com.localpress.reader.service.ReaderPurchaseService;
+import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +42,7 @@ class ReaderPurchaseServiceTest {
     private static final Long USER = 6L;
     private static final Long ARTICLE = 1L;
     private static final BigDecimal PRICE = new BigDecimal("15000.00");
+    private static final FinanceCurrentUser.Principal PRINCIPAL = new FinanceCurrentUser.Principal(USER, "READER");
 
     @Mock
     private ReaderPurchaseRepository repository;
@@ -46,18 +50,25 @@ class ReaderPurchaseServiceTest {
     @Mock
     private PaymentProcessingService payments;
 
+    @Mock
+    private FinanceCurrentUser financeUser;
+
     @InjectMocks
     private ReaderPurchaseService service;
 
     @BeforeEach
     void stubFinanceOrder() {
-        lenient().when(repository.findPendingOrderCode(any(), any(), any())).thenReturn(Optional.empty());
+        lenient().when(financeUser.require()).thenReturn(PRINCIPAL);
         lenient().when(payments.createOrder(any(), any())).thenReturn(
-                OrderCreateResponse.builder().orderCode("LP-NEW").amount(PRICE).build());
+                OrderCreateResponse.builder().orderCode("LP-NEW").amount(PRICE).status("PENDING").expired(false).build());
     }
 
     private ArticleForSale premiumArticle() {
         return new ArticleForSale(ARTICLE, "PREMIUM", "PUBLISHED", PRICE, 2L, "Bài điều tra");
+    }
+
+    private PurchaseRow purchase(long id, String status, String orderCode) {
+        return new PurchaseRow(id, status, orderCode);
     }
 
     private void assertStatus(HttpStatus expected, Runnable action) {
@@ -79,13 +90,14 @@ class ReaderPurchaseServiceTest {
         assertEquals(PRICE, response.getAmount());
         assertEquals("Bài điều tra", response.getTitle());
         assertEquals("LP-NEW", response.getOrderCode());
+        verify(repository).updatePurchaseOrderCode(77L, "LP-NEW");
     }
 
     @Test
     void reusesPendingPurchaseAndRefreshesPrice() {
         when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
         when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
-        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(new PurchaseRow(5L, "PENDING")));
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(purchase(5L, "PENDING", null)));
 
         PendingOrderTargetResponse response = service.createArticlePurchase(USER, ARTICLE);
 
@@ -95,23 +107,45 @@ class ReaderPurchaseServiceTest {
     }
 
     @Test
-    void reusesOpenFinanceOrderInsteadOfCreatingAnother() {
+    void reusesOpenFinanceOrderWhenStillPendingUnexpiredAndSameAmount() {
         when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
         when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
-        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(new PurchaseRow(5L, "PENDING")));
-        when(repository.findPendingOrderCode(USER, "ARTICLE", 5L)).thenReturn(Optional.of("LP-OLD"));
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(purchase(5L, "PENDING", "LP-OLD")));
+        when(payments.getPaymentView(PRINCIPAL, "LP-OLD")).thenReturn(
+                OrderCreateResponse.builder().orderCode("LP-OLD").amount(PRICE).status("PENDING").expired(false).build());
 
         PendingOrderTargetResponse response = service.createArticlePurchase(USER, ARTICLE);
 
         assertEquals("LP-OLD", response.getOrderCode());
         verify(payments, never()).createOrder(any(), any());
+        verify(repository, never()).updatePurchaseOrderCode(any(), any());
+    }
+
+    @Test
+    void createsNewOrderWhenStoredOrderAmountNoLongerMatchesPrice() {
+        when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
+        when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(purchase(5L, "PENDING", "LP-OLD")));
+        when(payments.getPaymentView(PRINCIPAL, "LP-OLD")).thenReturn(
+                OrderCreateResponse.builder()
+                        .orderCode("LP-OLD")
+                        .amount(new BigDecimal("10000.00"))
+                        .status("PENDING")
+                        .expired(false)
+                        .build());
+
+        PendingOrderTargetResponse response = service.createArticlePurchase(USER, ARTICLE);
+
+        assertEquals("LP-NEW", response.getOrderCode());
+        verify(payments).createOrder(any(), any());
+        verify(repository).updatePurchaseOrderCode(5L, "LP-NEW");
     }
 
     @Test
     void reusesRevokedPurchaseSoUserCanBuyAgainAfterFullRefund() {
         when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
         when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
-        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(new PurchaseRow(9L, "REVOKED")));
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(purchase(9L, "REVOKED", null)));
 
         PendingOrderTargetResponse response = service.createArticlePurchase(USER, ARTICLE);
 
@@ -123,7 +157,7 @@ class ReaderPurchaseServiceTest {
     void rejectsArticleAlreadyOwned() {
         when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
         when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
-        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(new PurchaseRow(5L, "ACTIVE")));
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(purchase(5L, "ACTIVE", "LP-PAID")));
 
         assertStatus(HttpStatus.CONFLICT, () -> service.createArticlePurchase(USER, ARTICLE));
         verify(repository, never()).resetPurchaseToPending(any(), any());
@@ -189,7 +223,7 @@ class ReaderPurchaseServiceTest {
         when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
         when(repository.findPurchase(USER, ARTICLE))
                 .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(new PurchaseRow(12L, "PENDING")));
+                .thenReturn(Optional.of(purchase(12L, "PENDING", null)));
         when(repository.insertPendingPurchase(USER, ARTICLE, PRICE)).thenThrow(new DuplicateKeyException("dup"));
 
         PendingOrderTargetResponse response = service.createArticlePurchase(USER, ARTICLE);
@@ -201,7 +235,7 @@ class ReaderPurchaseServiceTest {
     @Test
     void createsPendingSubscriptionWithPlanPrice() {
         when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
-        when(repository.findPendingSubscriptionId(USER, 1L)).thenReturn(Optional.empty());
+        when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.empty());
         when(repository.insertPendingSubscription(eq(USER), eq(1L), any(LocalDate.class))).thenReturn(40L);
 
         PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
@@ -210,12 +244,13 @@ class ReaderPurchaseServiceTest {
         assertEquals(40L, response.getTargetId());
         assertEquals(new BigDecimal("50000.00"), response.getAmount());
         assertEquals("Gói Tháng", response.getTitle());
+        verify(repository).updateSubscriptionOrderCode(40L, "LP-NEW");
     }
 
     @Test
     void reusesPendingSubscriptionOfSamePlan() {
         when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
-        when(repository.findPendingSubscriptionId(USER, 1L)).thenReturn(Optional.of(33L));
+        when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.of(new PendingSubscriptionRow(33L, null)));
 
         PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
 
@@ -227,13 +262,26 @@ class ReaderPurchaseServiceTest {
     @Test
     void allowsBuyingSubscriptionWhileAnotherIsActiveForRenewal() {
         when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
-        when(repository.findPendingSubscriptionId(USER, 1L)).thenReturn(Optional.empty());
+        when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.empty());
         when(repository.insertPendingSubscription(eq(USER), eq(1L), any(LocalDate.class))).thenReturn(41L);
 
         PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
 
         assertEquals(41L, response.getTargetId());
         verify(repository, never()).findActiveSubscriptions(any(), any());
+    }
+
+    @Test
+    void createsNewOrderWhenStoredFinanceOrderIsMissing() {
+        when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
+        when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.of(new PendingSubscriptionRow(33L, "LP-GONE")));
+        when(payments.getPaymentView(PRINCIPAL, "LP-GONE"))
+                .thenThrow(new AppException("Không tìm thấy đơn hàng với mã: LP-GONE", HttpStatus.NOT_FOUND));
+
+        PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
+
+        assertEquals("LP-NEW", response.getOrderCode());
+        verify(repository).updateSubscriptionOrderCode(33L, "LP-NEW");
     }
 
     @Test

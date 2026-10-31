@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // api mua lẻ bài và đăng ký gói của SV3 phục vụ UC034 và UC035 ở màn hình II.3.3
 // route gốc /api/v1/reader không nằm trong danh sách permitAll của SecurityConfig nên bắt buộc phải đăng nhập
-// luồng đi là frontend gọi vào đây lấy targetId và amount -> sau đó frontend gọi POST /api/v1/finance/orders của SV4 -> chuyển sang trang /payment/:orderCode
+// luồng đi là frontend gọi vào đây, server tạo/tái dùng đơn SV4 rồi trả orderCode để mở /payment/:orderCode
 @RestController
 @RequestMapping("/api/v1/reader")
 @RequiredArgsConstructor

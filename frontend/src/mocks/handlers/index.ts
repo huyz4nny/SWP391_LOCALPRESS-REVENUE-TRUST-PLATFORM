@@ -313,7 +313,15 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (mockStore.hasAccessToArticle(currentUser.id, article.id)) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 409, error: 'Conflict', message: 'Bạn đã có quyền đọc bài này', path: pathname })
     }
-    return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title, orderCode: `MOCK-${article.id}` }
+    const pending = mockStore.getState().orders.find((o) =>
+      o.userId === currentUser.id
+      && o.targetId === article.id
+      && o.orderType === 'ARTICLE_PURCHASE'
+      && o.paymentStatus === 'PENDING'
+      && o.amount === article.price)
+    const order = pending ?? mockStore.createOrder(
+      currentUser.id, 'ARTICLE_PURCHASE', article.id, article.title, article.price, 'VIETQR')
+    return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title, orderCode: order.orderCode }
   }
 
   // UC035 mock của POST /reader/subscriptions: khách đang có gói vẫn được mua tiếp để gia hạn
@@ -322,7 +330,15 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (!plan) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy gói cước', path: pathname })
     }
-    return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name, orderCode: `MOCK-${plan.id}` }
+    const pending = mockStore.getState().orders.find((o) =>
+      o.userId === currentUser.id
+      && o.targetId === plan.id
+      && o.orderType === 'SUBSCRIPTION'
+      && o.paymentStatus === 'PENDING'
+      && o.amount === plan.price)
+    const order = pending ?? mockStore.createOrder(
+      currentUser.id, 'SUBSCRIPTION', plan.id, plan.name, plan.price, 'VIETQR')
+    return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name, orderCode: order.orderCode }
   }
 
   if (pathname === '/reader/comments/mine' && method === 'GET') {

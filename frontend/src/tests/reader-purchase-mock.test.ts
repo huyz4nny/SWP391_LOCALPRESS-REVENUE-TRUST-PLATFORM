@@ -20,6 +20,11 @@ describe('Mock UC034 mua lẻ bài và UC035 đăng ký gói', () => {
     expect(res.orderType).toBe('ARTICLE')
     expect(res.targetId).toBe(article.id)
     expect(res.amount).toBe(article.price)
+    expect(res.orderCode).toMatch(/^LP-/)
+    const stored = mockStore.getState().orders.find((o) => o.orderCode === res.orderCode)
+    expect(stored?.orderType).toBe('ARTICLE_PURCHASE')
+    expect(stored?.targetId).toBe(article.id)
+    expect(stored?.paymentStatus).toBe('PENDING')
   })
 
   it('bài đã có quyền đọc thì bị chặn 409', async () => {
@@ -50,6 +55,11 @@ describe('Mock UC034 mua lẻ bài và UC035 đăng ký gói', () => {
     mockStore.setCurrentUser('user-reader-premium')
     const renew = await handleMockRequest('POST', '/api/v1/reader/subscriptions', { planId: plan.id })
     expect(renew.targetId).toBe(plan.id)
+    expect(renew.orderCode).toMatch(/^LP-/)
+    expect(mockStore.getState().orders.some((o) => o.orderCode === renew.orderCode && o.orderType === 'SUBSCRIPTION')).toBe(true)
+
+    const again = await handleMockRequest('POST', '/api/v1/reader/subscriptions', { planId: plan.id })
+    expect(again.orderCode).toBe(renew.orderCode)
   })
 
   it('gói không tồn tại thì 404', async () => {

@@ -41,8 +41,9 @@ localpress:
     secret: ${LOCALPRESS_JWT_SECRET:localpress-dev-only-signing-key-change-before-deploy-2026}
   storage:
     image-directory: "${user.home}/localpress-data/uploads"
-  # SePay: không gán merchant-id/secret-key rỗng ở đây — Spring sẽ đè file secrets và HMAC checkout crash.
-  # Khóa nằm ở backend/config/application-secrets.yml (gitignore) hoặc biến SEPAY_*.
+  # SePay: khóa nằm ở application-secrets.yml (gitignore) hoặc biến SEPAY_*.
+  # File import qua spring.config.import được ưu tiên hơn file đang import nó.
+  # Thiếu khóa thường do chạy Spring từ thư mục gốc nên không thấy ./config/application-secrets.yml.
   # Mẫu: backend/config/application-secrets.example.yml
   sepay:
     bank-code: ${SEPAY_BANK_CODE:VCB}
