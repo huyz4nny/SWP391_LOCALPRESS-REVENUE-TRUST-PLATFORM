@@ -1,3 +1,4 @@
+// Tác dụng: nạp script GIS (accounts.google.com) để vẽ nút đăng nhập Google.
 interface GoogleIdentityApi {
   initialize(options: {
     client_id: string

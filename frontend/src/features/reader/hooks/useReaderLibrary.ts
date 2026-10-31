@@ -1,12 +1,12 @@
+// Tác dụng: cache bookmark / follow / lịch sử / tủ sách — số trên sidebar đổi ngay khi bấm lưu bài.
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { AppApiError } from '@/lib/http/errors'
 import { readerApi } from '../api'
 
-// trạng thái bài đã lưu (UC038) và chuyên mục đang theo dõi (UC040) dùng chung cho mọi trang và menu tài khoản
-// để bấm lưu ở trang chủ thì số đếm ở menu tài khoản cũng đổi ngay mà không phải tải lại
-// luồng đi là hook tải id một lần cho mỗi user -> trang gọi toggleSaved/toggleFollow -> gọi api xong mới cập nhật trạng thái chung
+// so dem menu tai khoan: bai da luu, follow, ls doc, tu sach
+// bam bookmark o trang chu thi so o sidebar doi ngay, khong reload trang
 type LibrarySnapshot = {
   userId: string | null
   savedIds: string[]

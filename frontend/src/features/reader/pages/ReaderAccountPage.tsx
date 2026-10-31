@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account` — sửa hồ sơ, tóm tắt gói và số liệu tủ sách / follow / lịch sử.
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDate } from '@/lib/format'
@@ -20,6 +21,7 @@ function phoneError(raw: string): string | null {
   return 'Số điện thoại không đúng định dạng Việt Nam'
 }
 
+// trang /account: form ho so + the goi + 4 o so lieu
 export function ReaderAccountPage() {
   const session = mockStore.getCurrentUser()
   const library = useReaderLibrary()
@@ -83,6 +85,7 @@ export function ReaderAccountPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de ho so */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-slate-900">Hồ sơ độc giả</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -90,6 +93,7 @@ export function ReaderAccountPage() {
         </p>
       </div>
 
+      {/* the goi dang dung hoac chua co goi + link Quan ly goi / Xem cac goi */}
       <div className={`flex flex-col justify-between gap-4 rounded-lg border p-4 sm:flex-row sm:items-center ${
         plan ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
       }`}>
@@ -119,6 +123,7 @@ export function ReaderAccountPage() {
         )}
       </div>
 
+      {/* form ho so: ho ten, email khoa, sdt + nut Luu ho so */}
       <form onSubmit={save} className="max-w-lg space-y-4">
         <div>
           <Label htmlFor="name">Họ và tên</Label>
@@ -137,6 +142,7 @@ export function ReaderAccountPage() {
         <Button type="submit" isLoading={saving}>Lưu hồ sơ</Button>
       </form>
 
+      {/* 4 o so: bai mua le, da luu, da doc, thiet bi */}
       <div className="grid grid-cols-2 gap-3 border-t border-slate-200 pt-6 sm:grid-cols-4">
         <div className="rounded-lg bg-slate-50 p-3 text-center">
           <div className="text-lg font-semibold text-slate-900 num">{library.purchasedCount}</div>

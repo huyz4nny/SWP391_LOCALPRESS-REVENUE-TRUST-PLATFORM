@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form Huy `/wallet/complaints`.
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { complaintApi } from '@/features/finance/api/payment'
@@ -41,6 +42,7 @@ export function ReaderSupportPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de ho tro thanh toan */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Hỗ trợ thanh toán</h2>
         <p className="text-xs text-stone-500 mt-1">
@@ -48,6 +50,7 @@ export function ReaderSupportPage() {
         </p>
       </div>
 
+      {/* nut Gui khieu nai (sang trang Huy) + nut Xem lich su giao dich */}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => navigate('/wallet/complaints')}>
           Gửi khiếu nại thanh toán
@@ -77,6 +80,7 @@ export function ReaderSupportPage() {
         />
       ) : (
         <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200">
+          {/* vong lap ve tung khieu nai: so tien + badge trang thai */}
           {items.map((c) => (
             <li key={c.complaintId} className="px-4 py-3 space-y-1">
               <div className="flex items-center justify-between gap-3">

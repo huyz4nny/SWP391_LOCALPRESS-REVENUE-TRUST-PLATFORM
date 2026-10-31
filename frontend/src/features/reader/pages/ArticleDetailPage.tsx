@@ -1,3 +1,4 @@
+// Tác dụng: trang `/articles/:slug` — Free toàn văn (UC031), preview 30% (UC032), Premium đủ quyền (UC036).
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Article } from '../types'
@@ -22,6 +23,7 @@ import {
   Volume2,
 } from 'lucide-react'
 
+// trang /articles/:slug: tieu de, sapo, body hoac paywall, comment, sidebar
 export function ArticleDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const [article, setArticle] = useState<Article | null>(null)
@@ -93,7 +95,7 @@ export function ArticleDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Breadcrumb */}
+      {/* thanh breadcrumb: Trang chu > chuyen muc > tieu de */}
       <nav className="flex items-center space-x-2 text-xs text-stone-500 mb-4">
         <Link to="/" className="hover:text-primary-900">
           Trang chủ
@@ -107,9 +109,9 @@ export function ArticleDetailPage() {
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Main Article Content */}
+        {/* cot trai: toan bo bai */}
         <article className="lg:col-span-8 bg-white rounded-xl border border-stone-200 p-6 sm:p-8 shadow-2xs">
-          {/* Header */}
+          {/* dau bai: badge chuyen muc / Premium / Da mo khoa */}
           <div className="space-y-3 pb-6 border-b border-stone-200">
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold text-primary-900 uppercase tracking-wider bg-stone-100 px-2.5 py-0.5 rounded">
@@ -144,6 +146,7 @@ export function ArticleDetailPage() {
                 </span>
               </div>
 
+              {/* hang nut: Luu bai + Nghe bao (AI, chua co TTS) */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleToggleBookmark}
@@ -175,12 +178,12 @@ export function ArticleDetailPage() {
             </div>
           </div>
 
-          {/* Sapo Lead */}
+          {/* khoi sapo in nghieng, vien trai navy */}
           <div className="my-6 p-4 rounded-lg bg-stone-50 border-l-4 border-primary-900 text-stone-800 font-serif text-sm sm:text-base leading-relaxed italic">
             {article.sapo}
           </div>
 
-          {/* Cover image */}
+          {/* anh bia + chu thich anh */}
           <div className="my-6 overflow-hidden rounded-lg">
             <img
               src={article.coverImage}
@@ -192,7 +195,7 @@ export function ArticleDetailPage() {
             </p>
           </div>
 
-          {/* Article Body Content */}
+          {/* than bai: full van hoac preview + khung paywall */}
           <div className="font-serif text-stone-800 text-sm sm:text-base leading-relaxed space-y-4">
             {isUnlocked ? (
               // cat content theo doan de ve <p>, khong tu ghep preview
@@ -216,7 +219,7 @@ export function ArticleDetailPage() {
             )}
           </div>
 
-          {/* Tags */}
+          {/* hang tag #, bam sang /search */}
           {article.tags && article.tags.length > 0 && (
             <div className="mt-8 pt-4 border-t border-stone-200 flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-stone-400 font-medium">Từ khóa:</span>
@@ -234,22 +237,22 @@ export function ArticleDetailPage() {
 
           <ArticleReportBox articleId={article.id} />
 
-          {/* Comments section */}
+          {/* khoi y kien ban doc o cuoi bai */}
           <CommentSection articleId={article.id} />
         </article>
 
-        {/* Right Sidebar: Sticky Ads and Related Articles */}
+        {/* cot phai: banner + 3 bai cung chuyen muc */}
         <aside className="lg:col-span-4 space-y-6">
           <div className="sticky top-20 space-y-6">
             <AdSlotBanner slotCode="SLOT-SIDEBAR-STICKY" />
 
-            {/* Related articles */}
             {relatedArticles.length > 0 && (
               <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-2xs">
                 <h3 className="font-serif text-sm font-bold text-stone-900 pb-2 border-b border-stone-200 mb-3">
                   Cùng chuyên mục {article.categoryName}
                 </h3>
                 <div className="space-y-3">
+                  {/* vong lap 3 the gon cung chuyen muc */}
                   {relatedArticles.map((art) => (
                     <ArticleCard key={art.id} article={art} variant="compact" />
                   ))}

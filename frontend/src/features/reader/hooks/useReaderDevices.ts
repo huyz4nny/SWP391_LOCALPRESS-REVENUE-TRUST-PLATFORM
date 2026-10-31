@@ -1,8 +1,9 @@
+// Tác dụng: cache list phiên `/reader/devices` — số 0/2 trên menu và bảng `/account/devices`.
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { mockStore } from '@/mocks/store'
 import { readerApi, ReaderDevice } from '../api'
 
-// phiên đăng nhập còn hiệu lực, dùng chung cho menu tài khoản và trang thiết bị
+// list phien con hieu luc: so 0/2 tren menu va bang o /account/devices
 type DeviceSnapshot = {
   userId: string | null
   items: ReaderDevice[]

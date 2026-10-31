@@ -1,5 +1,8 @@
 package com.localpress.reader.service;
 
+import com.localpress.finance.dto.request.CreateOrderRequest;
+import com.localpress.finance.dto.response.OrderCreateResponse;
+import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.reader.dto.PendingOrderTargetResponse;
 import com.localpress.reader.repository.ReaderPurchaseRepository;
 import com.localpress.reader.repository.ReaderPurchaseRepository.ActiveSubscription;
@@ -17,10 +20,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
-// service của SV3 tạo bản ghi chờ thanh toán cho UC034 mua lẻ bài và UC035 đăng ký gói
-// hợp đồng với SV4 là SV3 phải tạo article_purchases hoặc subscriptions ở trạng thái PENDING trước rồi frontend mới gọi POST /finance/orders với targetId là id đó
-// luồng đi là ReaderPurchaseController gọi vào đây -> kiểm tra điều kiện -> ReaderPurchaseRepository ghi bản ghi PENDING -> trả targetId và số tiền
-// việc chuyển PENDING sang ACTIVE không làm ở đây mà do listener nghe PaymentSuccessEvent của SV4 làm sau khi tiền về
+// UC034/UC035: tạo quyền PENDING rồi gọi PaymentProcessingService.createOrder (giống AdBookingService).
+// Frontend không tự POST /finance/checkout. Đơn PENDING chưa hết hạn thì trả lại mã cũ.
 @Service
 @RequiredArgsConstructor
 public class ReaderPurchaseService {
@@ -29,6 +30,7 @@ public class ReaderPurchaseService {
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final ReaderPurchaseRepository repository;
+    private final PaymentProcessingService payments;
 
     // block tạo hoặc dùng lại bản ghi mua lẻ PENDING cho UC034
     // luồng đi là kiểm tra bài có bán lẻ được không -> kiểm tra đã mua hoặc đã có gói bao trùm chưa -> tạo mới hoặc dùng lại bản ghi -> trả purchase_id và giá
@@ -59,13 +61,7 @@ public class ReaderPurchaseService {
         }
 
         Long purchaseId = preparePendingPurchase(userId, articleId, price);
-
-        return PendingOrderTargetResponse.builder()
-                .orderType("ARTICLE")
-                .targetId(purchaseId)
-                .amount(price)
-                .title(article.title())
-                .build();
+        return attachFinanceOrder(userId, "ARTICLE", purchaseId, price, article.title());
     }
 
     // block tạo hoặc dùng lại bản ghi gói PENDING cho UC035
@@ -93,11 +89,29 @@ public class ReaderPurchaseService {
                 })
                 .orElseGet(() -> repository.insertPendingSubscription(userId, planId, today));
 
+        return attachFinanceOrder(userId, "SUBSCRIPTION", subscriptionId, plan.price(), plan.name());
+    }
+
+    // đơn PENDING còn hạn thì dùng lại; hết hạn hoặc chưa có thì Huy createOrder với giá server
+    private PendingOrderTargetResponse attachFinanceOrder(
+            Long userId, String orderType, Long targetId, BigDecimal amount, String title) {
+        String orderCode = repository.findPendingOrderCode(userId, orderType, targetId)
+                .orElseGet(() -> {
+                    OrderCreateResponse created = payments.createOrder(userId, CreateOrderRequest.builder()
+                            .orderType(orderType)
+                            .targetId(targetId)
+                            .amount(amount)
+                            .targetTitle(title)
+                            .description(title)
+                            .build());
+                    return created.getOrderCode();
+                });
         return PendingOrderTargetResponse.builder()
-                .orderType("SUBSCRIPTION")
-                .targetId(subscriptionId)
-                .amount(plan.price())
-                .title(plan.name())
+                .orderType(orderType)
+                .targetId(targetId)
+                .amount(amount)
+                .title(title)
+                .orderCode(orderCode)
                 .build();
     }
 

@@ -1,9 +1,11 @@
+// Tác dụng: thẻ bài tái sử dụng (trang chủ, chuyên mục, tủ sách, bookmark, lịch sử, feed) + màu badge chuyên mục.
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Article } from '../types'
 import { formatRelativeTime } from '@/lib/format'
 import { Crown, Clock, Bookmark, ArrowRight } from 'lucide-react'
 
+// mau badge chuyen muc tren the bai (thoi su do, kinh te xanh...)
 export function getCategoryBadgeStyle(slug?: string) {
   switch (slug) {
     case 'thoi-su':
@@ -36,7 +38,7 @@ export function ArticleCard({
   isBookmarked = false,
   onToggleBookmark,
 }: ArticleCardProps) {
-  // 1. Featured Card (Big Hero Story)
+  // the hero trang chu: anh lon + nhan Tieu diem + tieu de de len anh
   if (variant === 'featured') {
     return (
       <div className="relative group overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm hover:shadow-xl transition-all duration-300">
@@ -48,6 +50,7 @@ export function ArticleCard({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/40 to-transparent" />
           
+          {/* 2 nhan goc tren: Tieu diem dac biet + Premium VIP */}
           <div className="absolute top-4 left-4 flex items-center space-x-2">
             <span className="bg-crimson text-white text-[11px] font-black uppercase px-2.5 py-1 rounded tracking-wider shadow-md">
               Tiêu điểm đặc biệt
@@ -86,7 +89,7 @@ export function ArticleCard({
     )
   }
 
-  // 2. Lead Category Story (Semi-featured inside category grid)
+  // the lead trong khoi chuyen muc: anh tren, tieu de duoi, nut bookmark
   if (variant === 'lead') {
     return (
       <div className="group flex flex-col rounded-xl border border-stone-200/90 bg-white overflow-hidden hover:shadow-md transition-all duration-300">
@@ -108,6 +111,7 @@ export function ArticleCard({
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${getCategoryBadgeStyle(article.categorySlug)}`}>
                 {article.categoryName}
               </span>
+              {/* icon bookmark goc the */}
               {onToggleBookmark && (
                 <button
                   onClick={(e) => {
@@ -141,7 +145,7 @@ export function ArticleCard({
     )
   }
 
-  // 3. Horizontal Card (Secondary news list)
+  // the ngang: anh trai nho, tieu de phai (list chuyen muc / search)
   if (variant === 'horizontal') {
     return (
       <div className="flex gap-3.5 p-3 rounded-xl border border-stone-200/80 bg-white hover:border-stone-300 hover:shadow-sm transition-all group">
@@ -167,6 +171,7 @@ export function ArticleCard({
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${getCategoryBadgeStyle(article.categorySlug)}`}>
                 {article.categoryName}
               </span>
+              {/* nut bookmark tren the ngang */}
               {onToggleBookmark && (
                 <button
                   onClick={(e) => {
@@ -199,7 +204,7 @@ export function ArticleCard({
     )
   }
 
-  // 4. Compact Card (Sidebar or minimal list)
+  // the gon sidebar: 1 dong tieu de, khong anh
   if (variant === 'compact') {
     return (
       <div className="py-2.5 border-b border-stone-100 last:border-0 group">
@@ -226,7 +231,7 @@ export function ArticleCard({
     )
   }
 
-  // 5. Default Standard card
+  // the mac dinh tu sach: anh tren, sapo, nut bookmark
   return (
     <div className="group flex flex-col rounded-xl border border-stone-200/90 bg-white overflow-hidden hover:shadow-md hover:border-stone-300 transition-all duration-300">
       <Link to={`/articles/${article.slug}`} className="relative aspect-16/10 overflow-hidden">

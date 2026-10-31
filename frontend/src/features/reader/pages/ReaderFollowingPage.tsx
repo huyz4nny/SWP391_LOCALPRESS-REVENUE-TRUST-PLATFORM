@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/following` (UC040) — chuyên mục đang follow + feed bài của đúng chuyên mục đó.
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { readerApi, FollowedCategory } from '../api'
@@ -106,6 +107,7 @@ export function ReaderFollowingPage() {
 
   return (
     <div className="space-y-8">
+      {/* tieu de trang follow */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Chuyên mục theo dõi</h2>
         <p className="text-xs text-stone-500 mt-1">
@@ -115,6 +117,7 @@ export function ReaderFollowingPage() {
 
       {actionError && <p className="text-xs text-red-700">{actionError}</p>}
 
+      {/* list chuyen muc dang theo doi + nut Bo theo doi tung dong */}
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Đang theo dõi ({followed.length})</h3>
         {followed.length === 0 ? (
@@ -145,6 +148,7 @@ export function ReaderFollowingPage() {
 
       {suggestions.length > 0 && (
         <section className="space-y-3">
+          {/* hang chip: nut + ten chuyen muc de theo doi */}
           <h3 className="text-sm font-semibold text-slate-900">Gợi ý chuyên mục</h3>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((c) => (
@@ -163,6 +167,7 @@ export function ReaderFollowingPage() {
         </section>
       )}
 
+      {/* bang tin: vong lap the bai ngang + nut Xem them */}
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Bảng tin của bạn</h3>
         {feed.length === 0 ? (
@@ -173,6 +178,7 @@ export function ReaderFollowingPage() {
           />
         ) : (
           <div className="space-y-3">
+            {/* vong lap ve the bai trong feed */}
             {feed.map((art) => (
               <ArticleCard
                 key={art.id}

@@ -108,7 +108,7 @@ public class ReaderEntitlementListener {
                     + " đang ở trạng thái " + purchase.accessStatus() + " không phải PENDING");
             return;
         }
-        // số tiền khách trả phải đủ giá đã chốt vì module tài chính tin con số do client gửi lên
+        // số tiền khách trả phải đủ giá đã chốt trên server (article_purchases.price)
         if (event.getAmount() == null || event.getAmount().compareTo(purchase.price()) < 0) {
             reportGrantFailure(event, "Số tiền " + event.getAmount() + " thấp hơn giá bài " + purchase.price());
             return;

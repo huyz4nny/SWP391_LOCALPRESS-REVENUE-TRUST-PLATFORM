@@ -1,9 +1,9 @@
+// Tác dụng: hộp khóa bài Premium (UC034) — mua lẻ tạo purchase PENDING rồi `/payment`, hoặc sang `/premium`.
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Article } from '../types'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { httpClient } from '@/lib/http/client'
 import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
 import { readerApi } from '../api'
@@ -30,17 +30,8 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
     setIsLoading(true)
     setError('')
     try {
-      // phan SV3: tao article_purchases PENDING, gia lay tu DB khong lay tu nut
       const target = await readerApi.createArticlePurchase(article.id)
-      // phan SV4: tao don, targetId = purchase_id
-      const order = await httpClient.post<any>('/finance/checkout', {
-        orderType: 'ARTICLE_PURCHASE',
-        targetId: target.targetId,
-        targetTitle: target.title || article.title,
-        amount: target.amount,
-        paymentMethod: 'VIETQR',
-      })
-      navigate(paymentPath(order), { state: { returnUrl: `/articles/${article.slug}` } })
+      navigate(paymentPath({ orderCode: target.orderCode }), { state: { returnUrl: `/articles/${article.slug}` } })
     } catch (err) {
       // các lỗi như đã mua rồi hoặc đã có gói bao trùm được hiện cho khách thay vì chỉ ghi console
       console.error(err)
@@ -54,6 +45,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
     navigate('/premium', { state: { returnUrl: `/articles/${article.slug}` } })
   }
 
+  // khung den duoi preview: 2 the mua le / xem goi
   return (
     <div className="relative mt-8 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-stone-900 via-primary-950 to-stone-900 text-white shadow-2xl border border-amber-500/30 overflow-hidden">
       {/* Decorative gradient glow */}
@@ -72,9 +64,9 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
           Bạn vừa đọc xong phần trích đoạn xem thử miễn phí. Toàn bộ tài liệu, dữ liệu điều tra và phân tích độc quyền của phóng viên tòa soạn được bảo hộ dưới chính sách Paywall chất lượng cao.
         </p>
 
-        {/* Options grid */}
+        {/* 2 the: mua le ben trai, goi VIP ben phai */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left my-6">
-          {/* Option 1: Buy single article */}
+          {/* the Mua le: gia bai + nut Mua le bai viet ngay */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-5 hover:border-amber-400/40 transition-all flex flex-col justify-between">
             <div>
               <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
@@ -98,6 +90,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
               </ul>
             </div>
 
+            {/* nut tao don mua le roi sang /payment */}
             <Button
               variant="outline"
               size="sm"
@@ -110,7 +103,7 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
             {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
           </div>
 
-          {/* Option 2: Subscription (Best value) */}
+          {/* the goi VIP + nhan Khuyen dung + nut Xem cac goi */}
           <div className="bg-amber-500/10 border-2 border-amber-500/60 rounded-xl p-5 hover:border-amber-400 transition-all flex flex-col justify-between relative">
             <div className="absolute -top-2.5 right-3 bg-amber-500 text-stone-950 font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
               Khuyên dùng

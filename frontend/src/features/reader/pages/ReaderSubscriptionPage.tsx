@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+// Tác dụng: trang `/account/subscription` (UC044) — gói đang hiệu lực, tắt gia hạn, link mua gói / khiếu nại.
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -27,11 +28,16 @@ function PlanFacts({ item }: { item: ReaderSubscription }) {
   )
 }
 
+// trang /account/subscription: the goi dang dung + ky xep sau + nut tat gia han
 export function ReaderSubscriptionPage() {
   const subscription = useReaderSubscription()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState('')
+
+  useEffect(() => {
+    subscription.reload()
+  }, [subscription.reload])
 
   const cancel = async () => {
     if (!confirmId) return
@@ -64,6 +70,7 @@ export function ReaderSubscriptionPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de trang goi hoi vien */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-slate-900">Gói hội viên</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -73,6 +80,7 @@ export function ReaderSubscriptionPage() {
 
       {!primary && subscription.others.length === 0 ? (
         <div className="rounded-lg border border-slate-200 p-6 text-center">
+          {/* hop rong: chua co goi + nut Xem cac goi doc */}
           <h3 className="font-serif text-xl font-bold text-slate-900">Chưa có gói đang dùng</h3>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
             Bạn vẫn đọc được bài miễn phí và bản xem trước. Mua gói để đọc bài Premium trong phạm vi của gói.
@@ -86,6 +94,7 @@ export function ReaderSubscriptionPage() {
         </div>
       ) : primary ? (
         <section className="rounded-lg border border-slate-200 p-5">
+          {/* the goi dang hieu luc: badge vang + ten + ngay het han */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Badge variant="gold">Đang hiệu lực</Badge>
             <span className="text-sm text-slate-600">
@@ -104,6 +113,7 @@ export function ReaderSubscriptionPage() {
               : ' Gia hạn tự động đang tắt. Bạn vẫn đọc được đến hết ngày trên.'}
           </p>
           {actionError && <p className="mt-3 text-sm text-crimson">{actionError}</p>}
+          {/* hang nut: Mua hoac doi goi / Tat gia han / Khieu nai */}
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
             <Link to="/premium" className="text-sm font-medium text-primary-900 hover:underline">
               Mua hoặc đổi gói
@@ -122,6 +132,7 @@ export function ReaderSubscriptionPage() {
 
       {subscription.others.length > 0 && (
         <section className="space-y-2">
+          {/* list ky xep sau / ky khac: nhan Dang hieu luc hoac Chua toi ngay bat dau */}
           <h3 className="text-sm font-medium text-slate-900">Kỳ khác còn hiệu lực hoặc sắp bắt đầu</h3>
           {subscription.others.map((item) => (
             <div key={item.subscriptionId} className="rounded-lg border border-slate-200 px-4 py-3">
@@ -143,6 +154,7 @@ export function ReaderSubscriptionPage() {
         </section>
       )}
 
+      {/* hop xac nhan tat gia han */}
       <ConfirmDialog
         open={confirmId !== null}
         onClose={() => setConfirmId(null)}

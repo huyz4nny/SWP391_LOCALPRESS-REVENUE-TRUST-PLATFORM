@@ -1,3 +1,4 @@
+// Tác dụng: trang `/forgot-password` — UI gửi lại mật khẩu. Không có OTP/mail thật trên luồng SV3.
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'

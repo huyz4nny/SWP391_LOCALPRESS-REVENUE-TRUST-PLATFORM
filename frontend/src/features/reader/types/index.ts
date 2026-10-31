@@ -1,3 +1,4 @@
+// Tác dụng: kiểu FE độc giả (Article, Category, gói, comment). Không render UI.
 export type ArticleStatus =
   | 'DRAFT'
   | 'IN_REVIEW'

@@ -1,3 +1,4 @@
+// Tác dụng: client API reader — page gọi readerApi; mock hoặc backend thật theo APP_CONFIG.useMockApi.
 import { httpClient } from '@/lib/http/client'
 import { APP_CONFIG } from '@/app/config'
 import { Article, Category, SubscriptionPlan, Comment } from '../types'
@@ -24,6 +25,7 @@ export type PendingOrderTarget = {
   targetId: string | number
   amount: number
   title: string
+  orderCode: string
 }
 
 // kiểu của object phân trang Page mà spring boot trả về
@@ -500,17 +502,14 @@ export const readerApi = {
     })
   },
 
-  // UC034 tạo bản ghi mua lẻ chờ thanh toán (PENDING) trước khi tạo đơn bên SV4
-  // chế độ mock giữ nguyên id chuỗi còn backend thật cần id số nên đổi bằng Number
-  // luồng đi là gọi POST /reader/article-purchases -> nhận targetId (purchase_id) và giá từ server -> PaywallPrompt đem sang POST /finance/checkout
+  // UC034: server tạo purchase PENDING + đơn SV4, trả orderCode. FE không gọi /finance/checkout.
   createArticlePurchase: (articleId: string) => {
     return httpClient.post<PendingOrderTarget>('/reader/article-purchases', {
       articleId: APP_CONFIG.useMockApi ? articleId : Number(articleId),
     })
   },
 
-  // UC035 tạo bản ghi gói cước chờ thanh toán (PENDING) trước khi tạo đơn bên SV4
-  // luồng đi là gọi POST /reader/subscriptions -> nhận targetId (subscription_id) và giá của gói -> PremiumPlansPage đem sang POST /finance/checkout
+  // UC035: server tạo subscription PENDING + đơn SV4, trả orderCode.
   createSubscription: (planId: string) => {
     return httpClient.post<PendingOrderTarget>('/reader/subscriptions', {
       planId: APP_CONFIG.useMockApi ? planId : Number(planId),

@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/devices` (UC043) — list tối đa 2 phiên, nút thu hồi. Login chưa ghi phiên thì danh sách trống.
 import React, { useState } from 'react'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ function typeLabel(deviceType: string) {
   return 'Máy tính'
 }
 
+// trang /account/devices: list phien + nut Thu hoi, toi da 2
 export function ReaderDevicesPage() {
   const devices = useReaderDevices()
   const navigate = useNavigate()
@@ -56,6 +58,7 @@ export function ReaderDevicesPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de + so phien dang mo / 2 */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="font-serif text-2xl font-bold text-slate-900">Thiết bị đăng nhập</h2>
@@ -75,12 +78,14 @@ export function ReaderDevicesPage() {
         />
       ) : (
         <div className="space-y-3">
+          {/* vong lap ve tung dong thiet bi */}
           {devices.items.map((device) => (
             <DeviceRow key={device.deviceId} device={device} onRevoke={() => setConfirmId(device.deviceId)} />
           ))}
         </div>
       )}
 
+      {/* hop xac nhan thu hoi phien */}
       <ConfirmDialog
         open={target !== null}
         onClose={() => setConfirmId(null)}
@@ -97,6 +102,7 @@ export function ReaderDevicesPage() {
   )
 }
 
+// 1 dong: ten may, nhan Thiet bi nay, nut Thu hoi
 function DeviceRow({ device, onRevoke }: { device: ReaderDevice; onRevoke: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
@@ -117,6 +123,7 @@ function DeviceRow({ device, onRevoke }: { device: ReaderDevice; onRevoke: () =>
           {formatDateTime(device.lastActiveAt)}
         </p>
       </div>
+      {/* nut Thu hoi phien nay */}
       <Button variant="outline" size="sm" onClick={onRevoke}>
         Thu hồi
       </Button>

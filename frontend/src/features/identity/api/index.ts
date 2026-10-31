@@ -1,3 +1,4 @@
+// Tác dụng: client auth — /auth/me, login, register, Google nonce. Dùng chung, không thuộc advertising/finance.
 import { httpClient } from '@/lib/http/client'
 import { User } from '@/types'
 

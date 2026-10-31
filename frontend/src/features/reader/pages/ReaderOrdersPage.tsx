@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/orders` (UC045) — gọi GET /finance/orders/me của Huy, không đọc thẳng transactions.
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
@@ -68,6 +69,7 @@ export function ReaderOrdersPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de trang don hang */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Lịch sử giao dịch & Hóa đơn</h2>
         <p className="text-xs text-stone-500 mt-1">
@@ -89,6 +91,7 @@ export function ReaderOrdersPage() {
         />
       ) : (
         <div className="border border-stone-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+          {/* bang don: ma, dich vu, tien, thoi gian, trang thai, thao tac */}
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-stone-50 text-stone-600 font-semibold border-b border-stone-200 uppercase tracking-wider text-[11px]">
@@ -102,6 +105,7 @@ export function ReaderOrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
+                {/* vong lap for lay tung dong de display ls giao dich */}
                 {orders.map((o) => (
                   <tr key={o.orderCode} className="hover:bg-stone-50/70 transition-colors">
                     <td className="px-4 py-3 font-mono font-medium text-stone-900">
@@ -140,6 +144,7 @@ export function ReaderOrdersPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-2 text-xs">
+          {/* hang nut Trang truoc / Trang sau */}
           <Button variant="outline" size="sm" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>
             Trang trước
           </Button>

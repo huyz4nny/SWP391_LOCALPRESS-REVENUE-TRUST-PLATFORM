@@ -1,3 +1,4 @@
+// Tác dụng: khung trang báo công khai (masthead, tìm kiếm, badge VIP, ví). Ẩn ticker/banner trên /login /register.
 import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
@@ -24,6 +25,8 @@ export function PublicLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  // login/register: bo banner va dai tin de nut submit khong bi day xuong duoi man hinh
+  const isAuthScreen = ['/login', '/register', '/forgot-password'].includes(location.pathname)
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -51,11 +54,11 @@ export function PublicLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fafaf9] text-stone-900 font-sans">
-      {/* 1. Header chính tinh giản & sang trọng (Minimalist Clean Masthead) */}
+      {/* khung bao toan trang bao: header + banner + noi dung + footer */}
       <header className="bg-white">
-        {/* Top utility row */}
+        {/* thanh ngang tren cung: ngay/thoi tiet ben trai, link dang nhap ben phai */}
         <div className="max-w-7xl mx-auto px-4 pt-3 pb-2 flex items-center justify-between text-xs text-stone-500 border-b border-stone-100">
-          {/* Trái: Ngày tháng & thời tiết 1 dòng mỏng nhẹ */}
+          {/* chu Hai Phong + ngay + nhiet do */}
           <div className="flex items-center space-x-2">
             <span>Hải Phòng</span>
             <span className="text-stone-300">•</span>
@@ -66,7 +69,7 @@ export function PublicLayout() {
             </span>
           </div>
 
-          {/* Phải: Liên kết phụ tinh tế */}
+          {/* nut dark mode + link Dat quang cao + Goi Premium + Dang nhap/Dang ky */}
           <div className="flex items-center space-x-3.5">
             <ThemeToggle className="h-7 px-1.5 text-stone-600 hover:bg-stone-100" />
             <Link
@@ -96,6 +99,7 @@ export function PublicLayout() {
               </div>
             ) : (
               <div className="flex items-center space-x-2.5">
+                {/* nut so du vi cua Huy */}
                 <WalletBalanceButton />
                 <Link
                   to="/account"
@@ -114,6 +118,7 @@ export function PublicLayout() {
                   )}
                 </Link>
                 <span className="text-stone-300">|</span>
+                {/* nut Dang xuat, bam thi ve trang chu */}
                 <button
                     onClick={() => {
                       logout()
@@ -129,11 +134,11 @@ export function PublicLayout() {
           </div>
         </div>
 
-        {/* Masthead Center Branding & Search */}
+        {/* hang giua header: logo LOCALPRESS + o tim kiem */}
         <div className="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
           <div className="w-48 hidden md:block" />
 
-          {/* Logo trung tâm thanh lịch */}
+          {/* chu LOCALPRESS bam ve trang chu */}
           <div className="text-center flex-1">
             <Link to="/" className="inline-block group">
               <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-stone-900 uppercase">
@@ -146,7 +151,7 @@ export function PublicLayout() {
             </p>
           </div>
 
-          {/* Search box nhỏ gọn bên phải */}
+          {/* o nhap tim tin, enter thi sang /search */}
           <div className="w-48 flex justify-end">
             <form onSubmit={handleSearchSubmit} className="relative w-44 sm:w-48">
               <input
@@ -161,7 +166,7 @@ export function PublicLayout() {
           </div>
         </div>
 
-        {/* 2. Menu chuyên mục tinh gọn (Sticky, không nút khối đen, chỉ có active underline đỏ mỏng) */}
+        {/* thanh ngang menu chuyen muc: Trang chu, vong lap ten chuyen muc, Goi VIP */}
         <nav className="border-y border-stone-200 bg-white sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
             <div className="hidden lg:flex items-center space-x-7 py-2.5 overflow-x-auto text-sm mx-auto">
@@ -202,7 +207,7 @@ export function PublicLayout() {
               </Link>
             </div>
 
-            {/* Mobile toggle button */}
+            {/* man dien thoai: nut mo/dong menu chuyen muc */}
             <div className="lg:hidden flex items-center justify-between w-full py-2.5">
               <span className="text-sm font-medium text-stone-700 flex items-center">
                 <Menu className="w-4 h-4 mr-1.5 text-stone-700" />
@@ -217,7 +222,7 @@ export function PublicLayout() {
             </div>
           </div>
 
-          {/* Mobile dropdown menu */}
+          {/* list chuyen muc xoe xuong khi bam nut menu */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-stone-200 bg-white px-4 py-3 space-y-1">
               <Link
@@ -255,35 +260,37 @@ export function PublicLayout() {
           )}
         </nav>
 
-        {/* 3. Dải tin mới siêu mỏng & trang nhã (Minimalist Breaking News Ticker) */}
-        <div className="bg-stone-50 py-2 px-4 text-[13px]">
-          <div className="max-w-7xl mx-auto flex items-center space-x-2 text-stone-600">
-            <span className="font-semibold text-crimson text-xs shrink-0">
-              Mới nhất
-            </span>
-            <span className="text-stone-300">•</span>
-            <Link
-              to={`/articles/${latestBreakingNews.slug}`}
-              className="hover:text-crimson truncate font-medium text-stone-700 transition-colors flex-1"
-            >
-              {latestBreakingNews.title}
-            </Link>
-            <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0 hidden sm:inline" />
+        {!isAuthScreen && (
+          <div className="bg-stone-50 py-2 px-4 text-[13px]">
+            <div className="max-w-7xl mx-auto flex items-center space-x-2 text-stone-600">
+              <span className="font-semibold text-crimson text-xs shrink-0">
+                Mới nhất
+              </span>
+              <span className="text-stone-300">•</span>
+              <Link
+                to={`/articles/${latestBreakingNews.slug}`}
+                className="hover:text-crimson truncate font-medium text-stone-700 transition-colors flex-1"
+              >
+                {latestBreakingNews.title}
+              </Link>
+              <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0 hidden sm:inline" />
+            </div>
           </div>
-        </div>
+        )}
       </header>
 
-      {/* 4. Top Leaderboard Banner Ad */}
-      <div className="max-w-7xl mx-auto px-4 mt-4 w-full">
-        <AdSlotBanner slotCode="SLOT-TOP-LEADERBOARD" />
-      </div>
+      {!isAuthScreen && (
+        <div className="max-w-7xl mx-auto px-4 mt-4 w-full">
+          <AdSlotBanner slotCode="SLOT-TOP-LEADERBOARD" />
+        </div>
+      )}
 
-      {/* 5. Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
+      {/* cho trang con: trang chu, bai viet, search... */}
+      <main className={`flex-1 max-w-7xl mx-auto px-4 w-full ${isAuthScreen ? 'py-4' : 'py-6'}`}>
         <Outlet />
       </main>
 
-      {/* 6. Comprehensive Newspaper Footer */}
+      {/* footer: logo, list chuyen muc, link doc gia, link B2B */}
       <footer className="bg-white mt-24 text-stone-700 text-[13px]">
         <div className="max-w-7xl mx-auto px-4 py-14">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
@@ -310,6 +317,7 @@ export function PublicLayout() {
                 Chuyên mục
               </h3>
               <ul className="space-y-2 text-stone-700">
+                {/* vong lap link chuyen muc o footer */}
                 {categories.map((c) => (
                   <li key={c.id}>
                     <Link to={`/categories/${c.slug}`} className="hover:text-stone-900 transition-colors">
@@ -386,7 +394,7 @@ export function PublicLayout() {
         </div>
       </footer>
 
-      {/* Floating Demo Role Switcher */}
+      {/* thanh doi role demo o goc man hinh */}
       <RoleSwitcherBar />
     </div>
   )

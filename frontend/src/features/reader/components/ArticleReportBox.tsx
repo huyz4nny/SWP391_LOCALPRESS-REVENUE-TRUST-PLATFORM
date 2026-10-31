@@ -1,3 +1,4 @@
+// Tác dụng: hộp báo lỗi nội dung bài (UC042 phần bài) — 1 PENDING / user+bài, Phan duyệt.
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -56,10 +57,12 @@ export function ArticleReportBox({ articleId }: { articleId: string }) {
         </Link>
       ) : !open ? (
         <button type="button" className="text-sm text-slate-600 hover:text-slate-900 hover:underline" onClick={() => setOpen(true)}>
+          {/* nut mo form Bao loi noi dung bai */}
           Báo lỗi nội dung bài
         </button>
       ) : (
         <form onSubmit={submit} className="max-w-lg space-y-3">
+          {/* form: dropdown ly do + o mo ta + nut Gui / Dong */}
           <label className="block text-sm text-slate-700" htmlFor="article-report-reason">
             Lý do
             <select
@@ -85,6 +88,7 @@ export function ArticleReportBox({ articleId }: { articleId: string }) {
           </label>
           {error && <p className="text-sm text-crimson">{error}</p>}
           <div className="flex gap-2">
+            {/* nut Gui bao cao + nut Dong form */}
             <Button type="submit" size="sm" isLoading={sending}>Gửi báo cáo</Button>
             <Button type="button" size="sm" variant="outline" onClick={() => setOpen(false)}>Đóng</Button>
           </div>

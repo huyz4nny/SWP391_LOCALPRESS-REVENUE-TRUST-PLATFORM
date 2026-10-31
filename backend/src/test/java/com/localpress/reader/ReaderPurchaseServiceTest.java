@@ -1,5 +1,7 @@
 package com.localpress.reader;
 
+import com.localpress.finance.dto.response.OrderCreateResponse;
+import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.reader.dto.PendingOrderTargetResponse;
 import com.localpress.reader.repository.ReaderPurchaseRepository;
 import com.localpress.reader.repository.ReaderPurchaseRepository.ActiveSubscription;
@@ -7,6 +9,7 @@ import com.localpress.reader.repository.ReaderPurchaseRepository.ArticleForSale;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PlanRow;
 import com.localpress.reader.repository.ReaderPurchaseRepository.PurchaseRow;
 import com.localpress.reader.service.ReaderPurchaseService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,8 +43,18 @@ class ReaderPurchaseServiceTest {
     @Mock
     private ReaderPurchaseRepository repository;
 
+    @Mock
+    private PaymentProcessingService payments;
+
     @InjectMocks
     private ReaderPurchaseService service;
+
+    @BeforeEach
+    void stubFinanceOrder() {
+        lenient().when(repository.findPendingOrderCode(any(), any(), any())).thenReturn(Optional.empty());
+        lenient().when(payments.createOrder(any(), any())).thenReturn(
+                OrderCreateResponse.builder().orderCode("LP-NEW").amount(PRICE).build());
+    }
 
     private ArticleForSale premiumArticle() {
         return new ArticleForSale(ARTICLE, "PREMIUM", "PUBLISHED", PRICE, 2L, "Bài điều tra");
@@ -64,6 +78,7 @@ class ReaderPurchaseServiceTest {
         assertEquals(77L, response.getTargetId());
         assertEquals(PRICE, response.getAmount());
         assertEquals("Bài điều tra", response.getTitle());
+        assertEquals("LP-NEW", response.getOrderCode());
     }
 
     @Test
@@ -77,6 +92,19 @@ class ReaderPurchaseServiceTest {
         assertEquals(5L, response.getTargetId());
         verify(repository).resetPurchaseToPending(5L, PRICE);
         verify(repository, never()).insertPendingPurchase(any(), any(), any());
+    }
+
+    @Test
+    void reusesOpenFinanceOrderInsteadOfCreatingAnother() {
+        when(repository.findArticleForSale(ARTICLE)).thenReturn(Optional.of(premiumArticle()));
+        when(repository.findActiveSubscriptions(eq(USER), any(LocalDate.class))).thenReturn(List.of());
+        when(repository.findPurchase(USER, ARTICLE)).thenReturn(Optional.of(new PurchaseRow(5L, "PENDING")));
+        when(repository.findPendingOrderCode(USER, "ARTICLE", 5L)).thenReturn(Optional.of("LP-OLD"));
+
+        PendingOrderTargetResponse response = service.createArticlePurchase(USER, ARTICLE);
+
+        assertEquals("LP-OLD", response.getOrderCode());
+        verify(payments, never()).createOrder(any(), any());
     }
 
     @Test

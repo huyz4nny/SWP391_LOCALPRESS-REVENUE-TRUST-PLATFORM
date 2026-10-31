@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/history` (UC039) — list lần đọc, Đọc lại / Xóa dòng.
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { readerApi, ReadingHistoryItem } from '../api'
@@ -59,6 +60,7 @@ export function ReaderHistoryPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de trang lich su doc */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Lịch sử đọc tin</h2>
         <p className="text-xs text-stone-500 mt-1">
@@ -106,6 +108,7 @@ export function ReaderHistoryPage() {
                   {item.categoryName ? ` · ${item.categoryName}` : ''}
                 </span>
               </div>
+              {/* nut Doc lai + nut Xoa dong nay */}
               <div className="flex items-center gap-2 shrink-0">
                 <Link
                   to={`/articles/${item.slug}`}
@@ -126,6 +129,7 @@ export function ReaderHistoryPage() {
           ))}
           {hasMore && (
             <div className="pt-2 text-center">
+              {/* nut tai them lich su */}
               <Button variant="outline" size="sm" isLoading={loading} onClick={() => loadPage(page + 1)}>
                 Xem thêm
               </Button>

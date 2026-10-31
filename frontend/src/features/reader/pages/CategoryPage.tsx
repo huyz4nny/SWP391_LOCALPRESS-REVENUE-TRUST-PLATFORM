@@ -1,3 +1,4 @@
+// Tác dụng: trang chuyên mục `/categories/:slug` (UC029, UC040) — list bài + nút theo dõi.
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Article, Category } from '../types'
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { Check, ChevronRight, Filter, Plus } from 'lucide-react'
 
+// trang /categories/:slug: thanh loc + list the bai ngang + nut theo doi
 export function CategoryPage() {
   const { slug } = useParams<{ slug: string }>()
   const [articles, setArticles] = useState<Article[]>([])
@@ -64,7 +66,7 @@ export function CategoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
+      {/* thanh breadcrumb: Trang chu > ten chuyen muc */}
       <nav className="flex items-center space-x-2 text-xs text-stone-500">
         <Link to="/" className="hover:text-primary-900">
           Trang chủ
@@ -73,7 +75,7 @@ export function CategoryPage() {
         <span className="font-semibold text-stone-900">{category?.name || 'Chuyên mục'}</span>
       </nav>
 
-      {/* Category Header */}
+      {/* hop dau trang: ten chuyen muc + nut Theo doi / Dang theo doi */}
       <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-2xs">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="font-serif text-3xl font-black text-primary-950 uppercase tracking-tight">
@@ -102,7 +104,7 @@ export function CategoryPage() {
           </p>
         )}
 
-        {/* Filter buttons */}
+        {/* hang nut loc: Tat ca / Mien phi / Premium */}
         <div className="mt-4 pt-4 border-t border-stone-100 flex items-center space-x-2 text-xs">
           <span className="text-stone-500 flex items-center">
             <Filter className="w-3.5 h-3.5 mr-1" /> Bộ lọc:
@@ -140,7 +142,7 @@ export function CategoryPage() {
         </div>
       </div>
 
-      {/* Articles Grid */}
+      {/* cot trai list bai, cot phai banner */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-8">
           {loading ? (
@@ -161,6 +163,7 @@ export function CategoryPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* vong lap ve the bai ngang + nut bookmark tren the */}
               {filteredArticles.map((art) => (
                 <ArticleCard
                   key={art.id}
@@ -174,7 +177,7 @@ export function CategoryPage() {
           )}
         </div>
 
-        {/* Sidebar */}
+        {/* banner sticky ben phai */}
         <aside className="lg:col-span-4 sticky top-20">
           <AdSlotBanner slotCode="SLOT-SIDEBAR-STICKY" />
         </aside>

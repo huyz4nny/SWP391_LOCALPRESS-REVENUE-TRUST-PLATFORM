@@ -43,7 +43,7 @@ class ReaderPurchaseControllerTest {
     void articlePurchaseUsesUserFromSessionAndReturnsTarget() throws Exception {
         when(currentUser.requireUserId()).thenReturn(6L);
         when(purchaseService.createArticlePurchase(6L, 1L)).thenReturn(PendingOrderTargetResponse.builder()
-                .orderType("ARTICLE").targetId(77L).amount(new BigDecimal("15000.00")).title("Bài điều tra").build());
+                .orderType("ARTICLE").targetId(77L).amount(new BigDecimal("15000.00")).title("Bài điều tra").orderCode("LP-A").build());
 
         mvc.perform(post("/api/v1/reader/article-purchases")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -51,7 +51,8 @@ class ReaderPurchaseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderType").value("ARTICLE"))
                 .andExpect(jsonPath("$.targetId").value(77))
-                .andExpect(jsonPath("$.amount").value(15000.00));
+                .andExpect(jsonPath("$.amount").value(15000.00))
+                .andExpect(jsonPath("$.orderCode").value("LP-A"));
     }
 
     @Test

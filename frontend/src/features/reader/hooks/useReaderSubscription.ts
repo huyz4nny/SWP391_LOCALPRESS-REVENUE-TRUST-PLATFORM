@@ -1,8 +1,9 @@
+// Tác dụng: cache gói ACTIVE cho badge VIP header và trang `/account/subscription`. Reload khi mở trang gói.
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { mockStore } from '@/mocks/store'
 import { readerApi, ReaderSubscription } from '../api'
 
-// gói ACTIVE của độc giả, dùng chung cho header, hồ sơ và trang gói
+// goi ACTIVE dung de hien badge VIP tren header va the goi o /account/subscription
 type SubscriptionSnapshot = {
   userId: string | null
   items: ReaderSubscription[]
@@ -32,6 +33,7 @@ function subscribe(listener: () => void) {
 }
 
 async function load(userId: string) {
+  if (loadingFor === userId) return
   loadingFor = userId
   try {
     const items = await readerApi.getMySubscriptions()
@@ -41,6 +43,8 @@ async function load(userId: string) {
     if (loadingFor !== userId) return
     const message = err instanceof Error && err.message ? err.message : 'Không tải được gói đang dùng'
     emit({ userId, items: [], loaded: true, error: message })
+  } finally {
+    if (loadingFor === userId) loadingFor = null
   }
 }
 
@@ -54,9 +58,7 @@ export function useReaderSubscription() {
   const state = useSyncExternalStore(subscribe, () => snapshot)
 
   useEffect(() => {
-    if (snapshot.userId === userId || loadingFor === userId) return
     if (isGuest) {
-      loadingFor = userId
       emit({ userId, items: [], loaded: true, error: null })
       return
     }

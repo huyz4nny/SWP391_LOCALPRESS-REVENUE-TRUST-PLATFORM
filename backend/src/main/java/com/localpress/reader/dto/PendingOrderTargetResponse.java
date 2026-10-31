@@ -7,9 +7,8 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
-// dto trả về sau khi SV3 đã tạo bản ghi chờ thanh toán (PENDING) cho bài lẻ hoặc gói cước
-// frontend lấy targetId và amount ở đây để gọi tiếp POST /api/v1/finance/orders của SV4
-// targetId là purchase_id khi orderType là ARTICLE và là subscription_id khi orderType là SUBSCRIPTION
+// dto sau khi SV3 tạo quyền PENDING và tạo/tái dùng đơn thanh toán trên server
+// frontend chỉ navigate /payment/:orderCode, không gọi POST /finance/checkout (403 trên main)
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,4 +26,7 @@ public class PendingOrderTargetResponse {
 
     // tên bài hoặc tên gói để trang thanh toán hiển thị mô tả đơn
     private String title;
+
+    // mã đơn SV4, frontend mở /payment/:orderCode
+    private String orderCode;
 }

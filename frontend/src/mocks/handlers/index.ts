@@ -312,7 +312,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (mockStore.hasAccessToArticle(currentUser.id, article.id)) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 409, error: 'Conflict', message: 'Bạn đã có quyền đọc bài này', path: pathname })
     }
-    return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title }
+    return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title, orderCode: `MOCK-${article.id}` }
   }
 
   // UC035 mock của POST /reader/subscriptions: khách đang có gói vẫn được mua tiếp để gia hạn
@@ -321,7 +321,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (!plan) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy gói cước', path: pathname })
     }
-    return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name }
+    return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name, orderCode: `MOCK-${plan.id}` }
   }
 
   if (pathname === '/reader/comments/mine' && method === 'GET') {

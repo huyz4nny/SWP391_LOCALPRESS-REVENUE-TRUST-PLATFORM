@@ -1,3 +1,4 @@
+// Tác dụng: khung cổng tài khoản độc giả — sidebar tủ sách, gói, đơn, thiết bị, hỗ trợ. Guest thì mời login.
 import React, { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
@@ -39,7 +40,7 @@ export function ReaderAccountLayout() {
     return unsub
   }, [])
 
-  // Guard: If guest, prompt to login
+  // khach chua login: hop canh bao + 2 nut demo dang nhap
   if (currentUser.role === 'GUEST') {
     return (
       <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center p-4 font-sans text-slate-900">
@@ -67,6 +68,7 @@ export function ReaderAccountLayout() {
 
   const deviceBadge = devices.loaded ? `${devices.items.length}/2` : undefined
 
+  // list muc sidebar: ho so, tu sach, bookmark, follow, ls doc, goi, don, thiet bi, ho tro
   const navItems = [
     { label: 'Hồ sơ tài khoản', path: '/account', icon: UserIcon },
     { label: 'Tủ sách & bài đã mua', path: '/account/library', icon: BookOpen, badge: library.purchasedCount },
@@ -81,6 +83,7 @@ export function ReaderAccountLayout() {
 
   return (
     <div className="min-h-screen bg-[#fafaf9] font-sans text-slate-900">
+      {/* thanh ngang tren: logo + badge VIP/nut nang cap + vi + dark mode + nut Trang bao */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-4">
@@ -114,6 +117,7 @@ export function ReaderAccountLayout() {
 
       <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:py-8">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
+          {/* cot trai: avatar + ten + vong lap menu */}
           <aside>
             <div className="flex items-center gap-3 px-2.5 pb-4">
               <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#dfe7f5] text-sm font-semibold text-primary-900">
@@ -126,6 +130,7 @@ export function ReaderAccountLayout() {
             </div>
 
             <nav className="space-y-0.5" aria-label="Tài khoản độc giả">
+              {/* vong lap ve tung dong menu, so dem o ben phai */}
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive =
@@ -152,6 +157,7 @@ export function ReaderAccountLayout() {
                   </Link>
                 )
               })}
+              {/* nut Dang xuat o cuoi menu */}
               <button
                 onClick={() => {
                   logout()
@@ -165,6 +171,7 @@ export function ReaderAccountLayout() {
             </nav>
           </aside>
 
+          {/* cot phai: noi dung trang con (tu sach, goi, don...) */}
           <main className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
             <Outlet />
           </main>

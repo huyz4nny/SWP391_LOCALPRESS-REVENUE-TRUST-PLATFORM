@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/library` (UC037) — bài mua lẻ ACTIVE còn xuất bản.
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { readerApi } from '../api'
@@ -43,6 +44,7 @@ export function ReaderLibraryPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de trang tu sach */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Tủ sách & Phóng sự đã mua</h2>
         <p className="text-xs text-stone-500 mt-1">
@@ -86,6 +88,7 @@ export function ReaderLibraryPage() {
           </div>
           {hasMore && (
             <div className="text-center">
+              {/* nut tai them bai da mua */}
               <Button variant="outline" size="sm" isLoading={loading} onClick={() => loadPage(page + 1)}>
                 Xem thêm
               </Button>

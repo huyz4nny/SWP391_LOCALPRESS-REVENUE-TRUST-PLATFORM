@@ -1,9 +1,9 @@
+// Tác dụng: trang `/premium` (UC035) — thẻ gói, tạo subscription PENDING, đẩy `/payment` của Huy.
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SubscriptionPlan } from '../types'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { httpClient } from '@/lib/http/client'
 import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
 import { readerApi } from '../api'
@@ -36,18 +36,8 @@ export function PremiumPlansPage() {
     setLoadingPlanId(plan.id)
     setError('')
     try {
-      // phan SV3: tao dong subscriptions PENDING, lay subscription_id + gia that
       const target = await readerApi.createSubscription(plan.id)
-      // phan SV4: tao don tien, targetId phai la subscription_id chu khong phai planId
-      const order = await httpClient.post<any>('/finance/checkout', {
-        orderType: 'SUBSCRIPTION',
-        targetId: target.targetId,
-        targetTitle: target.title || plan.name,
-        amount: target.amount,
-        paymentMethod: 'VIETQR',
-      })
-      // sang trang QR/vi cua Huy, khong tu ve checkout rieng
-      navigate(paymentPath(order), { state: { returnUrl: '/account/subscription' } })
+      navigate(paymentPath({ orderCode: target.orderCode }), { state: { returnUrl: '/account/subscription' } })
     } catch (err) {
       // hiện lý do lỗi cho khách thay vì chỉ ghi console
       console.error(err)
@@ -59,7 +49,7 @@ export function PremiumPlansPage() {
 
   return (
     <div className="max-w-6xl mx-auto py-10 px-4 space-y-12">
-      {/* Header Banner */}
+      {/* banner dau trang: nhan dac quyen + tieu de */}
       <div className="text-center max-w-3xl mx-auto">
         <div className="inline-flex items-center space-x-1.5 bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 rounded-full mb-3 border border-amber-300">
           <Crown className="w-3.5 h-3.5 text-amber-700" />
@@ -145,6 +135,7 @@ export function PremiumPlansPage() {
                 </div>
               </div>
 
+              {/* nut Dang ky goi nay o day the */}
               <div className="mt-8 pt-4">
                 <Button
                   variant={isPopular ? 'gold' : 'primary'}
@@ -162,7 +153,7 @@ export function PremiumPlansPage() {
       </div>
       )}
 
-      {/* Trust factors */}
+      {/* 3 o tin cay duoi bang gia */}
       <div className="bg-stone-100 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs text-stone-600">
         <div className="flex flex-col items-center">
           <ShieldCheck className="w-6 h-6 text-primary-900 mb-2" />

@@ -168,4 +168,21 @@ public class ReaderPurchaseRepository {
         }
         return key.longValue();
     }
+
+    // đơn PENDING chưa hết hạn của đúng bài/gói — trả lại mã cũ, không tạo đơn thứ hai
+    public Optional<String> findPendingOrderCode(Long userId, String orderType, Long targetId) {
+        if (!"ARTICLE".equals(orderType) && !"SUBSCRIPTION".equals(orderType)) {
+            throw new IllegalArgumentException("Loại đơn không hợp lệ");
+        }
+        String column = "ARTICLE".equals(orderType) ? "purchase_id" : "subscription_id";
+        List<String> rows = jdbcTemplate.query("""
+                        SELECT gateway_transaction_id FROM transactions
+                        WHERE user_id = ? AND status = 'PENDING' AND %s = ?
+                          AND (expires_at IS NULL OR expires_at > NOW())
+                        ORDER BY transaction_id DESC
+                        """.formatted(column),
+                (rs, i) -> rs.getString("gateway_transaction_id"),
+                userId, targetId);
+        return rows.stream().findFirst();
+    }
 }

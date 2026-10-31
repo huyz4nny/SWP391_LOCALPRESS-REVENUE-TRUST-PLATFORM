@@ -1,3 +1,4 @@
+// Tác dụng: barrel — router import một chỗ mọi page/type/api của độc giả.
 export * from './pages/HomePage'
 export * from './pages/CategoryPage'
 export * from './pages/ArticleDetailPage'

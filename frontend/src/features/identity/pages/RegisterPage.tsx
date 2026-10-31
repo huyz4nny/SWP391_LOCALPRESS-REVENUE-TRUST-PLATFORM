@@ -1,3 +1,4 @@
+// Tác dụng: trang `/register` (UC033) — tạo tài khoản độc giả, không gửi email xác thực.
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -84,7 +85,7 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto py-10 px-4">
+    <div className="max-w-md mx-auto py-4 px-4">
       <Card>
         <CardHeader className="text-center">
           <CardTitle>Tạo tài khoản Độc giả</CardTitle>
@@ -155,7 +156,7 @@ export function RegisterPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-3">
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" isLoading={isSubmitting} disabled={isSubmitting}>
               Đăng ký tài khoản
             </Button>
             <div className="text-center text-xs text-stone-500">

@@ -1,3 +1,4 @@
+// Tác dụng: trang `/account/bookmarks` (UC038) — list bài đã lưu, bỏ lưu tại chỗ.
 import React, { useState, useEffect } from 'react'
 import { readerApi } from '../api'
 import { Article } from '../types'
@@ -51,6 +52,7 @@ export function ReaderBookmarksPage() {
 
   return (
     <div className="space-y-6">
+      {/* tieu de trang bai da luu */}
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Bài viết đã đánh dấu</h2>
         <p className="text-xs text-stone-500 mt-1">
@@ -92,6 +94,7 @@ export function ReaderBookmarksPage() {
           ))}
           {hasMore && (
             <div className="pt-2 text-center">
+              {/* nut tai them bai da luu */}
               <Button variant="outline" size="sm" isLoading={loading} onClick={() => loadPage(page + 1)}>
                 Xem thêm
               </Button>

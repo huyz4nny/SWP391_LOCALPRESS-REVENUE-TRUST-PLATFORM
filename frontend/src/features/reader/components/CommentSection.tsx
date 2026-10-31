@@ -1,3 +1,4 @@
+// Tác dụng: khối bình luận cuối bài (UC041, UC042) — gửi/sửa về PENDING, báo cáo comment đang hiện.
 import React, { useEffect, useState } from 'react'
 import { Comment } from '../types'
 import { readerApi } from '../api'
@@ -111,6 +112,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
     }
   }
 
+  // o sua comment: textarea + nut Luu sua / Huy
   const renderEditor = (commentId: string) => (
     <div className="mt-2 space-y-2">
       <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={3} maxLength={1000} />
@@ -123,6 +125,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
 
   return (
     <div className="mt-12 pt-8 border-t border-stone-200">
+      {/* tieu de Y kien ban doc + so comment da duyet */}
       <div className="flex items-center space-x-2 mb-6">
         <MessageSquare className="w-5 h-5 text-primary-900" />
         <h3 className="font-serif text-lg font-bold text-stone-900">
@@ -139,6 +142,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
 
       {signedIn ? (
         <form onSubmit={handleSubmit} className="mb-8">
+          {/* form viet comment + nut Gui binh luan */}
           <div className="flex items-start space-x-3">
             <img
               src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&auto=format&fit=crop&q=80'}
@@ -178,6 +182,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
 
       {waiting.length > 0 && (
         <div className="mb-6 space-y-3">
+          {/* khoi comment cua minh dang cho duyet */}
           <h4 className="text-xs font-bold text-stone-600">Bình luận của bạn chưa hiện trên bài</h4>
           {waiting.map((c) => (
             <div key={c.id} className="p-4 rounded-lg bg-stone-50 border border-stone-200">
@@ -200,6 +205,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
         </div>
       )}
 
+      {/* list comment cong khai (APPROVED) */}
       <div className="space-y-4">
         {comments.length === 0 ? (
           <p className="text-xs text-stone-400 italic">
@@ -228,6 +234,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
                   <p className="text-xs text-stone-700 leading-relaxed">{c.content}</p>
                 )}
 
+                {/* hang nut: Sua (cua minh) hoac Bao cao (comment nguoi khac) */}
                 {editingId !== c.id && (
                   <div className="mt-3 flex items-center space-x-4 text-[11px] text-stone-500">
                     {own && (
@@ -252,6 +259,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
                   </div>
                 )}
 
+                {/* form bao cao: o ly do + nut Gui bao cao / Huy */}
                 {reportingId === c.id && (
                   <div className="mt-3 space-y-2">
                     <Textarea
