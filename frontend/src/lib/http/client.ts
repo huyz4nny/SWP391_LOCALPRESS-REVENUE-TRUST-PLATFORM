@@ -28,16 +28,38 @@ function writeStoredAuth(value: string) {
     }
 }
 
+// Tabs of the same origin share the login through this channel: a new tab asks the open ones,
+// login and logout are announced. Nothing goes to localStorage, so closing every tab ends the session.
+const AUTH_CHANNEL = 'localpress-auth'
+
+type AuthMessage =
+    | { type: 'request' }
+    | { type: 'share'; basicAuth: string; bearerToken: string }
+    | { type: 'login'; basicAuth: string; bearerToken: string }
+    | { type: 'logout' }
+
+function openAuthChannel(): BroadcastChannel | null {
+    try {
+        return window.BroadcastChannel ? new window.BroadcastChannel(AUTH_CHANNEL) : null
+    } catch {
+        return null
+    }
+}
+
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
     // Preserve main's Basic session across reloads; Google Bearer remains in memory.
     private basicAuth = readStoredAuth()
     private bearerToken = ''
+    private channel = openAuthChannel()
+    // Set while a login is being checked: the login this tab had before (empty strings if none)
+    private confirmedAuth: { basicAuth: string; bearerToken: string } | null = null
 
     constructor() {
         this.baseUrl = APP_CONFIG.apiBaseUrl
         this.useMock = APP_CONFIG.useMockApi
+        this.channel?.addEventListener('message', (event: MessageEvent<AuthMessage>) => this.onAuthMessage(event.data))
     }
 
     public setUseMock(use: boolean) {
@@ -60,6 +82,87 @@ class HttpClient {
         this.basicAuth = ''
         writeStoredAuth('')
         this.bearerToken = token
+    }
+
+    /** Call before trying new credentials: until the backend accepts them, other tabs keep seeing the previous login. */
+    public beginLogin() {
+        this.confirmedAuth = { basicAuth: this.basicAuth, bearerToken: this.bearerToken }
+    }
+
+    /** Failed login: only this tab goes back to its previous login (or none); other tabs are not touched. */
+    public cancelLogin(): boolean {
+        const previous = this.confirmedAuth
+        this.confirmedAuth = null
+        if (previous) this.adoptAuth(previous.basicAuth, previous.bearerToken)
+        else this.clearBasicAuth()
+        return this.hasAuth()
+    }
+
+    /** Call after the backend accepted the login, so other open tabs switch to the same account. */
+    public shareLoginWithOtherTabs() {
+        this.confirmedAuth = null
+        if (this.hasAuth()) this.broadcast({ type: 'login', basicAuth: this.basicAuth, bearerToken: this.bearerToken })
+    }
+
+    /** Logs out this tab and every other open tab. */
+    public logoutAllTabs() {
+        this.confirmedAuth = null
+        this.clearBasicAuth()
+        this.broadcast({ type: 'logout' })
+    }
+
+    /** A tab opened without auth borrows it from an open tab; resolves false if none answers in time. */
+    public requestAuthFromOtherTabs(timeoutMs = 300): Promise<boolean> {
+        const channel = this.channel
+        if (this.hasAuth() || !channel) return Promise.resolve(this.hasAuth())
+        return new Promise((resolve) => {
+            const finish = (found: boolean) => {
+                clearTimeout(timer)
+                channel.removeEventListener('message', onMessage)
+                resolve(found)
+            }
+            const onMessage = (event: MessageEvent<AuthMessage>) => {
+                if (event.data?.type !== 'share') return
+                this.adoptAuth(event.data.basicAuth, event.data.bearerToken)
+                finish(this.hasAuth())
+            }
+            const timer = setTimeout(() => finish(false), timeoutMs)
+            channel.addEventListener('message', onMessage)
+            this.broadcast({ type: 'request' })
+        })
+    }
+
+    private onAuthMessage(message: AuthMessage) {
+        if (message?.type === 'request') {
+            // Never hand out credentials that are still being checked
+            const shared = this.confirmedAuth ?? { basicAuth: this.basicAuth, bearerToken: this.bearerToken }
+            if (shared.basicAuth || shared.bearerToken) this.broadcast({ type: 'share', ...shared })
+        } else if (message?.type === 'login') {
+            if (this.confirmedAuth) {
+                // this tab is mid-login: the other tab's account becomes the one to fall back to
+                this.confirmedAuth = { basicAuth: message.basicAuth, bearerToken: message.bearerToken }
+                return
+            }
+            if (message.basicAuth === this.basicAuth && message.bearerToken === this.bearerToken) return
+            this.adoptAuth(message.basicAuth, message.bearerToken)
+        } else if (message?.type === 'logout') {
+            this.confirmedAuth = null
+            this.clearBasicAuth()
+        }
+    }
+
+    private adoptAuth(basicAuth: string, bearerToken: string) {
+        this.basicAuth = basicAuth
+        this.bearerToken = bearerToken
+        writeStoredAuth(basicAuth)
+    }
+
+    private broadcast(message: AuthMessage) {
+        try {
+            this.channel?.postMessage(message)
+        } catch {
+            // channel closed: other tabs keep their own session
+        }
     }
 
     public hasAuth() {
@@ -155,6 +258,30 @@ class HttpClient {
         }
 
         return response.blob()
+    }
+
+    /** Tải file (CSV, PDF...) từ API thật; trả về blob + tên file trong Content-Disposition. Chế độ mock không hỗ trợ. */
+    public async getFile(path: string, options?: RequestOptions): Promise<{ blob: Blob; filename: string }> {
+        if (this.useMock) {
+            throw new Error('Tải file cần dùng API thật')
+        }
+        const url = this.buildUrl(path, options?.params)
+        const headers = new Headers(this.headers(options))
+        headers.delete('Content-Type')
+        const response = await fetch(url, { method: 'GET', headers })
+        if (!response.ok) {
+            const errorJson = await response.json().catch(() => ({}))
+            throw new AppApiError({
+                timestamp: new Date().toISOString(),
+                status: response.status,
+                error: response.statusText,
+                message: errorJson.message || 'Không tải được file',
+                path,
+            })
+        }
+        const disposition = response.headers.get('Content-Disposition') ?? ''
+        const match = /filename="?([^";]+)"?/i.exec(disposition)
+        return { blob: await response.blob(), filename: match?.[1] ?? 'download' }
     }
 
     public async post<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {

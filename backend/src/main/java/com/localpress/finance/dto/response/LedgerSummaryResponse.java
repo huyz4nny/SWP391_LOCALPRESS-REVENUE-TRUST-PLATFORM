@@ -47,9 +47,4 @@ public class LedgerSummaryResponse {
      * Số lượng giao dịch thất bại (FAILED).
      */
     private long failedCount;
-
-    /**
-     * Số lượng giao dịch chuyển khoản ngân hàng thủ công đang chờ Kế toán duyệt (UC050).
-     */
-    private long pendingManualTransfersCount;
 }

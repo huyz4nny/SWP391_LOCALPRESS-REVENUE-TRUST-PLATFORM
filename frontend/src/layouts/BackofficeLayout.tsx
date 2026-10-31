@@ -26,6 +26,8 @@ import {
   Menu,
   X,
   Webhook,
+  Receipt,
+  BellRing,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -104,6 +106,7 @@ export function BackofficeLayout() {
     { label: currentUser.role === 'AUTHOR' ? 'Bài viết của tôi' : 'Bài viết', path: '/backoffice/editorial/articles', icon: FileText },
     { label: 'Soạn bài mới', path: '/backoffice/editorial/articles/new', icon: PlusCircle },
     { label: 'Booking quảng cáo', path: '/backoffice/editorial/bookings', icon: Calendar },
+    { label: 'Lịch tồn kho slot (UC017)', path: '/backoffice/editorial/calendar', icon: Calendar },
     { label: 'Duyệt banner', path: '/backoffice/editorial/creatives', icon: ImageIcon },
     { label: 'Kiểm duyệt bình luận', path: '/backoffice/editorial/comments', icon: MessageSquare },
   ].filter((item) => currentUser.role !== 'AUTHOR'
@@ -115,8 +118,10 @@ export function BackofficeLayout() {
     { label: 'Nhật ký SePay', path: '/backoffice/finance/sepay', icon: Webhook },
     { label: 'Khiếu nại thanh toán', path: '/backoffice/finance/complaints', icon: MessageSquare },
     { label: 'Hoàn tiền', path: '/backoffice/finance/refunds', icon: RotateCcw },
-    { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
     { label: 'Sổ quỹ', path: '/backoffice/finance/ledger', icon: BookMarked },
+    { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
+    { label: 'Công nợ quảng cáo', path: '/backoffice/finance/receivables', icon: Receipt },
+    { label: 'Cảnh báo và báo cáo', path: '/backoffice/finance/reports', icon: BellRing },
   ]
 
   const adminItems: NavItem[] = [

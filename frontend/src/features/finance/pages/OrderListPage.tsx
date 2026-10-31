@@ -32,14 +32,10 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   REFUND: 'Hoàn tiền',
 }
 
+// Chỉ còn 2 cách trả: quét QR SePay hoặc trừ Ví LocalPress. Mã lạ (dữ liệu cũ) hiện nguyên văn.
 const METHOD_LABELS: Record<string, string> = {
   SEPAY: 'QR SePay',
-  VIETQR: 'VietQR',
   WALLET: 'Ví LocalPress',
-  BANK_TRANSFER: 'Chuyển khoản',
-  MANUAL_BANK_TRANSFER: 'Chuyển khoản',
-  VNPAY: 'VNPay',
-  MOMO: 'MoMo',
 }
 
 export function OrderListPage() {

@@ -310,7 +310,8 @@ const mock = {
     if (o.userId !== userId) throw new Error('Bạn không có quyền truy cập đơn hàng này')
     const paid = o.paymentStatus === 'PAID'
     const expiresAt = new Date(Date.parse(o.createdAt) + ORDER_TTL_MS).toISOString()
-    const expired = !paid && Date.now() > Date.parse(expiresAt)
+    // Rule 6 (giống backend isPaymentWindowClosed): chỉ booking quảng cáo giữ chỗ có hạn
+    const expired = !paid && o.orderType === 'AD_CAMPAIGN' && Date.now() > Date.parse(expiresAt)
     const paidByWallet = mock
       .wallet(state, userId)
       .entries.some((e) => e.direction === 'DEBIT' && e.transactionId === o.orderCode)

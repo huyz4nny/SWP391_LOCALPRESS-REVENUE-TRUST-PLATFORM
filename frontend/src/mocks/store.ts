@@ -1,6 +1,8 @@
 import { User } from '@/types'
 import { Article, Category, SubscriptionPlan, Comment, ReaderEntitlement } from '@/features/reader/types'
 import { AdSlot, AdBooking, AdCampaign, AdCreative, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange } from '@/features/advertising/types'
+import { companyProfileSchema } from '@/features/advertising/schemas/companyProfile'
+import { bookingSchema, getBookingDays } from '@/features/advertising/schemas/booking'
 import { Order, RefundRequest, ReconciliationPeriod, GeneralLedgerEntry, PaymentAttempt } from '@/features/finance/types'
 import { SystemAuditLog, PaywallSettings, AdDeliveryLiveStatus } from '@/features/administration/types'
 import {
@@ -268,6 +270,14 @@ class MockStore {
 
   constructor() {
     this.state = getInitialState()
+    // Another tab of the same browser changed the store (login, logout, mock data): pick it up.
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('storage', (event) => {
+        if (event.key !== STORAGE_KEY || event.newValue === null) return
+        this.state = getInitialState()
+        this.notify()
+      })
+    }
   }
 
   private persist() {
@@ -356,14 +366,12 @@ class MockStore {
     return this.state.advertiserHistory[user.id] || []
   }
 
-  public saveAdvertiserProfile(input: AdvertiserProfileInput): AdvertiserProfile {
+  public saveAdvertiserProfile(data: AdvertiserProfileInput): AdvertiserProfile {
     const user = this.getCurrentUser()
     if (user.role !== 'ADVERTISER') throw new Error('Không có quyền sửa hồ sơ doanh nghiệp')
-    if (!input.companyName.trim() || !input.taxCode.trim() || !input.contactPerson.trim() ||
-        !input.email.trim() || !input.phone.trim() || !input.businessSector?.trim() ||
-        !input.invoiceName?.trim() || !input.invoiceTaxCode?.trim() ||
-        !input.invoiceAddress?.trim() || !input.invoiceEmail?.trim())
-      throw new Error('Vui lòng điền các trường bắt buộc')
+    const parsed = companyProfileSchema.safeParse(data)
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+    const input = parsed.data
     if (Object.entries(this.state.advertiserProfiles).some(([id, profile]) =>
       id !== user.id && profile.taxCode === input.taxCode.trim())) throw new Error('Mã số thuế đã được sử dụng')
     const previous = this.state.advertiserProfiles[user.id]
@@ -826,36 +834,64 @@ class MockStore {
   }
 
   // --- Advertising & Creatives ---
+  /** Ngày đã kín sức chứa của slot (mock của kiểm tra lịch phía server). */
+  public getSlotFullDates(slotId: string, startDate: string, endDate: string): string[] {
+    const slot = this.state.adSlots.find((s) => s.id === slotId)
+    if (!slot) throw new Error('Không tìm thấy vị trí quảng cáo')
+    // Seed lưu ngày dạng ISO có giờ: chỉ so phần YYYY-MM-DD.
+    const taken = this.state.bookings
+      .filter((b) => b.slotId === slotId && !['REJECTED', 'CANCELLED'].includes(b.bookingStatus))
+      .map((b) => ({ start: b.startDate.slice(0, 10), end: b.endDate.slice(0, 10) }))
+      .filter((b) => b.start <= endDate && b.end >= startDate)
+    const full: string[] = []
+    for (let day = Date.parse(startDate); day <= Date.parse(endDate); day += 86_400_000) {
+      const date = new Date(day).toISOString().slice(0, 10)
+      if (taken.filter((b) => b.start <= date && b.end >= date).length >= slot.maxCapacity) full.push(date)
+    }
+    return full
+  }
+
   public createBooking(data: {
+    requestKey: string
+    campaignName: string
     slotId: string
     startDate: string
     endDate: string
-    daysCount: number
-    companyName: string
     contactPerson: string
     contactPhone: string
     contactEmail: string
   }): AdBooking {
+    const parsed = bookingSchema.safeParse(data)
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+    const input = parsed.data
     const slot = this.state.adSlots.find((s) => s.id === data.slotId)
-    if (!slot) throw new Error('Không tìm thấy vị trí quảng cáo')
+    if (!slot?.isActive) throw new Error('Không tìm thấy vị trí quảng cáo đang hoạt động')
 
     const currentUser = this.getCurrentUser()
-    const standardPrice = slot.pricePerDay * data.daysCount
+    const profile = this.state.advertiserProfiles[currentUser.id]
+    if (profile?.verificationStatus !== 'VERIFIED') throw new Error('Hồ sơ doanh nghiệp chưa được xác minh nên chưa gửi được booking')
+    const daysCount = getBookingDays(input.startDate, input.endDate)
+    if (!daysCount) throw new Error('Khoảng ngày booking không còn hợp lệ, vui lòng chọn lại')
+    if (this.getSlotFullDates(slot.id, input.startDate, input.endDate).length) {
+      throw new Error('Vị trí vừa được giữ chỗ trong khoảng ngày đã chọn, vui lòng chọn lịch khác')
+    }
+    const standardPrice = slot.pricePerDay * daysCount
     const finalPrice = standardPrice
 
     const newBooking: AdBooking = {
       id: `BK-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       advertiserId: currentUser.id,
-      companyName: data.companyName || currentUser.companyName || 'Doanh nghiệp đối tác',
-      contactPerson: data.contactPerson || currentUser.name,
-      contactPhone: data.contactPhone || currentUser.phone || '0900000000',
-      contactEmail: data.contactEmail || currentUser.email,
+      companyName: profile.companyName,
+      campaignName: input.campaignName,
+      contactPerson: input.contactPerson,
+      contactPhone: input.contactPhone,
+      contactEmail: input.contactEmail,
       slotId: slot.id,
       slotName: slot.name,
       slotCode: slot.code,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      daysCount: data.daysCount,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      daysCount,
       standardPrice,
       finalPrice,
       bookingStatus: 'SUBMITTED', // Awaiting quote
@@ -879,6 +915,7 @@ class MockStore {
     booking.finalPrice = finalPrice
     booking.discountPercent = discountPercent
     booking.quotationNotes = quotationNotes
+    booking.quoteVersion = (booking.quoteVersion ?? 0) + 1
     booking.bookingStatus = 'QUOTED'
     booking.updatedAt = new Date().toISOString()
 
@@ -887,9 +924,27 @@ class MockStore {
     return booking
   }
 
-  public acceptQuotation(bookingId: string): AdBooking {
+  public rejectBooking(bookingId: string, reason: string): AdBooking {
     const booking = this.state.bookings.find((b) => b.id === bookingId)
     if (!booking) throw new Error('Không tìm thấy booking')
+
+    booking.bookingStatus = 'REJECTED'
+    booking.rejectionReason = reason
+    booking.updatedAt = new Date().toISOString()
+
+    this.logAudit('TỪ CHỐI BOOKING QUẢNG CÁO', 'ADVERTISING', `Từ chối booking ${booking.id}. Lý do: ${reason}`)
+    this.persist()
+    return booking
+  }
+
+  public acceptQuotation(bookingId: string, quoteVersion?: number): AdBooking {
+    const booking = this.state.bookings.find((b) => b.id === bookingId)
+    if (!booking) throw new Error('Không tìm thấy booking')
+    if (booking.bookingStatus === 'CONFIRMED') return booking
+    if (booking.bookingStatus !== 'QUOTED') throw new Error('Tòa soạn chưa gửi báo giá cho booking này')
+    if (booking.quoteVersion !== undefined && booking.quoteVersion !== quoteVersion) {
+      throw new Error('Báo giá vừa được tòa soạn cập nhật, vui lòng tải lại và xem bản mới')
+    }
 
     booking.bookingStatus = 'CONFIRMED'
     booking.termsAccepted = true
@@ -903,7 +958,7 @@ class MockStore {
       companyName: booking.companyName,
       slotId: booking.slotId,
       slotName: booking.slotName,
-      name: `Chiến dịch quảng cáo ${booking.slotName}`,
+      name: booking.campaignName || `Chiến dịch quảng cáo ${booking.slotName}`,
       startDate: booking.startDate,
       endDate: booking.endDate,
       totalBudget: booking.finalPrice,

@@ -117,6 +117,21 @@ export interface AdBooking {
   termsAccepted: boolean
   createdAt: string
   updatedAt: string
+  // Iter 2 (UC005-UC007): các trường do backend advertising trả về
+  campaignName?: string
+  quoteVersion?: number          // tăng mỗi lần tòa soạn gửi/sửa báo giá; xác nhận phải gửi đúng số này
+  acceptedAt?: string | null
+  holdExpiresAt?: string | null  // hạn giữ chỗ chờ thanh toán
+  paymentOrderCode?: string | null
+  paymentIssue?: 'LATE_PAYMENT_CONFLICT' | null
+  rejectionReason?: string | null
+}
+
+export interface SlotAvailability {
+  available: boolean
+  capacity: number
+  inventoryMode: 'EXCLUSIVE' | 'ROTATING'
+  fullDates: string[]
 }
 
 export interface AdCampaign {
@@ -126,6 +141,7 @@ export interface AdCampaign {
   companyName: string
   slotId: string
   slotName: string
+  slotDimensions?: string
   name: string
   startDate: string
   endDate: string
@@ -144,4 +160,18 @@ export interface AdCampaign {
   }[]
   createdAt: string
   updatedAt: string
+}
+
+/** Một dòng của GET /finance/orders/me (OrderStatusResponse của SV4). */
+export interface AdPaymentOrder {
+  transactionId: number
+  orderCode: string
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
+  amount: number
+  paymentMethod?: string
+  createdAt: string
+  paidAt?: string
+  expired: boolean
+  description?: string
+  targetId?: number
 }

@@ -6,12 +6,13 @@ import { AppProviders } from './app/providers'
 import { syncAuthSession } from './features/identity/authSession'
 import './styles/globals.css'
 
-syncAuthSession()
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AppProviders>
-      <RouterProvider router={router} />
-    </AppProviders>
-  </StrictMode>,
-)
+// Render after the session check so a new tab does not flash the login page while borrowing auth.
+void syncAuthSession().finally(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>
+    </StrictMode>,
+  )
+})

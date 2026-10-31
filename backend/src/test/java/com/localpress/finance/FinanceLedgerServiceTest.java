@@ -13,6 +13,7 @@ import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceLedgerService;
+import com.localpress.finance.service.FinanceReconciliationService;
 import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
+
+import java.sql.ResultSet;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,8 +39,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -55,6 +62,12 @@ class FinanceLedgerServiceTest {
     @Mock
     private PaymentComplaintRepository paymentComplaintRepository;
 
+    @Mock
+    private FinanceReconciliationService reconciliationService;
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
+
     @InjectMocks
     private FinanceLedgerService financeLedgerService;
 
@@ -69,7 +82,7 @@ class FinanceLedgerServiceTest {
                 .transactionType(TransactionType.AD)
                 .amount(new BigDecimal("5000000.00"))
                 .currency("VND")
-                .paymentMethod("BANK_TRANSFER")
+                .paymentMethod("SEPAY")
                 .gatewayTransactionId("MB-998811")
                 .bankCode("MB")
                 .status(TransactionStatus.SUCCESS)
@@ -89,7 +102,7 @@ class FinanceLedgerServiceTest {
             when(transactionRepository.searchLedger(
                     eq(TransactionStatus.SUCCESS),
                     eq(TransactionType.AD),
-                    eq("BANK_TRANSFER"),
+                    eq("SEPAY"),
                     any(),
                     any(),
                     eq("MB-998811"),
@@ -99,7 +112,7 @@ class FinanceLedgerServiceTest {
             LedgerFilterRequest filter = LedgerFilterRequest.builder()
                     .status(TransactionStatus.SUCCESS)
                     .transactionType(TransactionType.AD)
-                    .paymentMethod("BANK_TRANSFER")
+                    .paymentMethod("SEPAY")
                     .keyword("MB-998811")
                     .page(0)
                     .size(10)
@@ -112,6 +125,26 @@ class FinanceLedgerServiceTest {
             assertThat(row.getTransactionId()).isEqualTo(1L);
             assertThat(row.getAmount()).isEqualByComparingTo("5000000.00");
             assertThat(row.getTargetId()).isEqualTo(202L);
+        }
+
+        @Test
+        @DisplayName("Mỗi dòng có tên và email thật của khách (đọc bảng users), không tự ghép từ userId")
+        void attachesRealCustomerNameAndEmail() throws Exception {
+            when(transactionRepository.searchLedger(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(sampleTx)));
+            ResultSet rs = mock(ResultSet.class);
+            when(rs.getLong(1)).thenReturn(101L);
+            when(rs.getString(2)).thenReturn("Nguyễn Văn An");
+            when(rs.getString(3)).thenReturn("reader.an@gmail.com");
+            doAnswer(inv -> {
+                inv.<RowCallbackHandler>getArgument(1).processRow(rs);
+                return null;
+            }).when(jdbcTemplate).query(contains("FROM users WHERE user_id IN"), any(RowCallbackHandler.class), eq(101L));
+
+            TransactionLedgerResponse row = financeLedgerService.getLedgerEntries(new LedgerFilterRequest()).getContent().get(0);
+
+            assertThat(row.getUserName()).isEqualTo("Nguyễn Văn An");
+            assertThat(row.getUserEmail()).isEqualTo("reader.an@gmail.com");
         }
     }
 
@@ -154,8 +187,6 @@ class FinanceLedgerServiceTest {
             when(transactionRepository.countByStatus(TransactionStatus.PENDING)).thenReturn(5L);
             when(transactionRepository.countByStatus(TransactionStatus.SUCCESS)).thenReturn(20L);
             when(transactionRepository.countByStatus(TransactionStatus.FAILED)).thenReturn(2L);
-            when(transactionRepository.countByStatusAndPaymentMethodIn(eq(TransactionStatus.PENDING), anyCollection()))
-                    .thenReturn(3L);
 
             LedgerSummaryResponse summary = financeLedgerService.getLedgerSummary();
 
@@ -165,7 +196,6 @@ class FinanceLedgerServiceTest {
             assertThat(summary.getPendingCount()).isEqualTo(5L);
             assertThat(summary.getSuccessCount()).isEqualTo(20L);
             assertThat(summary.getFailedCount()).isEqualTo(2L);
-            assertThat(summary.getPendingManualTransfersCount()).isEqualTo(3L);
         }
     }
 

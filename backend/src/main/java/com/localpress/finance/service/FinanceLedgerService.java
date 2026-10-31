@@ -19,11 +19,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * ==============================================================================
@@ -41,14 +46,8 @@ public class FinanceLedgerService {
     private final TransactionRepository transactionRepository;
     private final RefundRequestRepository refundRequestRepository;
     private final PaymentComplaintRepository paymentComplaintRepository;
-
-    /**
-     * Danh sách phương thức thanh toán chuyển khoản thủ công.
-     */
-    private static final List<String> MANUAL_PAYMENT_METHODS = List.of(
-            "BANK_TRANSFER",
-            "MANUAL_BANK_TRANSFER"
-    );
+    private final FinanceReconciliationService reconciliationService;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * UC047: Tra cứu danh sách chứng từ & sổ quỹ theo các tiêu chí lọc.
@@ -63,7 +62,7 @@ public class FinanceLedgerService {
         int size = filter.getSize() <= 0 ? 20 : Math.min(filter.getSize(), 100);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        return transactionRepository.searchLedger(
+        Page<TransactionLedgerResponse> result = transactionRepository.searchLedger(
                 filter.getStatus(),
                 filter.getTransactionType(),
                 trimToNull(filter.getPaymentMethod()),
@@ -72,6 +71,8 @@ public class FinanceLedgerService {
                 trimToNull(filter.getKeyword()),
                 pageable
         ).map(TransactionLedgerResponse::fromEntity);
+        attachCustomers(result.getContent());
+        return result;
     }
 
     /**
@@ -83,9 +84,15 @@ public class FinanceLedgerService {
     public TransactionDetailResponse getTransactionDetail(Long transactionId) {
         log.info("Xem chi tiết chứng từ giao dịch ID: {}", transactionId);
 
-        return transactionRepository.findById(transactionId)
+        TransactionDetailResponse detail = transactionRepository.findById(transactionId)
                 .map(TransactionDetailResponse::fromEntity)
                 .orElseThrow(() -> new AppException("Không tìm thấy chứng từ giao dịch #" + transactionId, HttpStatus.NOT_FOUND));
+        String[] customer = customersOf(List.of(detail.getUserId())).get(detail.getUserId());
+        if (customer != null) {
+            detail.setUserName(customer[0]);
+            detail.setUserEmail(customer[1]);
+        }
+        return detail;
     }
 
     /**
@@ -106,14 +113,37 @@ public class FinanceLedgerService {
                 .pendingCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
                 .successCount(transactionRepository.countByStatus(TransactionStatus.SUCCESS))
                 .failedCount(transactionRepository.countByStatus(TransactionStatus.FAILED))
-                .pendingManualTransfersCount(transactionRepository.countByStatusAndPaymentMethodIn(
-                        TransactionStatus.PENDING, MANUAL_PAYMENT_METHODS))
                 .build();
+    }
+
+    /** Gắn tên và email thật của khách vào từng dòng (1 câu SELECT cho cả trang). */
+    private void attachCustomers(List<TransactionLedgerResponse> rows) {
+        Map<Long, String[]> customers = customersOf(rows.stream().map(TransactionLedgerResponse::getUserId).toList());
+        for (TransactionLedgerResponse row : rows) {
+            String[] customer = customers.get(row.getUserId());
+            if (customer != null) {
+                row.setUserName(customer[0]);
+                row.setUserEmail(customer[1]);
+            }
+        }
+    }
+
+    /** user_id -> {full_name, email}; bảng users của identity chỉ đọc, không ghi. */
+    private Map<Long, String[]> customersOf(List<Long> userIds) {
+        List<Long> ids = userIds.stream().filter(Objects::nonNull).distinct().toList();
+        Map<Long, String[]> result = new HashMap<>();
+        if (ids.isEmpty()) return result;
+        String in = ids.stream().map(id -> "?").collect(Collectors.joining(","));
+        jdbcTemplate.query("SELECT user_id, full_name, email FROM users WHERE user_id IN (" + in + ")",
+                rs -> { result.put(rs.getLong(1), new String[]{rs.getString(2), rs.getString(3)}); }, ids.toArray());
+        return result;
     }
 
     /**
      * Lấy dữ liệu tổng quan cho trang Dashboard tài chính (FinanceDashboard.tsx).
+     * Không readOnly: mở dashboard thì quét khoản lệch đối soát tháng hiện tại (UC054) để số liệu luôn mới.
      */
+    @Transactional
     public FinanceDashboardResponse getFinanceDashboard() {
         log.info("Lấy dữ liệu tổng quan Dashboard tài chính");
 
@@ -124,6 +154,7 @@ public class FinanceLedgerService {
                 .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .map(TransactionLedgerResponse::fromEntity)
                 .getContent();
+        attachCustomers(recentTransactions);
 
         return FinanceDashboardResponse.builder()
                 .totalRevenue(netRevenue)
@@ -131,7 +162,7 @@ public class FinanceLedgerService {
                 .pendingOrdersCount(transactionRepository.countByStatus(TransactionStatus.PENDING))
                 .refundReviewCount(refundRequestRepository.countByStatus(RefundStatus.PENDING))
                 .openComplaintCount(paymentComplaintRepository.countByStatus(PaymentComplaint.Status.OPEN))
-                .reconciliationDiscrepancy(BigDecimal.ZERO)
+                .reconciliationDiscrepancy(reconciliationService.currentUnresolvedAmount())
                 .recentOrders(recentTransactions)
                 .build();
     }

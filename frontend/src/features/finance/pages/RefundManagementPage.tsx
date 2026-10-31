@@ -11,8 +11,13 @@ import { Dialog } from '@/components/ui/dialog'
 import { PlusCircle } from 'lucide-react'
 import { PageHeader, Panel, KeyValue, Notice, tableCls, LoadingBlock } from '../components/LedgerUI'
 
+/** Đề xuất không có người lập là do module khác tự lập khi tiền về mà không kích hoạt được (vd SV1). */
+const proposerLabel = (r: RefundRequest) => r.proposedByName || r.proposedBy || 'Hệ thống'
+
 export function RefundManagementPage() {
   const currentUser = mockStore.getCurrentUser()
+  // Mắt 2 là Kế toán trưởng (API thật: SYSTEM_ADMIN); backend trả 403 cho vai trò khác
+  const isManager = currentUser.role === 'FINANCE_MANAGER' || currentUser.role === 'SYSTEM_ADMIN'
 
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
   const [paidOrders, setPaidOrders] = useState<Order[]>([])
@@ -172,7 +177,7 @@ export function RefundManagementPage() {
                         <div className="truncate" title={r.affectedBenefit}>{r.affectedBenefit}</div>
                       </td>
                       <td className={`${tableCls.td} whitespace-nowrap`}>
-                        <div className="max-w-[170px] truncate text-slate-900" title={r.proposedByName || r.proposedBy}>{(r.proposedByName || r.proposedBy || '').replace(/\s*\(.*\)$/, '')}</div>
+                        <div className="max-w-[170px] truncate text-slate-900" title={proposerLabel(r)}>{proposerLabel(r).replace(/\s*\(.*\)$/, '')}</div>
                         <div className="text-xs text-slate-500 num">{formatDateTime(r.requestedAt)}</div>
                       </td>
                       <td className={tableCls.td}>
@@ -302,9 +307,13 @@ export function RefundManagementPage() {
               <KeyValue label="Đề xuất hoàn" strong><span className="num">{formatCurrency(selectedRefund.refundAmount)}</span></KeyValue>
               <KeyValue label="Quyền lợi bị thu hồi">{selectedRefund.affectedBenefit}</KeyValue>
               <KeyValue label="Lý do">{selectedRefund.reason}</KeyValue>
-              <KeyValue label="Người lập">{selectedRefund.proposedByName || selectedRefund.proposedBy}</KeyValue>
+              <KeyValue label="Người lập">{proposerLabel(selectedRefund)}</KeyValue>
               {selectedRefund.reviewNotes && <KeyValue label="Ý kiến duyệt">{selectedRefund.reviewNotes}</KeyValue>}
             </dl>
+
+            {selectedRefund.status === 'UNDER_REVIEW' && !isManager && selectedRefund.proposedBy !== currentUser.id && (
+              <Notice tone="note">Chỉ Kế toán trưởng được duyệt hoặc từ chối hoàn tiền (mắt 2).</Notice>
+            )}
 
             {selectedRefund.proposedBy === currentUser.id && (
               <Notice tone="warning">
@@ -337,7 +346,7 @@ export function RefundManagementPage() {
                     size="sm"
                     className="text-negative"
                     onClick={() => handleReviewRefund(false)}
-                    disabled={selectedRefund.proposedBy === currentUser.id}
+                    disabled={!isManager || selectedRefund.proposedBy === currentUser.id}
                     isLoading={isSubmittingReview}
                   >
                     Từ chối
@@ -345,7 +354,7 @@ export function RefundManagementPage() {
                   <Button
                     size="sm"
                     onClick={() => handleReviewRefund(true)}
-                    disabled={selectedRefund.proposedBy === currentUser.id}
+                    disabled={!isManager || selectedRefund.proposedBy === currentUser.id}
                     isLoading={isSubmittingReview}
                   >
                     Duyệt hoàn {formatCurrency(selectedRefund.refundAmount)}

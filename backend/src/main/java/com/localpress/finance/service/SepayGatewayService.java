@@ -3,7 +3,9 @@ package com.localpress.finance.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localpress.finance.dto.request.SepayIpnRequest;
+import com.localpress.finance.model.PaymentComplaint;
 import com.localpress.finance.model.SepayWebhookLog;
+import com.localpress.finance.repository.PaymentComplaintRepository;
 import com.localpress.finance.repository.SepayWebhookLogRepository;
 import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ public class SepayGatewayService {
 
     private final PaymentProcessingService paymentProcessingService;
     private final SepayWebhookLogRepository logRepository;
+    private final PaymentComplaintRepository complaintRepository;
     private final ObjectMapper objectMapper;
     private final Map<String, Long> lastOrderCheck = new ConcurrentHashMap<>();
 
@@ -107,6 +110,20 @@ public class SepayGatewayService {
         if (ipn.isOutgoing()) {
             save(entry.sepayId(sepayId).resultStatus("IGNORED_OUTGOING").resultMessage("Tiền ra khỏi tài khoản, không phải khách thanh toán").build());
             return new Outcome(200, PaymentProcessingService.result(true, "IGNORED_OUTGOING", null, "Bỏ qua giao dịch tiền ra"));
+        }
+
+        // Kế toán đã ghi nhận đúng khoản này qua khiếu nại (UC051) trước khi webhook về: không ghi lần 2 (Rule 5)
+        String reference = ipn.getReferenceCode() == null ? null : ipn.getReferenceCode().trim().toUpperCase();
+        if (reference != null && !reference.isEmpty()) {
+            Optional<PaymentComplaint> recorded = complaintRepository
+                    .findByBankReferenceAndStatus(reference, PaymentComplaint.Status.RESOLVED);
+            if (recorded.isPresent()) {
+                String msg = "Mã GD " + reference + " đã được ghi nhận qua khiếu nại #"
+                        + recorded.get().getComplaintId() + ", bỏ qua để không ghi 2 lần";
+                save(entry.sepayId(sepayId).resultStatus(SepayWebhookLog.RECORDED_BY_COMPLAINT).resultMessage(msg).build());
+                return new Outcome(200, PaymentProcessingService.result(true, SepayWebhookLog.RECORDED_BY_COMPLAINT,
+                        ipn.resolveOrderCode(), msg));
+            }
         }
 
         Map<String, Object> result;

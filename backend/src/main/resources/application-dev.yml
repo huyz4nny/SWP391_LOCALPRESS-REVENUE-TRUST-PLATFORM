@@ -1,9 +1,12 @@
 spring:
   config:
     # CWD = backend/ (Maven) hoặc thư mục gốc repo (IntelliJ). optional nên thiếu file không làm chết Spring.
+    # application-local.yml (gitignored): cờ chỉ dùng trên máy mình, vd localpress.demo-store.enabled
     import:
       - optional:file:./config/application-secrets.yml
+      - optional:file:./config/application-local.yml
       - optional:file:./backend/config/application-secrets.yml
+      - optional:file:./backend/config/application-local.yml
   datasource:
     url: jdbc:mysql://localhost:3306/localpress_db?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: root
@@ -20,6 +23,8 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+    # Chỉ ở dev: migration số nhỏ hơn merge về sau (từ nhánh khác) vẫn được chạy bù thay vì báo lỗi.
+    out-of-order: true
   servlet:
     multipart:
       max-file-size: 5MB
@@ -36,11 +41,19 @@ localpress:
     secret: ${LOCALPRESS_JWT_SECRET:localpress-dev-only-signing-key-change-before-deploy-2026}
   storage:
     image-directory: "${user.home}/localpress-data/uploads"
-  # SePay: không gán secret-key rỗng ở đây — Spring sẽ đè file secrets và HMAC checkout crash.
+  # SePay: không gán merchant-id/secret-key rỗng ở đây — Spring sẽ đè file secrets và HMAC checkout crash.
   # Khóa nằm ở backend/config/application-secrets.yml (gitignore) hoặc biến SEPAY_*.
   # Mẫu: backend/config/application-secrets.example.yml
+  sepay:
+    bank-code: ${SEPAY_BANK_CODE:VCB}
+    bank-short-name: ${SEPAY_BANK_SHORT_NAME:vietcombank}
+    account-number: ${SEPAY_ACCOUNT_NUMBER:}
+    account-name: ${SEPAY_ACCOUNT_NAME:}
+    webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
+    # Token API (my.sepay.vn > Cấu hình công ty > API Access) để tự hỏi giao dịch khi không nhận được webhook
+    api-token: ${SEPAY_API_TOKEN:}
+    api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}
   payment:
     order-ttl-minutes: 15
     topup-min-amount: 10000
     topup-max-amount: 50000000
-

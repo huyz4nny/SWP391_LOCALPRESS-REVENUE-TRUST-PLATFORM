@@ -62,7 +62,9 @@ public class RefundManagementController {
             @PathVariable Long id,
             @Valid @RequestBody ReviewRefundRequest request
     ) {
-        Long reviewerUserId = currentUser.require().userId();
+        // Mắt 2 phải là Kế toán trưởng; service chặn thêm việc người lập tự duyệt (Four-Eyes)
+        Long reviewerUserId = currentUser.requireFinanceManager(
+                "Chỉ Kế toán trưởng được duyệt hoặc từ chối hoàn tiền (mắt 2)").userId();
         log.info("API POST /api/v1/finance/refunds/{}/review-refund - Reviewer #{}, duyệt: {}",
                 id, reviewerUserId, request.isApproved());
 

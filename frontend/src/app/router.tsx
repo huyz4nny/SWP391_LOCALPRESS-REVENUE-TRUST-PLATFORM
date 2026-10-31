@@ -20,6 +20,7 @@ import {
   ArticleDetailPage,
   SearchPage,
   PremiumPlansPage,
+  PaymentResultPage,
   ReaderAccountPage,
   ReaderLibraryPage,
   ReaderBookmarksPage,
@@ -50,6 +51,7 @@ import {
   BookingManagementPage,
   CreativeReviewPage,
   CommentModerationPage,
+  AdvertisingInventoryCalendarPage,
 } from '@/features/editorial'
 
 // Finance
@@ -66,6 +68,9 @@ import {
   PaymentComplaintPage,
   ComplaintQueuePage,
   SepayLogPage,
+  ReceivablesPage,
+  DemoStorePage,
+  FinanceReportsPage,
 } from '@/features/finance'
 
 /** Link cũ /checkout/:orderId -> trang thanh toán chung của SV4 */
@@ -147,6 +152,9 @@ export const router = createBrowserRouter([
       { path: 'wallet', element: <WalletPage /> },
       { path: 'wallet/topup', element: <TopUpPage /> },
       { path: 'wallet/complaints', element: <PaymentComplaintPage /> },
+      // Cửa hàng thử (SV4, chỉ bản dev): đóng vai SV3 tạo đơn từ server để demo luồng thanh toán
+      ...(import.meta.env.DEV ? [{ path: 'dev/demo-store', element: <DemoStorePage /> }] : []),
+      { path: 'payments/:paymentId', element: <PaymentResultPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
@@ -237,6 +245,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'editorial/calendar',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <AdvertisingInventoryCalendarPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'editorial/creatives',
         element: (
           <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
@@ -307,6 +323,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
             <SepayLogPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/receivables',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <ReceivablesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/reports',
+        element: (
+          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
+            <FinanceReportsPage />
           </ProtectedRoute>
         ),
       },

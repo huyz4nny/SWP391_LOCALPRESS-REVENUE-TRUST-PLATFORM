@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { PlusCircle } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 export function AdSlotsExplorerPage() {
   const [slots, setSlots] = useState<AdSlot[]>([])
@@ -13,20 +14,11 @@ export function AdSlotsExplorerPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    loadSlots()
+    advertisingApi.getSlots()
+      .then(setSlots)
+      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Không tải được danh mục vị trí'))
+      .finally(() => setLoading(false))
   }, [])
-
-  const loadSlots = async () => {
-    try {
-      setLoading(true)
-      const data = await advertisingApi.getSlots()
-      setSlots(data)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không tải được danh mục vị trí')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -41,7 +33,7 @@ export function AdSlotsExplorerPage() {
 
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {loading && <p className="text-sm text-slate-500">Đang tải vị trí...</p>}
-      {!loading && !error && slots.length === 0 && <p className="text-sm text-slate-500">Chưa có vị trí quảng cáo đang mở.</p>}
+      {!loading && !error && slots.length === 0 && <EmptyState title="Chưa có vị trí quảng cáo đang mở" />}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {slots.map((slot) => {
           const unit = { CPD: '/ ngày', CPM: '/ 1.000 lượt hiển thị', CPC: '/ lượt nhấp', FLAT_FEE: '/ gói' }[slot.pricingType || 'CPD']
