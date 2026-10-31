@@ -145,6 +145,25 @@ public class ArticleMediaService {
     }
 
     @Transactional(readOnly = true)
+    public Resource getReviewCoverImage(Long articleId, Integer versionNumber) {
+        User user = currentUserService.requireCurrentAuthor();
+        Article article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy bài viết"));
+        boolean reviewer = user.getRole() == User.Role.EDITOR || user.getRole() == User.Role.SYSTEM_ADMIN;
+        if (!reviewer && !java.util.Objects.equals(article.getAuthorId(), user.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy ảnh của bài viết");
+        }
+        ArticleVersion version = articleVersionRepository.findByArticleIdAndVersionNumber(articleId, versionNumber)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên bản"));
+        String url = version.getCoverImageUrl();
+        String prefix = "/api/v1/content/images/";
+        if (url == null || !url.startsWith(prefix)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Phiên bản không có ảnh lưu trữ nội bộ");
+        }
+        return imageStorageService.load(url.substring(prefix.length()));
+    }
+
+    @Transactional(readOnly = true)
     public Resource getCoverImage(String filename) {
         User author = currentUserService.requireCurrentAuthor();
 

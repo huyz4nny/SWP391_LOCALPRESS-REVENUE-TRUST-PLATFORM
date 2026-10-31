@@ -437,7 +437,7 @@ export function ArticleEditorPage() {
             className="text-xs bg-sky-700 hover:bg-sky-800 font-bold"
           >
             <Send className="w-3.5 h-3.5 mr-1" />
-            {APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Lưu và tiếp tục gửi duyệt'}
+            {APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Gửi kiểm duyệt (Submit)'}
           </Button>
         </div>
       </div>

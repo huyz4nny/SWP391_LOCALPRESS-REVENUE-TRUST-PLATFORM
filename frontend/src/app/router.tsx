@@ -91,6 +91,7 @@ import {
 import {
   ArticleEditorPage as ContentArticleEditorPage,
 } from '@/features/content/pages/ArticleEditorPage'
+import { ArticleEditorEntry } from '@/features/content/pages/ArticleEditorEntry'
 
 function NotFoundPage() {
   return (
@@ -230,7 +231,7 @@ export const router = createBrowserRouter([
         path: 'editorial/articles/:id/edit',
         element: (
           <ProtectedRoute allowedRoles={ARTICLE_WRITING_ROLES} subsystemName="Soạn bài (SV5)">
-            <ArticleEditorPage />
+            <ArticleEditorEntry />
           </ProtectedRoute>
         ),
       },

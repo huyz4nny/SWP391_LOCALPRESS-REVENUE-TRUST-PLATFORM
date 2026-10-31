@@ -25,6 +25,12 @@ function requireRealVersionApi(): void {
 }
 
 export const contentApi = {
+    getReviewCoverImage(articleId: string, versionNumber: number): Promise<Blob> {
+        return httpClient.getBlob(
+            `/content/articles/${encodeURIComponent(articleId)}/versions/${versionNumber}/cover-image`,
+        )
+    },
+
     async submitVersionForReview(
         articleId: string,
         versionNumber: number,
