@@ -161,3 +161,17 @@ export interface AdCampaign {
   createdAt: string
   updatedAt: string
 }
+
+/** Một dòng của GET /finance/orders/me (OrderStatusResponse của SV4). */
+export interface AdPaymentOrder {
+  transactionId: number
+  orderCode: string
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
+  amount: number
+  paymentMethod?: string
+  createdAt: string
+  paidAt?: string
+  expired: boolean
+  description?: string
+  targetId?: number
+}

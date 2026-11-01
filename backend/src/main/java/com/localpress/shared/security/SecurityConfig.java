@@ -58,6 +58,8 @@ public class SecurityConfig {
                                 "/api/v1/comments/**", "/api/v1/subscription-plans/**").permitAll()
 
                         // 4. API Tra cứu vị trí quảng cáo công khai cho Doanh nghiệp (SV1 - UC003)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/delivery/ad-slots/*/serve").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/delivery/impressions", "/api/v1/delivery/clicks").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/ad-slots/**").permitAll()
 
                         // 5. Cổng xác thực & Webhook IPN cổng thanh toán (SV4 - Rule 4, 5)
@@ -79,6 +81,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/finance/wallet/**").authenticated()
                         // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
+                        // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
+                        .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)

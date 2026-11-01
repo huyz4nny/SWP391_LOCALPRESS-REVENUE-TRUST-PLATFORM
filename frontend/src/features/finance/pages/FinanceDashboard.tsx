@@ -63,8 +63,11 @@ export function FinanceDashboard() {
   }
 
   // Doanh thu theo ngày, tính từ chính các đơn đã thanh toán. Ngày không có tiền vẫn có cột 0 để thấy khoảng trống.
+  // Bỏ nạp ví (công nợ phải trả khách, Rule 16) và bút toán hoàn, giống ô "Doanh thu thực thu".
   const daily = useMemo(() => {
-    const paid = orders.filter((o) => o.paymentStatus === 'PAID' && o.createdAt)
+    const paid = orders.filter(
+      (o) => o.paymentStatus === 'PAID' && o.orderType !== 'TOPUP' && o.orderType !== 'REFUND' && o.createdAt,
+    )
     if (paid.length === 0) return { rows: [] as { day: string; label: string; revenue: number }[], total: 0, end: null as Date | null }
     const end = new Date(Math.max(...paid.map((o) => Date.parse(o.updatedAt || o.createdAt))))
     const sums = new Map<string, number>()

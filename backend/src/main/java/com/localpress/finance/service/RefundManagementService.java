@@ -44,6 +44,9 @@ import java.util.Optional;
 @Slf4j
 public class RefundManagementService {
 
+    /** Tên hiển thị khi đề xuất do hệ thống lập (proposed_by NULL). */
+    static final String SYSTEM_PROPOSER = "Hệ thống";
+
     private final RefundRequestRepository refundRequestRepository;
     private final TransactionRepository transactionRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -111,7 +114,8 @@ public class RefundManagementService {
                     .affectedBenefit("Thu hồi quyền lợi của đơn " + rs.getString("order_code") + " (" + rs.getString("transaction_type") + ")")
                     .requestedAt(localDateTime(rs, "created_at"))
                     .proposedBy(rs.getString("proposed_by"))
-                    .proposedByName(rs.getString("proposed_by_name"))
+                    // Không có người lập = module khác tự lập khi tiền về mà không kích hoạt được (vd SV1)
+                    .proposedByName(rs.getString("proposed_by") == null ? SYSTEM_PROPOSER : rs.getString("proposed_by_name"))
                     .reviewedBy(rs.getString("reviewed_by"))
                     .reviewedByName(rs.getString("reviewed_by_name"))
                     .reviewNotes(rs.getString("review_notes"))
@@ -184,7 +188,8 @@ public class RefundManagementService {
                 .status(savedRefund.getStatus().name())
                 .affectedBenefit(request.getAffectedBenefit())
                 .requestedAt(savedRefund.getCreatedAt())
-                .proposedBy(String.valueOf(proposerUserId))
+                .proposedBy(proposerUserId == null ? null : String.valueOf(proposerUserId))
+                .proposedByName(proposerUserId == null ? SYSTEM_PROPOSER : null)
                 .build();
     }
 

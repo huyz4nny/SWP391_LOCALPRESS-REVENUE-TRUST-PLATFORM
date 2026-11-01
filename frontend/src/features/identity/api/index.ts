@@ -1,3 +1,4 @@
+// Tác dụng: client auth — /auth/me, login, register, Google nonce. Dùng chung, không thuộc advertising/finance.
 import { httpClient } from '@/lib/http/client'
 import { User } from '@/types'
 
@@ -8,6 +9,9 @@ export interface AuthMeResponse extends User {
 
 export const authApi = {
   getMe: () => httpClient.get<AuthMeResponse>('/auth/me'),
+
+  updateMe: (body: { fullName: string; phone?: string }) =>
+    httpClient.patch<AuthMeResponse>('/auth/me', body),
 
   getGoogleNonce: () => httpClient.get<{ nonce: string }>('/auth/google/nonce', {
     skipAuth: true, credentials: 'include',

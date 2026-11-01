@@ -1,169 +1,51 @@
-import React, { useState, useEffect } from 'react'
-import { PaywallSettings } from '../types'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { adminApi } from '../api'
-import { formatCurrency, formatDateTime } from '@/lib/format'
+import type { PaywallSettings } from '../types'
+import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
-import { Settings, ShieldCheck, Crown, Smartphone, Save } from 'lucide-react'
 
+const schema = z.object({ previewWordLimit: z.coerce.number().int().min(1, 'Tối thiểu 1 từ').max(500, 'Tối đa 500 từ') })
 export function PaywallConfigPage() {
   const [settings, setSettings] = useState<PaywallSettings | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) })
   useEffect(() => {
-    loadSettings()
-  }, [])
-
-  const loadSettings = async () => {
-    try {
-      setLoading(true)
-      const data = await adminApi.getPaywallSettings()
-      setSettings(data)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    let active = true
+    void adminApi.getPaywallSettings().then(data => {
+      if (active) { setSettings(data); reset({ previewWordLimit: data.previewWordLimit }) }
+    }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Không tải được cấu hình') })
+    return () => { active = false }
+  }, [reset])
+  async function save(values: z.infer<typeof schema>) {
     if (!settings) return
-
-    setIsSaving(true)
+    setError(''); setSuccess('')
     try {
-      await adminApi.updatePaywallSettings(settings)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (err: any) {
-      alert(err.message || 'Lỗi lưu cấu hình')
-    } finally {
-      setIsSaving(false)
-    }
+      const saved = await adminApi.updatePaywallSettings({ ...settings, ...values })
+      setSettings(saved); reset({ previewWordLimit: saved.previewWordLimit })
+      setSuccess('Đã lưu cấu hình và ghi nhật ký thay đổi.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Không lưu được cấu hình') }
   }
-
-  if (loading || !settings) {
-    return <div className="py-12 text-center animate-pulse">Đang tải cấu hình Paywall...</div>
-  }
-
-  return (
-    <div className="space-y-6 max-w-2xl mx-auto">
-      <div className="pb-4 border-b border-slate-200">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Cấu hình Paywall Engine & Giới hạn Thiết bị
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Thiết lập tham số máy chủ kiểm tra quyền truy cập bài viết chuyên sâu và chính sách bảo vệ nội dung
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center">
-              <Crown className="w-4 h-4 mr-1.5 text-amber-600" />
-              Tham số Paywall cốt lõi
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="p-3 bg-stone-50 rounded-lg border border-stone-200 flex items-center justify-between">
-              <div>
-                <span className="font-bold text-slate-900 block">Kích hoạt Paywall toàn hệ thống</span>
-                <span className="text-[11px] text-slate-500">
-                  Khi tắt, tất cả độc giả vãng lai đều đọc được toàn văn mà không cần thanh toán
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.paywallEnabled}
-                onChange={(e) => setSettings({ ...settings, paywallEnabled: e.target.checked })}
-                className="w-4 h-4 rounded text-primary-900 cursor-pointer"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="wordLimit" required>
-                Số từ trích đoạn xem thử miễn phí (Preview Word Limit)
-              </Label>
-              <Input
-                id="wordLimit"
-                type="number"
-                value={settings.previewWordLimit}
-                onChange={(e) => setSettings({ ...settings, previewWordLimit: Number(e.target.value) })}
-                min={50}
-                max={500}
-                required
-              />
-              <p className="mt-1 text-[11px] text-slate-400">
-                Mặc định: 120 từ. Đoạn xem thử được gửi từ server, không giấu bằng CSS ngoài giao diện.
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="maxDevices" required>
-                Giới hạn số thiết bị đăng nhập đồng thời tối đa
-              </Label>
-              <Input
-                id="maxDevices"
-                type="number"
-                value={settings.maxDevicesAllowed}
-                onChange={(e) => setSettings({ ...settings, maxDevicesAllowed: Number(e.target.value) })}
-                min={1}
-                max={5}
-                required
-              />
-              <p className="mt-1 text-[11px] text-slate-400">
-                Quy định chuẩn của đồ án: <strong>2 thiết bị</strong> (1 máy tính + 1 điện thoại).
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="defaultPrice" required>
-                Đơn giá mua lẻ bài viết mặc định (VND)
-              </Label>
-              <Input
-                id="defaultPrice"
-                type="number"
-                value={settings.pricePerArticleDefault}
-                onChange={(e) => setSettings({ ...settings, pricePerArticleDefault: Number(e.target.value) })}
-                step={1000}
-                min={5000}
-                required
-              />
-            </div>
-
-            <div className="p-3 bg-stone-50 rounded-lg border border-stone-200 flex items-center justify-between">
-              <div>
-                <span className="font-bold text-slate-900 block">Đóng dấu Watermark bản quyền</span>
-                <span className="text-[11px] text-slate-500">
-                  Chèn mã định danh người mua mờ vào ảnh và bài viết để chống copy trái phép
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.watermarkEnabled}
-                onChange={(e) => setSettings({ ...settings, watermarkEnabled: e.target.checked })}
-                className="w-4 h-4 rounded text-primary-900 cursor-pointer"
-              />
-            </div>
-
-            <div className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-              Lần cập nhật cuối: {formatDateTime(settings.lastUpdatedAt)} bởi {settings.updatedBy}
-            </div>
-          </CardContent>
-          <CardFooter className="flex items-center justify-between">
-            {saveSuccess ? (
-              <span className="text-xs font-semibold text-emerald-600">✓ Đã lưu cấu hình máy chủ!</span>
-            ) : <span />}
-            <Button type="submit" isLoading={isSaving}>
-              <Save className="w-3.5 h-3.5 mr-1" />
-              Lưu cấu hình Paywall
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
-    </div>
-  )
+  return <div className="mx-auto max-w-2xl space-y-5">
+    <header><h1 className="text-2xl font-bold">Cấu hình Paywall</h1><p className="mt-2 text-sm text-slate-600">Preview luôn bị giới hạn tối đa 30% nội dung ở máy chủ.</p></header>
+    {error && <p role="alert" className="text-red-700">{error}</p>}
+    {success && <p role="status" className="text-emerald-700">{success}</p>}
+    {!settings && !error && <p role="status">Đang tải cấu hình...</p>}
+    {settings && <form onSubmit={handleSubmit(save)} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+      <fieldset disabled={isSubmitting} className="space-y-3">
+        <Label htmlFor="previewWordLimit">Giới hạn số từ xem trước</Label>
+        <Input id="previewWordLimit" type="number" min={1} max={500} {...register('previewWordLimit')} />
+        {errors.previewWordLimit && <p className="text-sm text-red-700">{errors.previewWordLimit.message}</p>}
+        <p className="text-sm text-slate-600">Áp dụng giới hạn thấp hơn giữa số từ này và 30% nội dung.</p>
+      </fieldset>
+      <p className="text-sm text-slate-600">Paywall luôn bật. Giới hạn 2 phiên thuộc luồng quản lý thiết bị; giá bài lấy theo từng bài viết. Watermark chưa được triển khai.</p>
+      <p className="text-xs text-slate-500">Cập nhật: {settings.lastUpdatedAt ? formatDateTime(settings.lastUpdatedAt) : 'Mặc định hệ thống'} · {settings.updatedBy}</p>
+      <Button type="submit" isLoading={isSubmitting}>Lưu cấu hình</Button>
+    </form>}
+  </div>
 }

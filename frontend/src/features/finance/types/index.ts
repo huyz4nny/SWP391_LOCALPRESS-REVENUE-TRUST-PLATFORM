@@ -168,6 +168,14 @@ export interface FinanceAlert {
   actionUrl: string
 }
 
+/** GET /finance/ledger/summary: tổng của toàn bộ sổ, không phụ thuộc số dòng đang tải. */
+export interface LedgerSummary {
+  grossRevenue: number
+  refundedAmount: number
+  netRevenue: number
+  successCount: number
+}
+
 export interface GeneralLedgerEntry {
   id: string
   entryCode: string

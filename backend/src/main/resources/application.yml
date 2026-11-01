@@ -20,3 +20,16 @@ localpress:
     # Other environments must supply a random secret of at least 32 UTF-8 bytes.
     secret: ${LOCALPRESS_JWT_SECRET:}
     expiration-ms: ${LOCALPRESS_JWT_EXPIRATION_MS:86400000}
+  # Fallback khi chưa import secrets. Profile dev nạp backend/config/application-secrets.yml đè lên đây.
+  # Không ghi khóa thật trong file này.
+  sepay:
+    merchant-id: ${SEPAY_MERCHANT_ID:}
+    secret-key: ${SEPAY_SECRET_KEY:}
+    env: ${SEPAY_ENV:sandbox}
+    bank-code: ${SEPAY_BANK_CODE:VCB}
+    bank-short-name: ${SEPAY_BANK_SHORT_NAME:vietcombank}
+    account-number: ${SEPAY_ACCOUNT_NUMBER:}
+    account-name: ${SEPAY_ACCOUNT_NAME:}
+    webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
+    api-token: ${SEPAY_API_TOKEN:}
+    api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}

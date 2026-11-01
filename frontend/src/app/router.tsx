@@ -24,6 +24,7 @@ import {
   ReaderAccountPage,
   ReaderLibraryPage,
   ReaderBookmarksPage,
+  ReaderFollowingPage,
   ReaderHistoryPage,
   ReaderSubscriptionPage,
   ReaderOrdersPage,
@@ -68,6 +69,7 @@ import {
   ComplaintQueuePage,
   SepayLogPage,
   ReceivablesPage,
+  DemoStorePage,
   FinanceReportsPage,
 } from '@/features/finance'
 
@@ -150,6 +152,8 @@ export const router = createBrowserRouter([
       { path: 'wallet', element: <WalletPage /> },
       { path: 'wallet/topup', element: <TopUpPage /> },
       { path: 'wallet/complaints', element: <PaymentComplaintPage /> },
+      // Cửa hàng thử (SV4, chỉ bản dev): đóng vai SV3 tạo đơn từ server để demo luồng thanh toán
+      ...(import.meta.env.DEV ? [{ path: 'dev/demo-store', element: <DemoStorePage /> }] : []),
       { path: 'payments/:paymentId', element: <PaymentResultPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
@@ -166,6 +170,7 @@ export const router = createBrowserRouter([
       { index: true, element: <ReaderAccountPage /> },
       { path: 'library', element: <ReaderLibraryPage /> },
       { path: 'bookmarks', element: <ReaderBookmarksPage /> },
+      { path: 'following', element: <ReaderFollowingPage /> },
       { path: 'history', element: <ReaderHistoryPage /> },
       { path: 'subscription', element: <ReaderSubscriptionPage /> },
       { path: 'orders', element: <ReaderOrdersPage /> },

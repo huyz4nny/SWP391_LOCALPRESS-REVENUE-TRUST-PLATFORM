@@ -2,6 +2,8 @@ package com.localpress.advertising;
 
 import com.localpress.finance.dto.response.OrderCreateResponse;
 import com.localpress.shared.event.PaymentSuccessEvent;
+import com.localpress.shared.event.ReceivableReminderEvent;
+import com.localpress.shared.event.RefundCompletedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import java.util.concurrent.Future;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Kiểm thử trên MySQL thật (khóa lịch không chứng minh được bằng mock). Ghi dữ liệu vào DB nên chỉ chạy khi bật rõ ràng,
@@ -100,8 +103,96 @@ class AdBookingIntegrationTest {
     }
 
     void paid(String id, long amount, Long user) {
-        events.publishEvent(PaymentSuccessEvent.builder().transactionId(1L).userId(user).transactionType("AD")
+        events.publishEvent(PaymentSuccessEvent.builder().transactionId(-1L).userId(user).transactionType("AD")
                 .targetId(Long.parseLong(id)).amount(BigDecimal.valueOf(amount)).paidAt(LocalDateTime.now()).build());
+    }
+
+    /** Đơn AD đã thu tiền thật trong bảng transactions (đề xuất hoàn tiền của finance cần giao dịch SUCCESS). */
+    long successfulOrder(String id, long user, long amount) {
+        String code = "IT" + run + id;
+        jdbc.update("INSERT INTO transactions (user_id, campaign_id, transaction_type, amount, payment_method, " +
+                "gateway_transaction_id, status, paid_at) VALUES (?, ?, 'AD', ?, 'SEPAY', ?, 'SUCCESS', NOW())",
+                user, Long.parseLong(id), amount, code);
+        jdbc.update("UPDATE ad_campaigns SET payment_order_code = ? WHERE campaign_id = ?", code, Long.parseLong(id));
+        return jdbc.queryForObject("SELECT transaction_id FROM transactions WHERE gateway_transaction_id = ?", Long.class, code);
+    }
+
+    void paidBy(String id, long transactionId, long amount, long user) {
+        events.publishEvent(PaymentSuccessEvent.builder().transactionId(transactionId).userId(user).transactionType("AD")
+                .targetId(Long.parseLong(id)).amount(BigDecimal.valueOf(amount)).paidAt(LocalDateTime.now()).build());
+    }
+
+    void refunded(String id, long transactionId, boolean full) {
+        events.publishEvent(RefundCompletedEvent.builder().refundId(1L).originalTransactionId(transactionId).userId(userA)
+                .transactionType("AD").targetId(Long.parseLong(id)).refundAmount(BigDecimal.valueOf(500000))
+                .fullRefund(full).build());
+    }
+
+    int refundProposals(long transactionId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM refund_requests WHERE transaction_id = ? AND status = 'PENDING' " +
+                "AND proposed_by IS NULL", Integer.class, transactionId);
+    }
+
+    @Test
+    void paymentForRejectedBookingIsProposedForRefundOnce() {
+        var booking = book(emailA, exclusiveSlot, start, start);
+        quote(booking.id(), 1, 500000);
+        bookings.acceptQuotation(emailA, Long.parseLong(booking.id()), 1, true);
+        jdbc.update("UPDATE ad_campaigns SET status = 'REJECTED' WHERE campaign_id = ?", Long.parseLong(booking.id()));
+        long tx = successfulOrder(booking.id(), userA, 500000);
+        paidBy(booking.id(), tx, 500000, userA);
+        paidBy(booking.id(), tx, 500000, userA);
+        assertEquals("UNPAID", paymentStatus(booking.id()));
+        assertEquals(1, refundProposals(tx));
+    }
+
+    @Test
+    void latePaymentConflictIsProposedForRefund() {
+        var late = book(emailA, exclusiveSlot, start, start);
+        quote(late.id(), 1, 500000);
+        bookings.acceptQuotation(emailA, Long.parseLong(late.id()), 1, true);
+        jdbc.update("UPDATE ad_campaigns SET hold_expires_at = NOW() - INTERVAL 1 MINUTE WHERE campaign_id = ?", Long.parseLong(late.id()));
+        book(emailB, exclusiveSlot, start, start);
+        long tx = successfulOrder(late.id(), userA, 500000);
+        paidBy(late.id(), tx, 500000, userA);
+        assertEquals(1, refundProposals(tx));
+    }
+
+    @Test
+    void fullRefundRevokesCampaignAndFreesSlotPartialRefundKeepsIt() {
+        var booking = book(emailA, exclusiveSlot, start, start);
+        quote(booking.id(), 1, 500000);
+        bookings.acceptQuotation(emailA, Long.parseLong(booking.id()), 1, true);
+        long tx = successfulOrder(booking.id(), userA, 500000);
+        paidBy(booking.id(), tx, 500000, userA);
+        assertEquals("PAID", paymentStatus(booking.id()));
+
+        refunded(booking.id(), tx, false);
+        assertEquals("PAID", paymentStatus(booking.id()));
+        // Hoàn khoản trả nhầm (giao dịch khác đơn của chiến dịch) không đụng chiến dịch.
+        refunded(booking.id(), tx + 1_000_000, true);
+        assertEquals("PAID", paymentStatus(booking.id()));
+
+        refunded(booking.id(), tx, true);
+        var row = jdbc.queryForMap("SELECT payment_status, status FROM ad_campaigns WHERE campaign_id = ?", Long.parseLong(booking.id()));
+        assertEquals("REFUNDED", row.get("payment_status"));
+        assertEquals("SUSPENDED", row.get("status"));
+        assertEquals(List.of(), bookings.availability(exclusiveSlot, start, start).fullDates());
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(emailA, null, "ROLE_ADVERTISER"));
+        assertThrows(ResponseStatusException.class, () -> bookings.createPayment(emailA, Long.parseLong(booking.id())));
+    }
+
+    @Test
+    void receivableReminderNotifiesAdvertiser() {
+        var booking = book(emailA, exclusiveSlot, start, start);
+        long advertiserId = jdbc.queryForObject("SELECT advertiser_id FROM advertisers WHERE user_id = ?", Long.class, userA);
+        events.publishEvent(ReceivableReminderEvent.builder().reminderId(1L).campaignId(Long.parseLong(booking.id()))
+                .advertiserId(advertiserId).campaignName("IT campaign").amountDue(BigDecimal.valueOf(1500000))
+                .dueDate(start).overdueDays(3).note("Vui lòng thanh toán").build());
+        String content = jdbc.queryForObject("SELECT content FROM notifications WHERE user_id = ? " +
+                "AND notification_type = 'AD_PAYMENT_REMINDER'", String.class, userA);
+        assertTrue(content.contains("1.500.000"), content);
+        assertTrue(content.contains("quá hạn 3 ngày"), content);
     }
 
     @Test

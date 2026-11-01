@@ -1,7 +1,7 @@
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { User } from '@/types'
-import { AdSlot, AdBooking, AdCampaign, AdCreative, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange, SlotAvailability } from '../types'
+import { AdSlot, AdBooking, AdCampaign, AdCreative, AdPaymentOrder, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange, SlotAvailability } from '../types'
 
 /** Đọc kích thước thật của ảnh ở trình duyệt (chỉ để báo lỗi sớm và cho mock; server kiểm tra lại). */
 export async function readImageSize(file: File) {
@@ -54,6 +54,14 @@ export const advertisingApi = {
   /** Backend lấy số tiền từ báo giá đã chốt và dùng lại đơn còn hạn; trả về đơn của trang thanh toán chung SV4. */
   createPayment: (campaignId: string) => {
     return httpClient.post<{ orderCode: string }>(`/advertiser/campaigns/${campaignId}/payment`)
+  },
+
+  /** Đơn quảng cáo của chính doanh nghiệp: GET /finance/orders/me?type=AD (ApiResponse<Page<OrderStatusResponse>> của SV4). */
+  getMyAdOrders: async () => {
+    const res = await httpClient.get<{ data: { content: AdPaymentOrder[] } }>('/finance/orders/me', {
+      params: { type: 'AD', size: 100 },
+    })
+    return res.data.content
   },
 
   getCampaignById: (id: string) => {

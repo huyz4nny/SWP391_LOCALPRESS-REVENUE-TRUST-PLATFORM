@@ -38,6 +38,9 @@ public class TransactionLedgerResponse {
     private String description;
     /** Kế toán đối soát (null = hệ thống tự ghi nhận qua webhook / ví). */
     private Long reconciledBy;
+    /** Tên và email thật của khách (đọc bảng users, chỉ để hiển thị). */
+    private String userName;
+    private String userEmail;
 
     /**
      * Chuyển đổi từ JPA Entity sang DTO phẳng.

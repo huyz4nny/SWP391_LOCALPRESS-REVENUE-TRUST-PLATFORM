@@ -2,6 +2,7 @@ package com.localpress.finance.controller;
 
 import com.localpress.finance.service.AdvertiserReceivablesService;
 import com.localpress.finance.service.FinanceReconciliationService;
+import com.localpress.finance.service.RightsGrantFailureService;
 import com.localpress.shared.exception.AppException;
 import com.localpress.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class FinanceReportController {
     private final JdbcTemplate jdbcTemplate;
     private final AdvertiserReceivablesService receivablesService;
     private final FinanceReconciliationService reconciliationService;
+    private final RightsGrantFailureService rightsGrantFailureService;
 
     /**
      * UC059: Xuất báo cáo giao dịch CSV (UTF-8 có BOM cho Excel).
@@ -182,6 +184,16 @@ public class FinanceReportController {
                 "RECONCILIATION_UNRESOLVED", "MEDIUM", "Khoản lệch đối soát chưa xử lý",
                 "Có %d khoản tiền giữa sao kê SePay và hệ thống chưa khớp trong kỳ này.",
                 "/backoffice/finance/reconciliation");
+
+        // 5. Tiền đã về nhưng module nguồn không cấp được quyền (RightsGrantFailedEvent, Rule 5)
+        long grantFailures = rightsGrantFailureService.countUnresolved();
+        if (grantFailures > 0) {
+            List<String> codes = rightsGrantFailureService.unresolvedOrderCodes(5);
+            addAlertIfAny(alerts, grantFailures, "RIGHTS_GRANT_FAILED", "HIGH", "Đã thu tiền nhưng chưa cấp quyền",
+                    "Có %d đơn đã thu tiền nhưng phân hệ nguồn không cấp được quyền (" + String.join(", ", codes)
+                            + (grantFailures > codes.size() ? ", ..." : "") + "). Kiểm tra và lập đề xuất hoàn hoặc cấp quyền tay.",
+                    "/backoffice/finance/refunds");
+        }
 
         return ResponseEntity.ok(ApiResponse.ok("Lấy danh sách cảnh báo tài chính thành công", alerts));
     }

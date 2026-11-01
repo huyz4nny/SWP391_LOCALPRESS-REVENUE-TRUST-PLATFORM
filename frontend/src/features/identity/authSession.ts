@@ -1,15 +1,26 @@
+// Tác dụng: logout + đồng bộ phiên — xóa basic auth, đưa mock user về Guest khi không còn token.
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
 
 export function logout(): void {
-    httpClient.clearBasicAuth()
+    httpClient.logoutAllTabs()
     mockStore.setCurrentUser('user-guest')
 }
 
-/** Real API mode: a remembered user without credentials (new tab, closed session) is shown as Guest. */
-export function syncAuthSession(): void {
-    if (!APP_CONFIG.useMockApi && !httpClient.hasAuth() && mockStore.getCurrentUser().id !== 'user-guest') {
+/** Failed login: this tab goes back to the login it had before; other tabs are not logged out. */
+export function cancelLogin(): void {
+    if (!httpClient.cancelLogin()) mockStore.setCurrentUser('user-guest')
+}
+
+/**
+ * Real API mode: a tab without credentials first borrows them from another open tab;
+ * if none is logged in, the remembered user is shown as Guest.
+ */
+export async function syncAuthSession(): Promise<void> {
+    if (APP_CONFIG.useMockApi || httpClient.hasAuth()) return
+    if (await httpClient.requestAuthFromOtherTabs()) return
+    if (mockStore.getCurrentUser().id !== 'user-guest') {
         mockStore.setCurrentUser('user-guest')
     }
 }

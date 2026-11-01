@@ -107,6 +107,27 @@ class RefundManagementServiceTest {
         }
 
         @Test
+        @DisplayName("Hệ thống lập (người lập null, vd SV1 khi không kích hoạt được chiến dịch): hiện tên 'Hệ thống'")
+        void proposeRefund_BySystem() {
+            Transaction tx = Transaction.builder()
+                    .transactionId(10L).userId(5L).gatewayTransactionId("LP-ORDER-10")
+                    .amount(BigDecimal.valueOf(100_000)).status(TransactionStatus.SUCCESS).build();
+            when(transactionRepository.findById(10L)).thenReturn(Optional.of(tx));
+            when(refundRequestRepository.sumCommittedRefundsByTransactionId(10L, null)).thenReturn(BigDecimal.ZERO);
+            when(refundRequestRepository.save(any(RefundRequest.class))).thenAnswer(inv -> {
+                RefundRequest r = inv.getArgument(0);
+                r.setRefundId(2L);
+                return r;
+            });
+
+            RefundDetailResponse response = refundManagementService.proposeRefund(null, ProposeRefundRequest.builder()
+                    .orderId(10L).refundAmount(BigDecimal.valueOf(100_000)).reason("Không kích hoạt được chiến dịch").build());
+
+            assertNull(response.getProposedBy());
+            assertEquals("Hệ thống", response.getProposedByName());
+        }
+
+        @Test
         @DisplayName("Thất bại khi vi phạm Rule 11 (Refund Cap vượt quá số tiền còn lại)")
         void proposeRefund_ViolatesRefundCap() {
             Transaction tx = Transaction.builder()

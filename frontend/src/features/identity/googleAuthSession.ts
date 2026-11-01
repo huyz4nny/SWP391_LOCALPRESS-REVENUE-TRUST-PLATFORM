@@ -1,17 +1,20 @@
+// Tác dụng: sau Google login — gọi /auth/google, lưu Bearer, gán user vào mockStore.
 import { authApi } from './api'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
+import { cancelLogin } from './authSession'
 
 export async function loginWithGoogle(idToken: string) {
+  httpClient.beginLogin()
   try {
     const session = await authApi.googleLogin(idToken)
     httpClient.setBearerToken(session.accessToken)
     const user = await authApi.getMe()
     mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
+    httpClient.shareLoginWithOtherTabs()
     return user
   } catch (error) {
-    httpClient.clearBasicAuth()
-    mockStore.setCurrentUser('user-guest')
+    cancelLogin()
     throw error
   }
 }

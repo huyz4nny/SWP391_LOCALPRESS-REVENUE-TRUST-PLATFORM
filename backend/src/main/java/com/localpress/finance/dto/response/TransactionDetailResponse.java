@@ -40,6 +40,9 @@ public class TransactionDetailResponse {
     private Long reconciledBy;
     private LocalDateTime createdAt;
     private Long targetId;
+    /** Tên và email thật của khách (đọc bảng users, chỉ để hiển thị). */
+    private String userName;
+    private String userEmail;
 
     /**
      * Chuyển đổi từ JPA Entity sang DTO chi tiết.

@@ -2,14 +2,19 @@ package com.localpress.advertising;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.localpress.finance.dto.request.CreateOrderRequest;
+import com.localpress.finance.dto.request.ProposeRefundRequest;
 import com.localpress.finance.dto.response.OrderCreateResponse;
 import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
+import com.localpress.finance.service.RefundManagementService;
 import com.localpress.shared.event.PaymentSuccessEvent;
+import com.localpress.shared.event.ReceivableReminderEvent;
+import com.localpress.shared.event.RefundCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -27,10 +32,12 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -41,6 +48,8 @@ import java.util.Map;
 public class AdBookingService {
     private static final Logger log = LoggerFactory.getLogger(AdBookingService.class);
     static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final Locale VI = Locale.forLanguageTag("vi-VN");
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /** Campaign đang chiếm lịch: chưa bị từ chối/kết thúc, không vướng xung đột tiền về muộn, đã trả tiền hoặc còn hạn giữ chỗ. */
     static final String OCCUPYING = "status IN ('PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED') AND payment_issue IS NULL " +
@@ -53,16 +62,18 @@ public class AdBookingService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final PaymentProcessingService payments;
+    private final RefundManagementService refunds;
     private final FinanceCurrentUser financeUser;
     private final TransactionTemplate newTransaction;
     private final int paymentHoldMinutes;
 
     public AdBookingService(JdbcTemplate jdbc, ObjectMapper json, PaymentProcessingService payments,
-                            FinanceCurrentUser financeUser, PlatformTransactionManager txManager,
+                            RefundManagementService refunds, FinanceCurrentUser financeUser, PlatformTransactionManager txManager,
                             @Value("${localpress.advertising.payment-hold-minutes:30}") int paymentHoldMinutes) {
         this.jdbc = jdbc;
         this.json = json;
         this.payments = payments;
+        this.refunds = refunds;
         this.financeUser = financeUser;
         this.newTransaction = new TransactionTemplate(txManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -294,6 +305,9 @@ public class AdBookingService {
         if ("PAID".equals(row.paymentStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Booking đã được thanh toán");
         }
+        if ("REFUNDED".equals(row.paymentStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Booking đã được hoàn tiền, vui lòng gửi booking mới");
+        }
         FinanceCurrentUser.Principal principal = financeUser.require();
         if (row.paymentOrderCode() != null) {
             OrderCreateResponse current = payments.getPaymentView(principal, row.paymentOrderCode());
@@ -346,7 +360,10 @@ public class AdBookingService {
     void confirmPayment(long campaignId, Long payerUserId, BigDecimal amount, LocalDateTime paidAt, Long transactionId) {
         Long slotId = jdbc.query("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?",
                 (rs, r) -> rs.getLong(1), campaignId).stream().findFirst().orElse(null);
-        if (slotId == null) return;
+        if (slotId == null) {
+            proposeRefund(campaignId, transactionId, amount, "Không tìm thấy chiến dịch nhận tiền");
+            return;
+        }
         Slot slot = jdbc.query("SELECT slot_id, capacity, inventory_mode FROM ad_slots WHERE slot_id = ? FOR UPDATE",
                 (rs, r) -> new Slot(rs.getLong(1), rs.getInt(2), rs.getString(3)), slotId).get(0);
         CampaignRow row = jdbc.query("SELECT c.*, a.user_id AS owner_user_id FROM ad_campaigns c " +
@@ -357,13 +374,23 @@ public class AdBookingService {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("transactionId", transactionId);
         detail.put("amount", amount);
+        String rejected = null;
         if (payerUserId == null || payerUserId != row.ownerUserId()) {
-            audit(payerUserId, "AD_PAYMENT_OWNER_MISMATCH", campaignId, detail);
-            return;
-        }
-        if (row.acceptedAmount() == null || amount == null || amount.compareTo(row.acceptedAmount()) < 0) {
+            rejected = "AD_PAYMENT_OWNER_MISMATCH";
+        } else if ("REJECTED".equals(row.status()) || "REJECTED".equals(row.quotationStatus())
+                || "COMPLETED".equals(row.status())) {
+            rejected = "AD_PAYMENT_BOOKING_CLOSED";
+        } else if (row.acceptedAmount() == null || amount == null || amount.compareTo(row.acceptedAmount()) < 0) {
             detail.put("expected", row.acceptedAmount());
-            audit(payerUserId, "AD_PAYMENT_AMOUNT_MISMATCH", campaignId, detail);
+            rejected = "AD_PAYMENT_AMOUNT_MISMATCH";
+        }
+        if (rejected != null) {
+            audit(payerUserId, rejected, campaignId, detail);
+            proposeRefund(campaignId, transactionId, amount, switch (rejected) {
+                case "AD_PAYMENT_OWNER_MISMATCH" -> "Người trả tiền không phải chủ chiến dịch";
+                case "AD_PAYMENT_BOOKING_CLOSED" -> "Booking đã bị từ chối hoặc đã kết thúc";
+                default -> "Số tiền về thấp hơn báo giá đã chốt " + row.acceptedAmount();
+            });
             return;
         }
         LocalDateTime paid = paidAt != null ? paidAt : now();
@@ -374,6 +401,82 @@ public class AdBookingService {
         jdbc.update("UPDATE ad_campaigns SET payment_status = 'PAID', payment_issue = ? WHERE campaign_id = ?",
                 issue, campaignId);
         audit(payerUserId, issue == null ? "AD_PAYMENT_CONFIRMED" : "AD_PAYMENT_LATE_CONFLICT", campaignId, detail);
+        if (issue != null) {
+            proposeRefund(campaignId, transactionId, amount, "Tiền về sau hạn giữ chỗ, vị trí đã có doanh nghiệp khác đặt");
+        }
+    }
+
+    /**
+     * Tiền đã về nhưng không kích hoạt: lập đề xuất hoàn tiền vào hàng đợi 4 mắt của finance (UC055), người lập để trống
+     * vì là hệ thống. Mỗi giao dịch chỉ lập một lần (kế toán trưởng đã từ chối thì không lập lại).
+     * Chạy trong transaction riêng: lỗi phía finance không làm hỏng việc ghi nhận của SV1, chỉ ghi log để xử lý tay.
+     */
+    private void proposeRefund(long campaignId, Long transactionId, BigDecimal amount, String reason) {
+        if (transactionId == null || amount == null || amount.signum() <= 0) return;
+        try {
+            newTransaction.executeWithoutResult(status -> {
+                Integer proposed = jdbc.queryForObject("SELECT COUNT(*) FROM refund_requests WHERE transaction_id = ?",
+                        Integer.class, transactionId);
+                if (proposed != null && proposed > 0) return;
+                refunds.proposeRefund(null, ProposeRefundRequest.builder()
+                        .orderId(transactionId)
+                        .refundAmount(amount)
+                        .reason("Không kích hoạt được chiến dịch quảng cáo #" + campaignId + ": " + reason)
+                        .affectedBenefit("Chiến dịch #" + campaignId + " không được kích hoạt")
+                        .build());
+                audit(null, "AD_PAYMENT_REFUND_PROPOSED", campaignId,
+                        Map.of("transactionId", transactionId, "amount", amount, "reason", reason));
+            });
+        } catch (RuntimeException e) {
+            log.error("Không lập được đề xuất hoàn tiền cho giao dịch #{} (campaign #{})", transactionId, campaignId, e);
+        }
+    }
+
+    /**
+     * UC056: finance đã hoàn tiền đơn AD. Phát đồng bộ trong transaction của finance: ném lỗi thì lần hoàn bị rollback.
+     * Hoàn toàn bộ thì thu hồi: payment_status = REFUNDED, tạm dừng chiến dịch, nhả lịch. Hoàn một phần thì giữ nguyên.
+     * Chỉ thu hồi khi giao dịch bị hoàn chính là đơn đã trả cho chiến dịch; hoàn khoản trả nhầm/trùng không đụng chiến dịch.
+     */
+    @EventListener
+    public void onRefundCompleted(RefundCompletedEvent event) {
+        if (!"AD".equals(event.getTransactionType()) || event.getTargetId() == null) return;
+        long campaignId = event.getTargetId();
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("refundId", event.getRefundId());
+        detail.put("transactionId", event.getOriginalTransactionId());
+        detail.put("refundAmount", event.getRefundAmount());
+        detail.put("fullRefund", event.isFullRefund());
+        if (!event.shouldRevokeRights()) {
+            audit(event.getUserId(), "AD_PARTIAL_REFUND", campaignId, detail);
+            return;
+        }
+        String orderCode = jdbc.query("SELECT gateway_transaction_id FROM transactions WHERE transaction_id = ?",
+                (rs, r) -> rs.getString(1), event.getOriginalTransactionId()).stream().findFirst().orElse(null);
+        int revoked = orderCode == null ? 0 : jdbc.update("UPDATE ad_campaigns SET payment_status = 'REFUNDED', " +
+                        "hold_expires_at = NOW(), status = IF(status IN ('REJECTED', 'COMPLETED'), status, 'SUSPENDED') " +
+                        "WHERE campaign_id = ? AND payment_order_code = ? AND payment_status = 'PAID'",
+                campaignId, orderCode);
+        audit(event.getUserId(), revoked == 1 ? "AD_REFUND_REVOKED" : "AD_REFUND_NOT_CAMPAIGN_PAYMENT", campaignId, detail);
+    }
+
+    /** UC053: kế toán nhắc nợ -> thông báo trong cổng doanh nghiệp. Chạy đồng bộ trong transaction của finance. */
+    @EventListener
+    public void onReceivableReminder(ReceivableReminderEvent event) {
+        StringBuilder content = new StringBuilder(String.format(VI, "Chiến dịch \"%s\" còn phải thanh toán %,.0f ₫",
+                event.getCampaignName(), event.getAmountDue()));
+        if (event.getDueDate() != null) content.append(", hạn ").append(event.getDueDate().format(DAY));
+        if (event.getOverdueDays() > 0) content.append(" (quá hạn ").append(event.getOverdueDays()).append(" ngày)");
+        content.append('.');
+        if (event.getNote() != null) content.append(" Ghi chú của kế toán: ").append(event.getNote());
+        int sent = jdbc.update("INSERT INTO notifications (user_id, notification_type, channel, title, content, delivery_status) " +
+                        "SELECT user_id, 'AD_PAYMENT_REMINDER', 'IN_APP', 'Nhắc thanh toán quảng cáo', ?, 'SENT' " +
+                        "FROM advertisers WHERE advertiser_id = ?", content.toString(), event.getAdvertiserId());
+        if (sent == 0) {
+            log.warn("Nhắc nợ #{} không tìm thấy doanh nghiệp #{}", event.getReminderId(), event.getAdvertiserId());
+            return;
+        }
+        audit(event.getSentBy(), "AD_PAYMENT_REMINDER_RECEIVED", event.getCampaignId(),
+                Map.of("reminderId", event.getReminderId(), "amountDue", event.getAmountDue()));
     }
 
     private LocalDateTime now() {
