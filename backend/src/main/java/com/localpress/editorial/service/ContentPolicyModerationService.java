@@ -92,11 +92,6 @@ public class ContentPolicyModerationService {
      * Duyệt / Từ chối / Ẩn bình luận độc giả (UC026).
      */
     @Transactional
-    public EditorialCommentDto moderateComment(Long commentId, ModerateCommentRequest request) {
-        return moderateComment(commentId, request, null);
-    }
-
-    @Transactional
     public EditorialCommentDto moderateComment(Long commentId, ModerateCommentRequest request, String email) {
         Long moderatorUserId = resolveUserId(email);
 
@@ -195,11 +190,6 @@ public class ContentPolicyModerationService {
      * - PREMIUM: single_price >= 0
      */
     @Transactional
-    public EditorialArticleDto updateArticlePolicy(Long articleId, UpdateArticlePolicyRequest request) {
-        return updateArticlePolicy(articleId, request, null);
-    }
-
-    @Transactional
     public EditorialArticleDto updateArticlePolicy(Long articleId, UpdateArticlePolicyRequest request, String email) {
         Long editorUserId = resolveUserId(email);
         Article article = articleRepository.findById(articleId)
@@ -265,11 +255,6 @@ public class ContentPolicyModerationService {
      * Tạo mới một gói cước hội viên (UC028).
      */
     @Transactional
-    public SubscriptionPlanDto createPlan(SaveSubscriptionPlanRequest request) {
-        return createPlan(request, null);
-    }
-
-    @Transactional
     public SubscriptionPlanDto createPlan(SaveSubscriptionPlanRequest request, String email) {
         Long editorUserId = email != null ? resolveUserId(email) : null;
 
@@ -330,11 +315,6 @@ public class ContentPolicyModerationService {
      * Cập nhật thông tin gói cước hội viên (UC028).
      */
     @Transactional
-    public SubscriptionPlanDto updatePlan(Long planId, SaveSubscriptionPlanRequest request) {
-        return updatePlan(planId, request, null);
-    }
-
-    @Transactional
     public SubscriptionPlanDto updatePlan(Long planId, SaveSubscriptionPlanRequest request, String email) {
         Long editorUserId = email != null ? resolveUserId(email) : null;
 
@@ -386,11 +366,6 @@ public class ContentPolicyModerationService {
     /**
      * Bật/Tắt trạng thái kích hoạt gói cước (ACTIVE <-> INACTIVE).
      */
-    @Transactional
-    public SubscriptionPlanDto togglePlanStatus(Long planId) {
-        return togglePlanStatus(planId, null);
-    }
-
     @Transactional
     public SubscriptionPlanDto togglePlanStatus(Long planId, String email) {
         Long editorUserId = email != null ? resolveUserId(email) : null;

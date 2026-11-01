@@ -12,8 +12,10 @@ import com.localpress.editorial.dto.SaveEditorialArticleRequest;
 import com.localpress.editorial.dto.UpdateArticleStatusRequest;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.repository.UserRepository;
+import com.localpress.shared.event.ArticlePublishedEvent;
 import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -22,10 +24,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -47,6 +52,7 @@ public class ArticleReviewService {
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
     private final ImageStorageService imageStorageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Lấy danh sách toàn bộ bài viết trong tòa soạn kèm phiên bản mới nhất và lịch sử phiên bản.
@@ -67,14 +73,6 @@ public class ArticleReviewService {
         Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
         return mapToDto(article);
-    }
-
-    /**
-     * Duyệt bài / Yêu cầu sửa / Xuất bản / Gỡ bài (UC025).
-     */
-    @Transactional
-    public EditorialArticleDto updateArticleStatus(Long articleId, UpdateArticleStatusRequest request) {
-        return updateArticleStatus(articleId, request, null);
     }
 
     @Transactional
@@ -149,6 +147,27 @@ public class ArticleReviewService {
         versionRepository.save(latestVersion);
         Article savedArticle = articleRepository.save(article);
 
+        // Phát sự kiện ArticlePublishedEvent khi bài chuyển sang PUBLISHED (Quy tắc 8 & Hoang SV3 notification listener)
+        if ("PUBLISHED".equals(targetStatus)) {
+            boolean firstPublication = oldStatus == null || !"PUBLISHED".equals(oldStatus);
+            Instant publishedInstant = savedArticle.getPublishedAt() != null
+                    ? savedArticle.getPublishedAt().atZone(ZoneId.systemDefault()).toInstant()
+                    : Instant.now();
+
+            ArticlePublishedEvent event = ArticlePublishedEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .articleId(savedArticle.getId())
+                    .categoryId(savedArticle.getCategoryId())
+                    .versionNumber(latestVersion.getVersionNumber())
+                    .title(latestVersion.getTitle())
+                    .slug(savedArticle.getSlug())
+                    .publishedAt(publishedInstant)
+                    .firstPublication(firstPublication)
+                    .build();
+
+            eventPublisher.publishEvent(event);
+        }
+
         // Ghi vết vào bảng audit_logs với cột chuẩn (user_id, action, target_type, target_id)
         String oldJson = String.format("{\"status\":\"%s\"}", oldStatus);
         String newJson = String.format("{\"status\":\"%s\",\"uiTarget\":\"%s\",\"version\":%d}",
@@ -180,20 +199,31 @@ public class ArticleReviewService {
             String infoJson,
             String email
     ) {
-        Long authorId = resolveUserId(email);
-        Long categoryId = resolveCategoryId(request.resolveCategoryId());
+        User caller = resolveUser(email);
+        if (caller.getRole() != User.Role.AUTHOR && caller.getRole() != User.Role.EDITOR && caller.getRole() != User.Role.SYSTEM_ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền viết bài");
+        }
+        Long authorId = caller.getId();
+
         String title = request.resolveTitle();
+        if (title == null || title.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tiêu đề bài viết không được để trống");
+        }
+
+        Long categoryId = resolveCategoryId(request.resolveCategoryId());
         String sapo = request.resolveSapo();
         String content = request.resolveContent();
         String slug = generateUniqueSlug(title);
 
-        Article article = Article.createDraft(categoryId, authorId, slug);
         boolean isPremium = request.resolveIsPremium();
-        BigDecimal price = isPremium ? request.resolvePrice() : BigDecimal.ZERO;
-        if (isPremium && price.compareTo(BigDecimal.ZERO) <= 0) {
-            price = BigDecimal.valueOf(15000);
+        BigDecimal price = request.resolvePrice();
+        if (isPremium && (price == null || price.compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bài viết Premium yêu cầu thiết lập giá bán lớn hơn 0");
         }
-        article.configureDraftAccess(isPremium, price);
+        BigDecimal effectivePrice = isPremium ? price : BigDecimal.ZERO;
+
+        Article article = Article.createDraft(categoryId, authorId, slug);
+        article.configureDraftAccess(isPremium, effectivePrice);
         article.advanceDraftVersion(1);
         Article savedArticle = articleRepository.save(article);
 
@@ -270,22 +300,22 @@ public class ArticleReviewService {
             String infoJson,
             String email
     ) {
-        Long userId = resolveUserId(email);
+        User caller = resolveUser(email);
         Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
 
-        if (request.resolveCategoryId() != null) {
-            Long newCatId = resolveCategoryId(request.resolveCategoryId());
-            article.updateDraftMetadata(newCatId, article.getSlug());
+        // Leader review point 2: Kiểm tra quyền sở hữu của AUTHOR (chỉ sửa bài của chính mình; EDITOR và SYSTEM_ADMIN được sửa)
+        if (caller.getRole() == User.Role.AUTHOR) {
+            if (!article.getAuthorId().equals(caller.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tác giả chỉ được chỉnh sửa bài viết của chính mình");
+            }
+        } else if (caller.getRole() != User.Role.EDITOR && caller.getRole() != User.Role.SYSTEM_ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền chỉnh sửa bài viết này");
         }
 
-        boolean isPremium = request.resolveIsPremium();
-        BigDecimal price = isPremium ? request.resolvePrice() : BigDecimal.ZERO;
-        if (isPremium && price.compareTo(BigDecimal.ZERO) <= 0) {
-            price = BigDecimal.valueOf(15000);
-        }
-        if (article.getStatus() == Article.Status.DRAFT) {
-            article.configureDraftAccess(isPremium, price);
+        // Leader review point 1: Bài không còn là nháp thì ném 409 Conflict
+        if (article.getStatus() != Article.Status.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ được chỉnh sửa khi bài viết ở trạng thái bản nháp");
         }
 
         Optional<ArticleVersion> latestVersionOpt = versionRepository
@@ -299,19 +329,43 @@ public class ArticleReviewService {
             return all.get(0);
         });
 
+        if (latestVersion.getReviewStatus() != ArticleVersion.ReviewStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ được chỉnh sửa phiên bản ở trạng thái bản nháp");
+        }
+
+        if (request.resolveCategoryId() != null) {
+            Long newCatId = resolveCategoryId(request.resolveCategoryId());
+            article.updateDraftMetadata(newCatId, article.getSlug());
+        }
+
+        boolean isPremium = request.resolveIsPremium();
+        BigDecimal price = request.resolvePrice();
+        if (isPremium && (price == null || price.compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bài viết Premium yêu cầu thiết lập giá bán lớn hơn 0");
+        }
+        BigDecimal effectivePrice = isPremium ? price : BigDecimal.ZERO;
+        article.configureDraftAccess(isPremium, effectivePrice);
+
+        String newTitle = request.resolveTitle();
+        if (newTitle == null || newTitle.isBlank()) {
+            newTitle = latestVersion.getTitle();
+        }
+
+        // Leader review point 1: Không nuốt lỗi updateDraftContent
         try {
             latestVersion.updateDraftContent(
-                    request.resolveTitle(),
+                    newTitle,
                     request.resolveSapo(),
                     request.resolveContent(),
                     request.resolveChangelog()
             );
-        } catch (Exception ignored) {
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
 
         if (file != null && !file.isEmpty()) {
             String filename = imageStorageService.store(file);
-            latestVersion.updateDraftCoverImage("/api/v1/content/images/" + filename, "Ảnh bìa", request.resolveTitle(), "LocalPress");
+            latestVersion.updateDraftCoverImage("/api/v1/content/images/" + filename, "Ảnh bìa", newTitle, "LocalPress");
         } else if (request.resolveCoverImageUrl() != null) {
             latestVersion.updateDraftPresentation(request.resolveCoverImageUrl(), request.resolveTags());
         }
@@ -332,7 +386,7 @@ public class ArticleReviewService {
             jdbcTemplate.update(
                     "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
                             "VALUES (?, 'ARTICLE_UPDATE', 'articles', ?, ?, NOW())",
-                    userId,
+                    caller.getId(),
                     savedArticle.getId(),
                     String.format("{\"version\":%d,\"status\":\"%s\"}", latestVersion.getVersionNumber(), savedArticle.getStatus().name())
             );
@@ -342,42 +396,54 @@ public class ArticleReviewService {
         return mapToDto(savedArticle);
     }
 
-    private Long resolveUserId(String email) {
+    private User resolveUser(String email) {
         if (email == null || email.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa xác thực danh tính người dùng");
         }
-        List<Long> ids = jdbcTemplate.query(
-                "SELECT user_id FROM users WHERE email = ? AND status = 'ACTIVE'",
-                (rs, r) -> rs.getLong(1),
-                email
-        );
-        if (ids.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản không tồn tại hoặc không có quyền truy cập");
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tài khoản không tồn tại"));
+        if (user.getStatus() != User.Status.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản đang bị khóa hoặc không hoạt động");
         }
-        return ids.get(0);
+        return user;
+    }
+
+    private Long resolveUserId(String email) {
+        return resolveUser(email).getId();
     }
 
     private Long resolveCategoryId(Object catIdObj) {
         if (catIdObj == null) {
-            return 1L;
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thiếu thông tin chuyên mục");
         }
         String str = String.valueOf(catIdObj).trim();
+        if (str.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã chuyên mục không hợp lệ");
+        }
         if (str.startsWith("cat-")) {
             str = str.substring(4);
         }
         Optional<Category> bySlug = categoryRepository.findBySlug(str);
         if (bySlug.isPresent()) {
-            return bySlug.get().getId();
+            Category cat = bySlug.get();
+            if (cat.getStatus() != Category.Status.ACTIVE) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chuyên mục đã ngừng hoạt động");
+            }
+            return cat.getId();
         }
         try {
             Long numericId = Long.parseLong(str);
-            if (categoryRepository.existsById(numericId)) {
-                return numericId;
+            Optional<Category> byId = categoryRepository.findById(numericId);
+            if (byId.isPresent()) {
+                Category cat = byId.get();
+                if (cat.getStatus() != Category.Status.ACTIVE) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chuyên mục đã ngừng hoạt động");
+                }
+                return cat.getId();
             }
         } catch (NumberFormatException ignored) {
         }
-        List<Category> all = categoryRepository.findAll();
-        return all.isEmpty() ? 1L : all.get(0).getId();
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chuyên mục không tồn tại: " + catIdObj);
     }
 
     private String generateUniqueSlug(String title) {

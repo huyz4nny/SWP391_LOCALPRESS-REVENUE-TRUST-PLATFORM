@@ -218,4 +218,41 @@ class EditorialArticleControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("POST /editorial/articles multipart with invalid JSON returns 400 Bad Request")
+    @WithMockUser(username = "bientap@localpress.vn", roles = "EDITOR")
+    void createArticle_multipart_corruptJson_returnsBadRequest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "cover.jpg", "image/jpeg", "image-content".getBytes());
+        MockMultipartFile articlePart = new MockMultipartFile(
+                "article",
+                "",
+                "application/json",
+                "{invalid_json_data".getBytes()
+        );
+
+        mvc.perform(multipart("/api/v1/editorial/articles")
+                        .file(file)
+                        .file(articlePart))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /editorial/articles/{id} multipart with invalid JSON returns 400 Bad Request")
+    @WithMockUser(username = "bientap@localpress.vn", roles = "EDITOR")
+    void updateArticle_multipart_corruptJson_returnsBadRequest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "cover.jpg", "image/jpeg", "image-content".getBytes());
+        MockMultipartFile requestPart = new MockMultipartFile(
+                "request",
+                "",
+                "application/json",
+                "not-valid-json".getBytes()
+        );
+
+        mvc.perform(multipart("/api/v1/editorial/articles/100")
+                        .file(file)
+                        .file(requestPart)
+                        .with(req -> { req.setMethod("PUT"); return req; }))
+                .andExpect(status().isBadRequest());
+    }
 }

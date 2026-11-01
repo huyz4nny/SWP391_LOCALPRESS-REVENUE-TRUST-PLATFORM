@@ -139,12 +139,12 @@ public class EditorialArticleController {
 
     private SaveEditorialArticleRequest parseArticleRequest(String json) {
         if (json == null || json.isBlank()) {
-            return new SaveEditorialArticleRequest();
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Thiếu dữ liệu thông tin bài viết");
         }
         try {
             return objectMapper.readValue(json, SaveEditorialArticleRequest.class);
         } catch (Exception e) {
-            return new SaveEditorialArticleRequest();
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Dữ liệu JSON bài viết không hợp lệ: " + e.getMessage());
         }
     }
 }

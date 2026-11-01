@@ -41,7 +41,7 @@ public class SaveEditorialArticleRequest {
             String t = String.valueOf(article.get("title")).trim();
             if (!t.isBlank()) return t;
         }
-        return "Bản thảo chưa đặt tên";
+        return null;
     }
 
     public String resolveSapo() {
@@ -65,7 +65,7 @@ public class SaveEditorialArticleRequest {
         if (article != null && article.get("categoryId") != null) {
             return article.get("categoryId");
         }
-        return 1L;
+        return null;
     }
 
     public String resolveCoverImageUrl() {
@@ -98,7 +98,7 @@ public class SaveEditorialArticleRequest {
             } catch (Exception ignored) {
             }
         }
-        return BigDecimal.ZERO;
+        return null;
     }
 
     public String resolveStatus() {
