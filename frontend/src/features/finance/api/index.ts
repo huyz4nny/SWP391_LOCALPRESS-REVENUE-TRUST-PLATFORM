@@ -158,8 +158,9 @@ export const financeApi = {
     return res?.data || res
   },
 
-  reviewRefund: async (id: string, approved: boolean, reviewNotes: string) => {
-    const res = await httpClient.post<any>(`/finance/refunds/${id}/review-refund`, { approved, reviewNotes })
+  /** UC055 mắt 2: payoutReference = mã GD chuyển trả khách, backend ghi vào bút toán REFUND (BANK_TRANSFER). */
+  reviewRefund: async (id: string, approved: boolean, reviewNotes: string, payoutReference?: string) => {
+    const res = await httpClient.post<any>(`/finance/refunds/${id}/review-refund`, { approved, reviewNotes, payoutReference })
     return res?.data || res
   },
 
@@ -169,7 +170,7 @@ export const financeApi = {
     return res?.data || res
   },
 
-  /** UC054: gán đơn / cộng ví / giải trình 1 khoản lệch (bắt buộc ghi chú). */
+  /** UC054: gán đơn / đã chuyển trả khách / giải trình 1 khoản lệch (bắt buộc ghi chú). */
   resolveDiscrepancy: async (input: ResolveDiscrepancyInput): Promise<ReconciliationPeriod> => {
     const res = await httpClient.post<any>('/finance/reconciliation/resolve', input)
     return res?.data || res

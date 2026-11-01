@@ -248,7 +248,10 @@ public class RefundManagementService {
             // LocalPress không giữ tiền: kế toán chuyển khoản trả về tài khoản ngân hàng của khách, hệ thống chỉ ghi bút toán đảo.
 
             // 2. Cập nhật trạng thái đơn gốc sang REFUNDED nếu đã hoàn toàn bộ
-            BigDecimal totalRefunded = committedRefunds(originalTx).orElse(refund.getRefundAmount());
+            // Chỉ cộng các phiếu đã hoàn tất (phiếu này vừa lưu COMPLETED ở trên), không cộng phiếu đang chờ khác
+            BigDecimal totalRefunded = Optional.ofNullable(
+                    refundRequestRepository.sumCompletedRefundsByTransactionId(originalTx.getTransactionId()))
+                    .orElse(refund.getRefundAmount());
             boolean fullRefund = totalRefunded.compareTo(originalTx.getAmount()) >= 0;
             if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);

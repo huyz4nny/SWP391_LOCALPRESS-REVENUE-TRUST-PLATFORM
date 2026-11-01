@@ -250,7 +250,7 @@ class RefundManagementServiceTest {
 
             when(refundRequestRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(refund));
             when(transactionRepository.findById(10L)).thenReturn(Optional.of(originalTx));
-            when(refundRequestRepository.sumCommittedRefundsByTransactionId(10L, null))
+            when(refundRequestRepository.sumCompletedRefundsByTransactionId(10L))
                     .thenReturn(BigDecimal.valueOf(15_000)); // Hoàn đủ 15.000đ -> originalTx thành REFUNDED
 
             ReviewRefundRequest req = ReviewRefundRequest.builder()
@@ -293,7 +293,7 @@ class RefundManagementServiceTest {
 
             when(refundRequestRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(refund));
             when(transactionRepository.findById(40L)).thenReturn(Optional.of(originalTx));
-            when(refundRequestRepository.sumCommittedRefundsByTransactionId(40L, null)).thenReturn(BigDecimal.valueOf(15_000));
+            when(refundRequestRepository.sumCompletedRefundsByTransactionId(40L)).thenReturn(BigDecimal.valueOf(15_000));
 
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -305,6 +305,29 @@ class RefundManagementServiceTest {
                     && "BANK_TRANSFER".equals(tx.getPaymentMethod()) && tx.getDescription().contains("FT555")));
             verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundCompletedEvent ev
                     && "SUBSCRIPTION".equals(ev.getTransactionType()) && ev.getTargetId().equals(8L) && ev.isFullRefund()));
+        }
+
+        @Test
+        @DisplayName("2 phiếu chờ 50k + 50k trên đơn 100k: duyệt phiếu đầu chỉ là hoàn một phần, chưa thu hồi quyền")
+        void reviewRefund_OtherPendingProposalNotCounted() {
+            RefundRequest refund = RefundRequest.builder()
+                    .refundId(5L).transactionId(50L).userId(5L)
+                    .refundAmount(BigDecimal.valueOf(50_000)).proposedBy(4L).status(RefundStatus.PENDING).build();
+            Transaction originalTx = Transaction.builder()
+                    .transactionId(50L).userId(5L).purchaseId(9L).transactionType(TransactionType.ARTICLE)
+                    .amount(BigDecimal.valueOf(100_000)).currency("VND").paymentMethod("SEPAY")
+                    .status(TransactionStatus.SUCCESS).build();
+
+            when(refundRequestRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(refund));
+            when(transactionRepository.findById(50L)).thenReturn(Optional.of(originalTx));
+            // Chỉ phiếu vừa duyệt đã COMPLETED; phiếu 50k còn lại vẫn PENDING nên không được cộng
+            when(refundRequestRepository.sumCompletedRefundsByTransactionId(50L)).thenReturn(BigDecimal.valueOf(50_000));
+            when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            refundManagementService.reviewRefund(2L, 5L, ReviewRefundRequest.builder().approved(true).build());
+
+            assertEquals(TransactionStatus.SUCCESS, originalTx.getStatus());
+            verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundCompletedEvent ev && !ev.isFullRefund()));
         }
 
         @Test

@@ -42,4 +42,16 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
             @Param("transactionId") Long transactionId,
             @Param("excludeRefundId") Long excludeRefundId
     );
+
+    /**
+     * Tổng tiền đã hoàn THẬT (COMPLETED) của một giao dịch: dùng để quyết định hoàn toàn phần hay một phần
+     * khi duyệt. Không cộng phiếu đang chờ của người khác, nếu không duyệt phiếu đầu đã bị tính là hoàn hết.
+     */
+    @Query("""
+        SELECT SUM(r.refundAmount)
+        FROM RefundRequest r
+        WHERE r.transactionId = :transactionId
+          AND r.status = com.localpress.finance.model.RefundStatus.COMPLETED
+    """)
+    BigDecimal sumCompletedRefundsByTransactionId(@Param("transactionId") Long transactionId);
 }
