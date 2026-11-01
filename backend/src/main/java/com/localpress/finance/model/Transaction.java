@@ -95,7 +95,8 @@ public class Transaction {
     private String currency = "VND";
 
     /**
-     * Phương thức thanh toán: 'SEPAY' (chuyển khoản QR, ghi nhận qua webhook) hoặc 'WALLET' (trừ Ví LocalPress).
+     * Phương thức thanh toán: 'SEPAY' (chuyển khoản QR, ghi nhận qua webhook). Bút toán REFUND: 'BANK_TRANSFER'.
+     * Dữ liệu cũ trước V12 có thể còn 'WALLET'.
      */
     @Column(name = "payment_method", nullable = false, length = 50)
     private String paymentMethod;
@@ -118,12 +119,6 @@ public class Transaction {
      */
     @Column(name = "description", length = 255)
     private String description;
-
-    /**
-     * Chỉ với đơn TOPUP nạp bù: mã đơn (bài / gói / quảng cáo) cần trả ngay khi tiền nạp về (V6).
-     */
-    @Column(name = "topup_for_order", length = 255)
-    private String topupForOrder;
 
     /**
      * Trạng thái giao dịch hiện tại: PENDING, SUCCESS, FAILED, REFUNDED.
@@ -191,14 +186,11 @@ public class Transaction {
 
     /**
      * Rule 6: hạn chỉ ràng buộc khi có thứ bị giữ chỗ.
-     * - AD   : booking giữ slot 15 phút, quá hạn thì không trả được nữa (tiền về muộn vào ví).
-     * - TOPUP: hạn của mã QR nạp tiền (tiền nạp về muộn vẫn được cộng ví).
-     * - ARTICLE / SUBSCRIPTION: bài / gói không giới hạn số lượng, đơn còn PENDING là còn trả được
-     *   (bằng ví hoặc chuyển khoản), giống nhánh webhook.
+     * - AD   : booking giữ slot 15 phút, quá hạn thì không nhận nữa (tiền về muộn kế toán chuyển trả).
+     * - ARTICLE / SUBSCRIPTION: bài / gói không giới hạn số lượng, đơn còn PENDING là còn trả được.
      */
     public boolean isPaymentWindowClosed(LocalDateTime now) {
-        boolean bounded = this.transactionType == TransactionType.AD || this.transactionType == TransactionType.TOPUP;
-        return bounded && isExpired(now);
+        return this.transactionType == TransactionType.AD && isExpired(now);
     }
 
     /** Đơn còn chờ nhưng đã đóng cửa thanh toán theo Rule 6 (trang thanh toán hiển thị "hết hạn"). */
@@ -207,22 +199,7 @@ public class Transaction {
     }
 
     /**
-     * Thanh toán đơn hàng bằng số dư Ví LocalPress (tiền đã được trừ ví trong cùng transaction DB).
-     */
-    public void markPaidByWallet() {
-        if (this.status != TransactionStatus.PENDING) {
-            throw new AppException(
-                    "Đơn " + this.gatewayTransactionId + " không ở trạng thái chờ thanh toán (Hiện tại: " + this.status + ")",
-                    HttpStatus.CONFLICT
-            );
-        }
-        this.status = TransactionStatus.SUCCESS;
-        this.paidAt = LocalDateTime.now();
-        this.paymentMethod = "WALLET";
-    }
-
-    /**
-     * Đánh dấu đơn hết hạn khi tiền về muộn và đã được chuyển vào ví thay vì cấp quyền.
+     * Đánh dấu đơn hết hạn khi tiền về muộn: không cấp quyền, kế toán chuyển trả lại khách.
      */
     public void markExpired() {
         if (this.status == TransactionStatus.PENDING) {
@@ -240,7 +217,6 @@ public class Transaction {
             case ARTICLE -> this.purchaseId;
             case AD -> this.campaignId;
             case REFUND -> this.originalTransactionId;
-            case TOPUP -> null;
         };
     }
 }

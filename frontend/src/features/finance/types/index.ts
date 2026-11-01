@@ -1,6 +1,7 @@
-export type OrderType = 'SUBSCRIPTION' | 'ARTICLE_PURCHASE' | 'AD_CAMPAIGN' | 'TOPUP' | 'REFUND'
+export type OrderType = 'SUBSCRIPTION' | 'ARTICLE_PURCHASE' | 'AD_CAMPAIGN' | 'REFUND'
 
-// Luồng hiện tại chỉ có SEPAY (QR chuyển khoản) và WALLET (Ví LocalPress).
+// Luồng hiện tại chỉ có SEPAY (QR chuyển khoản); BANK_TRANSFER là bút toán chuyển trả khi hoàn tiền.
+// WALLET chỉ còn ở dữ liệu cũ (LocalPress đã bỏ ví, không giữ tiền khách).
 // VIETQR / BANK_TRANSFER / MOMO chỉ còn vì CheckoutPage cũ của SV3 (không còn route) và mock store; bỏ khi SV3 xóa trang đó.
 export type PaymentMethod = 'SEPAY' | 'WALLET' | 'VIETQR' | 'BANK_TRANSFER' | 'MOMO'
 
@@ -87,7 +88,7 @@ export interface RefundRequest {
 
 /** BANK_NOT_RECORDED: SePay báo có tiền, hệ thống chưa ghi · RECORDED_WITHOUT_BANK: ghi theo khiếu nại, SePay chưa báo */
 export type DiscrepancyType = 'BANK_NOT_RECORDED' | 'RECORDED_WITHOUT_BANK'
-export type DiscrepancyAction = 'ASSIGN_ORDER' | 'CREDIT_WALLET' | 'EXPLAINED'
+export type DiscrepancyAction = 'ASSIGN_ORDER' | 'RETURNED_TO_CUSTOMER' | 'EXPLAINED'
 
 export interface ReconciliationDiscrepancy {
   id: string
@@ -130,37 +131,14 @@ export interface ResolveDiscrepancyInput {
   note: string
   action: DiscrepancyAction
   orderCode?: string
-  userId?: number
+  /** RETURNED_TO_CUSTOMER: mã GD ngân hàng của lần chuyển trả khách */
+  returnReference?: string
   amount?: number
-}
-
-/** UC053: công nợ quảng cáo theo chiến dịch */
-export interface AdvertiserReceivable {
-  campaignId: number
-  campaignName: string
-  advertiserId: number
-  companyName: string
-  taxCode?: string
-  contactPerson?: string
-  email?: string
-  phone?: string
-  contractReference?: string
-  contractValue: number
-  paidAmount: number
-  remainingDebt: number
-  startDate: string
-  dueDate: string
-  overdueDays: number
-  paymentStatus?: string
-  campaignStatus?: string
-  debtGroup: 'PAID_IN_FULL' | 'IN_TERM' | 'OVERDUE'
-  reminderCount: number
-  lastReminderAt?: string
 }
 
 /** UC060: cảnh báo tài chính */
 export interface FinanceAlert {
-  type: 'REFUND_PENDING' | 'COMPLAINT_OPEN' | 'DEBT_OVERDUE' | 'RECONCILIATION_UNRESOLVED' | string
+  type: 'REFUND_PENDING' | 'COMPLAINT_OPEN' | 'RECONCILIATION_UNRESOLVED' | 'RIGHTS_GRANT_FAILED' | string
   severity: 'HIGH' | 'MEDIUM' | 'LOW' | string
   title: string
   message: string
@@ -189,11 +167,11 @@ export interface GeneralLedgerEntry {
 }
 
 // =============================================================================
-// TRANG THANH TOÁN CHUNG /payment/:orderCode & VÍ LOCALPRESS (SV4)
+// TRANG THANH TOÁN CHUNG /payment/:orderCode (SV4) - không ví, không giữ tiền khách
 // =============================================================================
 
 /** Loại đơn theo backend (transactions.transaction_type) */
-export type PaymentOrderType = 'SUBSCRIPTION' | 'ARTICLE' | 'AD' | 'TOPUP'
+export type PaymentOrderType = 'SUBSCRIPTION' | 'ARTICLE' | 'AD'
 
 export interface PaymentOrderView {
   transactionId: string
@@ -211,8 +189,6 @@ export interface PaymentOrderView {
   accountNumber?: string
   accountName?: string
   transferContent: string
-  /** Đơn TOPUP nạp bù: mã đơn sẽ được tự trả khi tiền nạp về */
-  topupForOrder?: string
   createdAt?: string
   expiresAt?: string
   paidAt?: string
@@ -226,30 +202,12 @@ export interface PaymentStatusView {
   paymentMethod?: string
 }
 
-export interface WalletEntry {
-  entryId: string
-  transactionId: string
-  direction: 'CREDIT' | 'DEBIT'
-  amount: number
-  balanceAfter: number
-  reason?: string
-  createdAt: string
-}
-
-export interface WalletInfo {
-  balance: number
-  entries: WalletEntry[]
-}
-
 /** Kết quả webhook (thật hoặc giả lập) để hiển thị cho người demo */
 export interface IpnResult {
   success: boolean
   status: string
   orderCode?: string
   message: string
-  /** Nạp bù: kết quả tự trả đơn (PAID, ALREADY_PAID, ORDER_EXPIRED, INSUFFICIENT) */
-  autoPay?: string
-  paidOrder?: string
 }
 
 /** Khiếu nại "đã chuyển tiền nhưng chưa được ghi nhận" (UC051) */

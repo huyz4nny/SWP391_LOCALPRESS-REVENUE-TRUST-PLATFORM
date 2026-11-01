@@ -5,7 +5,6 @@ import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
-import { WalletBalanceButton } from '@/components/shared/WalletBalanceButton'
 import { Button } from '@/components/ui/button'
 import {
   Building2,
@@ -91,7 +90,6 @@ export function AdvertiserLayout() {
           </div>
 
           <div className="flex flex-none items-center gap-2.5">
-            <WalletBalanceButton />
             <ThemeToggle />
             <span className="hidden h-8 w-8 items-center justify-center rounded-full bg-[#dfe7f5] text-xs font-semibold text-primary-900 sm:flex" title={currentUser.email}>
               {currentUser.name.charAt(0)}

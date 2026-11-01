@@ -8,7 +8,6 @@ import {
   GeneralLedgerEntry,
   LedgerSummary,
   ResolveDiscrepancyInput,
-  AdvertiserReceivable,
   FinanceAlert,
 } from '../types'
 import { complaintApi } from './payment'
@@ -16,13 +15,12 @@ import { complaintApi } from './payment'
 
 /** Loại giao dịch backend (ENUM transactions.transaction_type) -> loại đơn hiển thị. */
 const mapOrderType = (t: string): OrderType =>
-  t === 'AD' ? 'AD_CAMPAIGN' : t === 'ARTICLE' ? 'ARTICLE_PURCHASE' : t === 'TOPUP' ? 'TOPUP' : t === 'REFUND' ? 'REFUND' : 'SUBSCRIPTION'
+  t === 'AD' ? 'AD_CAMPAIGN' : t === 'ARTICLE' ? 'ARTICLE_PURCHASE' : t === 'REFUND' ? 'REFUND' : 'SUBSCRIPTION'
 
 const TITLE_BY_TYPE: Record<string, string> = {
   SUBSCRIPTION: 'Gói hội viên',
   ARTICLE: 'Mua bài Premium',
   AD: 'Booking quảng cáo',
-  TOPUP: 'Nạp tiền vào ví',
   REFUND: 'Hoàn tiền',
 }
 
@@ -200,10 +198,9 @@ export const financeApi = {
     if (APP_CONFIG.useMockApi) return httpClient.get<GeneralLedgerEntry[]>('/finance/ledger')
     const res = await httpClient.get<any>('/finance/ledger', { params: { size: 100 } })
     const list = res?.data?.content || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
-    // Rule 16: tiền nạp ví là công nợ phải trả khách, không phải doanh thu -> không đưa vào sổ quỹ doanh thu.
     // Chỉ lấy giao dịch đã thành công / đã hoàn; đơn chờ hoặc thất bại chưa phát sinh tiền.
     return list
-      .filter((tx: any) => tx.transactionType !== 'TOPUP' && ['SUCCESS', 'REFUNDED'].includes(tx.status))
+      .filter((tx: any) => ['SUCCESS', 'REFUNDED'].includes(tx.status))
       .map((tx: any) => ({
       id: String(tx.transactionId || tx.id),
       entryCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
@@ -215,26 +212,6 @@ export const financeApi = {
       amount: Number(tx.amount || 0),
       createdBy: tx.reconciledBy ? `Kế toán #${tx.reconciledBy}` : 'Hệ thống tự động',
     }))
-  },
-
-  /** UC053: công nợ quảng cáo theo chiến dịch. */
-  getReceivables: async (): Promise<AdvertiserReceivable[]> => {
-    const res = await httpClient.get<any>('/finance/receivables')
-    const list = res?.data || (Array.isArray(res) ? res : [])
-    return list.map((r: any) => ({
-      ...r,
-      contractValue: Number(r.contractValue || 0),
-      paidAmount: Number(r.paidAmount || 0),
-      remainingDebt: Number(r.remainingDebt || 0),
-      overdueDays: Number(r.overdueDays || 0),
-      reminderCount: Number(r.reminderCount || 0),
-    }))
-  },
-
-  /** UC053: gửi nhắc nợ (SV4 lưu lịch sử + phát ReceivableReminderEvent, SV1 báo doanh nghiệp). */
-  sendReceivableReminder: async (campaignId: number, note?: string): Promise<AdvertiserReceivable> => {
-    const res = await httpClient.post<any>(`/finance/receivables/${campaignId}/reminders`, { note })
-    return res?.data || res
   },
 
   /** UC060: cảnh báo cuối kỳ. */
@@ -263,7 +240,7 @@ export const financeApi = {
     const rows = orders.filter((o) => inRange(o.createdAt))
     const BOM = String.fromCharCode(0xfeff) // Excel đọc đúng tiếng Việt UTF-8
     const cell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const gross = rows.filter((o) => o.paymentStatus === 'PAID' && o.orderType !== 'TOPUP' && o.orderType !== 'REFUND')
+    const gross = rows.filter((o) => o.paymentStatus === 'PAID' && o.orderType !== 'REFUND')
       .reduce((sum, o) => sum + o.finalAmount, 0)
     const refunded = rows.filter((o) => o.orderType === 'REFUND' && o.paymentStatus === 'PAID').reduce((sum, o) => sum + o.finalAmount, 0)
     const lines = [

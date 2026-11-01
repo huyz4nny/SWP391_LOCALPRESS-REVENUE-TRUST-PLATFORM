@@ -35,9 +35,7 @@ import java.util.Map;
  *    GET  /api/v1/finance/orders/me               : Đơn của tôi, phân trang, lọc theo loại (UC045 của SV3 dùng)
  * 3. GET  /api/v1/finance/orders/code/{code}/status : Polling trạng thái đơn hàng theo mã đơn (UC050)
  * 4. GET  /api/v1/finance/orders/code/{code}        : Dữ liệu trang thanh toán chung /payment/:orderCode
- * 5. POST /api/v1/finance/orders/code/{code}/pay-with-wallet : Trả đơn bằng số dư Ví LocalPress
- *    POST /api/v1/finance/orders/code/{code}/shortfall-topup : Ví thiếu -> mã QR nạp bù, tiền về tự trả đơn
- * 6. POST /api/v1/finance/webhook/sepay            : Tiếp nhận Webhook IPN từ SePay xử lý tự động (UC048, UC049)
+ * 5. POST /api/v1/finance/webhook/sepay            : Tiếp nhận Webhook IPN từ SePay xử lý tự động (UC048, UC049)
  * Người dùng luôn lấy từ phiên đăng nhập (FinanceCurrentUser), không tin header do client tự gửi (Rule 14).
  */
 @Slf4j
@@ -87,26 +85,7 @@ public class PaymentProcessingController {
     }
 
     /**
-     * Trả đơn bằng số dư Ví LocalPress.
-     */
-    @PostMapping("/orders/code/{orderCode}/pay-with-wallet")
-    public ResponseEntity<ApiResponse<OrderStatusResponse>> payWithWallet(@PathVariable String orderCode) {
-        OrderStatusResponse response = paymentProcessingService.payWithWallet(currentUser.require(), orderCode);
-        return ResponseEntity.ok(ApiResponse.ok("Thanh toán bằng ví thành công", response));
-    }
-
-    /**
-     * Ví không đủ tiền trả đơn: tạo (hoặc dùng lại) mã nạp bù đúng phần còn thiếu.
-     * Tiền nạp về thì hệ thống tự trừ ví trả đơn {orderCode}. Mọi thanh toán đơn đều đi qua ví.
-     */
-    @PostMapping("/orders/code/{orderCode}/shortfall-topup")
-    public ResponseEntity<ApiResponse<OrderCreateResponse>> createShortfallTopUp(@PathVariable String orderCode) {
-        OrderCreateResponse response = paymentProcessingService.createShortfallTopUp(currentUser.require(), orderCode);
-        return ResponseEntity.ok(ApiResponse.ok("Đã tạo mã nạp bù " + response.getAmount().toPlainString() + " VND", response));
-    }
-
-    /**
-     * Đơn của user đang đăng nhập, mới nhất trước. type (tùy chọn): SUBSCRIPTION, ARTICLE, AD, TOPUP, REFUND.
+     * Đơn của user đang đăng nhập, mới nhất trước. type (tùy chọn): SUBSCRIPTION, ARTICLE, AD, REFUND.
      * Đường dẫn cố định "/orders/me" được Spring ưu tiên hơn "/orders/{id}".
      */
     @GetMapping("/orders/me")

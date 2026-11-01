@@ -429,7 +429,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (body.action === 'ASSIGN_ORDER' && !body.orderCode) throw mockError(400, 'Gán vào đơn cần mã đơn hàng')
     disc.status = 'RESOLVED'
     disc.action = body.action || 'EXPLAINED'
-    disc.actionRef = body.action === 'ASSIGN_ORDER' ? body.orderCode : body.action === 'CREDIT_WALLET' ? `REC-${disc.transactionCode}` : undefined
+    disc.actionRef = body.action === 'ASSIGN_ORDER' ? body.orderCode : body.action === 'RETURNED_TO_CUSTOMER' ? body.returnReference : undefined
     disc.resolutionNote = body.note
     disc.resolvedBy = currentUser.name
     disc.resolvedAt = new Date().toISOString()
@@ -453,24 +453,6 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     return rec
   }
 
-  // UC053: công nợ quảng cáo dựng từ chiến dịch + đơn AD trong kho mock
-  if (pathname === '/finance/receivables' && method === 'GET') {
-    return mockReceivables()
-  }
-
-  if (pathname.startsWith('/finance/receivables/') && pathname.endsWith('/reminders') && method === 'POST') {
-    const campaignId = Number(pathname.split('/')[3])
-    const r = mockReceivables().find((x) => x.campaignId === campaignId)
-    if (!r) throw mockError(404, `Không tìm thấy công nợ của chiến dịch #${campaignId}`)
-    if (r.remainingDebt <= 0) throw mockError(400, 'Chiến dịch đã thanh toán đủ, không cần nhắc nợ')
-    const sent = mockReminders[campaignId] || []
-    if (sent.length && Date.now() - Date.parse(sent[sent.length - 1]) < 24 * 3600 * 1000) {
-      throw mockError(409, 'Mỗi 24 giờ chỉ nhắc 1 lần')
-    }
-    mockReminders[campaignId] = [...sent, new Date().toISOString()]
-    return mockReceivables().find((x) => x.campaignId === campaignId)
-  }
-
   // UC060: cảnh báo cùng logic với các màn hình tương ứng
   if (pathname === '/finance/alerts' && method === 'GET') {
     const state = mockStore.getState()
@@ -481,9 +463,6 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     add(state.refunds.filter((r) => r.status === 'UNDER_REVIEW').length, 'REFUND_PENDING', 'HIGH',
       'Yêu cầu hoàn tiền chờ duyệt', 'Có %d yêu cầu hoàn tiền đang chờ Kế toán trưởng phê duyệt theo nguyên tắc 4 mắt.',
       '/backoffice/finance/refunds')
-    add(mockReceivables().filter((r) => r.debtGroup === 'OVERDUE').length, 'DEBT_OVERDUE', 'HIGH',
-      'Công nợ quảng cáo B2B quá hạn', 'Có %d chiến dịch quảng cáo đã quá hạn nhưng chưa thanh toán đủ.',
-      '/backoffice/finance/receivables')
     add(withReconciliationCounts(state.reconciliation).unresolvedCount ?? 0, 'RECONCILIATION_UNRESOLVED', 'MEDIUM',
       'Khoản lệch đối soát chưa xử lý', 'Có %d khoản tiền giữa sao kê SePay và hệ thống chưa khớp trong kỳ này.',
       '/backoffice/finance/reconciliation')
@@ -545,38 +524,3 @@ function withReconciliationCounts(rec: ReconciliationPeriod): ReconciliationPeri
   return rec
 }
 
-/** Lịch sử nhắc nợ mock theo chiến dịch (chỉ trong phiên trình duyệt). */
-const mockReminders: Record<number, string[]> = {}
-
-function mockReceivables() {
-  const state = mockStore.getState()
-  const today = new Date().toISOString().slice(0, 10)
-  return state.campaigns
-    .filter((c) => c.totalBudget > 0 && c.status !== 'DRAFT' && c.status !== 'CANCELLED')
-    .map((c) => {
-      const campaignId = Number(String(c.id).replace(/\D/g, '')) || 0
-      const paid = state.orders
-        .filter((o) => o.orderType === 'AD_CAMPAIGN' && o.targetId === c.id && o.paymentStatus === 'PAID')
-        .reduce((sum, o) => sum + o.finalAmount, 0)
-      const remaining = Math.max(0, c.totalBudget - paid)
-      const overdueDays = remaining > 0 && today > c.endDate
-        ? Math.floor((Date.parse(today) - Date.parse(c.endDate)) / 86400000) : 0
-      const sent = mockReminders[campaignId] || []
-      return {
-        campaignId,
-        campaignName: c.name,
-        advertiserId: Number(String(c.advertiserId).replace(/\D/g, '')) || 0,
-        companyName: c.companyName,
-        contractValue: c.totalBudget,
-        paidAmount: paid,
-        remainingDebt: remaining,
-        startDate: c.startDate,
-        dueDate: c.endDate,
-        overdueDays,
-        campaignStatus: c.status,
-        debtGroup: remaining === 0 ? 'PAID_IN_FULL' : overdueDays > 0 ? 'OVERDUE' : 'IN_TERM',
-        reminderCount: sent.length,
-        lastReminderAt: sent[sent.length - 1],
-      }
-    })
-}

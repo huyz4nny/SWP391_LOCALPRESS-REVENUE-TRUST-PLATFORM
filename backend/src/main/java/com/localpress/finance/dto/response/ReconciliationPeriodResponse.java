@@ -73,7 +73,7 @@ public class ReconciliationPeriodResponse {
         private BigDecimal discrepancyAmount;
         private String reason;
         private String status; // UNRESOLVED, RESOLVED
-        /** ASSIGN_ORDER, CREDIT_WALLET, EXPLAINED */
+        /** ASSIGN_ORDER, RETURNED_TO_CUSTOMER, EXPLAINED */
         private String action;
         private String actionRef;
         private String actionResult;

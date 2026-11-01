@@ -45,7 +45,7 @@ public class OrderCreateResponse {
 
     // --- Dữ liệu hiển thị trên trang thanh toán chung /payment/:orderCode ---
 
-    /** SUBSCRIPTION | ARTICLE | AD | TOPUP */
+    /** SUBSCRIPTION | ARTICLE | AD */
     private String orderType;
 
     private Long targetId;
@@ -68,6 +68,4 @@ public class OrderCreateResponse {
 
     private String transferContent;
 
-    /** Đơn TOPUP nạp bù: mã đơn sẽ được tự trả khi tiền nạp về. */
-    private String topupForOrder;
 }

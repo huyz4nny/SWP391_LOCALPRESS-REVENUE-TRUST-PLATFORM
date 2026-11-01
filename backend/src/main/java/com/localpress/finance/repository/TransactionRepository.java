@@ -54,12 +54,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             Pageable pageable
     );
 
-    /** Mã nạp bù mới nhất còn chờ của 1 đơn, để mở lại trang thanh toán không tạo QR mới mỗi lần. */
-    Optional<Transaction> findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
-
-    /** Mọi mã nạp bù còn chờ của 1 đơn (kể cả đã quá hạn QR, vì tiền nạp về muộn vẫn được cộng ví). */
-    List<Transaction> findByTopupForOrderAndStatusOrderByCreatedAtDesc(String topupForOrder, TransactionStatus status);
-
     /**
      * UC047: Tra cứu sổ quỹ tài chính (Ledger) với bộ lọc linh hoạt (Status, Type, Khoảng thời gian, Keyword).
      */
@@ -90,13 +84,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     /**
      * UC049: Tổng doanh thu gộp = mọi đơn đã thu tiền, kể cả đơn sau đó bị hoàn hết (REFUNDED).
      * Tiền hoàn được trừ riêng 1 lần qua calculateTotalRefundedAmount (doanh thu thuần = gộp - hoàn).
-     * Không tính TOPUP (tiền nạp ví là công nợ, Rule 16) và không tính chính bút toán REFUND.
+     * Không tính chính bút toán REFUND.
      */
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
         FROM Transaction t
         WHERE t.status IN ('SUCCESS', 'REFUNDED')
-          AND t.transactionType NOT IN ('REFUND', 'TOPUP')
+          AND t.transactionType <> 'REFUND'
     """)
     BigDecimal calculateTotalGrossRevenue();
 

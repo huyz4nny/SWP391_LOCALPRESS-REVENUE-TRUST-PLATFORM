@@ -32,14 +32,13 @@ import java.util.Map;
  * khi kế toán Ghi nhận khiếu nại, hệ thống chạy đúng hàm processSepayIpn như webhook thật
  * (dùng mã giao dịch ngân hàng của khách), nên mọi nhánh đủ/thiếu/thừa/muộn và idempotency giữ nguyên.
  *
- * Kế toán chọn đích ghi nhận:
- *  - ORDER : khoản tiền là của đơn khách khai báo -> chạy luồng webhook cho đơn đó.
- *  - WALLET: không xác định được đơn, hoặc là khoản chuyển thêm -> cộng thẳng vào ví khách.
+ * LocalPress không giữ tiền khách (không có ví), kế toán chọn 1 trong 2 cách xử lý:
+ *  - ORDER   : khoản tiền đúng là của đơn khách khai báo, đúng số tiền, đơn còn chờ -> chạy luồng webhook cho đơn đó.
+ *  - RETURNED: không gán được vào đơn (sai số tiền, đơn hết hạn / đã trả, không có mã đơn) -> kế toán chuyển trả
+ *              lại tài khoản khách ngoài hệ thống rồi ghi mã GD chuyển trả vào ghi chú.
  *
  * Chống ghi nhận 2 lần (Rule 5), cả 2 chiều:
  *  - Mã GD ngân hàng đã có trong sepay_webhook_logs với kết quả đã ghi tiền -> 409, không ghi nhận lại.
- *  - Đơn mua còn mã nạp bù đang chờ (luồng mọi đơn trả bằng ví): ghi nhận vào mã nạp bù, không trả thẳng đơn,
- *    để webhook thật của mã nạp bù về sau gặp ALREADY_PROCESSED.
  *  - Webhook về sau mang mã GD đã ghi nhận qua khiếu nại: SepayGatewayService bỏ qua (RECORDED_BY_COMPLAINT).
  */
 @Service
@@ -47,7 +46,10 @@ import java.util.Map;
 @Slf4j
 public class PaymentComplaintService {
 
-    public enum Target { ORDER, WALLET }
+    public enum Target { ORDER, RETURNED }
+
+    /** Kết quả lưu trên khiếu nại khi kế toán đã chuyển trả lại khách. */
+    public static final String RETURNED_TO_CUSTOMER = "RETURNED_TO_CUSTOMER";
 
     private final PaymentComplaintRepository complaintRepository;
     private final TransactionRepository transactionRepository;
@@ -110,42 +112,46 @@ public class PaymentComplaintService {
             throw new AppException("Khiếu nại #" + complaintId + " đã được xử lý (" + c.getStatus() + ")", HttpStatus.CONFLICT);
         }
         assertNotRecordedByGateway(c);
-        Target effective = target != null ? target : (c.getOrderCode() != null ? Target.ORDER : Target.WALLET);
+        Target effective = target != null ? target : (c.getOrderCode() != null ? Target.ORDER : Target.RETURNED);
 
-        Map<String, Object> result;
+        String resultStatus;
         if (effective == Target.ORDER) {
             if (c.getOrderCode() == null) {
-                throw new AppException("Khiếu nại không có mã đơn, hãy chọn cộng vào ví", HttpStatus.BAD_REQUEST);
+                throw new AppException("Khiếu nại không có mã đơn, hãy chuyển trả lại khách", HttpStatus.BAD_REQUEST);
             }
-            String paymentCode = paymentProcessingService.resolvePaymentCode(c.getOrderCode(), c.getAmount());
-            if (!paymentCode.equals(c.getOrderCode())) {
-                note = joinNote("Ghi nhận qua mã nạp bù " + paymentCode, note);
-            }
-            result = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
-                    .content(paymentCode)
+            Map<String, Object> result = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
+                    .content(c.getOrderCode())
                     .amount(c.getAmount())
                     .referenceCode(c.getBankReference())
                     .build());
-            if ("ALREADY_PROCESSED".equals(result.get("status"))) {
+            resultStatus = String.valueOf(result.get("status"));
+            if ("ALREADY_PROCESSED".equals(resultStatus)) {
                 throw new AppException("Đơn " + c.getOrderCode() + " đã được ghi nhận trước đó. "
-                        + "Nếu sao kê có thêm khoản chuyển này, hãy chọn cộng vào ví.", HttpStatus.CONFLICT);
+                        + "Nếu sao kê có thêm khoản chuyển này, hãy chuyển trả lại khách.", HttpStatus.CONFLICT);
+            }
+            if (!"SUCCESS".equals(resultStatus)) {
+                // Rollback: không ghi nhận gì, kế toán chọn chuyển trả lại khách
+                throw new AppException(result.get("message") + ". Hãy chuyển trả lại khách.", HttpStatus.CONFLICT);
             }
         } else {
-            // Đơn còn chờ thanh toán mà cộng ví thì webhook thật về sau sẽ ghi nhận lần 2
+            // Đơn còn chờ đúng số tiền thì phải ghi vào đơn, tránh vừa trả lại vừa để webhook thật cấp quyền
             if (c.getOrderCode() != null) {
                 transactionRepository.findByGatewayTransactionId(c.getOrderCode())
-                        .filter(tx -> tx.getStatus() == TransactionStatus.PENDING && !tx.isPaymentWindowClosed(LocalDateTime.now()))
+                        .filter(tx -> tx.getStatus() == TransactionStatus.PENDING && !tx.isPaymentWindowClosed(LocalDateTime.now())
+                                && tx.getAmount().compareTo(c.getAmount()) == 0)
                         .ifPresent(tx -> {
-                            throw new AppException("Đơn " + c.getOrderCode() + " vẫn đang chờ thanh toán, hãy ghi nhận vào đơn",
+                            throw new AppException("Đơn " + c.getOrderCode() + " vẫn đang chờ đúng số tiền này, hãy ghi nhận vào đơn",
                                     HttpStatus.CONFLICT);
                         });
             }
-            result = paymentProcessingService.creditUnmatchedTransfer(c.getUserId(), c.getAmount(),
-                    "CMP-" + c.getBankReference(), "Ghi nhận khiếu nại #" + c.getComplaintId() + " (mã GD " + c.getBankReference() + ")");
+            if (note == null || note.isBlank()) {
+                throw new AppException("Nhập mã giao dịch chuyển trả lại khách vào ghi chú", HttpStatus.BAD_REQUEST);
+            }
+            resultStatus = RETURNED_TO_CUSTOMER;
         }
 
-        c.resolve(accountantId, String.valueOf(result.get("status")), note);
-        log.info("Kế toán #{} ghi nhận khiếu nại #{} -> {}", accountantId, complaintId, result.get("status"));
+        c.resolve(accountantId, resultStatus, note);
+        log.info("Kế toán #{} xử lý khiếu nại #{} -> {}", accountantId, complaintId, resultStatus);
         return ComplaintResponse.fromEntity(complaintRepository.save(c));
     }
 
@@ -162,7 +168,7 @@ public class PaymentComplaintService {
 
     /**
      * Sao kê chỉ cho biết tiền đã về ngân hàng, không cho biết hệ thống đã ghi chưa. Tra nhật ký SePay theo
-     * mã GD: webhook / đồng bộ API đã ghi tiền (đơn SUCCESS hoặc cộng ví) thì không cho ghi nhận lần 2.
+     * mã GD: webhook / đồng bộ API đã ghi tiền (đơn SUCCESS) thì không cho ghi nhận lần 2.
      */
     private void assertNotRecordedByGateway(PaymentComplaint c) {
         sepayLogRepository.findFirstByReferenceCodeAndResultStatusInOrderByReceivedAtAsc(
@@ -170,20 +176,15 @@ public class PaymentComplaintService {
                 .ifPresent(logEntry -> {
                     throw new AppException("Mã GD " + c.getBankReference() + " đã được SePay ghi nhận tự động ("
                             + logEntry.getResultStatus() + ", mã " + logEntry.getOrderCode()
-                            + "). Hãy từ chối khiếu nại và báo khách kiểm tra ví / đơn hàng.", HttpStatus.CONFLICT);
+                            + "). Hãy từ chối khiếu nại và báo khách kiểm tra đơn hàng.", HttpStatus.CONFLICT);
                 });
-        // Kế toán đã gán khoản này vào đơn / ví khi đối soát kỳ (UC054)
+        // Kế toán đã gán khoản này vào đơn / đã trả lại khách khi đối soát kỳ (UC054)
         if (reconciliationItemRepository.existsByReferenceCodeAndStatusAndActionIn(c.getBankReference(),
                 ReconciliationItem.Status.RESOLVED,
-                EnumSet.of(ReconciliationItem.Action.ASSIGN_ORDER, ReconciliationItem.Action.CREDIT_WALLET))) {
+                EnumSet.of(ReconciliationItem.Action.ASSIGN_ORDER, ReconciliationItem.Action.RETURNED_TO_CUSTOMER))) {
             throw new AppException("Mã GD " + c.getBankReference() + " đã được ghi nhận khi đối soát kỳ. "
-                    + "Hãy từ chối khiếu nại và báo khách kiểm tra ví / đơn hàng.", HttpStatus.CONFLICT);
+                    + "Hãy từ chối khiếu nại và báo khách kiểm tra đơn hàng.", HttpStatus.CONFLICT);
         }
-    }
-
-    private static String joinNote(String prefix, String note) {
-        String joined = note == null || note.isBlank() ? prefix : prefix + ". " + note.trim();
-        return joined.length() > 500 ? joined.substring(0, 500) : joined;
     }
 
     private PaymentComplaint lockComplaint(Long complaintId) {

@@ -56,7 +56,7 @@ public class PaymentComplaint {
     @Builder.Default
     private Status status = Status.OPEN;
 
-    /** Kết quả xử lý: trạng thái từ luồng webhook (SUCCESS, UNDERPAID_CREDITED_TO_WALLET, ...) hoặc CREDITED_WALLET. */
+    /** Kết quả xử lý: trạng thái từ luồng webhook (SUCCESS) hoặc RETURNED_TO_CUSTOMER (đã chuyển trả khách). */
     @Column(name = "resolution", length = 50)
     private String resolution;
 

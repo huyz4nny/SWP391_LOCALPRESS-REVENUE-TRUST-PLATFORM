@@ -62,12 +62,9 @@ import {
   ReconciliationPage,
   GeneralLedgerPage,
   PaymentPage,
-  TopUpPage,
-  WalletPage,
   PaymentComplaintPage,
   ComplaintQueuePage,
   SepayLogPage,
-  ReceivablesPage,
   DemoStorePage,
   FinanceReportsPage,
 } from '@/features/finance'
@@ -145,12 +142,10 @@ export const router = createBrowserRouter([
       { path: 'article/:slug', element: <ArticleDetailPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'premium', element: <PremiumPlansPage /> },
-      // Trang thanh toán chung & Ví LocalPress (SV4). CheckoutPage cũ của SV3 không còn route, chuyển hướng sang /payment.
+      // Trang thanh toán chung QR SePay (SV4, không ví, không giữ tiền khách). CheckoutPage cũ của SV3 chuyển hướng sang /payment.
       { path: 'checkout/:orderId', element: <LegacyCheckoutRedirect /> },
       { path: 'payment/:orderCode', element: <PaymentPage /> },
-      { path: 'wallet', element: <WalletPage /> },
-      { path: 'wallet/topup', element: <TopUpPage /> },
-      { path: 'wallet/complaints', element: <PaymentComplaintPage /> },
+      { path: 'payment-complaints', element: <PaymentComplaintPage /> },
       // Cửa hàng thử (SV4, chỉ bản dev): đóng vai SV3 tạo đơn từ server để demo luồng thanh toán
       ...(import.meta.env.DEV ? [{ path: 'dev/demo-store', element: <DemoStorePage /> }] : []),
       { path: 'payments/:paymentId', element: <PaymentResultPage /> },
@@ -321,14 +316,6 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
             <SepayLogPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'finance/receivables',
-        element: (
-          <ProtectedRoute allowedRoles={FINANCE_ROLES} subsystemName="Tài Chính & Kế Toán (SV4)">
-            <ReceivablesPage />
           </ProtectedRoute>
         ),
       },

@@ -1,6 +1,5 @@
 package com.localpress.finance.controller;
 
-import com.localpress.finance.service.AdvertiserReceivablesService;
 import com.localpress.finance.service.FinanceReconciliationService;
 import com.localpress.finance.service.RightsGrantFailureService;
 import com.localpress.shared.exception.AppException;
@@ -43,7 +42,6 @@ public class FinanceReportController {
     private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
 
     private final JdbcTemplate jdbcTemplate;
-    private final AdvertiserReceivablesService receivablesService;
     private final FinanceReconciliationService reconciliationService;
     private final RightsGrantFailureService rightsGrantFailureService;
 
@@ -51,8 +49,7 @@ public class FinanceReportController {
      * UC059: Xuất báo cáo giao dịch CSV (UTF-8 có BOM cho Excel).
      * fromDate / toDate (yyyy-MM-dd, bao gồm 2 đầu) lọc theo ngày tạo giao dịch; bỏ trống = toàn bộ.
      * Cuối file có khối tổng hợp tính đúng công thức của Dashboard / Sổ quỹ (Rule 16):
-     * tổng thu gộp = SUCCESS + REFUNDED, bỏ TOPUP và REFUND; đã hoàn = REFUND SUCCESS; thuần = gộp - hoàn;
-     * nạp ví tách riêng (công nợ phải trả khách, không phải doanh thu).
+     * tổng thu gộp = SUCCESS + REFUNDED, bỏ REFUND; đã hoàn = REFUND SUCCESS; thuần = gộp - hoàn.
      */
     @GetMapping(value = "/reports/export", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<byte[]> exportFinancialReport(
@@ -102,18 +99,16 @@ public class FinanceReportController {
                 .append(cell(to == null ? "Đến nay" : to.toString())).append('\n');
         csv.append("Mã giao dịch,Mã đơn hàng,Thời gian tạo,Loại dòng thu,Số tiền (VNĐ),Tiền tệ,Phương thức,Ngân hàng,Trạng thái,Thời gian thanh toán,Mã khách hàng,Tên khách hàng\n");
 
-        BigDecimal[] totals = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO}; // gộp, đã hoàn, nạp ví
+        BigDecimal[] totals = {BigDecimal.ZERO, BigDecimal.ZERO}; // gộp, đã hoàn
         int[] rows = {0};
         jdbcTemplate.query(sql, rs -> {
             String type = rs.getString("transaction_type");
             String status = rs.getString("status");
             BigDecimal amount = rs.getBigDecimal("amount");
-            if (("SUCCESS".equals(status) || "REFUNDED".equals(status)) && !"REFUND".equals(type) && !"TOPUP".equals(type)) {
+            if (("SUCCESS".equals(status) || "REFUNDED".equals(status)) && !"REFUND".equals(type)) {
                 totals[0] = totals[0].add(amount);
             } else if ("REFUND".equals(type) && "SUCCESS".equals(status)) {
                 totals[1] = totals[1].add(amount);
-            } else if ("TOPUP".equals(type) && "SUCCESS".equals(status)) {
-                totals[2] = totals[2].add(amount);
             }
             rows[0]++;
             csv.append(String.join(",",
@@ -138,7 +133,6 @@ public class FinanceReportController {
         csv.append("Tổng thu gộp,").append(totals[0].toPlainString()).append('\n');
         csv.append("Đã hoàn,").append(totals[1].toPlainString()).append('\n');
         csv.append("Doanh thu thuần,").append(totals[0].subtract(totals[1]).toPlainString()).append('\n');
-        csv.append("Nạp ví (công nợ phải trả khách),").append(totals[2].toPlainString()).append('\n');
 
         byte[] output = csv.toString().getBytes(StandardCharsets.UTF_8);
         String range = (from != null ? from.toString() : "dau") + "_" + (to != null ? to.toString() : "nay");
@@ -173,19 +167,15 @@ public class FinanceReportController {
                 "Có %d khiếu nại khách đã chuyển tiền nhưng chưa được ghi nhận, cần đối chiếu sao kê.",
                 "/backoffice/finance/complaints");
 
-        // 3. Công nợ quảng cáo quá hạn (cùng logic màn hình công nợ UC053)
-        addAlertIfAny(alerts, receivablesService.countOverdue(),
-                "DEBT_OVERDUE", "HIGH", "Công nợ quảng cáo B2B quá hạn",
-                "Có %d chiến dịch quảng cáo đã quá hạn nhưng chưa thanh toán đủ.",
-                "/backoffice/finance/receivables");
+        // Không có cảnh báo công nợ: doanh nghiệp quảng cáo phải trả đủ qua QR trước khi chạy, không cho nợ.
 
-        // 4. Khoản lệch đối soát tháng hiện tại chưa xử lý (UC054)
+        // 3. Khoản lệch đối soát tháng hiện tại chưa xử lý (UC054)
         addAlertIfAny(alerts, reconciliationService.currentUnresolvedCount(),
                 "RECONCILIATION_UNRESOLVED", "MEDIUM", "Khoản lệch đối soát chưa xử lý",
                 "Có %d khoản tiền giữa sao kê SePay và hệ thống chưa khớp trong kỳ này.",
                 "/backoffice/finance/reconciliation");
 
-        // 5. Tiền đã về nhưng module nguồn không cấp được quyền (RightsGrantFailedEvent, Rule 5)
+        // 4. Tiền đã về nhưng module nguồn không cấp được quyền (RightsGrantFailedEvent, Rule 5)
         long grantFailures = rightsGrantFailureService.countUnresolved();
         if (grantFailures > 0) {
             List<String> codes = rightsGrantFailureService.unresolvedOrderCodes(5);
