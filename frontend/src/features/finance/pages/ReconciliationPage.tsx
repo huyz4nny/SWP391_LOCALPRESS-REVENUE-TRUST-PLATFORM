@@ -21,7 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 const ACTION_LABEL: Record<DiscrepancyAction, string> = {
   ASSIGN_ORDER: 'Gán vào đơn',
-  CREDIT_WALLET: 'Cộng vào ví khách',
+  RETURNED_TO_CUSTOMER: 'Đã chuyển trả khách',
   EXPLAINED: 'Giải trình',
 }
 
@@ -43,7 +43,7 @@ export function ReconciliationPage() {
   const [selectedDisc, setSelectedDisc] = useState<ReconciliationDiscrepancy | null>(null)
   const [action, setAction] = useState<DiscrepancyAction>('EXPLAINED')
   const [orderCode, setOrderCode] = useState('')
-  const [userId, setUserId] = useState('')
+  const [returnReference, setReturnReference] = useState('')
   const [amount, setAmount] = useState('')
   const [resolutionNote, setResolutionNote] = useState('')
   const [resolveError, setResolveError] = useState('')
@@ -74,7 +74,7 @@ export function ReconciliationPage() {
     setSelectedDisc(d)
     setAction(d.itemType === 'BANK_NOT_RECORDED' && d.orderCode ? 'ASSIGN_ORDER' : 'EXPLAINED')
     setOrderCode(d.orderCode || '')
-    setUserId('')
+    setReturnReference('')
     setAmount('')
     setResolutionNote('')
     setResolveError('')
@@ -90,8 +90,8 @@ export function ReconciliationPage() {
         discrepancyId: selectedDisc.id,
         note: resolutionNote.trim(),
         action,
-        orderCode: action !== 'EXPLAINED' && orderCode.trim() ? orderCode.trim() : undefined,
-        userId: action === 'CREDIT_WALLET' && userId.trim() ? Number(userId) : undefined,
+        orderCode: action === 'ASSIGN_ORDER' && orderCode.trim() ? orderCode.trim() : undefined,
+        returnReference: action === 'RETURNED_TO_CUSTOMER' && returnReference.trim() ? returnReference.trim() : undefined,
         amount: amount.trim() ? Number(amount) : undefined,
       })
       setPeriod(updated)
@@ -197,7 +197,7 @@ export function ReconciliationPage() {
         <KpiStrip
           items={[
             { label: 'Sao kê (SePay báo về)', value: formatCurrency(period.totalGatewayRevenue), note: 'Tiền thực vào tài khoản ngân hàng' },
-            { label: 'Hệ thống đã ghi', value: formatCurrency(period.totalSystemRevenue), note: 'Đơn và nạp ví trả qua ngân hàng' },
+            { label: 'Hệ thống đã ghi', value: formatCurrency(period.totalSystemRevenue), note: 'Đơn đã thu qua QR SePay' },
             {
               label: 'Khoản lệch chưa xử lý',
               value: formatCurrency(period.discrepancyTotal),
@@ -288,7 +288,7 @@ export function ReconciliationPage() {
               <Label htmlFor="resAction" required>Cách xử lý</Label>
               <select id="resAction" value={action} onChange={(e) => setAction(e.target.value as DiscrepancyAction)} className={selectCls}>
                 {selectedDisc.itemType !== 'RECORDED_WITHOUT_BANK' && <option value="ASSIGN_ORDER">{ACTION_LABEL.ASSIGN_ORDER} (chạy đúng luồng webhook)</option>}
-                {selectedDisc.itemType !== 'RECORDED_WITHOUT_BANK' && <option value="CREDIT_WALLET">{ACTION_LABEL.CREDIT_WALLET}</option>}
+                {selectedDisc.itemType !== 'RECORDED_WITHOUT_BANK' && <option value="RETURNED_TO_CUSTOMER">{ACTION_LABEL.RETURNED_TO_CUSTOMER} (không giữ tiền khách)</option>}
                 <option value="EXPLAINED">{ACTION_LABEL.EXPLAINED} (không ghi tiền)</option>
               </select>
               {selectedDisc.itemType === 'RECORDED_WITHOUT_BANK' && (
@@ -298,14 +298,15 @@ export function ReconciliationPage() {
 
             {action !== 'EXPLAINED' && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="resOrder" required={action === 'ASSIGN_ORDER'}>Mã đơn</Label>
-                  <Input id="resOrder" value={orderCode} onChange={(e) => setOrderCode(e.target.value)} placeholder="LP..." />
-                </div>
-                {action === 'CREDIT_WALLET' && (
+                {action === 'ASSIGN_ORDER' ? (
                   <div>
-                    <Label htmlFor="resUser">Mã khách hàng</Label>
-                    <Input id="resUser" inputMode="numeric" value={userId} onChange={(e) => setUserId(e.target.value.replace(/\D/g, ''))} placeholder="Bỏ trống nếu đã có mã đơn" />
+                    <Label htmlFor="resOrder" required>Mã đơn</Label>
+                    <Input id="resOrder" value={orderCode} onChange={(e) => setOrderCode(e.target.value)} placeholder="LP..." />
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="resReturn" required>Mã GD chuyển trả khách</Label>
+                    <Input id="resReturn" value={returnReference} onChange={(e) => setReturnReference(e.target.value)} placeholder="FT..." required />
                   </div>
                 )}
                 {needsAmount && (

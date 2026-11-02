@@ -25,4 +25,10 @@ public class ReviewRefundRequest {
      * Ý kiến nhận xét / ghi chú kiểm soát của Kế toán trưởng.
      */
     private String reviewNotes;
+
+    /**
+     * Mã giao dịch ngân hàng của lần chuyển trả tiền về tài khoản khách (tùy chọn, ghi vào bút toán REFUND).
+     * LocalPress không có ví nên tiền hoàn luôn đi về ngân hàng của khách.
+     */
+    private String payoutReference;
 }

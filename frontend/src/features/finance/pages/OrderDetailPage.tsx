@@ -14,7 +14,6 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   SUBSCRIPTION: 'Gói độc giả',
   ARTICLE_PURCHASE: 'Bài lẻ',
   AD_CAMPAIGN: 'Quảng cáo',
-  TOPUP: 'Nạp ví',
   REFUND: 'Hoàn tiền',
 }
 

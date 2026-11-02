@@ -4,7 +4,6 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
-import { WalletBalanceButton } from '@/components/shared/WalletBalanceButton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -105,7 +104,6 @@ export function ReaderAccountLayout() {
                 Nâng cấp Premium
               </Link>
             )}
-            <WalletBalanceButton />
             <ThemeToggle />
             <Link to="/" className="hidden h-8 items-center gap-1 rounded-md px-2.5 text-[13px] text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:flex">
               <ArrowLeft className="h-3.5 w-3.5" />

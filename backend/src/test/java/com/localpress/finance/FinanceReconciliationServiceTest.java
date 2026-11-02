@@ -74,7 +74,6 @@ class FinanceReconciliationServiceTest {
     void assignOrder_runsWebhookFlow() {
         ReconciliationItem item = bankItem("15000");
         stubItem(item, period(ReconciliationPeriod.Status.OPEN));
-        when(paymentProcessingService.resolvePaymentCode(ORDER, new BigDecimal("15000"))).thenReturn(ORDER);
         when(paymentProcessingService.processSepayIpn(argThat(ipn -> ORDER.equals(ipn.resolveOrderCode())
                 && "FT777".equals(ipn.getReferenceCode()) && new BigDecimal("15000").compareTo(ipn.resolveAmount()) == 0)))
                 .thenReturn(Map.of("status", "SUCCESS"));
@@ -105,11 +104,10 @@ class FinanceReconciliationServiceTest {
     }
 
     @Test
-    @DisplayName("Gán vào đơn đã thanh toán -> 409, gợi ý cộng ví; khoản lệch vẫn mở")
+    @DisplayName("Gán vào đơn đã thanh toán -> 409, gợi ý chuyển trả khách; khoản lệch vẫn mở")
     void assignOrder_alreadyPaid() {
         ReconciliationItem item = bankItem("15000");
         stubItem(item, period(ReconciliationPeriod.Status.OPEN));
-        when(paymentProcessingService.resolvePaymentCode(any(), any())).thenReturn(ORDER);
         when(paymentProcessingService.processSepayIpn(any())).thenReturn(Map.of("status", "ALREADY_PROCESSED"));
 
         AppException ex = assertThrows(AppException.class,
@@ -120,46 +118,47 @@ class FinanceReconciliationServiceTest {
     }
 
     @Test
-    @DisplayName("SePay không báo số tiền: cộng ví bắt buộc nhập số tiền theo sao kê (400)")
-    void creditWallet_missingAmountNeedsStatementAmount() {
+    @DisplayName("SePay không báo số tiền: gán vào đơn bắt buộc nhập số tiền theo sao kê (400)")
+    void assignOrder_missingAmountNeedsStatementAmount() {
         ReconciliationItem item = bankItem("0");
         stubItem(item, period(ReconciliationPeriod.Status.OPEN));
-        ResolveDiscrepancyRequest req = request("CREDIT_WALLET", null);
-        req.setUserId(6L);
 
-        AppException ex = assertThrows(AppException.class, () -> service.resolveDiscrepancy(req, 3L));
+        AppException ex = assertThrows(AppException.class,
+                () -> service.resolveDiscrepancy(request("ASSIGN_ORDER", ORDER), 3L));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        verify(paymentProcessingService, never()).creditUnmatchedTransfer(any(), any(), any(), any());
+        verify(paymentProcessingService, never()).processSepayIpn(any());
     }
 
     @Test
-    @DisplayName("Cộng ví: dùng mã REC-{mã GD}, số tiền nhập theo sao kê được lưu lại vào khoản lệch")
-    void creditWallet_usesRecCode() {
-        ReconciliationItem item = bankItem("0");
+    @DisplayName("Đã chuyển trả khách: bắt buộc mã GD chuyển trả, lưu vào action_ref, không chạy luồng tiền")
+    void returnedToCustomer_recordsPayoutReference() {
+        ReconciliationItem item = bankItem("20000");
         stubItem(item, period(ReconciliationPeriod.Status.OPEN));
-        when(jdbcTemplate.queryForObject(startsWith("SELECT COUNT(*) FROM users"), eq(Integer.class), eq(6L))).thenReturn(1);
-        when(paymentProcessingService.creditUnmatchedTransfer(eq(6L), eq(new BigDecimal("20000")), eq("REC-FT777"), anyString()))
-                .thenReturn(Map.of("status", "CREDITED_WALLET"));
-        ResolveDiscrepancyRequest req = request("CREDIT_WALLET", null);
-        req.setUserId(6L);
-        req.setAmount(new BigDecimal("20000"));
 
+        AppException noRef = assertThrows(AppException.class,
+                () -> service.resolveDiscrepancy(request("RETURNED_TO_CUSTOMER", null), 3L));
+        assertEquals(HttpStatus.BAD_REQUEST, noRef.getStatus());
+
+        ResolveDiscrepancyRequest req = request("RETURNED_TO_CUSTOMER", null);
+        req.setReturnReference("ft999");
         service.resolveDiscrepancy(req, 3L);
 
-        assertEquals("CREDITED_WALLET", item.getActionResult());
-        assertEquals(0, new BigDecimal("20000").compareTo(item.getAmount()));
+        assertEquals(ReconciliationItem.Status.RESOLVED, item.getStatus());
+        assertEquals(ReconciliationItem.Action.RETURNED_TO_CUSTOMER, item.getAction());
+        assertEquals("FT999", item.getActionRef());
+        verify(paymentProcessingService, never()).processSepayIpn(any());
     }
 
     @Test
-    @DisplayName("Khoản ghi theo khiếu nại chỉ được giải trình, không gán đơn / cộng ví lần nữa (400)")
+    @DisplayName("Khoản ghi theo khiếu nại chỉ được giải trình, không gán đơn / trả lại lần nữa (400)")
     void recordedWithoutBank_onlyExplain() {
         ReconciliationItem item = bankItem("15000");
         item.setItemType(ReconciliationItem.Type.RECORDED_WITHOUT_BANK);
         stubItem(item, period(ReconciliationPeriod.Status.OPEN));
 
         AppException ex = assertThrows(AppException.class,
-                () -> service.resolveDiscrepancy(request("CREDIT_WALLET", ORDER), 3L));
+                () -> service.resolveDiscrepancy(request("RETURNED_TO_CUSTOMER", ORDER), 3L));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }

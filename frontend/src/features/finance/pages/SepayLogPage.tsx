@@ -27,11 +27,11 @@ const SOURCE_LABEL: Record<SepayLog['source'], string> = {
 
 const RESULT: Record<string, [string, NonNullable<BadgeProps['variant']>]> = {
   SUCCESS: ['Đã ghi nhận', 'success'],
-  EXCESS: ['Đủ, phần dư vào ví', 'success'],
   ALREADY_PROCESSED: ['Đã ghi nhận trước đó', 'secondary'],
   DUPLICATE_DELIVERY: ['SePay gửi lại, bỏ qua', 'secondary'],
-  UNDERPAID_CREDITED_TO_WALLET: ['Chuyển thiếu, vào ví', 'warning'],
-  LATE_PAYMENT_CREDITED_TO_WALLET: ['Về muộn, vào ví', 'warning'],
+  AMOUNT_MISMATCH: ['Sai số tiền, chờ trả lại', 'warning'],
+  LATE_PAYMENT: ['Về muộn, chờ trả lại', 'warning'],
+  AMOUNT_MISSING: ['Thiếu số tiền', 'warning'],
   ORDER_NOT_FOUND: ['Không khớp đơn', 'warning'],
   IGNORED_OUTGOING: ['Tiền ra, bỏ qua', 'secondary'],
   INVALID_SIGNATURE: ['Sai khóa, từ chối', 'destructive'],
@@ -92,7 +92,7 @@ export function SepayLogPage() {
 
   const real = logs.filter((l) => l.source !== 'SIMULATION' && l.authOk)
   const realTotal = real
-    .filter((l) => ['SUCCESS', 'EXCESS', 'UNDERPAID_CREDITED_TO_WALLET', 'LATE_PAYMENT_CREDITED_TO_WALLET'].includes(l.resultStatus))
+    .filter((l) => l.resultStatus === 'SUCCESS')
     .reduce((a, l) => a + (l.amount ?? 0), 0)
 
   return (

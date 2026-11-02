@@ -62,7 +62,7 @@ public class RefundCompletedEvent {
     /** true khi tổng đã hoàn >= số tiền đã trả (đơn gốc chuyển REFUNDED). */
     private boolean fullRefund;
 
-    /** Phương thức của đơn gốc: WALLET (đã hoàn vào ví) hoặc SEPAY (chuyển trả ngoài hệ thống). */
+    /** Phương thức của đơn gốc (SEPAY); tiền hoàn luôn được kế toán chuyển trả về tài khoản ngân hàng của khách. */
     private String paymentMethod;
 
     /** Lý do hoàn do kế toán nhập. */
