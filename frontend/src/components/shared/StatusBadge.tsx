@@ -59,6 +59,9 @@ const STATUS_MAP: Record<StatusType, Record<string, [string, Variant]>> = {
     IN_REVIEW: ['Chờ duyệt banner', 'warning'],
     CHANGES_REQUESTED: ['Cần sửa banner', 'destructive'],
     APPROVED: ['Banner đã duyệt', 'success'],
+    // Backend trả review_status của ad_creatives: PENDING / APPROVED / REJECTED
+    PENDING: ['Chờ duyệt banner', 'warning'],
+    REJECTED: ['Banner bị từ chối', 'destructive'],
   },
   refund: {
     REQUESTED: ['Chờ kế toán trưởng duyệt', 'warning'],

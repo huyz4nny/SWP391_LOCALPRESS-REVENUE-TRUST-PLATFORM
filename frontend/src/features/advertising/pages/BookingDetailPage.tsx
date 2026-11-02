@@ -138,6 +138,8 @@ export function BookingDetailPage() {
   }
 
   const activeCreative = campaign?.creatives.find((c) => c.isActiveServing)
+  // isActiveServing = bản APPROVED mới nhất (Rule 8). Chỉ gọi là "đang phát" khi campaign thật sự ACTIVE (Rule 9, SV5).
+  const isLive = booking?.deliveryStatus === 'LIVE'
 
   return (
     <div className="space-y-6">
@@ -265,7 +267,7 @@ export function BookingDetailPage() {
             <p className="text-amber-800">
               {booking.paymentStatus === 'PENDING'
                 ? 'Hệ thống chỉ ghi nhận khi cổng thanh toán xác nhận. Nếu đã chuyển tiền, bấm kiểm tra lại; đơn cũ được dùng lại, không phải trả lần hai.'
-                : 'Bạn đã xác nhận báo giá. Bấm nút để mở trang thanh toán (QR hoặc ví LocalPress).'}
+                : 'Bạn đã xác nhận báo giá. Bấm nút để mở trang thanh toán (quét QR SePay).'}
               {booking.holdExpiresAt && <> Giữ chỗ đến <strong>{formatDateTime(booking.holdExpiresAt)}</strong>.</>}
             </p>
           </div>
@@ -350,7 +352,9 @@ export function BookingDetailPage() {
                 </div>
 
                 <div>
-                  <span className="text-slate-500 font-medium block mb-1">Banner đang phát trực tiếp:</span>
+                  <span className="text-slate-500 font-medium block mb-1">
+                    {isLive ? 'Banner đang phát trực tiếp:' : 'Banner sẽ phát (bản đã duyệt mới nhất):'}
+                  </span>
                   {activeCreative ? (
                     <div className="rounded-lg border border-slate-200 p-2 bg-slate-50">
                       <img
@@ -372,7 +376,7 @@ export function BookingDetailPage() {
                     </div>
                   ) : (
                     <div className="p-4 bg-stone-50 border border-dashed border-stone-200 text-center text-stone-500 text-xs rounded-lg">
-                      Chưa có banner nào được duyệt phát trực tiếp.
+                      Chưa có banner nào được duyệt.
                     </div>
                   )}
                 </div>
@@ -434,7 +438,7 @@ export function BookingDetailPage() {
                           </span>
                           {cr.isActiveServing && (
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                              ✓ Đang phát (LIVE)
+                              {isLive ? '✓ Đang phát (LIVE)' : '✓ Bản sẽ phát'}
                             </span>
                           )}
                         </div>

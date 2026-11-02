@@ -5,7 +5,6 @@ import { advertisingApi } from '../api'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { PlusCircle } from 'lucide-react'
-import { APP_CONFIG } from '@/app/config'
 import { EmptyState } from '@/components/shared/EmptyState'
 
 export function AdSlotsExplorerPage() {
@@ -89,7 +88,7 @@ export function AdSlotsExplorerPage() {
                 </div>
               </div>
 
-              {APP_CONFIG.useMockApi && slot.pricingType !== 'CPM' && slot.pricingType !== 'CPC' &&
+              {slot.pricingType !== 'CPM' && slot.pricingType !== 'CPC' &&
                 <div className="mt-6 pt-4 border-t border-slate-100">
                   <Link to={`/advertiser/bookings/new?slotId=${slot.id}`} className="block">
                     <Button className="w-full text-xs font-bold">
