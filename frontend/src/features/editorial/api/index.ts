@@ -14,6 +14,7 @@ import type {
   CampaignEligibility,
   CampaignControl,
   EditorialContract,
+  CreateContractRequest,
   UpdateContractRequest,
   CreateContractAddendumRequest,
   AdvertiserVip,
@@ -199,8 +200,23 @@ export const editorialApi = {
     const res = await httpClient.get<any>('/editorial/contracts')
     return (res?.data ?? res) as EditorialContract[]
   },
-  updateContract: async (id: number | string, contractReference: string, contractFileUrl?: string): Promise<EditorialContract> => {
-    const res = await httpClient.put<any>(`/editorial/contracts/${id}`, { contractReference, contractFileUrl })
+  createContract: async (data: CreateContractRequest): Promise<EditorialContract> => {
+    const res = await httpClient.post<any>('/editorial/contracts', data)
+    return (res?.data ?? res) as EditorialContract
+  },
+  updateContract: async (
+    id: number | string,
+    contractReference: string,
+    contractFileUrl?: string,
+    signingDate?: string,
+    contractValue?: number
+  ): Promise<EditorialContract> => {
+    const res = await httpClient.put<any>(`/editorial/contracts/${id}`, {
+      contractReference,
+      contractFileUrl,
+      signingDate,
+      contractValue,
+    })
     return (res?.data ?? res) as EditorialContract
   },
   createContractAddendum: async (id: number | string, data: CreateContractAddendumRequest): Promise<EditorialContract> => {

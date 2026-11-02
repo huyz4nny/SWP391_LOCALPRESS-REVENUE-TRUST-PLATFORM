@@ -741,6 +741,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   if (pathname === '/editorial/contracts' && method === 'GET') {
     const state = mockStore.getState()
     return state.campaigns.map((camp, idx) => ({
+      contractId: idx + 1,
       campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
       advertiserId: 1,
       companyName: camp.companyName || 'Công ty CP Logistics Cảng Hải Phòng',
@@ -752,6 +753,8 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       slotCode: camp.slotId?.toUpperCase() || 'SLOT-TOP-LEADERBOARD',
       slotName: camp.slotName || 'Leaderboard Đầu Trang',
       contractReference: `HD-2026-DV-00${idx + 1}`,
+      contractNumber: `HD-2026-DV-00${idx + 1}`,
+      signingDate: '2026-08-25',
       contractFileUrl: `https://example.com/contracts/HD-2026-DV-00${idx + 1}.pdf`,
       contractValue: camp.totalBudget,
       startDate: camp.startDate,
@@ -759,6 +762,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       quotationStatus: 'ACCEPTED',
       paymentStatus: 'PAID',
       status: camp.status,
+      contractStatus: 'SIGNED',
       addendums: [
         {
           addendumId: 1,
@@ -770,6 +774,40 @@ export async function handleMockRequest(method: string, url: string, body?: any)
           createdAt: '2026-09-18T10:00:00Z',
         }
       ],
+    }))
+  }
+
+  // Tạo mới hợp đồng (UC019)
+  if (pathname === '/editorial/contracts' && method === 'POST') {
+    return {
+      contractId: Date.now(),
+      campaignId: Number(body.campaignId) || 1,
+      contractNumber: body.contractNumber,
+      contractReference: body.contractNumber,
+      signingDate: body.signingDate,
+      contractValue: Number(body.contractValue),
+      contractFileUrl: body.contractFileUrl,
+      status: 'SIGNED',
+      contractStatus: 'SIGNED',
+      addendums: [],
+    }
+  }
+
+  // API cho Doanh nghiệp xem hợp đồng của mình (SV1 - UC012)
+  if (pathname === '/advertiser/contracts' && method === 'GET') {
+    const state = mockStore.getState()
+    return state.campaigns.map((camp, idx) => ({
+      contractId: idx + 1,
+      campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
+      campaignName: camp.name,
+      contractNumber: `HD-2026-DV-00${idx + 1}`,
+      signingDate: '2026-08-25',
+      contractValue: camp.totalBudget,
+      contractFileUrl: `https://example.com/contracts/HD-2026-DV-00${idx + 1}.pdf`,
+      status: 'SIGNED',
+      slotName: camp.slotName || 'Leaderboard Đầu Trang',
+      startDate: camp.startDate,
+      endDate: camp.endDate,
     }))
   }
 
@@ -795,6 +833,8 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       campaignId: Number(id) || 1,
       contractReference: body.contractReference,
       contractFileUrl: body.contractFileUrl,
+      signingDate: body.signingDate || '2026-08-25',
+      contractValue: body.contractValue,
     }
   }
 

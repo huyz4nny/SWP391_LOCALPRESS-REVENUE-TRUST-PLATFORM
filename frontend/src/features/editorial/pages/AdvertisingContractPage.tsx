@@ -46,7 +46,19 @@ export const AdvertisingContractPage: React.FC = () => {
   const [editContractTarget, setEditContractTarget] = useState<EditorialContract | null>(null)
   const [contractRefInput, setContractRefInput] = useState('')
   const [contractUrlInput, setContractUrlInput] = useState('')
+  const [editSigningDate, setEditSigningDate] = useState('')
+  const [editContractValue, setEditContractValue] = useState<number | ''>('')
   const [isUpdatingContract, setIsUpdatingContract] = useState(false)
+
+  // Create Contract modal states
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [newCampaignId, setNewCampaignId] = useState<number | ''>('')
+  const [newContractNumber, setNewContractNumber] = useState('')
+  const [newSigningDate, setNewSigningDate] = useState(new Date().toISOString().slice(0, 10))
+  const [newContractValue, setNewContractValue] = useState<number | ''>('')
+  const [newContractUrl, setNewContractUrl] = useState('')
+  const [newNotes, setNewNotes] = useState('')
+  const [isCreatingContract, setIsCreatingContract] = useState(false)
 
   const [addendumTarget, setAddendumTarget] = useState<EditorialContract | null>(null)
   const [addendumNumber, setAddendumNumber] = useState('')
@@ -93,7 +105,9 @@ export const AdvertisingContractPage: React.FC = () => {
       await editorialApi.updateContract(
         editContractTarget.campaignId,
         contractRefInput.trim(),
-        contractUrlInput.trim() || undefined
+        contractUrlInput.trim() || undefined,
+        editSigningDate || undefined,
+        editContractValue ? Number(editContractValue) : undefined
       )
       setSuccessMsg(`Cập nhật hợp đồng #${contractRefInput.trim()} thành công!`)
       setEditContractTarget(null)
@@ -103,6 +117,39 @@ export const AdvertisingContractPage: React.FC = () => {
       setError(err?.message || 'Không thể cập nhật hợp đồng')
     } finally {
       setIsUpdatingContract(false)
+    }
+  }
+
+  // Handle Contract Create
+  const handleCreateContract = async () => {
+    if (!newCampaignId || !newContractNumber.trim() || !newSigningDate || !newContractValue) {
+      setError('Vui lòng điền đầy đủ: Chiến dịch, Số hiệu hợp đồng, Ngày ký và Giá trị hợp đồng')
+      return
+    }
+    try {
+      setIsCreatingContract(true)
+      setError(null)
+      await editorialApi.createContract({
+        campaignId: Number(newCampaignId),
+        contractNumber: newContractNumber.trim(),
+        signingDate: newSigningDate,
+        contractValue: Number(newContractValue),
+        contractFileUrl: newContractUrl.trim() || undefined,
+        notes: newNotes.trim() || undefined,
+      })
+      setSuccessMsg(`Tạo mới hợp đồng #${newContractNumber.trim()} thành công!`)
+      setIsCreateModalOpen(false)
+      setNewCampaignId('')
+      setNewContractNumber('')
+      setNewContractValue('')
+      setNewContractUrl('')
+      setNewNotes('')
+      await loadData()
+      setTimeout(() => setSuccessMsg(null), 5000)
+    } catch (err: any) {
+      setError(err?.message || 'Không thể tạo hợp đồng mới')
+    } finally {
+      setIsCreatingContract(false)
     }
   }
 
@@ -228,14 +275,31 @@ export const AdvertisingContractPage: React.FC = () => {
             Lưu trữ mã số hợp đồng pháp lý, số hóa file PDF, quản lý phụ lục thay đổi và thiết lập chiết khấu VIP
           </p>
         </div>
-        <button
-          onClick={loadData}
-          disabled={isLoading}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Làm mới
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              setIsCreateModalOpen(true)
+              if (contracts.length > 0) {
+                const target = contracts.find((c) => !c.contractNumber && !c.contractReference) || contracts[0]
+                setNewCampaignId(target.campaignId)
+                setNewContractValue(target.contractValue || '')
+                setNewContractNumber(`HD-2026-DV-00${target.campaignId}`)
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-800 transition-colors"
+          >
+            <FilePlus className="h-4 w-4" />
+            Tạo hợp đồng mới
+          </button>
+          <button
+            onClick={loadData}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -315,6 +379,7 @@ export const AdvertisingContractPage: React.FC = () => {
                 <tr>
                   <th className="px-4 py-3">Số hợp đồng & File</th>
                   <th className="px-4 py-3">Chiến dịch & Doanh nghiệp</th>
+                  <th className="px-4 py-3">Ngày ký</th>
                   <th className="px-4 py-3">Vị trí & Thời gian</th>
                   <th className="px-4 py-3">Giá trị hợp đồng</th>
                   <th className="px-4 py-3 text-center">Phụ lục</th>
@@ -325,14 +390,14 @@ export const AdvertisingContractPage: React.FC = () => {
               <tbody className="divide-y divide-slate-200">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
                       <RefreshCw className="mx-auto h-6 w-6 animate-spin text-primary-600" />
                       <p className="mt-2 text-sm">Đang tải hồ sơ hợp đồng quảng cáo...</p>
                     </td>
                   </tr>
                 ) : filteredContracts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
                       <FileText className="mx-auto h-10 w-10 text-slate-300" />
                       <p className="mt-2 text-base font-medium text-slate-700">Chưa có hợp đồng nào</p>
                     </td>
@@ -369,6 +434,16 @@ export const AdvertisingContractPage: React.FC = () => {
                         </div>
                         <div className="mt-0.5 text-xs text-slate-400">
                           LH: {c.contactPerson} ({c.contactPhone})
+                        </div>
+                      </td>
+
+                      {/* Signing Date */}
+                      <td className="px-4 py-3 text-xs">
+                        <div className="font-semibold text-slate-800">
+                          {c.signingDate ? formatDate(c.signingDate) : formatDate(c.startDate)}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-slate-400">
+                          Ký kết pháp lý
                         </div>
                       </td>
 
@@ -416,11 +491,13 @@ export const AdvertisingContractPage: React.FC = () => {
                           <button
                             onClick={() => {
                               setEditContractTarget(c)
-                              setContractRefInput(c.contractReference || '')
+                              setContractRefInput(c.contractReference || c.contractNumber || '')
                               setContractUrlInput(c.contractFileUrl || '')
+                              setEditSigningDate(c.signingDate || c.startDate || new Date().toISOString().slice(0, 10))
+                              setEditContractValue(c.contractValue || '')
                             }}
                             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            title="Chỉnh sửa số hợp đồng và link PDF"
+                            title="Chỉnh sửa số hợp đồng, ngày ký, giá trị và link PDF"
                           >
                             <Edit3 className="h-3.5 w-3.5" />
                             Sửa
@@ -564,9 +641,6 @@ export const AdvertisingContractPage: React.FC = () => {
                 <p className="mt-0.5">
                   Khách hàng: <span className="font-semibold">{editContractTarget.companyName}</span>
                 </p>
-                <p className="mt-0.5">
-                  Giá trị: <span className="font-bold text-primary-900">{formatCurrency(editContractTarget.contractValue)}</span>
-                </p>
               </div>
 
               <div>
@@ -580,6 +654,32 @@ export const AdvertisingContractPage: React.FC = () => {
                   placeholder="Ví dụ: HD-2026-DV-001"
                   className="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Ngày ký hợp đồng <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editSigningDate}
+                    onChange={(e) => setEditSigningDate(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Giá trị hợp đồng (VNĐ)
+                  </label>
+                  <input
+                    type="number"
+                    value={editContractValue}
+                    onChange={(e) => setEditContractValue(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="45000000"
+                    className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                </div>
               </div>
 
               <div>
@@ -611,6 +711,137 @@ export const AdvertisingContractPage: React.FC = () => {
               >
                 {isUpdatingContract && <RefreshCw className="h-4 w-4 animate-spin" />}
                 Lưu hồ sơ hợp đồng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Contract Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <FilePlus className="h-5 w-5 text-primary-900" />
+                <h3 className="text-lg font-bold text-slate-900">Tạo Mới Hồ Sơ Hợp Đồng Quảng Cáo</h3>
+              </div>
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Chọn chiến dịch quảng cáo <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={newCampaignId}
+                  onChange={(e) => {
+                    const cid = Number(e.target.value)
+                    setNewCampaignId(cid)
+                    const camp = contracts.find((c) => c.campaignId === cid)
+                    if (camp) {
+                      setNewContractValue(camp.contractValue || '')
+                      setNewContractNumber(`HD-2026-DV-00${cid}`)
+                    }
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                >
+                  <option value="">-- Chọn chiến dịch cần ký hợp đồng --</option>
+                  {contracts.map((c) => (
+                    <option key={c.campaignId} value={c.campaignId}>
+                      #{c.campaignId} - {c.campaignName} ({c.companyName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Số hiệu hợp đồng chính thức <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newContractNumber}
+                  onChange={(e) => setNewContractNumber(e.target.value)}
+                  placeholder="Ví dụ: HD-2026-DV-001"
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Ngày ký kết pháp lý <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newSigningDate}
+                    onChange={(e) => setNewSigningDate(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Giá trị hợp đồng (VNĐ) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={newContractValue}
+                    onChange={(e) => setNewContractValue(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="45000000"
+                    className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  File hợp đồng số hóa (PDF URL)
+                </label>
+                <input
+                  type="url"
+                  value={newContractUrl}
+                  onChange={(e) => setNewContractUrl(e.target.value)}
+                  placeholder="https://example.com/contracts/HD-2026-DV-001.pdf"
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Ghi chú điều khoản / Nghiệm thu
+                </label>
+                <textarea
+                  rows={2}
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  placeholder="Ghi chú thêm về điều khoản thanh toán, nghiệm thu bàn giao..."
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                disabled={isCreatingContract}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleCreateContract}
+                disabled={isCreatingContract || !newCampaignId || !newContractNumber.trim() || !newSigningDate}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-800 disabled:opacity-50"
+              >
+                {isCreatingContract && <RefreshCw className="h-4 w-4 animate-spin" />}
+                Xác nhận tạo hợp đồng
               </button>
             </div>
           </div>

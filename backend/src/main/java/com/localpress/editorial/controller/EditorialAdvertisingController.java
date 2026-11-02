@@ -6,6 +6,7 @@ import com.localpress.shared.constant.AppConstants;
 import com.localpress.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -217,6 +218,20 @@ public class EditorialAdvertisingController {
     public ResponseEntity<ApiResponse<List<EditorialContractDto>>> getContracts() {
         List<EditorialContractDto> list = advertisingService.getContracts();
         return ResponseEntity.ok(ApiResponse.ok("Lấy danh sách hợp đồng thành công", list));
+    }
+
+    /**
+     * POST /api/v1/editorial/contracts
+     * Tạo mới hồ sơ hợp đồng quảng cáo B2B (UC019) với đầy đủ: số hợp đồng, ngày ký, giá trị, file đính kèm.
+     */
+    @PostMapping("/contracts")
+    public ResponseEntity<ApiResponse<EditorialContractDto>> createContract(
+            @Valid @RequestBody CreateContractRequest request,
+            Authentication auth
+    ) {
+        String email = auth != null ? auth.getName() : null;
+        EditorialContractDto created = advertisingService.createContract(request, email);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Tạo hồ sơ hợp đồng thành công", created));
     }
 
     /**

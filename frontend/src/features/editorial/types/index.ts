@@ -79,6 +79,7 @@ export interface ContractAddendum {
 }
 
 export interface EditorialContract {
+  contractId?: number
   campaignId: number
   advertiserId: number
   companyName: string
@@ -90,6 +91,8 @@ export interface EditorialContract {
   slotCode: string
   slotName: string
   contractReference: string | null
+  contractNumber?: string | null
+  signingDate?: string
   contractFileUrl: string | null
   contractValue: number
   startDate: string
@@ -97,12 +100,24 @@ export interface EditorialContract {
   quotationStatus: string
   paymentStatus: string
   status: string
+  contractStatus?: string
   addendums: ContractAddendum[]
+}
+
+export interface CreateContractRequest {
+  campaignId: number
+  contractNumber: string
+  signingDate: string
+  contractValue: number
+  contractFileUrl?: string
+  notes?: string
 }
 
 export interface UpdateContractRequest {
   contractReference: string
   contractFileUrl?: string
+  signingDate?: string
+  contractValue?: number
 }
 
 export interface CreateContractAddendumRequest {

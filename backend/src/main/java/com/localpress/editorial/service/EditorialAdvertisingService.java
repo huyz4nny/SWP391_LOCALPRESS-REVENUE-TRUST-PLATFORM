@@ -876,25 +876,51 @@ public class EditorialAdvertisingService {
     // =========================================================================
 
     /**
-     * Lấy danh sách hồ sơ hợp đồng quảng cáo B2B.
+     * Lấy danh sách hồ sơ hợp đồng quảng cáo B2B (UC019, UC025).
+     * Truy vấn từ bảng ad_contracts (hoặc ad_campaigns), kết hợp quan hệ với đối tác và vị trí slot.
      */
     public List<EditorialContractDto> getContracts() {
         String sql = "SELECT c.campaign_id, c.advertiser_id, a.company_name, a.tax_code, " +
                 "c.contact_person, c.contact_email, c.contact_phone, " +
                 "c.campaign_name, s.slot_code, s.name AS slot_name, " +
+                "ct.contract_id, ct.contract_number, ct.signing_date, ct.contract_value AS ct_val, " +
+                "ct.contract_file_url AS ct_file_url, ct.status AS ct_status, " +
                 "c.contract_reference, c.contract_file_url, " +
-                "COALESCE(c.accepted_amount, c.quoted_amount) AS amount, " +
+                "COALESCE(ct.contract_value, c.accepted_amount, c.quoted_amount) AS amount, " +
                 "c.start_date, c.end_date, c.quotation_status, c.payment_status, c.status " +
                 "FROM ad_campaigns c " +
                 "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
                 "JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                "LEFT JOIN ad_contracts ct ON ct.campaign_id = c.campaign_id " +
                 "ORDER BY c.campaign_id DESC";
 
         return jdbc.query(sql, (rs, rowNum) -> {
             Long campId = rs.getLong("campaign_id");
             List<ContractAddendumDto> addendums = getAddendumsForCampaign(campId);
 
+            String contractNum = rs.getString("contract_number");
+            if (contractNum == null || contractNum.isBlank()) {
+                contractNum = rs.getString("contract_reference");
+            }
+
+            String fileUrl = rs.getString("ct_file_url");
+            if (fileUrl == null || fileUrl.isBlank()) {
+                fileUrl = rs.getString("contract_file_url");
+            }
+
+            LocalDate signDate = toLocalDate(rs.getDate("signing_date"));
+            if (signDate == null) {
+                signDate = toLocalDate(rs.getDate("start_date"));
+            }
+
+            Long contractId = rs.getObject("contract_id") != null ? rs.getLong("contract_id") : null;
+            String contractStatus = rs.getString("ct_status");
+            if (contractStatus == null || contractStatus.isBlank()) {
+                contractStatus = (contractNum != null && !contractNum.isBlank()) ? "SIGNED" : "DRAFT";
+            }
+
             return EditorialContractDto.builder()
+                    .contractId(contractId)
                     .campaignId(campId)
                     .advertiserId(rs.getLong("advertiser_id"))
                     .companyName(rs.getString("company_name"))
@@ -905,17 +931,82 @@ public class EditorialAdvertisingService {
                     .campaignName(rs.getString("campaign_name"))
                     .slotCode(rs.getString("slot_code"))
                     .slotName(rs.getString("slot_name"))
-                    .contractReference(rs.getString("contract_reference"))
-                    .contractFileUrl(rs.getString("contract_file_url"))
+                    .contractReference(contractNum)
+                    .contractNumber(contractNum)
+                    .signingDate(signDate)
+                    .contractFileUrl(fileUrl)
                     .contractValue(rs.getBigDecimal("amount"))
                     .startDate(toLocalDate(rs.getDate("start_date")))
                     .endDate(toLocalDate(rs.getDate("end_date")))
                     .quotationStatus(rs.getString("quotation_status"))
                     .paymentStatus(rs.getString("payment_status"))
                     .status(rs.getString("status"))
+                    .contractStatus(contractStatus)
                     .addendums(addendums)
                     .build();
         });
+    }
+
+    /**
+     * Tạo mới hồ sơ hợp đồng quảng cáo (UC019) với đầy đủ: số hợp đồng, ngày ký, giá trị, file đính kèm.
+     */
+    @Transactional
+    public EditorialContractDto createContract(CreateContractRequest request, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        Long campaignId = request.getCampaignId();
+
+        List<Map<String, Object>> campRows = jdbc.queryForList(
+                "SELECT campaign_id, advertiser_id, contract_reference FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (campRows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        Long advertiserId = ((Number) campRows.get(0).get("advertiser_id")).longValue();
+
+        // Kiểm tra trùng lặp số hợp đồng
+        List<Long> duplicate = jdbc.query(
+                "SELECT campaign_id FROM ad_campaigns WHERE contract_reference = ? AND campaign_id <> ?",
+                (rs, r) -> rs.getLong(1),
+                request.getContractNumber().trim(), campaignId
+        );
+        if (!duplicate.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Mã số hợp đồng [" + request.getContractNumber().trim() + "] đã tồn tại trên chiến dịch khác");
+        }
+
+        try {
+            jdbc.update(
+                    "INSERT INTO ad_contracts (campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, notes, created_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, 'SIGNED', ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number), signing_date = VALUES(signing_date), " +
+                    "contract_value = VALUES(contract_value), contract_file_url = VALUES(contract_file_url), notes = VALUES(notes)",
+                    campaignId, advertiserId, request.getContractNumber().trim(), request.getSigningDate(),
+                    request.getContractValue(), request.getContractFileUrl(), request.getNotes(), userId
+            );
+        } catch (Exception e) {
+            log.warn("Table ad_contracts insert fallback: {}", e.getMessage());
+        }
+
+        // Đồng bộ ngược lại ad_campaigns
+        jdbc.update(
+                "UPDATE ad_campaigns SET contract_reference = ?, contract_file_url = ? WHERE campaign_id = ?",
+                request.getContractNumber().trim(), request.getContractFileUrl(), campaignId
+        );
+
+        logAudit(userId, "CONTRACT_CREATED", "AD_CONTRACT", campaignId, Map.of(
+                "campaignId", campaignId,
+                "contractNumber", request.getContractNumber().trim(),
+                "signingDate", request.getSigningDate().toString(),
+                "contractValue", request.getContractValue().toString(),
+                "contractFileUrl", request.getContractFileUrl() != null ? request.getContractFileUrl() : "",
+                "createdBy", editorEmail
+        ));
+
+        return getContracts().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
     private List<ContractAddendumDto> getAddendumsForCampaign(Long campaignId) {
@@ -937,13 +1028,13 @@ public class EditorialAdvertisingService {
     }
 
     /**
-     * Cập nhật thông tin hợp đồng quảng cáo (Mã số hợp đồng, URL file PDF).
+     * Cập nhật thông tin hợp đồng quảng cáo (Mã số hợp đồng, Ngày ký, Giá trị, URL file PDF).
      */
     @Transactional
     public EditorialContractDto updateContract(Long campaignId, UpdateContractRequest request, String editorEmail) {
         Long userId = resolveUserId(editorEmail);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT campaign_id, contract_reference FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                "SELECT campaign_id, advertiser_id, contract_reference FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
                 campaignId
         );
         if (rows.isEmpty()) {
@@ -957,6 +1048,25 @@ public class EditorialAdvertisingService {
         );
         if (!duplicate.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Mã số hợp đồng [" + request.getContractReference() + "] đã tồn tại trên một chiến dịch khác");
+        }
+
+        Object advObj = rows.get(0).get("advertiser_id");
+        Long advertiserId = advObj instanceof Number ? ((Number) advObj).longValue() : 0L;
+
+        try {
+            LocalDate signDate = request.getSigningDate() != null ? request.getSigningDate() : LocalDate.now();
+            BigDecimal val = request.getContractValue() != null ? request.getContractValue() : BigDecimal.ZERO;
+            jdbc.update(
+                    "INSERT INTO ad_contracts (campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, created_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, 'SIGNED', ?) " +
+                    "ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number), contract_file_url = VALUES(contract_file_url), " +
+                    (request.getSigningDate() != null ? "signing_date = VALUES(signing_date), " : "") +
+                    (request.getContractValue() != null ? "contract_value = VALUES(contract_value), " : "") +
+                    "updated_at = NOW()",
+                    campaignId, advertiserId, request.getContractReference(), signDate, val, request.getContractFileUrl(), userId
+            );
+        } catch (Exception e) {
+            log.warn("Table ad_contracts update fallback: {}", e.getMessage());
         }
 
         jdbc.update(

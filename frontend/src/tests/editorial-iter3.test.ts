@@ -156,6 +156,21 @@ describe('SV2 Editorial Iteration 3 Comprehensive Test Suite (Screens II.2.7 - I
       expect(res.addendums[0].addendumNumber).toBe(addendumReq.addendumNumber)
     })
 
+    it('10b. POST /editorial/contracts creates a new legal contract dossier with signing date', async () => {
+      const created = await editorialApi.createContract({
+        campaignId: 2,
+        contractNumber: 'HD-2026-NEW-002',
+        signingDate: '2026-09-01',
+        contractValue: 30000000,
+        contractFileUrl: 'https://example.com/contracts/HD-2026-NEW-002.pdf',
+        notes: 'Hợp đồng tài trợ phát sóng quý 4',
+      })
+
+      expect(created.contractNumber).toBe('HD-2026-NEW-002')
+      expect(created.signingDate).toBe('2026-09-01')
+      expect(created.contractValue).toBe(30000000)
+    })
+
     it('11. GET /editorial/advertisers/vip returns B2B partners list with VIP tiers', async () => {
       const vips = await editorialApi.getVipAdvertisers()
       expect(Array.isArray(vips)).toBe(true)

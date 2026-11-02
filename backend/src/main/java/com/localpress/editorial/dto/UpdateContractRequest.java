@@ -7,6 +7,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 /**
  * Request cập nhật thông tin hợp đồng quảng cáo (UC019).
  */
@@ -22,4 +25,8 @@ public class UpdateContractRequest {
 
     @Size(max = 1000, message = "Đường dẫn file hợp đồng tối đa 1000 ký tự")
     private String contractFileUrl;
+
+    private LocalDate signingDate;
+
+    private BigDecimal contractValue;
 }

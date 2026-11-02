@@ -25,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -160,6 +161,51 @@ public class AdvertisingController {
                     json.valueToTree(after).toString());
         }
         return after;
+    }
+
+    public record AdvertiserContract(Long contractId, Long campaignId, String campaignName,
+                                     String contractNumber, LocalDate signingDate, BigDecimal contractValue,
+                                     String contractFileUrl, String status, String slotName,
+                                     LocalDate startDate, LocalDate endDate) {}
+
+    /**
+     * GET /api/v1/advertiser/contracts
+     * Lấy danh sách hợp đồng đã ký kết của doanh nghiệp (Phục vụ SV1 - UC012).
+     * Dữ liệu do Tòa soạn (SV2 - UC019) tạo ra và lưu trong ad_contracts.
+     */
+    @GetMapping("/advertiser/contracts")
+    public List<AdvertiserContract> myContracts(Authentication auth) {
+        String email = auth != null ? auth.getName() : null;
+        if (email == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        String sql = "SELECT ct.contract_id, c.campaign_id, c.campaign_name, " +
+                "COALESCE(ct.contract_number, c.contract_reference) AS contract_number, " +
+                "COALESCE(ct.signing_date, c.start_date) AS signing_date, " +
+                "COALESCE(ct.contract_value, c.accepted_amount, c.quoted_amount) AS contract_value, " +
+                "COALESCE(ct.contract_file_url, c.contract_file_url) AS contract_file_url, " +
+                "COALESCE(ct.status, 'SIGNED') AS status, s.name AS slot_name, " +
+                "c.start_date, c.end_date " +
+                "FROM ad_campaigns c " +
+                "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
+                "JOIN users u ON u.user_id = a.user_id " +
+                "JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                "LEFT JOIN ad_contracts ct ON ct.campaign_id = c.campaign_id " +
+                "WHERE u.email = ? AND (ct.contract_number IS NOT NULL OR c.contract_reference IS NOT NULL) " +
+                "ORDER BY c.campaign_id DESC";
+        return jdbc.query(sql, (rs, r) -> new AdvertiserContract(
+                rs.getObject("contract_id") != null ? rs.getLong("contract_id") : null,
+                rs.getLong("campaign_id"),
+                rs.getString("campaign_name"),
+                rs.getString("contract_number"),
+                rs.getDate("signing_date") != null ? rs.getDate("signing_date").toLocalDate() : null,
+                rs.getBigDecimal("contract_value"),
+                rs.getString("contract_file_url"),
+                rs.getString("status"),
+                rs.getString("slot_name"),
+                rs.getDate("start_date") != null ? rs.getDate("start_date").toLocalDate() : null,
+                rs.getDate("end_date") != null ? rs.getDate("end_date").toLocalDate() : null
+        ), email);
     }
 
     private Profile mapProfile(ResultSet rs, int row) throws SQLException {
