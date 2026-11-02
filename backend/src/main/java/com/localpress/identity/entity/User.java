@@ -1,3 +1,4 @@
+// package entity của identity chứa các class ánh xạ bảng người dùng
 package com.localpress.identity.entity;
 
 import jakarta.persistence.*;
@@ -6,6 +7,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
+// entity ánh xạ bảng users dùng chung toàn hệ thống
+// chứa thông tin đăng nhập vai trò trạng thái tài khoản và số lần đăng nhập sai
+// SV3 chỉ dùng hàm createReader bên dưới để tạo độc giả khi đăng ký ở UC033
 @Entity
 @Table(name = "users")
 @Getter
@@ -45,6 +49,8 @@ public class User {
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
+    // hàm tạo độc giả mới với role READER và status ACTIVE và số lần sai ban đầu là 0
+    // luồng đi là ReaderRegistrationService gọi hàm này rồi lưu xuống bảng users
     public static User createReader(
             String fullName,
             String email,

@@ -313,6 +313,35 @@ class HttpClient {
         return response.json()
     }
 
+    public async patch<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
+        const url = this.buildUrl(path, options?.params)
+
+        if (this.useMock) {
+            return handleMockRequest('PATCH', url, body)
+        }
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: this.headers(options),
+            credentials: options?.credentials,
+            body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+            const errorJson = await response.json().catch(() => ({}))
+            throw new AppApiError({
+                timestamp: new Date().toISOString(),
+                status: response.status,
+                error: response.statusText,
+                message: errorJson.message || 'Lỗi gửi dữ liệu lên máy chủ',
+                path,
+                fieldErrors: errorJson.fieldErrors,
+            })
+        }
+
+        return response.json()
+    }
+
     public async put<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
         const url = this.buildUrl(path, options?.params)
 
@@ -411,7 +440,14 @@ class HttpClient {
             })
         }
 
-        return response.json()
+        if (response.status === 204) {
+            return undefined as T
+        }
+        const text = await response.text()
+        if (!text) {
+            return undefined as T
+        }
+        return JSON.parse(text) as T
     }
 }
 

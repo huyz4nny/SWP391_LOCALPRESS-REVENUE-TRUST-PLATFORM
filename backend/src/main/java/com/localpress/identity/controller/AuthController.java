@@ -1,11 +1,16 @@
 package com.localpress.identity.controller;
 
+import com.localpress.identity.dto.UpdateProfileRequest;
+import com.localpress.identity.service.ProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthController {
 
     private final JdbcTemplate jdbc;
+    private final ProfileService profileService;
 
     public record CurrentUserResponse(
             String id,
@@ -44,10 +50,7 @@ public class AuthController {
      */
     @GetMapping("/me")
     public CurrentUserResponse getCurrentUser(Authentication auth) {
-        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập");
-        }
-
+        requireLogin(auth);
         log.info("Xác thực thông tin tài khoản: {}", auth.getName());
 
         return jdbc.query(
@@ -69,5 +72,19 @@ public class AuthController {
                 ),
                 auth.getName()
         ).stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin tài khoản"));
+    }
+
+    // PATCH /api/v1/auth/me chỉ đổi họ tên và số điện thoại của phiên hiện tại
+    @PatchMapping("/me")
+    public CurrentUserResponse updateMe(Authentication auth, @Valid @RequestBody UpdateProfileRequest request) {
+        requireLogin(auth);
+        profileService.update(auth.getName(), request.fullName(), request.phone());
+        return getCurrentUser(auth);
+    }
+
+    private static void requireLogin(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập");
+        }
     }
 }

@@ -1,3 +1,4 @@
+// Tác dụng: logout + đồng bộ phiên — xóa basic auth, đưa mock user về Guest khi không còn token.
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
