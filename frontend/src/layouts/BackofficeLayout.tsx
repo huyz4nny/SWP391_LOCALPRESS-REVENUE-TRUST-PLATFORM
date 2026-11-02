@@ -26,7 +26,6 @@ import {
   Menu,
   X,
   Webhook,
-  Receipt,
   BellRing,
   type LucideIcon,
 } from 'lucide-react'
@@ -120,7 +119,6 @@ export function BackofficeLayout() {
     { label: 'Hoàn tiền', path: '/backoffice/finance/refunds', icon: RotateCcw },
     { label: 'Sổ quỹ', path: '/backoffice/finance/ledger', icon: BookMarked },
     { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
-    { label: 'Công nợ quảng cáo', path: '/backoffice/finance/receivables', icon: Receipt },
     { label: 'Cảnh báo và báo cáo', path: '/backoffice/finance/reports', icon: BellRing },
   ]
 

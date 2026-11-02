@@ -32,7 +32,7 @@ public class LedgerFilterRequest {
     private TransactionType transactionType;
 
     /**
-     * Lọc theo phương thức thanh toán: SEPAY (QR chuyển khoản) hoặc WALLET (Ví LocalPress).
+     * Lọc theo phương thức thanh toán: SEPAY (QR chuyển khoản) hoặc BANK_TRANSFER (bút toán chuyển trả khi hoàn tiền).
      */
     private String paymentMethod;
 

@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * ==============================================================================
  * ENTITY: KHOẢN LỆCH TRONG KỲ ĐỐI SOÁT (SV4 - UC054)
  * ==============================================================================
- * BANK_NOT_RECORDED     : SePay báo có tiền (log_id) nhưng hệ thống chưa ghi vào đơn / ví.
+ * BANK_NOT_RECORDED     : SePay báo có tiền (log_id) nhưng hệ thống chưa ghi vào đơn.
  * RECORDED_WITHOUT_BANK : kế toán đã ghi nhận theo khiếu nại (complaint_id) nhưng SePay chưa báo khoản đó.
  * Xử lý xong là RESOLVED với hành động + ghi chú + người xử lý; không bao giờ xóa dòng.
  */
@@ -29,8 +29,11 @@ public class ReconciliationItem {
 
     public enum Status { UNRESOLVED, RESOLVED }
 
-    /** ASSIGN_ORDER: ghi vào đơn (chạy luồng webhook) · CREDIT_WALLET: cộng ví khách · EXPLAINED: chỉ giải trình. */
-    public enum Action { ASSIGN_ORDER, CREDIT_WALLET, EXPLAINED }
+    /**
+     * ASSIGN_ORDER: ghi vào đơn (chạy luồng webhook) · RETURNED_TO_CUSTOMER: kế toán đã chuyển trả lại khách
+     * (action_ref = mã GD chuyển trả) · EXPLAINED: chỉ giải trình. LocalPress không giữ tiền khách.
+     */
+    public enum Action { ASSIGN_ORDER, RETURNED_TO_CUSTOMER, EXPLAINED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

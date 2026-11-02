@@ -56,5 +56,3 @@ localpress:
     api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}
   payment:
     order-ttl-minutes: 15
-    topup-min-amount: 10000
-    topup-max-amount: 50000000

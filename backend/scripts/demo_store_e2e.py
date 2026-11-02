@@ -64,14 +64,10 @@ def full_content_len():
 
 
 def pay(order_code, amount):
-    """Trả đơn qua ví; ví thiếu thì tạo mã nạp bù và giả lập SePay báo tiền về cho mã nạp bù (tự trả đơn)."""
-    s, b = call("POST", f"/finance/orders/code/{order_code}/pay-with-wallet")
-    if s == 200:
-        return "WALLET"
-    s, topup = call("POST", f"/finance/orders/code/{order_code}/shortfall-topup")
-    assert s == 200, (s, topup)
-    s, b = call("POST", f"/finance/orders/code/{topup['orderCode']}/simulate-ipn", {"amount": float(topup["amount"])})
-    return f"TOPUP {topup['orderCode']} autoPay={b.get('autoPay')}"
+    """Trả đơn bằng QR SePay: giả lập SePay báo về đúng mã đơn + đúng số tiền (LocalPress không có ví)."""
+    s, b = call("POST", f"/finance/orders/code/{order_code}/simulate-ipn", {"amount": amount})
+    assert s == 200 and b.get("status") == "SUCCESS", (s, b)
+    return "SEPAY"
 
 
 def cleanup():
@@ -145,11 +141,9 @@ check("Mua lại gói đang dùng -> 409", s == 409, s)
 s, _ = call("POST", "/finance/dev/demo-store/purchase", {"type": "ARTICLE", "itemId": "abc"})
 check("Mã món hàng không phải số -> 400", s == 400, s)
 
-# 8. Kiểm tra sổ: ví không âm, ví = tổng bút toán
-neg = sql("SELECT COUNT(*) FROM wallets WHERE balance < 0")
-diff = sql("SELECT COUNT(*) FROM wallets w WHERE w.balance <> (SELECT COALESCE(SUM(CASE direction WHEN 'CREDIT' THEN amount "
-           "ELSE -amount END), 0) FROM wallet_entries e WHERE e.wallet_id = w.wallet_id)")
-check("Ví không âm và khớp tổng bút toán", neg == "0" and diff == "0", f"{neg}/{diff}")
+# 8. Không còn bảng ví: LocalPress không giữ tiền khách
+left = sql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='localpress_db' AND table_name IN ('wallets','wallet_entries')")
+check("Không còn bảng ví", left == "0", left)
 
 cleanup()
 

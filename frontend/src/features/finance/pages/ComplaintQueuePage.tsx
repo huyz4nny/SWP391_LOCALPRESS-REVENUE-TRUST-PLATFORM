@@ -13,28 +13,31 @@ import { PageHeader, Panel, Segmented, Notice, tableCls } from '../components/Le
  * HÀNG CHỜ KHIẾU NẠI THANH TOÁN /backoffice/finance/complaints (SV4 - UC051, phía kế toán)
  * ==============================================================================
  * Thay cho "duyệt chuyển khoản thủ công". Kế toán mở sao kê ngân hàng, tìm theo mã giao dịch & số tiền:
- *  - Thấy tiền + có đơn  -> "Ghi nhận vào đơn": chạy đúng luồng webhook (đủ/thiếu/thừa/muộn, chống trùng).
- *  - Thấy tiền, không rõ đơn / đơn đã trả -> "Cộng vào ví" khách.
+ *  - Thấy tiền + có đơn đúng số tiền -> "Ghi nhận vào đơn": chạy đúng luồng webhook (chống trùng).
+ *  - Thấy tiền nhưng không gán được vào đơn (sai số tiền, đơn hết hạn / đã trả, không có mã đơn)
+ *    -> kế toán chuyển trả lại tài khoản khách rồi bấm "Đã chuyển trả khách" kèm mã GD chuyển trả.
+ *    LocalPress không giữ tiền khách, không có ví.
  *  - Không thấy tiền     -> "Từ chối" (bắt buộc lý do, khách nhìn thấy).
  */
 
 const RESOLUTION_LABELS: Record<string, string> = {
   SUCCESS: 'Đã ghi nhận đơn thành công',
-  EXCESS: 'Đơn thành công, phần dư vào ví',
-  UNDERPAID_CREDITED_TO_WALLET: 'Chuyển thiếu, tiền vào ví',
-  LATE_PAYMENT_CREDITED_TO_WALLET: 'Đơn hết hiệu lực, tiền vào ví',
-  CREDITED_WALLET: 'Đã cộng vào ví',
+  RETURNED_TO_CUSTOMER: 'Đã chuyển trả lại khách',
+  // Dữ liệu cũ trước khi bỏ ví
+  UNDERPAID_CREDITED_TO_WALLET: 'Chuyển thiếu, tiền vào ví (dữ liệu cũ)',
+  LATE_PAYMENT_CREDITED_TO_WALLET: 'Đơn hết hiệu lực, tiền vào ví (dữ liệu cũ)',
+  CREDITED_WALLET: 'Đã cộng vào ví (dữ liệu cũ)',
 }
 
 export function ComplaintStatusBadge({ status }: { status: PaymentComplaint['status'] }) {
   if (status === 'OPEN') return <Badge variant="warning">Chờ đối soát</Badge>
-  if (status === 'RESOLVED') return <Badge variant="success">Đã ghi nhận</Badge>
+  if (status === 'RESOLVED') return <Badge variant="success">Đã xử lý</Badge>
   return <Badge variant="destructive">Từ chối</Badge>
 }
 
 const FILTERS: { value: PaymentComplaint['status'] | undefined; label: string }[] = [
   { value: 'OPEN', label: 'Chờ đối soát' },
-  { value: 'RESOLVED', label: 'Đã ghi nhận' },
+  { value: 'RESOLVED', label: 'Đã xử lý' },
   { value: 'REJECTED', label: 'Từ chối' },
   { value: undefined, label: 'Tất cả' },
 ]
@@ -46,7 +49,9 @@ export function ComplaintQueuePage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const [confirm, setConfirm] = useState<{ c: PaymentComplaint; target: 'ORDER' | 'WALLET' } | null>(null)
+  const [returning, setReturning] = useState<string | null>(null)
+  const [payoutRef, setPayoutRef] = useState('')
+  const [confirm, setConfirm] = useState<PaymentComplaint | null>(null)
 
   const load = () => complaintApi.listForAccountant(filter).then(setItems).catch((e) => setError(e?.message || 'Không tải được hàng chờ'))
 
@@ -73,7 +78,7 @@ export function ComplaintQueuePage() {
     <div>
       <PageHeader
         title="Khiếu nại thanh toán"
-        sub="Khách báo đã chuyển tiền nhưng chưa được ghi nhận. Tìm đúng mã giao dịch và số tiền trên sao kê trước khi ghi nhận; ghi nhận vào đơn chạy lại luồng webhook nên không cộng trùng."
+        sub="Khách báo đã chuyển tiền nhưng chưa được ghi nhận. Tìm đúng mã giao dịch và số tiền trên sao kê. Đúng đơn, đúng số tiền thì ghi nhận vào đơn (chạy lại luồng webhook, không ghi trùng); không gán được vào đơn thì chuyển trả lại khách, LocalPress không giữ tiền."
       />
 
       <div className="mb-3">
@@ -118,11 +123,38 @@ export function ComplaintQueuePage() {
                       <ComplaintStatusBadge status={c.status} />
                       {c.resolution && <div className="mt-1 text-xs text-slate-500">{RESOLUTION_LABELS[c.resolution] ?? c.resolution}</div>}
                       {c.status === 'REJECTED' && c.resolutionNote && <div className="mt-1 max-w-[220px] text-xs text-[#831c1e]">{c.resolutionNote}</div>}
+                      {c.resolution === 'RETURNED_TO_CUSTOMER' && c.resolutionNote && <div className="mt-1 max-w-[220px] text-xs text-slate-500">{c.resolutionNote}</div>}
                     </td>
                     <td className={`${tableCls.tdNum} align-top font-semibold`}>{formatCurrency(c.amount)}</td>
                     <td className={`${tableCls.td} align-top text-right`}>
                       {c.status === 'OPEN' &&
-                        (rejecting === c.complaintId ? (
+                        (returning === c.complaintId ? (
+                          <div className="ml-auto w-60 space-y-1.5">
+                            <Input
+                              placeholder="Mã GD chuyển trả lại khách"
+                              value={payoutRef}
+                              onChange={(e) => setPayoutRef(e.target.value)}
+                              className="h-8 text-[13px]"
+                              autoFocus
+                            />
+                            <div className="flex justify-end gap-1.5">
+                              <Button size="sm" variant="ghost" onClick={() => setReturning(null)}>
+                                Hủy
+                              </Button>
+                              <Button
+                                size="sm"
+                                disabled={!payoutRef.trim() || busyId === c.complaintId}
+                                onClick={() =>
+                                  run(c.complaintId, () =>
+                                    complaintApi.resolve(c.complaintId, 'RETURNED', `Đã chuyển trả khách, mã GD ${payoutRef.trim()}`)
+                                  ).then(() => setReturning(null))
+                                }
+                              >
+                                Xác nhận đã trả
+                              </Button>
+                            </div>
+                          </div>
+                        ) : rejecting === c.complaintId ? (
                           <div className="ml-auto w-60 space-y-1.5">
                             <Input
                               placeholder="Lý do từ chối, khách sẽ thấy"
@@ -150,7 +182,7 @@ export function ComplaintQueuePage() {
                         ) : (
                           <div className="flex justify-end gap-1.5">
                             {c.orderCode && (
-                              <Button size="sm" disabled={busyId === c.complaintId} onClick={() => setConfirm({ c, target: 'ORDER' })}>
+                              <Button size="sm" disabled={busyId === c.complaintId} onClick={() => setConfirm(c)}>
                                 Ghi nhận vào đơn
                               </Button>
                             )}
@@ -158,9 +190,12 @@ export function ComplaintQueuePage() {
                               size="sm"
                               variant="outline"
                               disabled={busyId === c.complaintId}
-                              onClick={() => setConfirm({ c, target: 'WALLET' })}
+                              onClick={() => {
+                                setPayoutRef('')
+                                setReturning(c.complaintId)
+                              }}
                             >
-                              Cộng vào ví
+                              Đã chuyển trả khách
                             </Button>
                             <Button
                               size="sm"
@@ -187,13 +222,13 @@ export function ComplaintQueuePage() {
       {confirm && (
         <ConfirmDialog
           open
-          title={confirm.target === 'ORDER' ? 'Ghi nhận khoản tiền vào đơn?' : 'Cộng khoản tiền vào ví khách?'}
-          message={`Xác nhận đã thấy ${formatCurrency(confirm.c.amount)} với mã giao dịch ${confirm.c.bankReference} trên sao kê ngân hàng.`}
+          title="Ghi nhận khoản tiền vào đơn?"
+          message={`Xác nhận đã thấy ${formatCurrency(confirm.amount)} với mã giao dịch ${confirm.bankReference} trên sao kê ngân hàng.`}
           confirmText="Đã khớp sao kê, ghi nhận"
           onConfirm={() => {
-            const { c, target } = confirm
+            const c = confirm
             setConfirm(null)
-            run(c.complaintId, () => complaintApi.resolve(c.complaintId, target))
+            run(c.complaintId, () => complaintApi.resolve(c.complaintId, 'ORDER'))
           }}
           onClose={() => setConfirm(null)}
         />

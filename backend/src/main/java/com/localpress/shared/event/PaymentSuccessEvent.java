@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * ==============================================================================
  * - Mục đích: Đóng vai trò là cầu nối lỏng lẻo (Decoupled Bridge) giữa phân hệ Finance (SV4)
  *   và các phân hệ nghiệp vụ khác (SV1 - Advertising, SV3 - Reader).
- * - Cơ chế: Khi Webhook IPN SePay xác nhận đủ tiền, khi khách trả bằng Ví LocalPress, hoặc khi kế toán
+ * - Cơ chế: Khi Webhook IPN SePay xác nhận đúng mã đơn + đúng số tiền (LocalPress không có ví), hoặc khi kế toán
  *   ghi nhận khiếu nại (chạy lại đúng logic webhook), Finance publish sự kiện này qua ApplicationEventPublisher.
  * - Chiều ngược lại (hoàn tiền) dùng RefundCompletedEvent.
  * - Tuân thủ Quy tắc 17: SV4 không cần gọi trực tiếp Repository/Service của SV1 hay SV3.
@@ -61,7 +61,7 @@ public class PaymentSuccessEvent {
     private String currency;
 
     /**
-     * Phương thức thanh toán: "SEPAY" (QR) hoặc "WALLET" (Ví LocalPress).
+     * Phương thức thanh toán: "SEPAY" (QR chuyển khoản, LocalPress không có ví).
      */
     private String paymentMethod;
 
