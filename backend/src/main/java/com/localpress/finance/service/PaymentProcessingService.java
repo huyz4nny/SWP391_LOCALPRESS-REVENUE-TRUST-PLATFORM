@@ -87,6 +87,13 @@ public class PaymentProcessingService {
             default -> { }
         }
 
+        // Đơn mới thay đơn cũ cùng đối tượng: đóng đơn cũ, tiền về đơn cũ sau đó thành LATE_PAYMENT (kế toán chuyển trả)
+        for (Transaction old : transactionRepository.findPendingByTargetForUpdate(type, request.getTargetId())) {
+            old.markExpired();
+            transactionRepository.save(old);
+            log.info("Đóng đơn cũ {} của {}#{} vì đã có đơn mới thay thế", old.getGatewayTransactionId(), type, request.getTargetId());
+        }
+
         Transaction savedTx = transactionRepository.save(txBuilder.build());
         log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(), savedTx.getGatewayTransactionId());
 

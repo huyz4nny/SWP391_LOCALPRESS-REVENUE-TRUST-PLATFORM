@@ -140,6 +140,35 @@ class PaymentProcessingServiceTest {
     }
 
     @Test
+    @DisplayName("PAY-01: Tạo đơn mới cho cùng đối tượng -> đóng đơn PENDING cũ, tránh khách trả 2 QR bị thu 2 lần")
+    void createOrder_closesSupersededPendingOrder() {
+        stubSaveEcho();
+        Transaction old = pending(TransactionType.ARTICLE, "15000");
+        when(transactionRepository.findPendingByTargetForUpdate(TransactionType.ARTICLE, 3L)).thenReturn(List.of(old));
+
+        OrderCreateResponse response = paymentProcessingService.createOrder(7L, CreateOrderRequest.builder()
+                .orderType("ARTICLE").targetId(3L).amount(new BigDecimal("20000")).targetTitle("Bài điều tra").build());
+
+        assertEquals(TransactionStatus.FAILED, old.getStatus());
+        assertEquals("PENDING", response.getStatus());
+        assertNotEquals(old.getGatewayTransactionId(), response.getOrderCode());
+    }
+
+    @Test
+    @DisplayName("PAY-01: Tiền về đơn đã bị thay thế -> LATE_PAYMENT, không cấp quyền")
+    void ipn_supersededOrder_latePayment() {
+        Transaction old = pending(TransactionType.ARTICLE, "15000");
+        old.markExpired();
+        stubLockedOrder(old);
+        stubSaveEcho();
+
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("15000"));
+
+        assertEquals("LATE_PAYMENT", result.get("status"));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     @DisplayName("UC049: Webhook đủ tiền -> SUCCESS và phát PaymentSuccessEvent")
     void ipn_fullAmount_success() {
         Transaction tx = pending(TransactionType.SUBSCRIPTION, "50000");

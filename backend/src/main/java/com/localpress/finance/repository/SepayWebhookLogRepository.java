@@ -22,4 +22,7 @@ public interface SepayWebhookLogRepository extends JpaRepository<SepayWebhookLog
 
     /** Khoản tiền có mã GD ngân hàng này đã được ghi nhận tự động chưa (chặn khiếu nại ghi nhận lần 2). */
     Optional<SepayWebhookLog> findFirstByReferenceCodeAndResultStatusInOrderByReceivedAtAsc(String referenceCode, Collection<String> statuses);
+
+    /** Số tiền SePay thật sự báo về cho mã GD này (bỏ log sai khóa: ai cũng gửi được). Dùng đối chiếu số tiền khách khai. */
+    Optional<SepayWebhookLog> findFirstByReferenceCodeAndAuthOkTrueAndTransferAmountNotNullOrderByReceivedAtAsc(String referenceCode);
 }

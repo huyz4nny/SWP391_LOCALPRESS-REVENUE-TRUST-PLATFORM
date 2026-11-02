@@ -44,6 +44,10 @@ public class SepayGatewayService {
     private static final DateTimeFormatter SEPAY_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     /** Một đơn chỉ được hỏi API SePay 1 lần mỗi 10 giây (nút "kiểm tra lại" của khách). */
     private static final long ORDER_CHECK_COOLDOWN_MS = 10_000;
+    /** Số giao dịch tối đa lấy mỗi lần gọi API SePay. */
+    private static final int SYNC_LIMIT = 200;
+    /** Nút kiểm tra của khách: hỏi từ lúc tạo đơn lùi lại chừng này phút (lệch giờ máy chủ / ngân hàng). */
+    private static final long ORDER_CHECK_LOOKBACK_MINUTES = 10;
 
     private final PaymentProcessingService paymentProcessingService;
     private final SepayWebhookLogRepository logRepository;
@@ -156,12 +160,16 @@ public class SepayGatewayService {
      * orderCode khác null: chỉ xử lý giao dịch có mã đơn đó trong nội dung chuyển khoản.
      */
     public SyncResult syncFromSepay(int hours, String orderCode) {
+        int window = Math.max(1, Math.min(hours, 24 * 7));
+        return syncFromSepay(LocalDateTime.now().minusHours(window), orderCode);
+    }
+
+    private SyncResult syncFromSepay(LocalDateTime since, String orderCode) {
         if (!apiTokenConfigured()) {
             throw new AppException("Chưa cấu hình localpress.sepay.api-token (tạo ở my.sepay.vn > Cấu hình công ty > API Access)",
                     HttpStatus.SERVICE_UNAVAILABLE);
         }
-        int window = Math.max(1, Math.min(hours, 24 * 7));
-        String from = LocalDateTime.now().minusHours(window).format(SEPAY_TIME);
+        String from = since.format(SEPAY_TIME);
 
         JsonNode root;
         try {
@@ -169,7 +177,7 @@ public class SepayGatewayService {
                     .uri(uri -> {
                         uri.path("/transactions/list")
                                 .queryParam("transaction_date_min", from)
-                                .queryParam("limit", 200);
+                                .queryParam("limit", SYNC_LIMIT);
                         if (accountNumber != null && !accountNumber.isBlank()) {
                             uri.queryParam("account_number", accountNumber);
                         }
@@ -223,25 +231,33 @@ public class SepayGatewayService {
             item.put("status", outcome.body().get("status"));
             items.add(item);
         }
-        log.info("Đồng bộ SePay {} giờ: lấy {}, xử lý {}, trùng {}, bỏ qua {}", window, rows.size(), processed, duplicate, ignored);
+        if (rows.size() >= SYNC_LIMIT) {
+            log.warn("API SePay trả đủ {} giao dịch từ {}: có thể còn giao dịch cũ hơn chưa lấy, hãy đồng bộ khoảng ngắn hơn", SYNC_LIMIT, from);
+        }
+        log.info("Đồng bộ SePay từ {}: lấy {}, xử lý {}, trùng {}, bỏ qua {}", from, rows.size(), processed, duplicate, ignored);
         return new SyncResult(rows.size(), processed, duplicate, ignored, items);
     }
 
     /**
-     * Nút "Tôi đã chuyển khoản, kiểm tra lại" của khách: hỏi API SePay đúng đơn này.
+     * Nút "Tôi đã chuyển khoản, kiểm tra lại" của khách: hỏi API SePay đúng đơn này, từ lúc tạo đơn.
      * Chưa cấu hình token hoặc vừa hỏi trong 10 giây thì chỉ trả trạng thái hiện tại.
      */
-    public Map<String, Object> checkOrderWithSepay(String orderCode) {
+    public Map<String, Object> checkOrderWithSepay(String orderCode, LocalDateTime orderCreatedAt) {
         if (!apiTokenConfigured()) {
             return Map.of("checked", false, "reason", "API_TOKEN_NOT_CONFIGURED");
         }
+        // Khóa theo mã chuẩn hóa: viết hoa / thường khác nhau vẫn là 1 đơn, không lách được thời gian chờ
+        String key = orderCode.trim().toUpperCase();
         long now = System.currentTimeMillis();
-        Long last = lastOrderCheck.get(orderCode);
-        if (last != null && now - last < ORDER_CHECK_COOLDOWN_MS) {
+        lastOrderCheck.values().removeIf(t -> now - t >= ORDER_CHECK_COOLDOWN_MS);
+        if (lastOrderCheck.putIfAbsent(key, now) != null) {
             return Map.of("checked", false, "reason", "TOO_SOON");
         }
-        lastOrderCheck.put(orderCode, now);
-        SyncResult r = syncFromSepay(48, orderCode);
+        // Chỉ hỏi từ lúc tạo đơn: ít giao dịch hơn nên không bị giới hạn SYNC_LIMIT cắt mất khoản của khách
+        LocalDateTime since = orderCreatedAt != null
+                ? orderCreatedAt.minusMinutes(ORDER_CHECK_LOOKBACK_MINUTES)
+                : LocalDateTime.now().minusHours(48);
+        SyncResult r = syncFromSepay(since, key);
         return Map.of("checked", true, "found", r.processed(), "items", r.items());
     }
 

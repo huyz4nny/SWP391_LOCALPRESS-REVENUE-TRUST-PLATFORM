@@ -132,7 +132,7 @@ public class RefundManagementService {
         log.info("Lập đề xuất hoàn tiền: proposer={}, orderId={}, amount={}",
                 proposerUserId, request.getOrderId(), request.getRefundAmount());
 
-        Transaction originalTx = transactionRepository.findById(request.getOrderId())
+        Transaction originalTx = transactionRepository.findByIdForUpdate(request.getOrderId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng #" + request.getOrderId(), HttpStatus.NOT_FOUND));
 
         // Dữ liệu cũ có thể thiếu transaction_type: chỉ chặn khi biết chắc là REFUND
@@ -220,7 +220,7 @@ public class RefundManagementService {
         refund.setReviewNotes(request.getReviewNotes());
         refund.setResolvedAt(now);
 
-        Transaction originalTx = transactionRepository.findById(refund.getTransactionId())
+        Transaction originalTx = transactionRepository.findByIdForUpdate(refund.getTransactionId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng gốc #" + refund.getTransactionId(), HttpStatus.NOT_FOUND));
 
         refund.setStatus(request.isApproved() ? RefundStatus.COMPLETED : RefundStatus.REJECTED);
@@ -252,6 +252,12 @@ public class RefundManagementService {
             BigDecimal totalRefunded = Optional.ofNullable(
                     refundRequestRepository.sumCompletedRefundsByTransactionId(originalTx.getTransactionId()))
                     .orElse(refund.getRefundAmount());
+            // Rule 11 kiểm lại lúc duyệt (đơn gốc đã khóa): 2 phiếu lập cùng lúc vẫn không hoàn vượt số đã thu
+            if (totalRefunded.compareTo(originalTx.getAmount()) > 0) {
+                throw new AppException(String.format(
+                        "Vi phạm Rule 11 (Refund Cap): duyệt phiếu này thì tổng đã hoàn (%,.0f đ) vượt số tiền đã thu của đơn (%,.0f đ). Hãy từ chối phiếu.",
+                        totalRefunded, originalTx.getAmount()), HttpStatus.CONFLICT);
+            }
             boolean fullRefund = totalRefunded.compareTo(originalTx.getAmount()) >= 0;
             if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);
