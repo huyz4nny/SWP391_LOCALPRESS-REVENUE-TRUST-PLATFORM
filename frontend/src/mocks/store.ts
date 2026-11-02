@@ -450,16 +450,30 @@ class MockStore {
     return false
   }
 
-  public toggleBookmark(userId: string, articleId: string): boolean {
+  // UC038 lưu hoặc bỏ lưu theo trạng thái mong muốn, bài vừa lưu lên đầu giống saved_at giảm dần
+  public setBookmark(userId: string, articleId: string, saved: boolean): boolean {
     const ent = this.getEntitlements(userId)
-    const exists = ent.bookmarkedArticleIds.includes(articleId)
-    if (exists) {
-      ent.bookmarkedArticleIds = ent.bookmarkedArticleIds.filter((id) => id !== articleId)
-    } else {
-      ent.bookmarkedArticleIds.push(articleId)
-    }
+    const others = ent.bookmarkedArticleIds.filter((id) => id !== articleId)
+    const exists = others.length !== ent.bookmarkedArticleIds.length
+    ent.bookmarkedArticleIds = saved ? (exists ? ent.bookmarkedArticleIds : [articleId, ...others]) : others
     this.persist()
-    return !exists
+    return saved
+  }
+
+  // UC040 theo dõi hoặc bỏ theo dõi chuyên mục theo trạng thái mong muốn
+  public setCategoryFollow(userId: string, categoryId: string, following: boolean): boolean {
+    const ent = this.getEntitlements(userId)
+    const others = ent.followedCategoryIds.filter((id) => id !== categoryId)
+    const exists = others.length !== ent.followedCategoryIds.length
+    ent.followedCategoryIds = following ? (exists ? ent.followedCategoryIds : [categoryId, ...others]) : others
+    this.persist()
+    return following
+  }
+
+  public removeReadingHistory(userId: string, articleId: string) {
+    const ent = this.getEntitlements(userId)
+    ent.readingHistory = ent.readingHistory.filter((h) => h.articleId !== articleId)
+    this.persist()
   }
 
   public recordReadingHistory(userId: string, article: Article) {
@@ -565,6 +579,7 @@ class MockStore {
       ent.hasSubscription = true
       ent.subscriptionPlanId = order.targetId
       ent.subscriptionPlanName = plan?.name || 'Gói Độc Giả'
+      ent.subscriptionAutoRenew = true
       const expires = new Date()
       expires.setDate(expires.getDate() + (plan?.durationDays || 30))
       ent.subscriptionExpiresAt = expires.toISOString()

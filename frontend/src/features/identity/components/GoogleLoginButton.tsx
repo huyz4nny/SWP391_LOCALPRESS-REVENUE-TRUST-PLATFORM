@@ -1,3 +1,4 @@
+// Tác dụng: nút Google trên `/login` — lấy nonce, nhận idToken, giao cho LoginPage.
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AppApiError } from '@/lib/http/errors'

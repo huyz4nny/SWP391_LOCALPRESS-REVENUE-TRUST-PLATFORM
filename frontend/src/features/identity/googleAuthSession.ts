@@ -1,3 +1,4 @@
+// Tác dụng: sau Google login — gọi /auth/google, lưu Bearer, gán user vào mockStore.
 import { authApi } from './api'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'

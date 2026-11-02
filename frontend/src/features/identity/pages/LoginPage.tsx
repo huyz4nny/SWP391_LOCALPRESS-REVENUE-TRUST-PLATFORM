@@ -1,3 +1,4 @@
+// Tác dụng: trang `/login` (UC033) — email/mật khẩu hoặc Google, cấp phiên, không OTP.
 import React, { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'

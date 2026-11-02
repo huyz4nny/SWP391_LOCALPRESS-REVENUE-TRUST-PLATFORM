@@ -1,68 +1,68 @@
-import React from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { mockStore } from '@/mocks/store'
+import { APP_CONFIG } from '@/app/config'
+import { adDeliveryApi, type AdOffer } from './adDeliveryApi'
 import { ExternalLink, Megaphone } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-interface AdSlotBannerProps {
+interface Props {
   slotCode: 'SLOT-TOP-LEADERBOARD' | 'SLOT-ARTICLE-INLINE' | 'SLOT-SIDEBAR-STICKY'
   className?: string
 }
-
-export function AdSlotBanner({ slotCode, className = '' }: AdSlotBannerProps) {
-  const state = mockStore.getState()
-  const slot = state.adSlots.find((s) => s.code === slotCode)
-  const booking = state.bookings.find(
-    (b) => b.slotCode === slotCode && b.deliveryStatus === 'LIVE'
-  )
-  const campaign = booking ? state.campaigns.find((c) => c.bookingId === booking.id) : null
-  const activeCreative = campaign?.creatives.find((c) => c.isActiveServing)
-
-  if (activeCreative && campaign) {
-    return (
-      <div className={`relative overflow-hidden rounded border border-slate-200 bg-white group ${className}`}>
-        <div className="absolute top-1 right-1 z-10 bg-slate-900/80 text-[11px] text-white px-1.5 py-0.5 rounded font-medium">
-          Quảng cáo · {booking?.companyName}
-        </div>
-        <a
-          href={activeCreative.targetUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => {
-            campaign.clicks += 1
-            mockStore.getState().adDeliveryStatus.forEach((stat) => {
-              if (stat.slotCode === slotCode) stat.todayClicks += 1
-            })
-          }}
-          className="block transition-transform duration-300 group-hover:opacity-95"
-        >
-          <img
-            src={activeCreative.imageUrl}
-            alt={activeCreative.title}
-            className="w-full h-auto object-cover max-h-[140px] md:max-h-[200px]"
-          />
-        </a>
-      </div>
-    )
+export function AdSlotBanner({ slotCode, className = '' }: Props) {
+  const [offer, setOffer] = useState<AdOffer | null>(null)
+  const seen = useRef(new Map<string, Promise<unknown>>())
+  const userId = mockStore.getCurrentUser().id
+  useEffect(() => {
+    if (APP_CONFIG.useMockApi) return
+    let active = true
+    setOffer(null)
+    void adDeliveryApi.serve(slotCode)
+      .then(data => { if (active) setOffer(data) })
+      .catch(() => { if (active) setOffer(null) })
+    return () => { active = false }
+  }, [slotCode, userId])
+  const state = APP_CONFIG.useMockApi ? mockStore.getState() : null
+  const mockSlot = state?.adSlots.find(s => s.code === slotCode)
+  const booking = state?.bookings.find(b => b.slotCode === slotCode && b.deliveryStatus === 'LIVE')
+  const campaign = booking ? state?.campaigns.find(c => c.bookingId === booking.id) : null
+  const mockCreative = campaign?.creatives.find(c => c.isActiveServing)
+  const creative = APP_CONFIG.useMockApi
+    ? mockCreative && { ...mockCreative, companyName: booking?.companyName }
+    : offer?.creative
+  const slot = APP_CONFIG.useMockApi ? mockSlot : offer?.slot
+  function impression(): Promise<unknown> {
+    const token = offer?.trackingToken
+    if (!token) return Promise.resolve()
+    const existing = seen.current.get(token)
+    if (existing) return existing
+    const request = adDeliveryApi.impression(token)
+    seen.current.set(token, request)
+    return request
   }
-
-  // Placeholder when empty or waiting for approval
+  if (!APP_CONFIG.useMockApi && offer?.hidden) return null
+  if (creative) return (
+    <div className={'relative overflow-hidden rounded border border-slate-200 bg-white ' + className}>
+      <span className="absolute right-1 top-1 rounded bg-slate-900/80 px-1.5 py-0.5 text-xs text-white">Quảng cáo · {creative.companyName}</span>
+      <a href={creative.targetUrl} target="_blank" rel="noopener noreferrer sponsored" onClick={() => {
+        if (APP_CONFIG.useMockApi) { if (campaign) campaign.clicks += 1; return }
+        if (offer?.trackingToken) {
+          const token = offer.trackingToken
+          void impression().then(() => adDeliveryApi.click(token)).catch(() => {})
+        }
+      }}>
+        <img src={creative.imageUrl} alt={creative.title} className="max-h-[200px] w-full object-cover" onLoad={() => {
+          if (!APP_CONFIG.useMockApi) void impression().catch(() => {})
+        }} />
+      </a>
+    </div>
+  )
   return (
-    <div
-      className={`border border-dashed border-slate-300 bg-slate-50/70 rounded-md p-4 text-center flex flex-col items-center justify-center text-xs text-slate-500 hover:bg-slate-100 transition-colors ${className}`}
-    >
-      <div className="flex items-center space-x-1.5 text-slate-600 font-semibold mb-1">
-        <Megaphone className="w-4 h-4 text-primary-700" />
-        <span>Vị trí quảng cáo: {slot?.name || slotCode}</span>
-      </div>
-      <p className="text-[11px] text-slate-400 mb-2">
-        Kích thước chuẩn {slot?.dimensions} • Tiếp cận hàng chục ngàn độc giả địa phương mỗi ngày
-      </p>
-      <Link
-        to={`/advertiser/bookings/new?slotId=${slot?.id}`}
-        className="inline-flex items-center font-medium text-primary-800 hover:text-primary-900 hover:underline text-xs bg-white px-2.5 py-1 rounded border border-slate-200 shadow-2xs"
-      >
-        <span>Liên hệ đặt vị trí này</span>
-        <ExternalLink className="w-3 h-3 ml-1" />
+    <div className={'flex flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50/70 p-4 text-center text-xs text-slate-500 ' + className}>
+      <div className="mb-1 flex items-center gap-1.5 font-semibold"><Megaphone className="h-4 w-4" />Vị trí quảng cáo: {slot?.name || slotCode}</div>
+      <p className="mb-2">{slot?.dimensions || 'Chưa có quảng cáo phù hợp'}</p>
+      <Link to={slot ? '/advertiser/bookings/new?slotId=' + slot.id : '/advertiser/bookings/new'} className="inline-flex items-center gap-1 text-primary-900 underline">
+        Liên hệ đặt vị trí này <ExternalLink className="h-3 w-3" />
       </Link>
     </div>
   )

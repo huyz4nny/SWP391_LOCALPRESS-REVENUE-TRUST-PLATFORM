@@ -58,6 +58,8 @@ public class SecurityConfig {
                                 "/api/v1/comments/**", "/api/v1/subscription-plans/**").permitAll()
 
                         // 4. API Tra cứu vị trí quảng cáo công khai cho Doanh nghiệp (SV1 - UC003)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/delivery/ad-slots/*/serve").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/delivery/impressions", "/api/v1/delivery/clicks").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/ad-slots/**").permitAll()
 
                         // 5. Cổng xác thực & Webhook IPN cổng thanh toán (SV4 - Rule 4, 5)
