@@ -4,8 +4,8 @@ package com.localpress.finance.model;
  * ==============================================================================
  * ENUM: PHÂN LOẠI GIAO DỊCH TÀI CHÍNH (TRANSACTION TYPE)
  * ==============================================================================
- * Khớp 100% với ràng buộc ENUM('SUBSCRIPTION', 'ARTICLE', 'AD', 'REFUND', 'TOPUP')
- * trong bảng CSDL transactions (V1__create_tables.sql + V3__wallet_and_topup.sql).
+ * Khớp 100% với ràng buộc ENUM('SUBSCRIPTION', 'ARTICLE', 'AD', 'REFUND')
+ * trong bảng CSDL transactions (V16__remove_wallet.sql bỏ loại TOPUP của ví).
  */
 public enum TransactionType {
     /**
@@ -26,16 +26,10 @@ public enum TransactionType {
     /**
      * Nghiệp vụ tài chính: Hoàn tiền giao dịch theo nguyên tắc 4 mắt (SV4).
      */
-    REFUND,
+    REFUND;
 
-    /**
-     * Nạp tiền vào Ví LocalPress qua QR SePay. Không gắn đối tượng nghiệp vụ nào.
-     * Là công nợ phải trả khách, KHÔNG tính vào doanh thu (doanh thu ghi nhận khi tiêu ví).
-     */
-    TOPUP;
-
-    /** Đơn mua (bài, gói, quảng cáo): loại duy nhất được thanh toán bằng ví và được hoàn tiền. */
+    /** Đơn mua (bài, gói, quảng cáo): loại duy nhất được thanh toán qua QR và được hoàn tiền. */
     public boolean isPurchase() {
-        return this != REFUND && this != TOPUP;
+        return this != REFUND;
     }
 }

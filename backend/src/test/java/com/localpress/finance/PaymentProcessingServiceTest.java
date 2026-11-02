@@ -11,7 +11,6 @@ import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.SePayService;
-import com.localpress.finance.service.WalletService;
 import com.localpress.shared.event.PaymentSuccessEvent;
 import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +44,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * ==============================================================================
- * TEST: BỘ XỬ LÝ THANH TOÁN, VÍ & WEBHOOK SEPAY (SV4)
+ * TEST: BỘ XỬ LÝ THANH TOÁN QR & WEBHOOK SEPAY (SV4) - không ví, không giữ tiền khách
  * ==============================================================================
  */
 @ExtendWith(MockitoExtension.class)
@@ -55,9 +54,6 @@ class PaymentProcessingServiceTest {
 
     @Mock
     private TransactionRepository transactionRepository;
-
-    @Mock
-    private WalletService walletService;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -144,15 +140,6 @@ class PaymentProcessingServiceTest {
     }
 
     @Test
-    @DisplayName("Nạp ví: số tiền ngoài hạn mức bị từ chối")
-    void createTopUp_rejectsOutOfRange() {
-        AppException ex = assertThrows(AppException.class,
-                () -> paymentProcessingService.createTopUp(7L, new BigDecimal("5000")));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        verify(transactionRepository, never()).save(any());
-    }
-
-    @Test
     @DisplayName("UC049: Webhook đủ tiền -> SUCCESS và phát PaymentSuccessEvent")
     void ipn_fullAmount_success() {
         Transaction tx = pending(TransactionType.SUBSCRIPTION, "50000");
@@ -166,7 +153,6 @@ class PaymentProcessingServiceTest {
         ArgumentCaptor<PaymentSuccessEvent> captor = ArgumentCaptor.forClass(PaymentSuccessEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertEquals(2L, captor.getValue().getTargetId());
-        verify(walletService, never()).credit(any(), any(), anyString());
     }
 
     @Test
@@ -195,22 +181,8 @@ class PaymentProcessingServiceTest {
     }
 
     @Test
-    @DisplayName("Nạp ví: webhook cộng đúng số tiền thực nhận vào ví")
-    void ipn_topUp_creditsWallet() {
-        Transaction tx = pending(TransactionType.TOPUP, "100000");
-        stubLockedOrder(tx);
-        stubSaveEcho();
-
-        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("100000"));
-
-        assertEquals("SUCCESS", result.get("status"));
-        verify(walletService).credit(eq(tx), eq(new BigDecimal("100000")), anyString());
-        verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    @DisplayName("Rule 6: Booking quảng cáo quá hạn giữ chỗ -> không cấp quyền, tiền vào ví")
-    void ipn_lateAdPayment_creditsWallet() {
+    @DisplayName("Rule 6: Booking quảng cáo quá hạn giữ chỗ -> LATE_PAYMENT, không cấp quyền, không giữ tiền")
+    void ipn_lateAdPayment_notRecorded() {
         Transaction tx = pending(TransactionType.AD, "2000000");
         tx.setExpiresAt(LocalDateTime.now().minusMinutes(1));
         stubLockedOrder(tx);
@@ -218,87 +190,49 @@ class PaymentProcessingServiceTest {
 
         Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("2000000"));
 
-        assertEquals("LATE_PAYMENT_CREDITED_TO_WALLET", result.get("status"));
+        assertEquals("LATE_PAYMENT", result.get("status"));
         assertEquals(TransactionStatus.FAILED, tx.getStatus());
-        verify(walletService).credit(argThat(t -> (ORDER_CODE + "-LATE").equals(t.getGatewayTransactionId())),
-                eq(new BigDecimal("2000000")), anyString());
+        verify(transactionRepository, times(1)).save(tx);
         verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("Chuyển thiếu -> đơn vẫn PENDING, số tiền đã nhận vào ví")
-    void ipn_underpaid_creditsWallet() {
+    @DisplayName("Chuyển thiếu -> AMOUNT_MISMATCH, đơn vẫn PENDING, không lưu gì")
+    void ipn_underpaid_notRecorded() {
         Transaction tx = pending(TransactionType.ARTICLE, "15000");
         stubLockedOrder(tx);
-        stubSaveEcho();
 
         Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("10000"));
 
-        assertEquals("UNDERPAID_CREDITED_TO_WALLET", result.get("status"));
+        assertEquals("AMOUNT_MISMATCH", result.get("status"));
         assertEquals(TransactionStatus.PENDING, tx.getStatus());
-        verify(walletService).credit(any(), eq(new BigDecimal("10000")), anyString());
+        verify(transactionRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("Chuyển thừa -> đơn SUCCESS, phần dư vào ví")
-    void ipn_overpaid_creditsExcess() {
+    @DisplayName("Chuyển thừa -> AMOUNT_MISMATCH, không cấp quyền (QR đã cố định số tiền)")
+    void ipn_overpaid_notRecorded() {
         Transaction tx = pending(TransactionType.ARTICLE, "15000");
         stubLockedOrder(tx);
-        stubSaveEcho();
 
         Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("20000"));
 
-        assertEquals("SUCCESS", result.get("status"));
-        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
-        verify(walletService).credit(any(), eq(new BigDecimal("5000")), anyString());
-    }
-
-    @Test
-    @DisplayName("Trả bằng ví: trừ ví, đơn SUCCESS, phát event với paymentMethod WALLET")
-    void payWithWallet_success() {
-        Transaction tx = pending(TransactionType.ARTICLE, "15000");
-        stubLockedOrder(tx);
-        stubSaveEcho();
-
-        paymentProcessingService.payWithWallet(reader, ORDER_CODE);
-
-        verify(walletService).debit(eq(tx), eq(new BigDecimal("15000")), anyString());
-        assertEquals(TransactionStatus.SUCCESS, tx.getStatus());
-        assertEquals("WALLET", tx.getPaymentMethod());
-        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
-    }
-
-    @Test
-    @DisplayName("Trả bằng ví: số dư không đủ -> 402, đơn giữ PENDING, không bắn event")
-    void payWithWallet_insufficientBalance() {
-        Transaction tx = pending(TransactionType.ARTICLE, "15000");
-        stubLockedOrder(tx);
-        doThrow(new AppException("Số dư ví không đủ", HttpStatus.PAYMENT_REQUIRED))
-                .when(walletService).debit(any(), any(), anyString());
-
-        AppException ex = assertThrows(AppException.class, () -> paymentProcessingService.payWithWallet(reader, ORDER_CODE));
-
-        assertEquals(HttpStatus.PAYMENT_REQUIRED, ex.getStatus());
+        assertEquals("AMOUNT_MISMATCH", result.get("status"));
         assertEquals(TransactionStatus.PENDING, tx.getStatus());
         verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("Rule 14: Người khác đoán đúng mã đơn -> 403 khi xem và khi trả bằng ví")
+    @DisplayName("Rule 14: Người khác đoán đúng mã đơn -> 403 khi xem trang thanh toán")
     void otherUser_forbidden() {
         Transaction tx = pending(TransactionType.ARTICLE, "15000");
         when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(tx));
-        stubLockedOrder(tx);
 
         AppException view = assertThrows(AppException.class,
                 () -> paymentProcessingService.getPaymentView(otherReader, ORDER_CODE));
-        AppException pay = assertThrows(AppException.class,
-                () -> paymentProcessingService.payWithWallet(otherReader, ORDER_CODE));
 
         assertEquals(HttpStatus.FORBIDDEN, view.getStatus());
-        assertEquals(HttpStatus.FORBIDDEN, pay.getStatus());
-        verify(walletService, never()).debit(any(), any(), anyString());
     }
 
     @Test
@@ -308,91 +242,6 @@ class PaymentProcessingServiceTest {
         assertTrue(sePayService.verifyIpnSecretKey("test-webhook-key"));
         assertFalse(sePayService.verifyIpnSecretKey("Apikey wrong"));
         assertFalse(sePayService.verifyIpnSecretKey(null));
-    }
-
-    // =========================================================================
-    // MỌI THANH TOÁN QUA VÍ: NẠP BÙ GẮN ĐƠN + TỰ TRẢ KHI TIỀN VỀ (V6)
-    // =========================================================================
-
-    private static final String TOPUP_CODE = "LP2610221000TOPU";
-
-    private Transaction linkedTopUp(String amount) {
-        return Transaction.builder()
-                .transactionId(77L).userId(7L).transactionType(TransactionType.TOPUP)
-                .amount(new BigDecimal(amount)).currency("VND").paymentMethod("SEPAY")
-                .gatewayTransactionId(TOPUP_CODE).topupForOrder(ORDER_CODE)
-                .status(TransactionStatus.PENDING).createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMinutes(15)).build();
-    }
-
-    @Test
-    @DisplayName("Ví thiếu: tạo mã nạp bù đúng phần còn thiếu, gắn mã đơn")
-    void shortfallTopUpIsExactAndLinked() {
-        Transaction order = pending(TransactionType.ARTICLE, "15000");
-        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(order));
-        when(walletService.findByUserId(7L)).thenReturn(Optional.of(com.localpress.finance.model.Wallet.builder()
-                .userId(7L).balance(new BigDecimal("4000")).build()));
-        when(transactionRepository.findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(ORDER_CODE, TransactionStatus.PENDING))
-                .thenReturn(Optional.empty());
-        stubSaveEcho();
-
-        OrderCreateResponse view = paymentProcessingService.createShortfallTopUp(reader, ORDER_CODE);
-
-        assertEquals(0, view.getAmount().compareTo(new BigDecimal("11000")));
-        assertEquals("TOPUP", view.getOrderType());
-        assertEquals(ORDER_CODE, view.getTopupForOrder());
-    }
-
-    @Test
-    @DisplayName("Ví đã đủ: không tạo mã nạp bù (409)")
-    void noShortfallWhenWalletEnough() {
-        Transaction order = pending(TransactionType.ARTICLE, "15000");
-        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(order));
-        when(walletService.findByUserId(7L)).thenReturn(Optional.of(com.localpress.finance.model.Wallet.builder()
-                .userId(7L).balance(new BigDecimal("20000")).build()));
-
-        AppException ex = assertThrows(AppException.class, () -> paymentProcessingService.createShortfallTopUp(reader, ORDER_CODE));
-        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
-    }
-
-    @Test
-    @DisplayName("Tiền nạp bù về: cộng ví rồi tự trả đơn, phát PaymentSuccessEvent")
-    void linkedTopUpAutoPaysOrder() {
-        Transaction topup = linkedTopUp("11000");
-        Transaction order = pending(TransactionType.ARTICLE, "15000");
-        when(transactionRepository.findByGatewayTransactionIdForUpdate(TOPUP_CODE)).thenReturn(Optional.of(topup));
-        stubLockedOrder(order);
-        when(walletService.lockedBalance(7L)).thenReturn(new BigDecimal("15000"));
-        stubSaveEcho();
-
-        Map<String, Object> r = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
-                .content(TOPUP_CODE).amount(new BigDecimal("11000")).referenceCode("FT9").build());
-
-        assertEquals("SUCCESS", r.get("status"));
-        assertEquals("PAID", r.get("autoPay"));
-        assertEquals(TransactionStatus.SUCCESS, order.getStatus());
-        assertEquals("WALLET", order.getPaymentMethod());
-        verify(walletService).credit(eq(topup), any(), anyString());
-        verify(walletService).debit(eq(order), any(), anyString());
-        verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
-    }
-
-    @Test
-    @DisplayName("Nạp bù về nhưng ví vẫn thiếu: giữ tiền trong ví, đơn vẫn chờ, không trừ ví")
-    void linkedTopUpInsufficientKeepsOrderPending() {
-        Transaction topup = linkedTopUp("11000");
-        Transaction order = pending(TransactionType.ARTICLE, "15000");
-        when(transactionRepository.findByGatewayTransactionIdForUpdate(TOPUP_CODE)).thenReturn(Optional.of(topup));
-        stubLockedOrder(order);
-        when(walletService.lockedBalance(7L)).thenReturn(new BigDecimal("9000"));
-        stubSaveEcho();
-
-        Map<String, Object> r = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
-                .content(TOPUP_CODE).amount(new BigDecimal("5000")).referenceCode("FT10").build());
-
-        assertEquals("INSUFFICIENT", r.get("autoPay"));
-        assertEquals(TransactionStatus.PENDING, order.getStatus());
-        verify(walletService, never()).debit(any(), any(), anyString());
     }
 
     @Test
@@ -439,7 +288,7 @@ class PaymentProcessingServiceTest {
     }
 
     @Test
-    @DisplayName("Rule 4: webhook không có số tiền -> AMOUNT_MISSING, không đổi đơn, không cộng ví, không bắn event")
+    @DisplayName("Rule 4: webhook không có số tiền -> AMOUNT_MISSING, không đổi đơn, không bắn event")
     void webhook_missingAmount_notRecorded() {
         Transaction tx = pending(TransactionType.ARTICLE, "15000");
         stubLockedOrder(tx);
@@ -450,60 +299,20 @@ class PaymentProcessingServiceTest {
         assertEquals("AMOUNT_MISSING", result.get("status"));
         assertEquals(TransactionStatus.PENDING, tx.getStatus());
         verify(transactionRepository, never()).save(any());
-        verify(walletService, never()).credit(any(), any(), anyString());
         verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("Rule 6: đơn bài quá 15 phút vẫn trả bằng ví được (giống nhánh webhook)")
-    void payWithWallet_lateArticleStillPayable() {
+    @DisplayName("Rule 6: đơn bài quá 15 phút, tiền về đúng số tiền vẫn ghi nhận (bài không giữ chỗ)")
+    void ipn_lateArticleStillRecorded() {
         Transaction tx = pending(TransactionType.ARTICLE, "15000");
         tx.setExpiresAt(LocalDateTime.now().minusMinutes(5));
         stubLockedOrder(tx);
         stubSaveEcho();
 
-        paymentProcessingService.payWithWallet(reader, ORDER_CODE);
+        paymentProcessingService.processSepayIpn(ipn("15000"));
 
         assertEquals(TransactionStatus.SUCCESS, tx.getStatus());
         verify(eventPublisher).publishEvent(any(PaymentSuccessEvent.class));
-    }
-
-    @Test
-    @DisplayName("Rule 6: booking quảng cáo quá hạn giữ chỗ -> trả bằng ví bị chặn 410")
-    void payWithWallet_expiredAdHold_gone() {
-        Transaction tx = pending(TransactionType.AD, "500000");
-        tx.setExpiresAt(LocalDateTime.now().minusMinutes(5));
-        stubLockedOrder(tx);
-
-        AppException ex = assertThrows(AppException.class, () -> paymentProcessingService.payWithWallet(reader, ORDER_CODE));
-
-        assertEquals(HttpStatus.GONE, ex.getStatus());
-        verify(walletService, never()).debit(any(), any(), anyString());
-    }
-
-    @Test
-    @DisplayName("Ghi nhận tay vào đơn mua còn mã nạp bù chờ -> dùng mã nạp bù đúng số tiền")
-    void resolvePaymentCode_prefersMatchingShortfallTopUp() {
-        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(pending(TransactionType.ARTICLE, "15000")));
-        Transaction other = Transaction.builder().transactionType(TransactionType.TOPUP).amount(new BigDecimal("5000"))
-                .gatewayTransactionId("LP2610201205TOP2").topupForOrder(ORDER_CODE).status(TransactionStatus.PENDING).build();
-        Transaction matching = Transaction.builder().transactionType(TransactionType.TOPUP).amount(new BigDecimal("11000"))
-                .gatewayTransactionId("LP2610201201TOP1").topupForOrder(ORDER_CODE).status(TransactionStatus.PENDING).build();
-        when(transactionRepository.findByTopupForOrderAndStatusOrderByCreatedAtDesc(ORDER_CODE, TransactionStatus.PENDING))
-                .thenReturn(List.of(other, matching));
-
-        assertEquals("LP2610201201TOP1", paymentProcessingService.resolvePaymentCode(ORDER_CODE, new BigDecimal("11000")));
-        assertEquals("LP2610201205TOP2", paymentProcessingService.resolvePaymentCode(ORDER_CODE, new BigDecimal("9999")));
-    }
-
-    @Test
-    @DisplayName("Ghi nhận tay: đơn không còn chờ -> giữ nguyên mã đơn")
-    void resolvePaymentCode_keepsOrderCode() {
-        Transaction paid = pending(TransactionType.ARTICLE, "15000");
-        paid.setStatus(TransactionStatus.SUCCESS);
-        when(transactionRepository.findByGatewayTransactionId(ORDER_CODE)).thenReturn(Optional.of(paid));
-
-        assertEquals(ORDER_CODE, paymentProcessingService.resolvePaymentCode(ORDER_CODE, new BigDecimal("15000")));
-        verify(transactionRepository, never()).findByTopupForOrderAndStatusOrderByCreatedAtDesc(any(), any());
     }
 }

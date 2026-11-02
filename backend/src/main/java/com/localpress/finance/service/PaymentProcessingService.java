@@ -7,7 +7,6 @@ import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
-import com.localpress.finance.model.Wallet;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.shared.event.PaymentSuccessEvent;
 import com.localpress.shared.exception.AppException;
@@ -27,22 +26,23 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
  * ==============================================================================
  * DỊCH VỤ XỬ LÝ THANH TOÁN TẬP TRUNG (SV4 - PAYMENT PROCESSING SERVICE)
  * ==============================================================================
- * Mọi luồng thanh toán (mua bài lẻ, gói hội viên, booking quảng cáo, nạp ví) đều tạo đơn ở đây
+ * Mọi luồng thanh toán (mua bài lẻ, gói hội viên, booking quảng cáo) đều tạo đơn ở đây
  * rồi chuyển khách sang trang thanh toán chung /payment/:orderCode.
- * - UC047: Tạo đơn thanh toán (kể cả đơn nạp ví TOPUP).
+ * - UC047: Tạo đơn thanh toán.
  * - UC048: Xác minh kết quả thanh toán, đối chiếu số tiền.
- * - UC049: Xử lý Webhook IPN SePay idempotent, xử lý tiền về muộn / chuyển thiếu / chuyển thừa.
+ * - UC049: Xử lý Webhook IPN SePay idempotent.
  * - UC050: Trạng thái đơn cho trang thanh toán polling.
- * Nguyên tắc: tiền khách đã chuyển không bao giờ bị treo. Không cấp quyền được thì cộng vào ví.
+ * Nguyên tắc: LocalPress KHÔNG giữ tiền khách (không ví, không nạp tiền). Khách quét QR có sẵn đúng
+ * mã đơn + đúng số tiền; SePay báo về khớp thì đơn PAID. Khoản không khớp (sai số tiền, về sau khi
+ * booking hết giữ chỗ, không có mã đơn) chỉ ghi nhật ký; khách gửi khiếu nại (UC051), kế toán ghi nhận
+ * vào đơn hoặc chuyển trả lại tài khoản khách.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,17 +51,10 @@ public class PaymentProcessingService {
 
     private final TransactionRepository transactionRepository;
     private final SePayService sePayService;
-    private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Value("${localpress.payment.order-ttl-minutes:15}")
     private long orderTtlMinutes = 15;
-
-    @Value("${localpress.payment.topup-min-amount:10000}")
-    private BigDecimal topUpMinAmount = new BigDecimal("10000");
-
-    @Value("${localpress.payment.topup-max-amount:50000000}")
-    private BigDecimal topUpMaxAmount = new BigDecimal("50000000");
 
     // =========================================================================
     // UC047: TẠO ĐƠN
@@ -100,25 +93,6 @@ public class PaymentProcessingService {
         return toPaymentView(savedTx);
     }
 
-    /**
-     * Nạp tiền vào Ví LocalPress: tạo đơn TOPUP (không gắn đối tượng), khách quét QR SePay để trả.
-     */
-    @Transactional
-    public OrderCreateResponse createTopUp(Long userId, BigDecimal amount) {
-        if (amount == null || amount.compareTo(topUpMinAmount) < 0 || amount.compareTo(topUpMaxAmount) > 0) {
-            throw new AppException(String.format("Số tiền nạp phải từ %,d đến %,d VND",
-                    topUpMinAmount.longValue(), topUpMaxAmount.longValue()), HttpStatus.BAD_REQUEST);
-        }
-        if (amount.stripTrailingZeros().scale() > 0) {
-            throw new AppException("Số tiền nạp phải là số nguyên VND", HttpStatus.BAD_REQUEST);
-        }
-
-        Transaction savedTx = transactionRepository.save(
-                newPendingOrder(userId, TransactionType.TOPUP, amount, "Nạp tiền vào Ví LocalPress").build());
-        log.info("User #{} tạo đơn nạp ví {} VND, mã {}", userId, amount, savedTx.getGatewayTransactionId());
-        return toPaymentView(savedTx);
-    }
-
     // =========================================================================
     // UC050: TRA CỨU ĐƠN CHO TRANG THANH TOÁN
     // =========================================================================
@@ -137,7 +111,7 @@ public class PaymentProcessingService {
     }
 
     /**
-     * "Đơn của tôi": mọi đơn của user đang đăng nhập (kể cả TOPUP, REFUND), mới nhất trước.
+     * "Đơn của tôi": mọi đơn của user đang đăng nhập (kể cả REFUND), mới nhất trước.
      * SV3 dùng cho UC045 thay vì đọc thẳng bảng transactions (Rule 17).
      */
     @Transactional(readOnly = true)
@@ -154,78 +128,18 @@ public class PaymentProcessingService {
     }
 
     // =========================================================================
-    // THANH TOÁN BẰNG VÍ
-    // =========================================================================
-
-    /**
-     * Khách trả đơn bằng số dư ví. Khóa dòng đơn + khóa dòng ví trong cùng 1 transaction DB:
-     * bấm 2 lần chỉ trừ 1 lần, số dư không đủ thì không trừ gì và đơn giữ nguyên PENDING.
-     */
-    @Transactional
-    public OrderStatusResponse payWithWallet(FinanceCurrentUser.Principal principal, String orderCode) {
-        Transaction tx = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode)
-                .orElseThrow(() -> orderNotFound(orderCode));
-        assertOwnPurchase(principal, tx, "Đơn nạp ví không thể thanh toán bằng chính số dư ví");
-        if (tx.getStatus() == TransactionStatus.SUCCESS) {
-            return toStatus(tx);
-        }
-        if (tx.getStatus() != TransactionStatus.PENDING || tx.isPaymentWindowClosed(LocalDateTime.now())) {
-            throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
-        }
-
-        return toStatus(debitAndMarkPaid(tx));
-    }
-
-    /**
-     * Ví không đủ tiền trả đơn: tạo 1 đơn TOPUP đúng bằng phần còn thiếu, gắn mã đơn cần trả (topup_for_order).
-     * Khách quét QR của mã nạp bù này; tiền về thì processSepayIpn cộng ví rồi tự trả đơn (tryAutoPay).
-     * Mở lại trang nhiều lần thì dùng lại mã nạp bù còn hạn nếu số tiền vẫn đúng, không sinh QR mới.
-     */
-    @Transactional
-    public OrderCreateResponse createShortfallTopUp(FinanceCurrentUser.Principal principal, String orderCode) {
-        Transaction order = findByCode(orderCode);
-        assertOwnPurchase(principal, order, "Đơn nạp ví không cần nạp bù");
-        if (order.getStatus() == TransactionStatus.SUCCESS) {
-            throw new AppException("Đơn " + orderCode + " đã được thanh toán", HttpStatus.CONFLICT);
-        }
-        LocalDateTime now = LocalDateTime.now();
-        if (order.getStatus() != TransactionStatus.PENDING || order.isPaymentWindowClosed(now)) {
-            throw new AppException("Đơn hàng đã hết hạn, vui lòng tạo lại đơn mới", HttpStatus.GONE);
-        }
-
-        BigDecimal balance = walletService.findByUserId(order.getUserId()).map(Wallet::getBalance).orElse(BigDecimal.ZERO);
-        BigDecimal shortfall = order.getAmount().subtract(balance);
-        if (shortfall.signum() <= 0) {
-            throw new AppException("Ví đã đủ tiền, hãy thanh toán bằng ví", HttpStatus.CONFLICT);
-        }
-
-        Optional<Transaction> existing = transactionRepository
-                .findFirstByTopupForOrderAndStatusOrderByCreatedAtDesc(orderCode, TransactionStatus.PENDING);
-        if (existing.isPresent() && !existing.get().isExpired(now) && existing.get().getAmount().compareTo(shortfall) == 0) {
-            return toPaymentView(existing.get());
-        }
-
-        Transaction topup = transactionRepository.save(
-                newPendingOrder(order.getUserId(), TransactionType.TOPUP, shortfall, "Nạp bù cho đơn " + orderCode)
-                        .topupForOrder(orderCode)
-                        .build());
-        log.info("User #{} nạp bù {} VND cho đơn {}, mã nạp {}", order.getUserId(), shortfall, orderCode, topup.getGatewayTransactionId());
-        return toPaymentView(topup);
-    }
-
-    // =========================================================================
     // UC048 & UC049: WEBHOOK IPN SEPAY
     // =========================================================================
 
     /**
      * Xử lý IPN đã qua xác thực khóa ở Controller. Các nhánh:
-     * 1. Không có mã đơn / đơn không tồn tại  -> ORDER_NOT_FOUND (Kế toán đối soát bằng sao kê, UC054).
+     * 1. Không có mã đơn / đơn không tồn tại  -> ORDER_NOT_FOUND (chỉ ghi nhật ký, khách khiếu nại UC051).
      * 2. Đơn đã SUCCESS                       -> ALREADY_PROCESSED (Rule 5).
      *    Không có số tiền                     -> AMOUNT_MISSING, không đổi gì (Rule 4).
-     * 3. Đơn TOPUP                            -> cộng ví đúng số tiền thực nhận.
-     * 4. Đơn hết hiệu lực / quảng cáo quá hạn -> tiền vào ví, không cấp quyền (Rule 6).
-     * 5. Chuyển thiếu                         -> tiền vào ví, đơn vẫn PENDING để khách bù.
-     * 6. Đủ hoặc thừa                         -> SUCCESS + PaymentSuccessEvent, phần thừa vào ví.
+     * 3. Đơn đã đóng / booking quá hạn giữ chỗ -> LATE_PAYMENT, không cấp quyền (Rule 6).
+     * 4. Số tiền khác số tiền đơn             -> AMOUNT_MISMATCH, đơn giữ nguyên.
+     * 5. Đúng số tiền                         -> SUCCESS + PaymentSuccessEvent.
+     * Nhánh 3, 4 không giữ tiền trong hệ thống: kế toán đối chiếu sao kê và chuyển trả lại khách.
      */
     @Transactional
     public Map<String, Object> processSepayIpn(SepayIpnRequest ipnRequest) {
@@ -238,8 +152,8 @@ public class PaymentProcessingService {
         }
 
         Transaction tx = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode).orElse(null);
-        if (tx == null) {
-            log.warn("Không tìm thấy giao dịch nào khớp với mã đơn hàng: {}. Chờ Kế toán đối soát.", orderCode);
+        if (tx == null || !tx.getTransactionType().isPurchase()) {
+            log.warn("Không tìm thấy đơn hàng nào khớp với mã: {}. Chờ khiếu nại / đối soát.", orderCode);
             return result(false, "ORDER_NOT_FOUND", orderCode, "Đơn hàng không tồn tại: " + orderCode);
         }
 
@@ -254,163 +168,37 @@ public class PaymentProcessingService {
             log.warn("Webhook cho đơn {} không có số tiền, không ghi nhận", orderCode);
             return result(false, "AMOUNT_MISSING", orderCode, "Thông báo tiền về không có số tiền, chờ kế toán đối soát");
         }
-        String reference = ipnRequest.getReferenceCode();
 
-        // 3. Nạp ví: cộng đúng số tiền thực nhận, kể cả khi về sau hạn QR (không có gì để mất chỗ)
-        if (tx.getTransactionType() == TransactionType.TOPUP) {
-            tx.setAmount(paidAmount);
-            tx.markPaidByGateway(sePayService.getBankCode());
-            transactionRepository.save(tx);
-            walletService.credit(tx, paidAmount, tx.getTopupForOrder() != null
-                    ? "Nạp bù qua SePay cho đơn " + tx.getTopupForOrder() + ", mã " + orderCode
-                    : "Nạp tiền qua SePay, mã " + orderCode);
-            Map<String, Object> body = result(true, "SUCCESS", orderCode, "Đã cộng " + paidAmount.toPlainString() + " VND vào ví");
-            if (tx.getTopupForOrder() != null) {
-                String autoPay = tryAutoPay(tx.getUserId(), tx.getTopupForOrder());
-                body.put("autoPay", autoPay);
-                body.put("paidOrder", tx.getTopupForOrder());
-                body.put("message", body.get("message") + autoPayMessage(autoPay, tx.getTopupForOrder()));
-            }
-            return body;
-        }
-
-        // 4. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ: không cấp quyền, tiền vào ví
-        boolean adHoldExpired = tx.getTransactionType() == TransactionType.AD && tx.isPaymentWindowClosed(LocalDateTime.now());
-        if (tx.getStatus() != TransactionStatus.PENDING || adHoldExpired) {
+        // 3. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ: không cấp quyền
+        if (tx.getStatus() != TransactionStatus.PENDING || tx.isPaymentWindowClosed(LocalDateTime.now())) {
             tx.markExpired();
             transactionRepository.save(tx);
-            return creditToWallet(tx, paidAmount, "LATE",
-                    "Tiền về sau khi đơn " + orderCode + " hết hiệu lực, chuyển vào ví",
-                    "LATE_PAYMENT_CREDITED_TO_WALLET");
+            log.warn("Tiền về sau khi đơn {} hết hiệu lực: {} VND, chờ kế toán chuyển trả", orderCode, paidAmount);
+            return result(false, "LATE_PAYMENT", orderCode,
+                    "Tiền về sau khi đơn " + orderCode + " hết hiệu lực, kế toán sẽ chuyển trả lại khách");
         }
 
-        // 5. Chuyển thiếu
-        if (paidAmount.compareTo(tx.getAmount()) < 0) {
-            String suffix = "PART-" + (reference != null && !reference.isBlank() ? reference : paidAmount.toBigInteger());
-            log.warn("Đơn {} chuyển thiếu: nhận {} / cần {}", orderCode, paidAmount, tx.getAmount());
-            return creditToWallet(tx, paidAmount, suffix,
-                    "Chuyển thiếu cho đơn " + orderCode + ", tiền đã nhận được cộng vào ví",
-                    "UNDERPAID_CREDITED_TO_WALLET");
+        // 4. QR đã cố định số tiền: khác số tiền thì không tự ghi nhận
+        if (paidAmount.compareTo(tx.getAmount()) != 0) {
+            log.warn("Đơn {} chuyển sai số tiền: nhận {} / cần {}", orderCode, paidAmount, tx.getAmount());
+            return result(false, "AMOUNT_MISMATCH", orderCode, String.format(
+                    "Chuyển %s VND, đơn cần %s VND. Đơn chưa được ghi nhận, kế toán sẽ chuyển trả lại khách",
+                    paidAmount.toPlainString(), tx.getAmount().toPlainString()));
         }
 
-        // 6. Đủ hoặc thừa
+        // 5. Đúng số tiền
         tx.markPaidByGateway(sePayService.getBankCode());
         Transaction savedTx = transactionRepository.save(tx);
         publishPaymentSuccess(savedTx);
-
-        BigDecimal excess = paidAmount.subtract(tx.getAmount());
-        if (excess.compareTo(BigDecimal.ZERO) > 0) {
-            creditToWallet(tx, excess, "EXCESS", "Chuyển thừa cho đơn " + orderCode + ", phần dư cộng vào ví", "EXCESS");
-        }
 
         Map<String, Object> body = result(true, "SUCCESS", orderCode, "Xác nhận thanh toán thành công");
         body.put("transactionId", savedTx.getTransactionId());
         return body;
     }
 
-    /**
-     * Ghi nhận khoản tiền thực nhận nhưng không gắn được vào đơn nào (khiếu nại không có mã đơn,
-     * hoặc chuyển thêm vào đơn đã thanh toán): tạo giao dịch TOPUP mã {code} rồi cộng ví.
-     * Mã trùng (đã xử lý) thì không cộng lần 2.
-     */
-    @Transactional
-    public Map<String, Object> creditUnmatchedTransfer(Long userId, BigDecimal amount, String code, String reason) {
-        Transaction carrier = Transaction.builder().userId(userId).gatewayTransactionId(code).build();
-        return creditToWallet(carrier, amount, null, reason, "CREDITED_WALLET");
-    }
-
-    /**
-     * Ghi nhận tay một khoản tiền vào đơn (khiếu nại UC051, đối soát UC054) phải đi đúng đường tiền thật đã đi.
-     * Luồng mọi đơn trả bằng ví: QR khách quét mang mã nạp bù (TOPUP gắn topup_for_order), không phải mã đơn.
-     * Đơn mua còn mã nạp bù đang chờ -> trả về mã nạp bù (ưu tiên mã đúng số tiền) để tiền cộng ví rồi tự trả đơn,
-     * và webhook thật của mã đó về sau gặp ALREADY_PROCESSED. Ngược lại giữ nguyên mã được khai.
-     */
-    @Transactional(readOnly = true)
-    public String resolvePaymentCode(String orderCode, BigDecimal amount) {
-        Transaction order = transactionRepository.findByGatewayTransactionId(orderCode).orElse(null);
-        if (order == null || !order.getTransactionType().isPurchase() || order.getStatus() != TransactionStatus.PENDING) {
-            return orderCode;
-        }
-        List<Transaction> topups = transactionRepository
-                .findByTopupForOrderAndStatusOrderByCreatedAtDesc(orderCode, TransactionStatus.PENDING);
-        return topups.stream()
-                .filter(t -> amount != null && t.getAmount().compareTo(amount) == 0)
-                .findFirst()
-                .or(() -> topups.stream().findFirst())
-                .map(Transaction::getGatewayTransactionId)
-                .orElse(orderCode);
-    }
-
     // =========================================================================
     // HÀM NỘI BỘ
     // =========================================================================
-
-    /**
-     * Ghi nhận tiền thực nhận nhưng không gắn được vào đơn: tạo 1 giao dịch TOPUP con với mã
-     * {orderCode}-{suffix} rồi cộng ví. UNIQUE gateway_transaction_id khiến webhook lặp lại
-     * không thể tạo bản ghi con thứ 2.
-     */
-    private Map<String, Object> creditToWallet(Transaction origin, BigDecimal amount, String suffix,
-                                               String reason, String status) {
-        String childCode = suffix == null ? origin.getGatewayTransactionId() : origin.getGatewayTransactionId() + "-" + suffix;
-        if (transactionRepository.existsByGatewayTransactionId(childCode)) {
-            return result(true, "ALREADY_PROCESSED", origin.getGatewayTransactionId(), "Khoản tiền này đã được cộng vào ví trước đó");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        Transaction child = transactionRepository.save(Transaction.builder()
-                .userId(origin.getUserId())
-                .transactionType(TransactionType.TOPUP)
-                .amount(amount)
-                .currency("VND")
-                .paymentMethod("SEPAY")
-                .bankCode(sePayService.getBankCode())
-                .gatewayTransactionId(childCode)
-                .description(reason)
-                .status(TransactionStatus.SUCCESS)
-                .paidAt(now)
-                .createdAt(now)
-                .build());
-        walletService.credit(child, amount, reason);
-
-        log.info("{}: cộng {} VND vào ví user #{} (giao dịch con {})", status, amount, origin.getUserId(), childCode);
-        return result(true, status, origin.getGatewayTransactionId(), reason);
-    }
-
-    /** Trừ ví và đánh dấu đơn SUCCESS (đã khóa dòng đơn từ trước), phát PaymentSuccessEvent. */
-    private Transaction debitAndMarkPaid(Transaction order) {
-        walletService.debit(order, order.getAmount(), "Thanh toán đơn " + order.getGatewayTransactionId());
-        order.markPaidByWallet();
-        Transaction saved = transactionRepository.save(order);
-        publishPaymentSuccess(saved);
-        return saved;
-    }
-
-    /**
-     * Tiền nạp bù vừa vào ví: tự trả đơn nếu đơn còn chờ, còn hạn và ví đủ tiền.
-     * Kiểm tra số dư trên dòng ví đã khóa trước khi trừ, để không ném 402 làm rollback cả tiền nạp.
-     * Kết quả: PAID, ALREADY_PAID, ORDER_EXPIRED (tiền ở lại ví), INSUFFICIENT (chờ nạp thêm), ORDER_NOT_FOUND.
-     */
-    private String tryAutoPay(Long userId, String orderCode) {
-        Transaction order = transactionRepository.findByGatewayTransactionIdForUpdate(orderCode).orElse(null);
-        if (order == null || !order.getUserId().equals(userId)) return "ORDER_NOT_FOUND";
-        if (order.getStatus() == TransactionStatus.SUCCESS) return "ALREADY_PAID";
-        if (order.getStatus() != TransactionStatus.PENDING || order.isPaymentWindowClosed(LocalDateTime.now())) return "ORDER_EXPIRED";
-        if (walletService.lockedBalance(userId).compareTo(order.getAmount()) < 0) return "INSUFFICIENT";
-        debitAndMarkPaid(order);
-        log.info("Tự trả đơn {} bằng ví sau khi nạp bù", orderCode);
-        return "PAID";
-    }
-
-    private static String autoPayMessage(String autoPay, String orderCode) {
-        return switch (autoPay) {
-            case "PAID" -> ", đã tự thanh toán đơn " + orderCode;
-            case "ALREADY_PAID" -> ", đơn " + orderCode + " đã thanh toán trước đó";
-            case "ORDER_EXPIRED" -> ", đơn " + orderCode + " đã hết hạn nên tiền giữ trong ví";
-            case "INSUFFICIENT" -> ", ví vẫn chưa đủ để trả đơn " + orderCode;
-            default -> "";
-        };
-    }
 
     private Transaction.TransactionBuilder newPendingOrder(Long userId, TransactionType type, BigDecimal amount, String description) {
         LocalDateTime now = LocalDateTime.now();
@@ -419,7 +207,7 @@ public class PaymentProcessingService {
                 .transactionType(type)
                 .amount(amount)
                 .currency("VND")
-                // Mọi khoản tiền vào đều qua SePay (QR) hoặc ví; không còn chuyển khoản thủ công do kế toán duyệt
+                // Mọi khoản tiền vào đều qua QR SePay; không có ví, không có chuyển khoản thủ công do kế toán duyệt
                 .paymentMethod("SEPAY")
                 .bankCode(sePayService.getBankCode())
                 .gatewayTransactionId(generateOrderCode(now))
@@ -458,16 +246,6 @@ public class PaymentProcessingService {
         Transaction tx = findByCode(orderCode);
         principal.assertCanAccess(tx.getUserId());
         return tx;
-    }
-
-    /** Chỉ chủ đơn mới được trả, và chỉ trả đơn mua (không phải TOPUP / REFUND). */
-    private static void assertOwnPurchase(FinanceCurrentUser.Principal principal, Transaction order, String notPurchaseMessage) {
-        if (!order.getUserId().equals(principal.userId())) {
-            throw new AppException("Bạn không có quyền thanh toán đơn hàng này", HttpStatus.FORBIDDEN);
-        }
-        if (!order.getTransactionType().isPurchase()) {
-            throw new AppException(notPurchaseMessage, HttpStatus.BAD_REQUEST);
-        }
     }
 
     private static AppException orderNotFound(String orderCode) {
@@ -510,7 +288,6 @@ public class PaymentProcessingService {
                 .accountNumber(sePayService.getAccountNumber())
                 .accountName(sePayService.getAccountName())
                 .transferContent(tx.getGatewayTransactionId())
-                .topupForOrder(tx.getTopupForOrder())
                 .createdAt(tx.getCreatedAt())
                 .expiresAt(tx.getExpiresAt())
                 .paidAt(tx.getPaidAt())

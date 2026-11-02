@@ -46,6 +46,6 @@ public class OrderStatusResponse {
 
     private String description;
 
-    /** purchase_id / subscription_id / campaign_id; với REFUND là id đơn gốc; TOPUP là null. */
+    /** purchase_id / subscription_id / campaign_id; với REFUND là id đơn gốc. */
     private Long targetId;
 }

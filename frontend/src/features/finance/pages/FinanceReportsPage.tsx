@@ -28,7 +28,7 @@ const today = () => {
  * ==============================================================================
  * CẢNH BÁO & BÁO CÁO /backoffice/finance/reports (SV4 - UC060, UC059, II.4.12)
  * ==============================================================================
- * Cảnh báo cuối kỳ: mỗi cảnh báo dẫn tới đúng hàng chờ xử lý (hoàn tiền, khiếu nại, công nợ, đối soát).
+ * Cảnh báo cuối kỳ: mỗi cảnh báo dẫn tới đúng hàng chờ xử lý (hoàn tiền, khiếu nại, đối soát, cấp quyền lỗi).
  * Xuất CSV giao dịch theo khoảng ngày; cuối file có khối tổng hợp cùng công thức Dashboard (Rule 16).
  */
 export function FinanceReportsPage() {
@@ -82,7 +82,7 @@ export function FinanceReportsPage() {
           ) : !alerts ? (
             <LoadingBlock rows={3} />
           ) : alerts.length === 0 ? (
-            <p className="text-sm text-slate-500">Không có việc tồn đọng: hoàn tiền, khiếu nại, công nợ và đối soát đều đã xử lý.</p>
+            <p className="text-sm text-slate-500">Không có việc tồn đọng: hoàn tiền, khiếu nại và đối soát đều đã xử lý.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {alerts.map((a) => (

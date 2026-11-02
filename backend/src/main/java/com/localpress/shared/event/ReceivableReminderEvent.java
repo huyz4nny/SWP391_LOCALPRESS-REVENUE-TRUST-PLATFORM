@@ -11,8 +11,11 @@ import java.time.LocalDateTime;
 
 /**
  * ==============================================================================
- * HỢP ĐỒNG SỰ KIỆN MIỀN (SHARED DOMAIN EVENT): KẾ TOÁN NHẮC NỢ QUẢNG CÁO (UC053)
+ * HỢP ĐỒNG SỰ KIỆN MIỀN (SHARED DOMAIN EVENT): KẾ TOÁN NHẮC NỢ QUẢNG CÁO (UC053) - ĐÃ BỎ
  * ==============================================================================
+ * KHÔNG CÒN ĐƯỢC PHÁT (02/11/2026): doanh nghiệp quảng cáo phải trả đủ qua QR trước khi chạy, không cho nợ,
+ * nên SV4 bỏ UC053 và bảng receivable_reminders (V17). Giữ class này đến khi SV1 xóa listener
+ * AdBookingService.onReceivableReminder và test liên quan, sau đó SV4 xóa class.
  * - Kế toán bấm "Gửi nhắc nợ" cho 1 chiến dịch còn nợ, Finance (SV4) lưu receivable_reminders
  *   rồi publish sự kiện này.
  * - Tuân thủ Quy tắc 17: SV4 không ghi bảng notifications / ad_campaigns của module khác.
@@ -23,6 +26,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Deprecated
 public class ReceivableReminderEvent {
 
     /** receivable_reminders.reminder_id */
