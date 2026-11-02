@@ -10,6 +10,18 @@ import type {
   CoverImageInfoRequest,
   ArticleVersionReviewStatus,
 } from '@/features/content/types'
+import type {
+  CampaignEligibility,
+  CampaignControl,
+  EditorialContract,
+  UpdateContractRequest,
+  CreateContractAddendumRequest,
+  AdvertiserVip,
+  UpdateVipTierRequest,
+  EditorialDashboardOverview,
+} from '../types'
+
+export * from '../types'
 export type EditorialCategoryOption = Pick<Category, 'id' | 'name' | 'slug'> & { apiId?: string }
 
 function coverUploadBody(partName: 'article' | 'request', payload: unknown, file: File, info: CoverImageInfoRequest): FormData {
@@ -146,5 +158,69 @@ export const editorialApi = {
       '/editorial/ai/suggest',
       { topic }
     )
+  },
+
+  // ==========================================
+  // Iteration 3: Screen II.2.7 (Eligibility)
+  // ==========================================
+  getEligibilityChecklist: async (): Promise<CampaignEligibility[]> => {
+    const res = await httpClient.get<any>('/editorial/eligibility')
+    return (res?.data ?? res) as CampaignEligibility[]
+  },
+  activateCampaign: async (id: number | string): Promise<CampaignEligibility> => {
+    const res = await httpClient.post<any>(`/editorial/eligibility/${id}/activate`)
+    return (res?.data ?? res) as CampaignEligibility
+  },
+
+  // ==========================================
+  // Iteration 3: Screen II.2.8 (Campaign Control)
+  // ==========================================
+  getCampaignControlList: async (): Promise<CampaignControl[]> => {
+    const res = await httpClient.get<any>('/editorial/campaign-control')
+    return (res?.data ?? res) as CampaignControl[]
+  },
+  suspendCampaign: async (id: number | string, reason: string): Promise<CampaignControl> => {
+    const res = await httpClient.post<any>(`/editorial/campaign-control/${id}/suspend`, { reason })
+    return (res?.data ?? res) as CampaignControl
+  },
+  resumeCampaign: async (id: number | string): Promise<CampaignControl> => {
+    const res = await httpClient.post<any>(`/editorial/campaign-control/${id}/resume`)
+    return (res?.data ?? res) as CampaignControl
+  },
+  makeGoodCampaign: async (id: number | string, extraDays: number, reason: string): Promise<CampaignControl> => {
+    const res = await httpClient.post<any>(`/editorial/campaign-control/${id}/make-good`, { extraDays, reason })
+    return (res?.data ?? res) as CampaignControl
+  },
+
+  // ==========================================
+  // Iteration 3: Screen II.2.9 (Contracts & VIP)
+  // ==========================================
+  getContracts: async (): Promise<EditorialContract[]> => {
+    const res = await httpClient.get<any>('/editorial/contracts')
+    return (res?.data ?? res) as EditorialContract[]
+  },
+  updateContract: async (id: number | string, contractReference: string, contractFileUrl?: string): Promise<EditorialContract> => {
+    const res = await httpClient.put<any>(`/editorial/contracts/${id}`, { contractReference, contractFileUrl })
+    return (res?.data ?? res) as EditorialContract
+  },
+  createContractAddendum: async (id: number | string, data: CreateContractAddendumRequest): Promise<EditorialContract> => {
+    const res = await httpClient.post<any>(`/editorial/contracts/${id}/addendum`, data)
+    return (res?.data ?? res) as EditorialContract
+  },
+  getVipAdvertisers: async (): Promise<AdvertiserVip[]> => {
+    const res = await httpClient.get<any>('/editorial/advertisers/vip')
+    return (res?.data ?? res) as AdvertiserVip[]
+  },
+  updateVipTier: async (advertiserId: number | string, data: UpdateVipTierRequest): Promise<AdvertiserVip> => {
+    const res = await httpClient.put<any>(`/editorial/advertisers/${advertiserId}/vip-tier`, data)
+    return (res?.data ?? res) as AdvertiserVip
+  },
+
+  // ==========================================
+  // Iteration 3: Screen II.2.10 (Business Dashboard)
+  // ==========================================
+  getDashboardOverview: async (): Promise<EditorialDashboardOverview> => {
+    const res = await httpClient.get<any>('/editorial/dashboard/overview')
+    return (res?.data ?? res) as EditorialDashboardOverview
   },
 }

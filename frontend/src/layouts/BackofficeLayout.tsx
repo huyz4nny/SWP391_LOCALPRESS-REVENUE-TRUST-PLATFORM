@@ -27,6 +27,10 @@ import {
   X,
   Webhook,
   BellRing,
+  ShieldCheck,
+  AlertOctagon,
+  FileCheck,
+  LayoutDashboard,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -108,6 +112,10 @@ export function BackofficeLayout() {
     { label: 'Lịch tồn kho slot (UC017)', path: '/backoffice/editorial/calendar', icon: Calendar },
     { label: 'Duyệt banner', path: '/backoffice/editorial/creatives', icon: ImageIcon },
     { label: 'Kiểm duyệt bình luận', path: '/backoffice/editorial/comments', icon: MessageSquare },
+    { label: 'Vận hành kinh doanh (UC015)', path: '/backoffice/editorial/dashboard', icon: LayoutDashboard },
+    { label: 'Thẩm định phát sóng (UC023)', path: '/backoffice/editorial/eligibility', icon: ShieldCheck },
+    { label: 'Điều khiển chiến dịch (UC024)', path: '/backoffice/editorial/control', icon: AlertOctagon },
+    { label: 'Hợp đồng & VIP (UC019)', path: '/backoffice/editorial/contracts', icon: FileCheck },
   ].filter((item) => currentUser.role !== 'AUTHOR'
     || ['/backoffice/editorial/articles', '/backoffice/editorial/articles/new'].includes(item.path))
 

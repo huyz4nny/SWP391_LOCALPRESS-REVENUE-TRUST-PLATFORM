@@ -146,7 +146,7 @@ export interface AdCampaign {
   startDate: string
   endDate: string
   totalBudget: number
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED'
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'SUSPENDED'
   activeCreativeVersion?: number
   creatives: AdCreative[]
   impressions: number
