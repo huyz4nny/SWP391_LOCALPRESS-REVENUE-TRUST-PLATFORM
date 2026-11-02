@@ -147,6 +147,8 @@ export const router = createBrowserRouter([
       { path: 'checkout/:orderId', element: <LegacyCheckoutRedirect /> },
       { path: 'payment/:orderCode', element: <PaymentPage /> },
       { path: 'payment-complaints', element: <PaymentComplaintPage /> },
+      // Link cũ của trang hỗ trợ (SV3) trước khi bỏ ví: giữ để không ra 404
+      { path: 'wallet/complaints', element: <Navigate to="/payment-complaints" replace /> },
       // Cửa hàng thử (SV4, chỉ bản dev): đóng vai SV3 tạo đơn từ server để demo luồng thanh toán
       ...(import.meta.env.DEV ? [{ path: 'dev/demo-store', element: <DemoStorePage /> }] : []),
       { path: 'payments/:paymentId', element: <PaymentResultPage /> },
