@@ -6,11 +6,14 @@ import com.localpress.reader.repository.ReaderEntitlementRepository.Subscription
 import com.localpress.reader.service.ReaderEntitlementListener;
 import com.localpress.shared.event.PaymentSuccessEvent;
 import com.localpress.shared.event.RefundCompletedEvent;
+import com.localpress.shared.event.RightsGrantFailedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -33,6 +37,9 @@ class ReaderEntitlementListenerTest {
 
     @Mock
     private ReaderEntitlementRepository repository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ReaderEntitlementListener listener;
@@ -69,6 +76,14 @@ class ReaderEntitlementListenerTest {
         listener.onPaymentSuccess(paid("ARTICLE", 2L, 5000));
 
         verify(repository, never()).activatePurchase(any(), any());
+        ArgumentCaptor<RightsGrantFailedEvent> failed = ArgumentCaptor.forClass(RightsGrantFailedEvent.class);
+        verify(eventPublisher).publishEvent(failed.capture());
+        assertEquals(100L, failed.getValue().getTransactionId());
+        assertEquals("ARTICLE", failed.getValue().getTransactionType());
+        assertEquals(2L, failed.getValue().getTargetId());
+        assertEquals(USER, failed.getValue().getUserId());
+        assertEquals(BigDecimal.valueOf(5000), failed.getValue().getAmount());
+        assertEquals("SV3", failed.getValue().getSourceModule());
     }
 
     @Test

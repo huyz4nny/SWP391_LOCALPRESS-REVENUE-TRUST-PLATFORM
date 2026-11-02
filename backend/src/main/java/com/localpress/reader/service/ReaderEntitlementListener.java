@@ -5,8 +5,10 @@ import com.localpress.reader.repository.ReaderEntitlementRepository.PurchaseForG
 import com.localpress.reader.repository.ReaderEntitlementRepository.SubscriptionForGrant;
 import com.localpress.shared.event.PaymentSuccessEvent;
 import com.localpress.shared.event.RefundCompletedEvent;
+import com.localpress.shared.event.RightsGrantFailedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +32,7 @@ public class ReaderEntitlementListener {
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final ReaderEntitlementRepository repository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // block nhận sự kiện tiền về thành công
     // chỉ xử lý loại ARTICLE và SUBSCRIPTION còn AD của SV1 và REFUND thì bỏ qua
@@ -167,13 +170,26 @@ public class ReaderEntitlementListener {
         return event.getPaidAt() != null ? event.getPaidAt() : LocalDateTime.now(VN_ZONE);
     }
 
-    // block duy nhất báo lỗi khi tiền đã về mà không cấp được quyền (Rule 5)
-    // Leader Huy sẽ thêm RightsGrantFailedEvent(transactionId, reason) vào shared.event để đưa đơn vào hàng chờ đối soát
-    // khi có class đó thì chỉ cần publish sự kiện ngay tại đây và bản ghi vẫn giữ PENDING
-    // hiện tại chỉ ghi log mức ERROR kèm mã giao dịch để kế toán tra được
+    // Tiền đã về mà không cấp được quyền: giữ PENDING, không ném lỗi (kẻo rollback đơn của finance).
+    // Finance nghe RightsGrantFailedEvent để ghi audit và đưa vào hàng chờ hoàn tiền.
     private void reportGrantFailure(PaymentSuccessEvent event, String reason) {
         log.error("CẤP QUYỀN THẤT BẠI sau khi tiền đã về: giao dịch #{} loại {} target #{} user #{} số tiền {}: {}",
                 event.getTransactionId(), event.getTransactionType(), event.getTargetId(),
                 event.getUserId(), event.getAmount(), reason);
+        try {
+            eventPublisher.publishEvent(RightsGrantFailedEvent.builder()
+                    .transactionId(event.getTransactionId())
+                    .transactionType(event.getTransactionType())
+                    .targetId(event.getTargetId())
+                    .userId(event.getUserId())
+                    .amount(event.getAmount())
+                    .sourceModule("SV3")
+                    .reason(reason)
+                    .failedAt(LocalDateTime.now())
+                    .build());
+        } catch (Exception publishFailed) {
+            log.error("Không phát được RightsGrantFailedEvent cho giao dịch #{}: {}",
+                    event.getTransactionId(), publishFailed.getMessage());
+        }
     }
 }
