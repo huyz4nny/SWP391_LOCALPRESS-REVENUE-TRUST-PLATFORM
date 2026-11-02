@@ -25,6 +25,8 @@ public class ArticleSummaryResponse {
     private String categorySlug;
     // dùng để frontend hiện nhãn premium trên thẻ bài
     private Boolean isPremium;
+    // người đang gọi đã được đọc toàn văn: bài FREE luôn true, bài PREMIUM chỉ true khi đã mua hoặc gói còn hạn
+    private Boolean accessible;
     private String publishedAt;
     private String authorName;
     private Long viewCount;

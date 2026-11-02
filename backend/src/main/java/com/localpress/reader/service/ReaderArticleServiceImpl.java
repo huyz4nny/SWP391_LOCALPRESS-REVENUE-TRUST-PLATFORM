@@ -32,7 +32,26 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
     public Page<ArticleSummaryResponse> getArticles(String category, String search, String access, Pageable pageable) {
         return readerArticleRepository
                 .findAllPublishedArticles(blankToNull(category), blankToNull(search), blankToNull(access), pageable)
-                .map(ReaderArticleServiceImpl::mapToSummary);
+                .map(this::mapToSummaryWithAccess);
+    }
+
+    // danh sách không trả toàn văn, nhưng phải báo bài nào người đang gọi đã mở được
+    // để trang chủ không chào mua lại bài đã mua lẻ hoặc đã nằm trong gói còn hạn
+    private ArticleSummaryResponse mapToSummaryWithAccess(ArticleProjection projection) {
+        ArticleSummaryResponse summary = mapToSummary(projection);
+        summary.setAccessible(readableByCaller(projection));
+        return summary;
+    }
+
+    private boolean readableByCaller(ArticleProjection projection) {
+        if (!"PREMIUM".equalsIgnoreCase(projection.getAccessType())) {
+            return true;
+        }
+        Long articleId = projection.getId();
+        if (articleId == null) {
+            return false;
+        }
+        return paywallEngine.checkCurrentAccess(articleId).allowed();
     }
 
     // block lấy chi tiết bài và tăng lượt xem cho UC031 và UC032 ở màn hình II.3.2
@@ -55,41 +74,18 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
         return applyPaywall(mapToDetail(projection), projection.getContent(), projection.getAccessType(), allowed);
     }
 
-    // block tính vị trí cắt 30 phần trăm văn bản cho UC032 (rule 3)
-    // kết quả trả về là chỉ số ký tự dùng để substring ở applyPaywall
-    static int previewCut(String rawContent) {
-        // lấy 30 phần trăm độ dài văn bản làm mốc cắt
-        int cutIndex = (int) Math.floor(rawContent.length() * 0.3d);
-        // nếu bài rỗng hoặc quá ngắn thì không cắt gì cả
-        if (cutIndex <= 0) {
-            return 0;
-        }
-        // tìm dấu cách hoặc xuống dòng gần nhất nằm trước mốc cắt để không bị cắt đứt đôi một từ
-        int lastBreak = Math.max(rawContent.lastIndexOf(' ', cutIndex), rawContent.lastIndexOf('\n', cutIndex));
-        // chỉ lùi về chỗ ngắt từ nếu nó không quá xa (còn lại trên nửa mốc cắt) còn không thì cắt thẳng ở mốc
-        if (lastBreak > cutIndex / 2) {
-            return lastBreak;
-        }
-        return cutIndex;
-    }
-
-    // block rào chắn paywall phía server cho UC031 và UC032 (rule 3)
-    // luồng đi là nhận dto đã map và cờ allowed từ PaywallEngine -> được phép thì trả toàn văn còn không thì chỉ trả 30 phần trăm -> trả về getArticleBySlug
+    // PaywallEngine cắt tối đa 30% và tôn trọng previewWordLimit do admin cấu hình.
     private ArticleReaderResponse applyPaywall(ArticleReaderResponse response, String rawContent, String accessType, boolean allowed) {
         boolean premium = "PREMIUM".equalsIgnoreCase(accessType);
         response.setIsPremium(premium);
-        // nhánh được phép đọc gồm bài free người đã mua lẻ hoặc người có gói còn hạn thì mở hết không khóa
         if (allowed) {
             response.setContent(rawContent);
             response.setPreviewContent(rawContent);
             response.setIsLocked(false);
             return response;
         }
-        // nhánh không được phép chỉ gán đoạn preview 30 phần trăm và bài không có nội dung thì preview rỗng
-        response.setPreviewContent(rawContent == null ? "" : rawContent.substring(0, previewCut(rawContent)));
-        // xóa sạch toàn văn ở server để bấm F12 cũng không thấy phần còn lại
+        response.setPreviewContent(paywallEngine.buildLockedPreview(rawContent));
         response.setContent(null);
-        // bật cờ khóa để frontend hiện khung paywall mời mua
         response.setIsLocked(true);
         return response;
     }

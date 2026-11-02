@@ -1,5 +1,7 @@
 package com.localpress.shared.security;
 
+import com.localpress.shared.device.DeviceSessionService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.annotation.Value;
 import com.localpress.identity.service.JwtTokenService;
@@ -41,7 +43,8 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JdbcTemplate jdbc) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JdbcTemplate jdbc,
+                                                   ObjectProvider<DeviceSessionService> devices) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -90,7 +93,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .httpBasic(Customizer.withDefaults())
-                .addFilterBefore(new JwtAuthenticationFilter(tokens, jdbc), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthenticationFilter(tokens, jdbc, devices.getIfAvailable()),
+                        UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

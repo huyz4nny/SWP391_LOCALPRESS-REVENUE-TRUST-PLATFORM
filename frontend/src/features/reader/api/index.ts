@@ -148,6 +148,7 @@ function mapArticle(dto: ArticleDto): Article {
     tags: dto.tags ?? [],
     isPremium,
     isLocked,
+    accessible: dto.accessible === true,
     price: Number(dto.price ?? dto.singlePrice ?? 0),
     status: dto.status ?? 'PUBLISHED',
     views,

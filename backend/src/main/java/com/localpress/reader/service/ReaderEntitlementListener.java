@@ -100,8 +100,13 @@ public class ReaderEntitlementListener {
             reportGrantFailure(event, "Bản ghi mua lẻ #" + purchase.purchaseId() + " không thuộc người thanh toán");
             return;
         }
-        // đã ACTIVE thì sự kiện này đã được xử lý trước đó nên bỏ qua để chạy lại vẫn an toàn
         if ("ACTIVE".equals(purchase.accessStatus())) {
+            if (isDifferentPayment(purchase.grantedTransactionId(), event.getTransactionId())) {
+                reportGrantFailure(event, "Bản ghi mua lẻ #" + purchase.purchaseId()
+                        + " đã được cấp bởi giao dịch #" + purchase.grantedTransactionId()
+                        + ", không cấp thêm cho giao dịch #" + event.getTransactionId());
+                return;
+            }
             log.info("Bản ghi mua lẻ #{} đã ACTIVE, bỏ qua sự kiện lặp của giao dịch #{}",
                     purchase.purchaseId(), event.getTransactionId());
             return;
@@ -116,7 +121,7 @@ public class ReaderEntitlementListener {
             reportGrantFailure(event, "Số tiền " + event.getAmount() + " thấp hơn giá bài " + purchase.price());
             return;
         }
-        int updated = repository.activatePurchase(purchase.purchaseId(), paidAtOrNow(event));
+        int updated = repository.activatePurchase(purchase.purchaseId(), paidAtOrNow(event), event.getTransactionId());
         log.info("Đã cấp quyền đọc bài lẻ purchase #{} cho user #{} (cập nhật {} dòng)",
                 purchase.purchaseId(), purchase.userId(), updated);
     }
@@ -137,6 +142,12 @@ public class ReaderEntitlementListener {
             return;
         }
         if ("ACTIVE".equals(subscription.status())) {
+            if (isDifferentPayment(subscription.grantedTransactionId(), event.getTransactionId())) {
+                reportGrantFailure(event, "Bản ghi gói #" + subscription.subscriptionId()
+                        + " đã được cấp bởi giao dịch #" + subscription.grantedTransactionId()
+                        + ", không cấp thêm cho giao dịch #" + event.getTransactionId());
+                return;
+            }
             log.info("Bản ghi gói #{} đã ACTIVE, bỏ qua sự kiện lặp của giao dịch #{}",
                     subscription.subscriptionId(), event.getTransactionId());
             return;
@@ -154,13 +165,16 @@ public class ReaderEntitlementListener {
         // ngày bắt đầu là ngày trả tiền nhưng nếu khách còn gói đang chạy thì nối tiếp từ ngày sau ngày hết hạn của gói đó
         // ngày kết thúc là ngày bắt đầu cộng số ngày của gói
         LocalDate paidDate = paidAtOrNow(event).toLocalDate();
-        LocalDate start = repository.findLatestActiveEndDate(subscription.userId(), paidDate)
+        LocalDate start = repository.findLatestActiveEndDate(
+                        subscription.userId(), paidDate, subscription.accessScope(), subscription.categoryId())
                 .map(latestEnd -> latestEnd.plusDays(1))
                 .filter(continuation -> continuation.isAfter(paidDate))
                 .orElse(paidDate);
-        LocalDate end = start.plusDays(subscription.durationDays());
+        int days = Math.max(subscription.durationDays(), 1);
+        LocalDate end = start.plusDays(days - 1L);
 
-        int updated = repository.activateSubscription(subscription.subscriptionId(), start, end);
+        int updated = repository.activateSubscription(
+                subscription.subscriptionId(), start, end, event.getTransactionId());
         log.info("Đã kích hoạt gói subscription #{} cho user #{} từ {} đến {} (cập nhật {} dòng)",
                 subscription.subscriptionId(), subscription.userId(), start, end, updated);
     }
@@ -168,6 +182,13 @@ public class ReaderEntitlementListener {
     // block lấy thời điểm trả tiền theo giờ Việt Nam và nếu sự kiện không có thì dùng giờ hiện tại
     private LocalDateTime paidAtOrNow(PaymentSuccessEvent event) {
         return event.getPaidAt() != null ? event.getPaidAt() : LocalDateTime.now(VN_ZONE);
+    }
+
+    // Webhook gửi lại cùng transactionId thì bỏ qua. Giao dịch khác trên bản ghi đã ACTIVE là thu tiền lần hai.
+    private boolean isDifferentPayment(Long grantedTransactionId, Long eventTransactionId) {
+        return grantedTransactionId != null
+                && eventTransactionId != null
+                && !grantedTransactionId.equals(eventTransactionId);
     }
 
     // Tiền đã về mà không cấp được quyền: giữ PENDING, không ném lỗi (kẻo rollback đơn của finance).
