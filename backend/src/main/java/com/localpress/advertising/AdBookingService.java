@@ -9,7 +9,6 @@ import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.RefundManagementService;
 import com.localpress.shared.event.PaymentSuccessEvent;
-import com.localpress.shared.event.ReceivableReminderEvent;
 import com.localpress.shared.event.RefundCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,12 +31,10 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -48,8 +45,6 @@ import java.util.Map;
 public class AdBookingService {
     private static final Logger log = LoggerFactory.getLogger(AdBookingService.class);
     static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final Locale VI = Locale.forLanguageTag("vi-VN");
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /** Campaign đang chiếm lịch: chưa bị từ chối/kết thúc, không vướng xung đột tiền về muộn, đã trả tiền hoặc còn hạn giữ chỗ. */
     static final String OCCUPYING = "status IN ('PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED') AND payment_issue IS NULL " +
@@ -457,26 +452,6 @@ public class AdBookingService {
                         "WHERE campaign_id = ? AND payment_order_code = ? AND payment_status = 'PAID'",
                 campaignId, orderCode);
         audit(event.getUserId(), revoked == 1 ? "AD_REFUND_REVOKED" : "AD_REFUND_NOT_CAMPAIGN_PAYMENT", campaignId, detail);
-    }
-
-    /** UC053: kế toán nhắc nợ -> thông báo trong cổng doanh nghiệp. Chạy đồng bộ trong transaction của finance. */
-    @EventListener
-    public void onReceivableReminder(ReceivableReminderEvent event) {
-        StringBuilder content = new StringBuilder(String.format(VI, "Chiến dịch \"%s\" còn phải thanh toán %,.0f ₫",
-                event.getCampaignName(), event.getAmountDue()));
-        if (event.getDueDate() != null) content.append(", hạn ").append(event.getDueDate().format(DAY));
-        if (event.getOverdueDays() > 0) content.append(" (quá hạn ").append(event.getOverdueDays()).append(" ngày)");
-        content.append('.');
-        if (event.getNote() != null) content.append(" Ghi chú của kế toán: ").append(event.getNote());
-        int sent = jdbc.update("INSERT INTO notifications (user_id, notification_type, channel, title, content, delivery_status) " +
-                        "SELECT user_id, 'AD_PAYMENT_REMINDER', 'IN_APP', 'Nhắc thanh toán quảng cáo', ?, 'SENT' " +
-                        "FROM advertisers WHERE advertiser_id = ?", content.toString(), event.getAdvertiserId());
-        if (sent == 0) {
-            log.warn("Nhắc nợ #{} không tìm thấy doanh nghiệp #{}", event.getReminderId(), event.getAdvertiserId());
-            return;
-        }
-        audit(event.getSentBy(), "AD_PAYMENT_REMINDER_RECEIVED", event.getCampaignId(),
-                Map.of("reminderId", event.getReminderId(), "amountDue", event.getAmountDue()));
     }
 
     private LocalDateTime now() {

@@ -2,7 +2,6 @@ package com.localpress.advertising;
 
 import com.localpress.finance.dto.response.OrderCreateResponse;
 import com.localpress.shared.event.PaymentSuccessEvent;
-import com.localpress.shared.event.ReceivableReminderEvent;
 import com.localpress.shared.event.RefundCompletedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,19 +179,6 @@ class AdBookingIntegrationTest {
         assertEquals(List.of(), bookings.availability(exclusiveSlot, start, start).fullDates());
         SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(emailA, null, "ROLE_ADVERTISER"));
         assertThrows(ResponseStatusException.class, () -> bookings.createPayment(emailA, Long.parseLong(booking.id())));
-    }
-
-    @Test
-    void receivableReminderNotifiesAdvertiser() {
-        var booking = book(emailA, exclusiveSlot, start, start);
-        long advertiserId = jdbc.queryForObject("SELECT advertiser_id FROM advertisers WHERE user_id = ?", Long.class, userA);
-        events.publishEvent(ReceivableReminderEvent.builder().reminderId(1L).campaignId(Long.parseLong(booking.id()))
-                .advertiserId(advertiserId).campaignName("IT campaign").amountDue(BigDecimal.valueOf(1500000))
-                .dueDate(start).overdueDays(3).note("Vui lòng thanh toán").build());
-        String content = jdbc.queryForObject("SELECT content FROM notifications WHERE user_id = ? " +
-                "AND notification_type = 'AD_PAYMENT_REMINDER'", String.class, userA);
-        assertTrue(content.contains("1.500.000"), content);
-        assertTrue(content.contains("quá hạn 3 ngày"), content);
     }
 
     @Test
