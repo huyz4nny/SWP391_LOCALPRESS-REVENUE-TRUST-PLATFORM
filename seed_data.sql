@@ -21,6 +21,12 @@ INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, 
 (7, 'reader.mai@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Thị Mai (Độc giả VIP SV3)', '0988776655', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120', 'READER', 'ACTIVE'),
 (8, 'kiemduyet@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Phạm Kiểm Duyệt Bình Luận', '0907778899', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120', 'STAFF', 'ACTIVE');
 
+-- 1.0.1 Kế toán trưởng (SV4, mắt 2 duyệt hoàn tiền / chốt kỳ đối soát). Bảng users không có role FINANCE_MANAGER
+-- (thuộc module identity), nhóm thống nhất SYSTEM_ADMIN giữ vai Kế toán trưởng (FinanceCurrentUser.FINANCE_MANAGER_ROLES).
+-- Không ghi user_id để không trùng id với dữ liệu seed của module khác; mật khẩu "password".
+INSERT INTO users (email, password_hash, full_name, phone, avatar_url, role, status) VALUES
+('ketoantruong@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Kế Toán Trưởng (SV4)', '0903456790', NULL, 'SYSTEM_ADMIN', 'ACTIVE');
+
 -- 1.1 USER DEVICES (Khống chế tối đa 2 thiết bị - Độc giả Mai)
 INSERT INTO user_devices (device_id, user_id, device_name, device_type, device_token, ip_address) VALUES
 (1, 7, 'iPhone 15 Pro Max (iOS)', 'MOBILE', 'TOKEN_MAI_IPHONE_15_PRO', '118.70.128.45'),

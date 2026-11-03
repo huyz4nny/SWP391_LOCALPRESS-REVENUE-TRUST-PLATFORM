@@ -176,6 +176,25 @@ class PaymentProcessingServiceTest {
     }
 
     @Test
+    @DisplayName("closePendingOrders: module hủy đối tượng -> đóng đơn chờ; tiền về sau đó LATE_PAYMENT, không chứng từ")
+    void closePendingOrders_thenLatePayment() {
+        Transaction tx = pending(TransactionType.AD, "300000");
+        when(transactionRepository.findPendingByTargetForUpdate(TransactionType.AD, 3L)).thenReturn(List.of(tx));
+        stubSaveEcho();
+
+        int closed = paymentProcessingService.closePendingOrders("AD", 3L, "SV1 hủy chiến dịch #3");
+
+        assertEquals(1, closed);
+        assertEquals(TransactionStatus.FAILED, tx.getStatus());
+        stubLockedOrder(tx);
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(ipn("300000"));
+        assertEquals("LATE_PAYMENT", result.get("status"));
+        verify(documentService, never()).issueFor(any());
+        verify(eventPublisher, never()).publishEvent(any());
+        assertThrows(AppException.class, () -> paymentProcessingService.closePendingOrders("REFUND", 3L, null));
+    }
+
+    @Test
     @DisplayName("UC049: Webhook đủ tiền -> SUCCESS và phát PaymentSuccessEvent")
     void ipn_fullAmount_success() {
         Transaction tx = pending(TransactionType.SUBSCRIPTION, "50000");

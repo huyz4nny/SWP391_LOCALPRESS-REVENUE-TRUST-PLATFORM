@@ -13,6 +13,7 @@ import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinancialDocumentService;
 import com.localpress.finance.service.RefundManagementService;
 import com.localpress.shared.event.RefundCompletedEvent;
+import com.localpress.shared.event.RefundRejectedEvent;
 import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -373,8 +374,12 @@ class RefundManagementServiceTest {
 
             Transaction originalTx = Transaction.builder()
                     .transactionId(20L)
+                    .userId(5L)
+                    .campaignId(31L)
+                    .transactionType(TransactionType.AD)
                     .status(TransactionStatus.SUCCESS)
                     .build();
+            refund.setRefundAmount(BigDecimal.valueOf(300_000));
 
             when(refundRequestRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(refund));
             when(transactionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(originalTx));
@@ -387,8 +392,32 @@ class RefundManagementServiceTest {
             RefundDetailResponse res = refundManagementService.reviewRefund(3L, 2L, req);
 
             assertEquals("REJECTED", res.getStatus());
-            verifyNoInteractions(eventPublisher);
+            // Không ghi tiền, không hủy chứng từ; chỉ báo module đã lập đề xuất (SV1 hủy chiến dịch)
+            verify(transactionRepository, never()).save(any());
+            verify(documentService, never()).voidFor(any(), any());
+            verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundRejectedEvent ev
+                    && ev.getRefundId().equals(2L) && "AD".equals(ev.getTransactionType()) && ev.getTargetId().equals(31L)
+                    && ev.getUserId().equals(5L) && ev.getReviewedBy().equals(3L)
+                    && "Không đủ chứng từ ngân hàng".equals(ev.getReviewNotes())));
+            verify(eventPublisher, never()).publishEvent(any(RefundCompletedEvent.class));
             verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
         }
+    }
+
+    @Test
+    @DisplayName("getRefund: module đọc trạng thái 1 phiếu (REJECTED + lý do), không có thì 404")
+    void getRefund_returnsStatus() {
+        when(refundRequestRepository.findById(7L)).thenReturn(Optional.of(RefundRequest.builder()
+                .refundId(7L).transactionId(70L).userId(5L).refundAmount(BigDecimal.valueOf(50_000))
+                .status(RefundStatus.REJECTED).reviewedBy(3L).reviewNotes("Sai số tài khoản").build()));
+        when(refundRequestRepository.findById(8L)).thenReturn(Optional.empty());
+
+        RefundDetailResponse r = refundManagementService.getRefund(7L);
+
+        assertEquals("REJECTED", r.getStatus());
+        assertEquals("70", r.getOrderId());
+        assertEquals("Sai số tài khoản", r.getReviewNotes());
+        AppException ex = assertThrows(AppException.class, () -> refundManagementService.getRefund(8L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
     }
 }

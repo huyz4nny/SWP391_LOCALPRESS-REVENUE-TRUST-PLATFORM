@@ -89,16 +89,41 @@ public class PaymentProcessingService {
         }
 
         // Đơn mới thay đơn cũ cùng đối tượng: đóng đơn cũ, tiền về đơn cũ sau đó thành LATE_PAYMENT (kế toán chuyển trả)
-        for (Transaction old : transactionRepository.findPendingByTargetForUpdate(type, request.getTargetId())) {
-            old.markExpired();
-            transactionRepository.save(old);
-            log.info("Đóng đơn cũ {} của {}#{} vì đã có đơn mới thay thế", old.getGatewayTransactionId(), type, request.getTargetId());
-        }
+        closePending(type, request.getTargetId(), "đã có đơn mới thay thế");
 
         Transaction savedTx = transactionRepository.save(txBuilder.build());
         log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(), savedTx.getGatewayTransactionId());
 
         return toPaymentView(savedTx);
+    }
+
+    /**
+     * Module sở hữu đối tượng hủy nó (vd SV1 hủy chiến dịch, SV3 hủy lượt mua) thì gọi hàm này TỪ SERVER, trong
+     * cùng transaction với việc hủy: mọi đơn PENDING của đối tượng bị đóng (FAILED). Tiền khách lỡ chuyển vào
+     * QR cũ sau đó thành LATE_PAYMENT: không ghi vào đơn, không phát hành chứng từ, không cần đề xuất hoàn;
+     * kế toán chuyển trả qua khiếu nại / đối soát (LocalPress không giữ tiền).
+     * Đơn đã SUCCESS không bị đụng tới: muốn trả lại tiền đã thu thì lập đề xuất hoàn (proposeRefund).
+     *
+     * @return số đơn vừa đóng
+     */
+    @Transactional
+    public int closePendingOrders(String orderType, Long targetId, String reason) {
+        TransactionType type = parseOrderType(orderType);
+        if (!type.isPurchase() || targetId == null) {
+            throw new AppException("Chỉ đóng được đơn mua có đối tượng (ARTICLE, SUBSCRIPTION, AD)", HttpStatus.BAD_REQUEST);
+        }
+        return closePending(type, targetId, reason == null || reason.isBlank() ? "module sở hữu đã hủy đối tượng" : reason.trim());
+    }
+
+    private int closePending(TransactionType type, Long targetId, String reason) {
+        int closed = 0;
+        for (Transaction old : transactionRepository.findPendingByTargetForUpdate(type, targetId)) {
+            old.markExpired();
+            transactionRepository.save(old);
+            closed++;
+            log.info("Đóng đơn {} của {}#{}: {}", old.getGatewayTransactionId(), type, targetId, reason);
+        }
+        return closed;
     }
 
     // =========================================================================
