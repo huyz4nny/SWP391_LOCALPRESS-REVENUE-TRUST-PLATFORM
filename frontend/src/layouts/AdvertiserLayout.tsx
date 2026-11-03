@@ -1,3 +1,5 @@
+import '@/features/advertising/portal.css'
+import { advertisingApi } from '@/features/advertising/api'
 import React, { useState, useEffect } from 'react'
 import { Outlet, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
@@ -7,12 +9,11 @@ import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import {
+  Bell, FileText, ClipboardList, Menu,
   Building2,
   LayoutDashboard,
   CalendarCheck,
   PlusCircle,
-  Image as ImageIcon,
-  BarChart3,
   Receipt,
   ArrowLeft,
   LogOut,
@@ -22,6 +23,16 @@ export function AdvertiserLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
   const location = useLocation()
   const navigate = useNavigate()
+  const [unread, setUnread] = useState<number | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => {
+    let active = true
+    setMenuOpen(false)
+    const load = () => advertisingApi.getUnreadCount().then((n) => { if (active) setUnread(n) }).catch(() => { if (active) setUnread(null) })
+    if (currentUser.role === 'ADVERTISER') load()
+    window.addEventListener('advertiser-notifications-changed', load)
+    return () => { active = false; window.removeEventListener('advertiser-notifications-changed', load) }
+  }, [location.pathname, currentUser.id, currentUser.role])
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -66,6 +77,9 @@ export function AdvertiserLayout() {
     { label: 'Đặt vị trí mới', path: '/advertiser/bookings/new', icon: PlusCircle, isAction: true },
     { label: 'Booking & báo giá', path: '/advertiser/bookings', icon: CalendarCheck },
     { label: 'Vị trí & bảng giá', path: '/advertiser/slots', icon: Building2 },
+    { label: 'Yêu cầu hủy / hoàn tiền', path: '/advertiser/requests', icon: ClipboardList },
+    { label: 'Thông báo', path: '/advertiser/notifications', icon: Bell },
+    { label: 'Hợp đồng & chứng từ', path: '/advertiser/documents', icon: FileText },
     { label: 'Hóa đơn & thanh toán', path: '/advertiser/billing', icon: Receipt },
   ]
 
@@ -77,7 +91,7 @@ export function AdvertiserLayout() {
 
   return (
     <div className="min-h-screen bg-ground font-sans text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-[#e1e4e9] bg-ground">
+      <header className="sticky top-0 z-40 bg-ground">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-4">
             <Link to="/" className="font-serif text-lg font-black tracking-tight text-slate-900">
@@ -90,6 +104,8 @@ export function AdvertiserLayout() {
           </div>
 
           <div className="flex flex-none items-center gap-2.5">
+            <button className="rounded-md p-2 hover:bg-slate-200 lg:hidden" aria-label="Mở menu doanh nghiệp" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Menu className="h-4 w-4" /></button>
+            <Link to="/advertiser/notifications" aria-label={unread === null ? 'Thông báo doanh nghiệp' : `Thông báo doanh nghiệp: ${unread} chưa đọc`} className="flex items-center gap-1 rounded-md p-2 text-sm hover:bg-slate-200"><Bell className="h-4 w-4" />{unread !== null && unread > 0 && <span className="text-xs font-semibold tabular-nums">{unread}</span>}</Link>
             <ThemeToggle />
             <span className="hidden h-8 w-8 items-center justify-center rounded-full bg-[#dfe7f5] text-xs font-semibold text-primary-900 sm:flex" title={currentUser.email}>
               {currentUser.name.charAt(0)}
@@ -110,8 +126,8 @@ export function AdvertiserLayout() {
       </header>
 
       <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:py-8">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
-          <aside>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className={menuOpen ? 'block' : 'hidden lg:block'}>
             <nav className="space-y-0.5" aria-label="Cổng doanh nghiệp">
               {navItems.map((item) => {
                 const Icon = item.icon

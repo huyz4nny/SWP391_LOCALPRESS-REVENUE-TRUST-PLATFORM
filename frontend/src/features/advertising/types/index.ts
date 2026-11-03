@@ -15,6 +15,7 @@ export type PaymentStatus =
   | 'PARTIALLY_REFUNDED'
 
 export type DeliveryStatus =
+  | 'CANCELLED'
   | 'NOT_STARTED'  // Chưa đến lịch
   | 'ELIGIBLE'     // Đủ điều kiện (Đã thanh toán + Creative duyệt + Đến ngày)
   | 'LIVE'         // Đang phát
@@ -90,6 +91,8 @@ export interface AdCreative {
   reviewedAt?: string
   reviewedBy?: string
   isActiveServing: boolean // Is this the currently served creative?
+  replacementReason?: string | null
+  requestedEffectiveAt?: string | null
 }
 
 export interface AdBooking {
@@ -146,7 +149,9 @@ export interface AdCampaign {
   startDate: string
   endDate: string
   totalBudget: number
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED'
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'REJECTED'
+  stage?: string
+  stageReason?: string
   activeCreativeVersion?: number
   creatives: AdCreative[]
   impressions: number
@@ -174,4 +179,110 @@ export interface AdPaymentOrder {
   expired: boolean
   description?: string
   targetId?: number
+}
+
+export interface CampaignSummary {
+  campaignId: string
+  campaignName: string
+  slotName: string
+  startDate: string
+  endDate: string
+  stage: string
+  stageReason: string
+  paymentStatus: string
+  impressions: number
+  clicks: number
+  ctr: number
+  paidAmount: number
+  contractNumber: string
+  contractFileUrl: string
+  acceptanceAvailable: boolean
+  acceptanceReason: string
+}
+export interface AdvertiserDashboardData {
+  campaigns: CampaignSummary[]
+  stageCounts: Record<string, number>
+  impressions: number
+  clicks: number
+  ctr: number
+  totalPaid: number
+  generatedAt: string
+  excludedEventsAvailable: boolean
+}
+export interface DailyPerformance {
+  campaignId: string
+  campaignName: string
+  date: string
+  impressions: number
+  clicks: number
+  ctr: number
+}
+export interface CancellationQuote {
+  allowed: boolean
+  blockedReason: string
+  paidAmount: number
+  totalDays: number
+  unusedDays: number
+  proposedAmount: number
+  refundApplicable: boolean
+  policyText: string
+}
+export interface CancellationRequest {
+  id: string
+  campaignId: string
+  campaignName: string
+  reason: string
+  effectiveAt: string
+  paidAmount: number
+  totalDays: number
+  unusedDays: number
+  proposedAmount: number
+  refundDecision: 'NOT_APPLICABLE' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  refundStatus: 'NONE' | 'PROCESSING' | 'REFUNDED'
+  refundedAmount: number
+  reviewNotes?: string
+  decidedAt?: string
+  refundedAt?: string
+}
+export interface BusinessNotification {
+  id: string
+  type: string
+  title: string
+  content: string
+  link: string
+  read: boolean
+  createdAt: string
+}
+export interface NotificationPage {
+  items: BusinessNotification[]
+  total: number
+  page: number
+  size: number
+}
+export interface AcceptanceReport {
+  campaignId: string
+  campaignName: string
+  companyName: string
+  taxCode: string
+  address: string
+  contractNumber: string
+  slotName: string
+  startDate: string
+  endDate: string
+  impressions: number
+  clicks: number
+  ctr: number
+  servedDays: number
+  pauses: string[]
+  generatedAt: string
+}
+export interface AdvertiserContract {
+  contractId: number
+  campaignId: number
+  campaignName: string
+  contractNumber: string
+  signingDate: string
+  contractValue: number
+  contractFileUrl: string
+  status: string
 }
