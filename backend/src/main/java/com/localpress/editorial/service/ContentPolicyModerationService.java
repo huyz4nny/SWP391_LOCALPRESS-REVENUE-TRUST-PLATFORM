@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -39,14 +40,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContentPolicyModerationService {
 
-    private static final Long DEFAULT_EDITOR_USER_ID = 3L;
-
     private final EditorialCommentRepository commentRepository;
     private final EditorialSubscriptionPlanRepository planRepository;
     private final ArticleRepository articleRepository;
     private final ArticleVersionRepository versionRepository;
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
+
+    private Long resolveUserId(String email) {
+        if (email == null || email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa xác thực danh tính người dùng");
+        }
+        List<Long> ids = jdbcTemplate.query(
+                "SELECT user_id FROM users WHERE email = ? AND status = 'ACTIVE'",
+                (rs, r) -> rs.getLong(1),
+                email
+        );
+        if (ids.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản không tồn tại hoặc không có quyền truy cập");
+        }
+        return ids.get(0);
+    }
 
     // =========================================================================
     // UC026: KIỂM DUYỆT BÌNH LUẬN (COMMENT MODERATION)
@@ -78,7 +92,9 @@ public class ContentPolicyModerationService {
      * Duyệt / Từ chối / Ẩn bình luận độc giả (UC026).
      */
     @Transactional
-    public EditorialCommentDto moderateComment(Long commentId, ModerateCommentRequest request) {
+    public EditorialCommentDto moderateComment(Long commentId, ModerateCommentRequest request, String email) {
+        Long moderatorUserId = resolveUserId(email);
+
         EditorialComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bình luận với ID: " + commentId, HttpStatus.NOT_FOUND));
 
@@ -87,13 +103,13 @@ public class ContentPolicyModerationService {
 
         switch (targetStatus) {
             case "APPROVED":
-                comment.approve(DEFAULT_EDITOR_USER_ID);
+                comment.approve(moderatorUserId);
                 break;
             case "REJECTED":
-                comment.reject(DEFAULT_EDITOR_USER_ID);
+                comment.reject(moderatorUserId);
                 break;
             case "HIDDEN":
-                comment.hide(DEFAULT_EDITOR_USER_ID);
+                comment.hide(moderatorUserId);
                 break;
             default:
                 throw new AppException("Trạng thái kiểm duyệt không hợp lệ: " + targetStatus, HttpStatus.BAD_REQUEST);
@@ -101,12 +117,12 @@ public class ContentPolicyModerationService {
 
         EditorialComment saved = commentRepository.save(comment);
 
-        // Ghi vết vào audit_logs
+        // Ghi vết vào audit_logs với cột chuẩn (user_id, action, target_type, target_id)
         try {
             jdbcTemplate.update(
-                    "INSERT INTO audit_logs (actor_user_id, action, entity_name, entity_id, old_values_json, new_values_json, created_at) " +
+                    "INSERT INTO audit_logs (user_id, action, target_type, target_id, old_value, new_value, created_at) " +
                             "VALUES (?, ?, 'comments', ?, ?, ?, NOW())",
-                    DEFAULT_EDITOR_USER_ID,
+                    moderatorUserId,
                     "COMMENT_MODERATE_" + targetStatus,
                     saved.getCommentId(),
                     String.format("{\"status\":\"%s\"}", oldStatus),
@@ -174,7 +190,8 @@ public class ContentPolicyModerationService {
      * - PREMIUM: single_price >= 0
      */
     @Transactional
-    public EditorialArticleDto updateArticlePolicy(Long articleId, UpdateArticlePolicyRequest request) {
+    public EditorialArticleDto updateArticlePolicy(Long articleId, UpdateArticlePolicyRequest request, String email) {
+        Long editorUserId = resolveUserId(email);
         Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new AppException("Không tìm thấy bài viết với ID: " + articleId, HttpStatus.NOT_FOUND));
 
@@ -198,12 +215,12 @@ public class ContentPolicyModerationService {
         article.updateAccessPolicy(accessType, price);
         Article saved = articleRepository.save(article);
 
-        // Ghi audit_logs
+        // Ghi audit_logs với user_id
         try {
             jdbcTemplate.update(
-                    "INSERT INTO audit_logs (actor_user_id, action, entity_name, entity_id, old_values_json, new_values_json, created_at) " +
-                            "VALUES (?, 'ARTICLE_POLICY_UPDATE', 'articles', ?, NULL, ?, NOW())",
-                    DEFAULT_EDITOR_USER_ID,
+                    "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
+                            "VALUES (?, 'ARTICLE_POLICY_UPDATE', 'articles', ?, ?, NOW())",
+                    editorUserId,
                     saved.getId(),
                     String.format("{\"accessType\":\"%s\",\"singlePrice\":%s}", accessType.name(), price.toPlainString())
             );
@@ -238,7 +255,9 @@ public class ContentPolicyModerationService {
      * Tạo mới một gói cước hội viên (UC028).
      */
     @Transactional
-    public SubscriptionPlanDto createPlan(SaveSubscriptionPlanRequest request) {
+    public SubscriptionPlanDto createPlan(SaveSubscriptionPlanRequest request, String email) {
+        Long editorUserId = email != null ? resolveUserId(email) : null;
+
         if (request.getName() == null || request.getName().trim().isBlank()) {
             throw new AppException("Tên gói cước không được để trống", HttpStatus.BAD_REQUEST);
         }
@@ -275,6 +294,20 @@ public class ContentPolicyModerationService {
                 .build();
 
         EditorialSubscriptionPlan saved = planRepository.save(plan);
+
+        if (editorUserId != null) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
+                                "VALUES (?, 'PLAN_CREATE', 'subscription_plans', ?, ?, NOW())",
+                        editorUserId,
+                        saved.getPlanId(),
+                        String.format("{\"name\":\"%s\"}", saved.getName())
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
         return mapPlanToDto(saved);
     }
 
@@ -282,7 +315,9 @@ public class ContentPolicyModerationService {
      * Cập nhật thông tin gói cước hội viên (UC028).
      */
     @Transactional
-    public SubscriptionPlanDto updatePlan(Long planId, SaveSubscriptionPlanRequest request) {
+    public SubscriptionPlanDto updatePlan(Long planId, SaveSubscriptionPlanRequest request, String email) {
+        Long editorUserId = email != null ? resolveUserId(email) : null;
+
         EditorialSubscriptionPlan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new AppException("Không tìm thấy gói cước với ID: " + planId, HttpStatus.NOT_FOUND));
 
@@ -311,6 +346,20 @@ public class ContentPolicyModerationService {
         );
 
         EditorialSubscriptionPlan saved = planRepository.save(plan);
+
+        if (editorUserId != null) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
+                                "VALUES (?, 'PLAN_UPDATE', 'subscription_plans', ?, ?, NOW())",
+                        editorUserId,
+                        saved.getPlanId(),
+                        String.format("{\"name\":\"%s\"}", saved.getName())
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
         return mapPlanToDto(saved);
     }
 
@@ -318,7 +367,9 @@ public class ContentPolicyModerationService {
      * Bật/Tắt trạng thái kích hoạt gói cước (ACTIVE <-> INACTIVE).
      */
     @Transactional
-    public SubscriptionPlanDto togglePlanStatus(Long planId) {
+    public SubscriptionPlanDto togglePlanStatus(Long planId, String email) {
+        Long editorUserId = email != null ? resolveUserId(email) : null;
+
         EditorialSubscriptionPlan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new AppException("Không tìm thấy gói cước với ID: " + planId, HttpStatus.NOT_FOUND));
 
@@ -329,6 +380,20 @@ public class ContentPolicyModerationService {
         }
 
         EditorialSubscriptionPlan saved = planRepository.save(plan);
+
+        if (editorUserId != null) {
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, created_at) " +
+                                "VALUES (?, 'PLAN_TOGGLE', 'subscription_plans', ?, ?, NOW())",
+                        editorUserId,
+                        saved.getPlanId(),
+                        String.format("{\"status\":\"%s\"}", saved.getStatus().name())
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
         return mapPlanToDto(saved);
     }
 
