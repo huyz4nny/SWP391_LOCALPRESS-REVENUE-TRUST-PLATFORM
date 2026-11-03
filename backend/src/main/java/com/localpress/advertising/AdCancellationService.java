@@ -137,7 +137,8 @@ public class AdCancellationService {
 
         Long refundId = null;
         if (q.refundApplicable()) {
-            var refund = refunds.proposeRefund(me.userId(), ProposeRefundRequest.builder()
+            var refund = refunds.proposeRefund(null, // người lập = Hệ thống, như AdBookingService; lý do đã ở reason
+                    ProposeRefundRequest.builder()
                     .orderId(order.getTransactionId())
                     .refundAmount(q.proposedAmount())
                     .reason("Hủy chiến dịch #" + id + ": " + why)

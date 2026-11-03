@@ -13,13 +13,14 @@ class GoogleIdentityMigrationTest {
     @Test void migrationVersionsAreUniqueAndGoogleUsesV7() throws Exception {
         Path migrations = Path.of("src/main/resources/db/migration");
         var versionPattern = Pattern.compile("V(\\d+)__.*\\.sql");
-        var versions = new HashSet<Integer>();
+        // Long: version theo thời gian (Rule 20) như 202611041000 vượt int.
+        var versions = new HashSet<Long>();
 
         try (var files = Files.list(migrations)) {
             for (Path file : files.toList()) {
                 var match = versionPattern.matcher(file.getFileName().toString());
                 if (match.matches()) {
-                    int version = Integer.parseInt(match.group(1));
+                    long version = Long.parseLong(match.group(1));
                     assertTrue(versions.add(version), "Duplicate Flyway version: V" + version);
                 }
             }
