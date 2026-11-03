@@ -162,8 +162,8 @@ public class ReaderEntitlementListener {
             return;
         }
 
-        // ngày bắt đầu là ngày trả tiền nhưng nếu khách còn gói đang chạy thì nối tiếp từ ngày sau ngày hết hạn của gói đó
-        // ngày kết thúc là ngày bắt đầu cộng số ngày của gói
+        // ngày bắt đầu là ngày trả tiền; nếu còn gói cùng phạm vi đang chạy thì kỳ mới bắt đầu vào ngày kế ngày hết hạn
+        // ngày kết thúc tính cả hai đầu: end = start + durationDays - 1, nên gói 30 ngày có đúng 30 ngày đọc
         LocalDate paidDate = paidAtOrNow(event).toLocalDate();
         LocalDate start = repository.findLatestActiveEndDate(
                         subscription.userId(), paidDate, subscription.accessScope(), subscription.categoryId())
