@@ -46,6 +46,12 @@ function openAuthChannel(): BroadcastChannel | null {
     }
 }
 
+// API void (vd. đánh dấu đã đọc) trả 200 body rỗng; response.json() sẽ ném "Unexpected end of JSON input".
+async function readJson<T>(response: Response): Promise<T> {
+    const text = await response.text()
+    return (text ? JSON.parse(text) : undefined) as T
+}
+
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
@@ -220,7 +226,7 @@ class HttpClient {
             })
         }
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async getBlob(path: string, options?: RequestOptions,): Promise<Blob> {
@@ -310,7 +316,7 @@ class HttpClient {
             })
         }
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async patch<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
@@ -339,7 +345,7 @@ class HttpClient {
             })
         }
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async put<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
@@ -367,7 +373,7 @@ class HttpClient {
             })
         }
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async postFormData<T>(path: string, body: FormData, options?: RequestOptions): Promise<T> {
@@ -414,7 +420,7 @@ class HttpClient {
             })
         }
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async delete<T>(path: string, options?: RequestOptions): Promise<T> {

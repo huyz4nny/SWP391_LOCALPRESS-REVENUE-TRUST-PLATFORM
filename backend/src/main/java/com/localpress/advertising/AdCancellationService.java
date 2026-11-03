@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -225,6 +226,6 @@ public class AdCancellationService {
         notifications.notify(event.getUserId(), event.getTargetId(), "AD_REFUND_APPROVED",
                 "Khoản hoàn đã được duyệt", "Kế toán đã duyệt khoản hoàn của chiến dịch.", refundId);
         notifications.notify(event.getUserId(), event.getTargetId(), "AD_REFUNDED",
-                "Đã hoàn tiền chiến dịch", "Số tiền đã hoàn: " + event.getRefundAmount() + " đ", refundId);
+                "Đã hoàn tiền chiến dịch", String.format(Locale.forLanguageTag("vi-VN"), "Số tiền đã hoàn: %,.0f đ", event.getRefundAmount()), refundId);
     }
 }
