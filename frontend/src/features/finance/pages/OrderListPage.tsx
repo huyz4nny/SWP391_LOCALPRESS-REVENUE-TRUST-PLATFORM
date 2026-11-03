@@ -12,7 +12,6 @@ const TYPE_OPTIONS = [
   { value: 'SUBSCRIPTION', label: 'Gói độc giả' },
   { value: 'ARTICLE_PURCHASE', label: 'Bài lẻ' },
   { value: 'AD_CAMPAIGN', label: 'Quảng cáo' },
-  { value: 'TOPUP', label: 'Nạp ví' },
 ]
 
 const STATUS_OPTIONS = [
@@ -28,14 +27,14 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   SUBSCRIPTION: 'Gói độc giả',
   ARTICLE_PURCHASE: 'Bài lẻ',
   AD_CAMPAIGN: 'Quảng cáo',
-  TOPUP: 'Nạp ví',
   REFUND: 'Hoàn tiền',
 }
 
-// Chỉ còn 2 cách trả: quét QR SePay hoặc trừ Ví LocalPress. Mã lạ (dữ liệu cũ) hiện nguyên văn.
+// Chỉ còn 1 cách trả: quét QR SePay (LocalPress không có ví). BANK_TRANSFER là bút toán chuyển trả khi hoàn tiền.
 const METHOD_LABELS: Record<string, string> = {
   SEPAY: 'QR SePay',
-  WALLET: 'Ví LocalPress',
+  BANK_TRANSFER: 'Chuyển trả ngân hàng',
+  WALLET: 'Ví LocalPress (dữ liệu cũ)',
 }
 
 export function OrderListPage() {

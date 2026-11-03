@@ -6,8 +6,9 @@ Backend phải bật localpress.payment.client-orders-enabled=true (ví dụ tro
 Chạy ở thư mục gốc repo:
     python backend/scripts/sepay_webhook_e2e.py backend/config/application-secrets.yml
 Gửi payload đúng định dạng webhook của SePay (camelCase) vào /api/v1/finance/webhook/sepay và kiểm tra:
-sai khóa 401, ghi nhận SUCCESS, mọi đơn trả qua ví (thiếu thì nạp bù đúng phần thiếu, tiền về tự trả đơn), gửi lại cùng id không cộng trùng (kể cả 2 lần đồng thời), chuyển thiếu vào ví rồi trả nốt bằng ví,
-nạp ví, không có mã đơn vẫn trả success:true, tiền ra bị bỏ qua, phân quyền xem nhật ký, nút giả lập ghi nguồn SIMULATION.
+sai khóa 401, ghi nhận SUCCESS, gửi lại cùng id không ghi trùng (kể cả 2 lần đồng thời), chuyển sai số tiền chỉ ghi log
+(AMOUNT_MISMATCH, LocalPress không giữ tiền, không ví), không có mã đơn vẫn trả success:true, tiền ra bị bỏ qua,
+phân quyền xem nhật ký, nút giả lập ghi nguồn SIMULATION.
 Khóa webhook đọc từ file secrets, không in ra màn hình. Script tạo thêm vài đơn thử của user 6 trong DB dev.
 """
 import base64, json, random, re, sys, threading, urllib.request, urllib.error, subprocess
@@ -61,9 +62,6 @@ def check(name, cond, detail=""):
     results.append((name, bool(cond)))
     print(("PASS " if cond else "FAIL ") + name + (f"  [{detail}]" if detail else ""))
 
-def balance():
-    return float(sql("SELECT balance FROM wallets WHERE user_id = 6") or 0)
-
 def sepay_payload(sid, content, amount, ref=None, ttype="in"):
     # Đúng định dạng webhook biến động số dư của SePay (camelCase)
     return {"id": sid, "gateway": "Vietcombank", "transactionDate": "2026-10-22 01:40:00",
@@ -94,25 +92,25 @@ check("Gửi lại cùng id -> 200 ALREADY_PROCESSED", s == 200 and b.get("succe
 check("DB: log DUPLICATE_DELIVERY, chỉ 1 dòng có sepay_id", sql(f"SELECT COUNT(*) FROM sepay_webhook_logs WHERE sepay_id={base_id}") == "1"
       and sql(f"SELECT COUNT(*) FROM sepay_webhook_logs WHERE result_status='DUPLICATE_DELIVERY' AND order_code='{code}'") == "1")
 
-# 5. Chuyển thiếu rồi trả nốt bằng ví
-s, b = call("POST", "/finance/orders", {"orderType": "ARTICLE", "targetId": 1, "amount": 20000, "description": "E2E chuyển thiếu"}, {"Authorization": READER})
+# 5. Chuyển sai số tiền: không ghi nhận, không giữ tiền, đơn vẫn chờ; chuyển đúng sau đó mới SUCCESS
+s, b = call("POST", "/finance/orders", {"orderType": "ARTICLE", "targetId": 1, "amount": 20000, "description": "E2E sai số tiền"}, {"Authorization": READER})
 code2 = data((s, b)).get("orderCode")
-bal0 = balance()
 s, b = webhook(sepay_payload(base_id + 1, f"{code2}", 5000))
-check("Chuyển thiếu 5.000/20.000 -> UNDERPAID, đơn vẫn PENDING", b.get("status") == "UNDERPAID_CREDITED_TO_WALLET"
+check("Chuyển thiếu 5.000/20.000 -> AMOUNT_MISMATCH, đơn vẫn PENDING", s == 200 and b.get("success") is True and b.get("status") == "AMOUNT_MISMATCH"
       and sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code2}'") == "PENDING", b.get("status"))
-check("Ví +5.000", abs(balance() - bal0 - 5000) < 0.01, f"{bal0} -> {balance()}")
-bal1 = balance()
-s, b = call("POST", f"/finance/orders/code/{code2}/pay-with-wallet", None, {"Authorization": READER})
-check("Trả nốt bằng ví -> SUCCESS, ví -20.000", s == 200 and sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code2}'") == "SUCCESS"
-      and abs(bal1 - balance() - 20000) < 0.01, f"HTTP {s} {bal1} -> {balance()}")
+s, b = webhook(sepay_payload(base_id + 2, f"{code2}", 25000))
+check("Chuyển thừa 25.000/20.000 -> AMOUNT_MISMATCH, đơn vẫn PENDING", b.get("status") == "AMOUNT_MISMATCH"
+      and sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code2}'") == "PENDING", b.get("status"))
+check("DB: không sinh giao dịch con nào cho tiền sai", sql(f"SELECT COUNT(*) FROM transactions WHERE gateway_transaction_id LIKE '{code2}-%'") == "0")
+s, b = webhook(sepay_payload(base_id + 6, f"{code2}", 20000))
+check("Chuyển đúng 20.000 -> SUCCESS", b.get("status") == "SUCCESS"
+      and sql(f"SELECT CONCAT(status,'|',payment_method) FROM transactions WHERE gateway_transaction_id='{code2}'") == "SUCCESS|SEPAY", b.get("status"))
 
-# 6. Nạp ví
-s, b = call("POST", "/finance/wallet/topups", {"amount": 50000}, {"Authorization": READER})
-tcode = data((s, b)).get("orderCode")
-bal2 = balance()
-s, b = webhook(sepay_payload(base_id + 2, f"NAP {tcode}", 50000))
-check("Nạp ví 50.000 qua webhook -> SUCCESS, ví +50.000", b.get("status") == "SUCCESS" and abs(balance() - bal2 - 50000) < 0.01, f"{b.get('status')} {bal2} -> {balance()}")
+# 6. Không còn ví / nạp tiền
+s, b = call("POST", f"/finance/orders/code/{code2}/pay-with-wallet", None, {"Authorization": READER})
+check("pay-with-wallet đã bỏ -> 404", s == 404, f"HTTP {s}")
+s, b = call("POST", f"/finance/orders/code/{code2}/shortfall-topup", None, {"Authorization": READER})
+check("shortfall-topup đã bỏ -> 404", s == 404, f"HTTP {s}")
 
 # 7. Nội dung không có mã đơn
 s, b = webhook(sepay_payload(base_id + 3, "chuyen tien khong ghi ma", 99000))
@@ -152,41 +150,17 @@ s, b = call("POST", f"/finance/orders/code/{code4}/simulate-ipn", {}, {"Authoriz
 check("Giả lập -> SUCCESS, log nguồn SIMULATION", b.get("status") == "SUCCESS"
       and sql(f"SELECT source FROM sepay_webhook_logs WHERE order_code='{code4}' ORDER BY log_id DESC LIMIT 1") == "SIMULATION", b.get("status"))
 
-# 13. MỌI THANH TOÁN QUA VÍ: ví thiếu -> mã nạp bù đúng phần thiếu -> tiền về tự trả đơn (V6)
-bal = balance()
-price = int(bal) + 37000
-s, b = call("POST", "/finance/orders", {"orderType": "ARTICLE", "targetId": 1, "amount": price, "description": "E2E nạp bù"}, {"Authorization": READER})
+# 13. Booking quảng cáo quá hạn giữ chỗ: tiền về muộn không cấp quyền, không giữ (LATE_PAYMENT)
+ADV = auth("adv.canghaiphong@gmail.com")
+s, b = call("POST", "/finance/orders", {"orderType": "AD", "targetId": 1, "amount": 300000, "description": "E2E quảng cáo muộn"}, {"Authorization": ADV})
 code5 = data((s, b)).get("orderCode")
-s, b = call("POST", f"/finance/orders/code/{code5}/shortfall-topup", None, {"Authorization": READER})
-t1 = data((s, b))
-check("Ví thiếu 37.000 -> mã nạp bù đúng 37.000, gắn đơn", s == 200 and float(t1.get("amount", 0)) == 37000 and t1.get("topupForOrder") == code5,
-      f"HTTP {s} {t1.get('amount') if isinstance(t1, dict) else t1}")
-s, b = call("POST", f"/finance/orders/code/{code5}/shortfall-topup", None, {"Authorization": READER})
-check("Mở lại trang -> dùng lại đúng mã nạp bù cũ", data((s, b)).get("orderCode") == t1.get("orderCode"))
-s, b = webhook(sepay_payload(base_id + 10, f"{t1['orderCode']} nap bu", 20000))
-check("Nạp bù thiếu 20.000 -> tiền vào ví, autoPay INSUFFICIENT, đơn vẫn chờ", b.get("autoPay") == "INSUFFICIENT"
-      and sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code5}'") == "PENDING", f"{b.get('status')} {b.get('autoPay')}")
-s, b = call("POST", f"/finance/orders/code/{code5}/shortfall-topup", None, {"Authorization": READER})
-t2 = data((s, b))
-check("Mã nạp bù mới cho phần còn thiếu 17.000", float(t2.get("amount", 0)) == 17000 and t2.get("orderCode") != t1.get("orderCode"), str(t2.get("amount")))
-s, b = webhook(sepay_payload(base_id + 11, f"{t2['orderCode']}", 17000))
-row = sql(f"SELECT CONCAT(status,'|',payment_method) FROM transactions WHERE gateway_transaction_id='{code5}'")
-check("Nạp đủ -> tự trả đơn: SUCCESS | WALLET, ví về 0 so với trước", b.get("autoPay") == "PAID" and row == "SUCCESS|WALLET"
-      and abs(balance() - (bal + 37000 - price)) < 0.01, f"{b.get('autoPay')} {row} ví {balance()}")
-s, b = webhook(sepay_payload(base_id + 11, f"{t2['orderCode']}", 17000))
-check("SePay gửi lại tiền nạp bù -> không cộng, không trừ lần 2", b.get("status") == "ALREADY_PROCESSED" and abs(balance() - (bal + 37000 - price)) < 0.01)
-s, b = call("POST", "/finance/orders", {"orderType": "ARTICLE", "targetId": 1, "amount": 1000, "description": "E2E ví đủ"}, {"Authorization": READER})
-code6 = data((s, b)).get("orderCode")
-webhook(sepay_payload(base_id + 12, "NAP them de du", 5000))  # không ảnh hưởng
-s, b = call("POST", "/finance/wallet/topups", {"amount": 10000}, {"Authorization": READER})
-webhook(sepay_payload(base_id + 13, data((s, b)).get("orderCode"), 10000))
-s, b = call("POST", f"/finance/orders/code/{code6}/shortfall-topup", None, {"Authorization": READER})
-check("Ví đủ tiền -> không tạo mã nạp bù (409)", s == 409, f"HTTP {s}")
-s, b = call("POST", f"/finance/orders/code/{code6}/pay-with-wallet", None, {"Authorization": READER})
-check("Ví đủ -> 1 nút trả bằng ví thành công", s == 200 and sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code6}'") == "SUCCESS", f"HTTP {s}")
+sql(f"UPDATE transactions SET expires_at = NOW() - INTERVAL 1 MINUTE WHERE gateway_transaction_id='{code5}'")
+s, b = webhook(sepay_payload(base_id + 10, f"{code5}", 300000))
+check("Quảng cáo về muộn -> LATE_PAYMENT, đơn FAILED", b.get("status") == "LATE_PAYMENT"
+      and sql(f"SELECT status FROM transactions WHERE gateway_transaction_id='{code5}'") == "FAILED", b.get("status"))
 
 print()
 print(sql(f"SELECT log_id, source, IFNULL(sepay_id,'-'), result_status, IFNULL(order_code,'-'), transfer_amount FROM sepay_webhook_logs ORDER BY log_id DESC LIMIT 12"))
 ok = sum(1 for _, r in results if r)
 print(f"\n{ok}/{len(results)} PASS")
-print("ORDERS", code, code2, tcode, code3, code4, code5, code6)
+print("ORDERS", code, code2, code3, code4, code5)

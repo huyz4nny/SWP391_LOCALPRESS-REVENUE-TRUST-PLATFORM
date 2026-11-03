@@ -1,37 +1,47 @@
-import React, { useState } from 'react'
+// Tác dụng: trang `/premium` (UC035) — thẻ gói, tạo subscription PENDING, đẩy `/payment` của Huy.
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SEED_SUBSCRIPTION_PLANS } from '@/mocks/data/seed'
+import { SubscriptionPlan } from '../types'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { httpClient } from '@/lib/http/client'
 import { paymentPath } from '@/features/finance/api/payment'
 import { mockStore } from '@/mocks/store'
+import { readerApi } from '../api'
 import { Crown, Check, Sparkles, HelpCircle, ShieldCheck, Zap } from 'lucide-react'
 
+// UC035 trang /premium: ve 3 the goi, bam Dang ky thi tao dong PENDING roi dua sang trang thanh toan cua Huy
 export function PremiumPlansPage() {
   const navigate = useNavigate()
-  const [plans] = useState(SEED_SUBSCRIPTION_PLANS)
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null)
+  const [error, setError] = useState('')
   const currentUser = mockStore.getCurrentUser()
 
-  const handleSelectPlan = async (plan: (typeof SEED_SUBSCRIPTION_PLANS)[0]) => {
+  // vao trang la lay ds goi ACTIVE, khach chua login van xem duoc
+  useEffect(() => {
+    readerApi.getSubscriptionPlans()
+      .then(setPlans)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Không tải được danh sách gói'))
+      .finally(() => setLoadingPlans(false))
+  }, [])
+
+  const handleSelectPlan = async (plan: SubscriptionPlan) => {
+    // chua login thi bat sang /login, xong quay lai /premium bam lai
     if (currentUser.role === 'GUEST') {
       navigate('/login', { state: { from: { pathname: '/premium' } } })
       return
     }
 
     setLoadingPlanId(plan.id)
+    setError('')
     try {
-      const order = await httpClient.post<any>('/finance/checkout', {
-        orderType: 'SUBSCRIPTION',
-        targetId: plan.id,
-        targetTitle: plan.name,
-        amount: plan.price,
-        paymentMethod: 'VIETQR',
-      })
-      navigate(paymentPath(order), { state: { returnUrl: '/account/subscription' } })
+      const target = await readerApi.createSubscription(plan.id)
+      navigate(paymentPath({ orderCode: target.orderCode }), { state: { returnUrl: '/account/subscription' } })
     } catch (err) {
+      // hiện lý do lỗi cho khách thay vì chỉ ghi console
       console.error(err)
+      setError(err instanceof Error ? err.message : 'Không thể tạo đơn đăng ký gói, vui lòng thử lại')
     } finally {
       setLoadingPlanId(null)
     }
@@ -39,7 +49,7 @@ export function PremiumPlansPage() {
 
   return (
     <div className="max-w-6xl mx-auto py-10 px-4 space-y-12">
-      {/* Header Banner */}
+      {/* banner dau trang: nhan dac quyen + tieu de */}
       <div className="text-center max-w-3xl mx-auto">
         <div className="inline-flex items-center space-x-1.5 bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 rounded-full mb-3 border border-amber-300">
           <Crown className="w-3.5 h-3.5 text-amber-700" />
@@ -53,8 +63,23 @@ export function PremiumPlansPage() {
         </p>
       </div>
 
-      {/* Pricing Cards */}
+      {error && (
+        <p className="max-w-3xl mx-auto text-center text-xs text-crimson border border-red-200 bg-red-50 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
+
+      {loadingPlans ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-pulse">
+          <div className="h-72 rounded-2xl bg-stone-200" />
+          <div className="h-72 rounded-2xl bg-stone-200" />
+          <div className="h-72 rounded-2xl bg-stone-200" />
+        </div>
+      ) : plans.length === 0 ? (
+        <p className="text-center text-sm text-stone-500">Hiện chưa có gói hội viên đang mở bán.</p>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        {/* vong lap ve tung the goi: ten, gia, dac quyen, nut Dang ky */}
         {plans.map((plan) => {
           const isPopular = plan.isPopular
           return (
@@ -110,6 +135,7 @@ export function PremiumPlansPage() {
                 </div>
               </div>
 
+              {/* nut Dang ky goi nay o day the */}
               <div className="mt-8 pt-4">
                 <Button
                   variant={isPopular ? 'gold' : 'primary'}
@@ -125,8 +151,9 @@ export function PremiumPlansPage() {
           )
         })}
       </div>
+      )}
 
-      {/* Trust factors */}
+      {/* 3 o tin cay duoi bang gia */}
       <div className="bg-stone-100 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs text-stone-600">
         <div className="flex flex-col items-center">
           <ShieldCheck className="w-6 h-6 text-primary-900 mb-2" />

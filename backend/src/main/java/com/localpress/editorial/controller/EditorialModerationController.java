@@ -6,6 +6,8 @@ import com.localpress.shared.constant.AppConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping(AppConstants.API_V1_PREFIX + "/editorial")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('EDITOR', 'STAFF', 'SYSTEM_ADMIN')")
 public class EditorialModerationController {
 
     private final ContentPolicyModerationService moderationService;
@@ -48,9 +51,11 @@ public class EditorialModerationController {
     @PostMapping("/comments/{id}/moderate")
     public ResponseEntity<EditorialCommentDto> moderateComment(
             @PathVariable("id") Long id,
-            @RequestBody ModerateCommentRequest request
+            @RequestBody ModerateCommentRequest request,
+            Authentication auth
     ) {
-        return ResponseEntity.ok(moderationService.moderateComment(id, request));
+        String email = auth != null ? auth.getName() : null;
+        return ResponseEntity.ok(moderationService.moderateComment(id, request, email));
     }
 
     // =========================================================================
@@ -60,13 +65,17 @@ public class EditorialModerationController {
     /**
      * PUT /api/v1/editorial/articles/{id}/policy
      * Thiết lập chế độ Miễn phí (FREE) hoặc Trả phí (PREMIUM) và giá bán lẻ từng bài.
+     * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
      */
+    @PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN')")
     @PutMapping("/articles/{id}/policy")
     public ResponseEntity<EditorialArticleDto> updateArticlePolicy(
             @PathVariable("id") Long id,
-            @RequestBody UpdateArticlePolicyRequest request
+            @RequestBody UpdateArticlePolicyRequest request,
+            Authentication auth
     ) {
-        return ResponseEntity.ok(moderationService.updateArticlePolicy(id, request));
+        String email = auth != null ? auth.getName() : null;
+        return ResponseEntity.ok(moderationService.updateArticlePolicy(id, request, email));
     }
 
     // =========================================================================
@@ -85,30 +94,46 @@ public class EditorialModerationController {
     /**
      * POST /api/v1/editorial/subscription-plans
      * Tạo mới một gói cước hội viên.
+     * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
      */
+    @PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN')")
     @PostMapping("/subscription-plans")
-    public ResponseEntity<SubscriptionPlanDto> createPlan(@RequestBody SaveSubscriptionPlanRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(moderationService.createPlan(request));
+    public ResponseEntity<SubscriptionPlanDto> createPlan(
+            @RequestBody SaveSubscriptionPlanRequest request,
+            Authentication auth
+    ) {
+        String email = auth != null ? auth.getName() : null;
+        return ResponseEntity.status(HttpStatus.CREATED).body(moderationService.createPlan(request, email));
     }
 
     /**
      * PUT /api/v1/editorial/subscription-plans/{id}
      * Cập nhật thông tin gói cước.
+     * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
      */
+    @PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN')")
     @PutMapping("/subscription-plans/{id}")
     public ResponseEntity<SubscriptionPlanDto> updatePlan(
             @PathVariable("id") Long id,
-            @RequestBody SaveSubscriptionPlanRequest request
+            @RequestBody SaveSubscriptionPlanRequest request,
+            Authentication auth
     ) {
-        return ResponseEntity.ok(moderationService.updatePlan(id, request));
+        String email = auth != null ? auth.getName() : null;
+        return ResponseEntity.ok(moderationService.updatePlan(id, request, email));
     }
 
     /**
      * POST /api/v1/editorial/subscription-plans/{id}/toggle-status
      * Bật/Tắt trạng thái hoạt động của gói cước.
+     * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
      */
+    @PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN')")
     @PostMapping("/subscription-plans/{id}/toggle-status")
-    public ResponseEntity<SubscriptionPlanDto> togglePlanStatus(@PathVariable("id") Long id) {
-        return ResponseEntity.ok(moderationService.togglePlanStatus(id));
+    public ResponseEntity<SubscriptionPlanDto> togglePlanStatus(
+            @PathVariable("id") Long id,
+            Authentication auth
+    ) {
+        String email = auth != null ? auth.getName() : null;
+        return ResponseEntity.ok(moderationService.togglePlanStatus(id, email));
     }
 }

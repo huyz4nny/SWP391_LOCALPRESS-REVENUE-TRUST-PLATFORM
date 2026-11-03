@@ -48,6 +48,7 @@ class GoogleLoginSecurityTest {
     @Autowired JwtTokenService tokens;
     @Autowired PasswordEncoder passwords;
     @MockBean GoogleLoginService login;
+    @MockBean ProfileService profileService;
     @MockBean JdbcTemplate jdbc;
     ResultSet account;
     User reader;

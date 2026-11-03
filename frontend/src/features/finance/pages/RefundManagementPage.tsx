@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { RefundRequest, Order } from '../types'
 import { financeApi } from '../api'
 import { mockStore } from '@/mocks/store'
@@ -11,8 +12,14 @@ import { Dialog } from '@/components/ui/dialog'
 import { PlusCircle } from 'lucide-react'
 import { PageHeader, Panel, KeyValue, Notice, tableCls, LoadingBlock } from '../components/LedgerUI'
 
+/** Đề xuất không có người lập là do module khác tự lập khi tiền về mà không kích hoạt được (vd SV1). */
+const proposerLabel = (r: RefundRequest) => r.proposedByName || r.proposedBy || 'Hệ thống'
+
 export function RefundManagementPage() {
   const currentUser = mockStore.getCurrentUser()
+  // Mở từ nút "Lập đề xuất hoàn tiền" ở chi tiết đơn: /backoffice/finance/refunds?orderId=...
+  const [searchParams] = useSearchParams()
+  const presetOrderId = searchParams.get('orderId')
   // Mắt 2 là Kế toán trưởng (API thật: SYSTEM_ADMIN); backend trả 403 cho vai trò khác
   const isManager = currentUser.role === 'FINANCE_MANAGER' || currentUser.role === 'SYSTEM_ADMIN'
 
@@ -31,6 +38,8 @@ export function RefundManagementPage() {
   // Xét duyệt (kế toán trưởng)
   const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null)
   const [reviewNotes, setReviewNotes] = useState('')
+  // Mã GD ngân hàng của lần chuyển trả tiền về tài khoản khách (LocalPress không có ví, hoàn tiền luôn là chuyển khoản)
+  const [payoutRef, setPayoutRef] = useState('')
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
   useEffect(() => {
@@ -44,11 +53,14 @@ export function RefundManagementPage() {
       setRefunds(rData)
       const paid = oData.filter((o) => o.paymentStatus === 'PAID')
       setPaidOrders(paid)
-      if (paid.length > 0) {
-        setSelectedOrderId(paid[0].id)
-        setRefundAmount(paid[0].finalAmount)
-        setAffectedBenefit(`Hủy quyền truy cập ${paid[0].targetTitle}`)
+      const preset = paid.find((o) => o.id === presetOrderId)
+      const first = preset ?? paid[0]
+      if (first) {
+        setSelectedOrderId(first.id)
+        setRefundAmount(first.finalAmount)
+        setAffectedBenefit(`Thu hồi quyền lợi của đơn ${first.orderCode}: ${first.targetTitle}`)
       }
+      if (preset) setShowProposeModal(true)
     } finally {
       setLoading(false)
     }
@@ -104,10 +116,10 @@ export function RefundManagementPage() {
 
     setIsSubmittingReview(true)
     try {
-      await financeApi.reviewRefund(selectedRefund.id, approved, reviewNotes)
+      await financeApi.reviewRefund(selectedRefund.id, approved, reviewNotes, approved ? payoutRef.trim() : undefined)
       setSelectedRefund(null)
       loadData()
-      alert(approved ? 'Phê duyệt hoàn tiền thành công! Tiền đã được ghi nợ vào sổ quỹ và thu hồi quyền lợi tương ứng.' : 'Đã từ chối yêu cầu hoàn tiền.')
+      alert(approved ? 'Phê duyệt hoàn tiền thành công! Đã ghi bút toán hoàn (chuyển khoản trả khách) và phát sự kiện thu hồi quyền lợi.' : 'Đã từ chối yêu cầu hoàn tiền.')
     } catch (err: any) {
       alert(err.message || 'Lỗi phê duyệt hoàn tiền')
     } finally {
@@ -174,7 +186,7 @@ export function RefundManagementPage() {
                         <div className="truncate" title={r.affectedBenefit}>{r.affectedBenefit}</div>
                       </td>
                       <td className={`${tableCls.td} whitespace-nowrap`}>
-                        <div className="max-w-[170px] truncate text-slate-900" title={r.proposedByName || r.proposedBy}>{(r.proposedByName || r.proposedBy || '').replace(/\s*\(.*\)$/, '')}</div>
+                        <div className="max-w-[170px] truncate text-slate-900" title={proposerLabel(r)}>{proposerLabel(r).replace(/\s*\(.*\)$/, '')}</div>
                         <div className="text-xs text-slate-500 num">{formatDateTime(r.requestedAt)}</div>
                       </td>
                       <td className={tableCls.td}>
@@ -198,6 +210,7 @@ export function RefundManagementPage() {
                               onClick={() => {
                                 setSelectedRefund(r)
                                 setReviewNotes('')
+                                setPayoutRef('')
                               }}
                             >
                               Xét duyệt
@@ -304,11 +317,11 @@ export function RefundManagementPage() {
               <KeyValue label="Đề xuất hoàn" strong><span className="num">{formatCurrency(selectedRefund.refundAmount)}</span></KeyValue>
               <KeyValue label="Quyền lợi bị thu hồi">{selectedRefund.affectedBenefit}</KeyValue>
               <KeyValue label="Lý do">{selectedRefund.reason}</KeyValue>
-              <KeyValue label="Người lập">{selectedRefund.proposedByName || selectedRefund.proposedBy}</KeyValue>
+              <KeyValue label="Người lập">{proposerLabel(selectedRefund)}</KeyValue>
               {selectedRefund.reviewNotes && <KeyValue label="Ý kiến duyệt">{selectedRefund.reviewNotes}</KeyValue>}
             </dl>
 
-            {selectedRefund.status === 'UNDER_REVIEW' && !isManager && selectedRefund.proposedBy !== currentUser.id && (
+            {isWaiting(selectedRefund) && !isManager && selectedRefund.proposedBy !== currentUser.id && (
               <Notice tone="note">Chỉ Kế toán trưởng được duyệt hoặc từ chối hoàn tiền (mắt 2).</Notice>
             )}
 
@@ -318,7 +331,19 @@ export function RefundManagementPage() {
               </Notice>
             )}
 
-            {selectedRefund.status === 'UNDER_REVIEW' && (
+            {isWaiting(selectedRefund) && (
+              <div>
+                <Label htmlFor="payoutRef">Mã GD chuyển trả khách</Label>
+                <Input
+                  id="payoutRef"
+                  value={payoutRef}
+                  onChange={(e) => setPayoutRef(e.target.value)}
+                  placeholder="Mã giao dịch ngân hàng khi chuyển khoản trả khách (ghi vào bút toán hoàn)"
+                />
+              </div>
+            )}
+
+            {isWaiting(selectedRefund) && (
               <div>
                 <Label htmlFor="rvNotes">Ý kiến của kế toán trưởng</Label>
                 <Textarea
@@ -336,7 +361,7 @@ export function RefundManagementPage() {
                 Đóng
               </Button>
 
-              {selectedRefund.status === 'UNDER_REVIEW' && (
+              {isWaiting(selectedRefund) && (
                 <>
                   <Button
                     variant="outline"

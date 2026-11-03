@@ -35,7 +35,7 @@ import java.util.Optional;
  * Tuân thủ bất biến:
  * 1. Rule 11 (Refund Cap): Tổng số tiền hoàn qua các đợt không vượt quá số tiền thực thu.
  * 2. Four-Eyes Principle: Người đề xuất != Người phê duyệt.
- * 3. UC056 theo Rule 17: SV4 chỉ xử lý tiền (bút toán REFUND, hoàn ví) rồi phát RefundCompletedEvent.
+ * 3. UC056 theo Rule 17: SV4 chỉ xử lý tiền (bút toán REFUND, chuyển trả về tài khoản ngân hàng của khách) rồi phát RefundCompletedEvent.
  *    Thu hồi quyền đọc / hủy gói (SV3) và dừng chiến dịch (SV1) do module sở hữu tự làm qua @EventListener,
  *    SV4 không sửa bảng article_purchases / subscriptions / ad_campaigns.
  */
@@ -44,10 +44,12 @@ import java.util.Optional;
 @Slf4j
 public class RefundManagementService {
 
+    /** Tên hiển thị khi đề xuất do hệ thống lập (proposed_by NULL). */
+    static final String SYSTEM_PROPOSER = "Hệ thống";
+
     private final RefundRequestRepository refundRequestRepository;
     private final TransactionRepository transactionRepository;
     private final JdbcTemplate jdbcTemplate;
-    private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -111,7 +113,8 @@ public class RefundManagementService {
                     .affectedBenefit("Thu hồi quyền lợi của đơn " + rs.getString("order_code") + " (" + rs.getString("transaction_type") + ")")
                     .requestedAt(localDateTime(rs, "created_at"))
                     .proposedBy(rs.getString("proposed_by"))
-                    .proposedByName(rs.getString("proposed_by_name"))
+                    // Không có người lập = module khác tự lập khi tiền về mà không kích hoạt được (vd SV1)
+                    .proposedByName(rs.getString("proposed_by") == null ? SYSTEM_PROPOSER : rs.getString("proposed_by_name"))
                     .reviewedBy(rs.getString("reviewed_by"))
                     .reviewedByName(rs.getString("reviewed_by_name"))
                     .reviewNotes(rs.getString("review_notes"))
@@ -132,7 +135,7 @@ public class RefundManagementService {
         Transaction originalTx = transactionRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng #" + request.getOrderId(), HttpStatus.NOT_FOUND));
 
-        // Dữ liệu cũ có thể thiếu transaction_type: chỉ chặn khi biết chắc là TOPUP / REFUND
+        // Dữ liệu cũ có thể thiếu transaction_type: chỉ chặn khi biết chắc là REFUND
         if (originalTx.getTransactionType() != null && !originalTx.getTransactionType().isPurchase()) {
             throw new AppException(
                     "Không thể hoàn tiền cho giao dịch loại " + originalTx.getTransactionType() + " (chỉ hoàn đơn mua bài, gói hoặc quảng cáo)",
@@ -184,7 +187,8 @@ public class RefundManagementService {
                 .status(savedRefund.getStatus().name())
                 .affectedBenefit(request.getAffectedBenefit())
                 .requestedAt(savedRefund.getCreatedAt())
-                .proposedBy(String.valueOf(proposerUserId))
+                .proposedBy(proposerUserId == null ? null : String.valueOf(proposerUserId))
+                .proposedByName(proposerUserId == null ? SYSTEM_PROPOSER : null)
                 .build();
     }
 
@@ -196,7 +200,7 @@ public class RefundManagementService {
     public RefundDetailResponse reviewRefund(Long reviewerUserId, Long refundId, ReviewRefundRequest request) {
         log.info("Phê duyệt hoàn tiền #{}: reviewer={}, approved={}", refundId, reviewerUserId, request.isApproved());
 
-        RefundRequest refund = refundRequestRepository.findById(refundId)
+        RefundRequest refund = refundRequestRepository.findByIdForUpdate(refundId)
                 .orElseThrow(() -> new AppException("Không tìm thấy yêu cầu hoàn tiền #" + refundId, HttpStatus.NOT_FOUND));
 
         if (refund.getStatus() != RefundStatus.PENDING) {
@@ -232,7 +236,8 @@ public class RefundManagementService {
                     .transactionType(TransactionType.REFUND)
                     .amount(refund.getRefundAmount())
                     .currency(originalTx.getCurrency())
-                    .paymentMethod(originalTx.getPaymentMethod())
+                    .paymentMethod("BANK_TRANSFER")
+                    .description(refundDescription(originalTx, request.getPayoutReference()))
                     .gatewayTransactionId("REFUND-" + refund.getRefundId() + "-" + (System.currentTimeMillis() % 100000))
                     .status(TransactionStatus.SUCCESS)
                     .paidAt(now)
@@ -240,15 +245,13 @@ public class RefundManagementService {
                     .reconciledBy(reviewerUserId)
                     .build());
 
-            // Đơn đã trả bằng Ví LocalPress: tiền hoàn trả lại vào ví (idempotent theo UNIQUE(transaction_id, direction)).
-            // Đơn trả qua QR SePay: tiền chuyển trả khách ngoài hệ thống, chỉ ghi bút toán đảo.
-            if ("WALLET".equals(originalTx.getPaymentMethod())) {
-                walletService.credit(savedRefundTx, refund.getRefundAmount(),
-                        "Hoàn tiền đơn " + originalTx.getGatewayTransactionId() + " (yêu cầu #" + refund.getRefundId() + ")");
-            }
+            // LocalPress không giữ tiền: kế toán chuyển khoản trả về tài khoản ngân hàng của khách, hệ thống chỉ ghi bút toán đảo.
 
             // 2. Cập nhật trạng thái đơn gốc sang REFUNDED nếu đã hoàn toàn bộ
-            BigDecimal totalRefunded = committedRefunds(originalTx).orElse(refund.getRefundAmount());
+            // Chỉ cộng các phiếu đã hoàn tất (phiếu này vừa lưu COMPLETED ở trên), không cộng phiếu đang chờ khác
+            BigDecimal totalRefunded = Optional.ofNullable(
+                    refundRequestRepository.sumCompletedRefundsByTransactionId(originalTx.getTransactionId()))
+                    .orElse(refund.getRefundAmount());
             boolean fullRefund = totalRefunded.compareTo(originalTx.getAmount()) >= 0;
             if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);
@@ -272,6 +275,12 @@ public class RefundManagementService {
                 .reviewNotes(refund.getReviewNotes())
                 .resolvedAt(refund.getResolvedAt())
                 .build();
+    }
+
+    private static String refundDescription(Transaction originalTx, String payoutReference) {
+        String text = "Chuyển trả khách cho đơn " + originalTx.getGatewayTransactionId()
+                + (payoutReference == null || payoutReference.isBlank() ? "" : ", mã GD ngân hàng " + payoutReference.trim());
+        return text.length() > 255 ? text.substring(0, 255) : text;
     }
 
     /**

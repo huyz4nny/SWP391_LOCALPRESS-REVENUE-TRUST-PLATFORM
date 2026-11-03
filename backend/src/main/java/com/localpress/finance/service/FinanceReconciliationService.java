@@ -32,13 +32,14 @@ import java.util.*;
  * DỊCH VỤ ĐỐI SOÁT KỲ (SV4 - UC054)
  * ==============================================================================
  * "Sao kê" là tiền SePay báo về tài khoản ngân hàng (sepay_webhook_logs: webhook + đồng bộ API + giả lập dev),
- * "hệ thống" là tiền đã ghi vào đơn / ví từ ngân hàng (transactions SUCCESS / REFUNDED, không trả bằng ví).
+ * "hệ thống" là tiền đã ghi vào đơn từ ngân hàng (transactions SUCCESS / REFUNDED, bỏ bút toán hoàn).
  * Mở kỳ thì quét và lưu các khoản lệch vào reconciliation_items (không còn dữ liệu mẫu trong bộ nhớ):
- *  - BANK_NOT_RECORDED     : ngân hàng có tiền, hệ thống chưa ghi (ORDER_NOT_FOUND, AMOUNT_MISSING,
- *                            chuyển thêm vào đơn đã trả). Xử lý: gán đơn / cộng ví / giải trình.
+ *  - BANK_NOT_RECORDED     : ngân hàng có tiền, hệ thống chưa ghi (ORDER_NOT_FOUND, AMOUNT_MISSING, AMOUNT_MISMATCH,
+ *                            LATE_PAYMENT, chuyển thêm vào đơn đã trả). Xử lý: gán đơn / đã chuyển trả khách / giải trình.
+ *                            LocalPress không giữ tiền: khoản không gán được vào đơn thì kế toán chuyển trả lại khách.
  *  - RECORDED_WITHOUT_BANK : kế toán ghi nhận theo khiếu nại nhưng SePay chưa báo khoản đó. Xử lý: giải trình
  *                            sau khi đối chiếu sao kê thật (sai thì lập hoàn tiền ở UC055).
- * Gán đơn / cộng ví đi qua đúng hàm của webhook (processSepayIpn / creditUnmatchedTransfer) nên giữ Rule 5.
+ * Gán đơn đi qua đúng hàm của webhook (processSepayIpn) nên giữ Rule 5.
  * Kế toán trưởng chốt kỳ: lưu ảnh chụp số liệu, khóa mọi xử lý trong kỳ.
  */
 @Service
@@ -49,14 +50,16 @@ public class FinanceReconciliationService {
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** Kết quả xử lý webhook cho biết tiền đã về ngân hàng nhưng chưa ghi vào đâu. */
-    private static final List<String> NOT_RECORDED_STATUSES = List.of("ORDER_NOT_FOUND", "ALREADY_PROCESSED", "AMOUNT_MISSING");
+    private static final List<String> NOT_RECORDED_STATUSES = List.of(
+            "ORDER_NOT_FOUND", "ALREADY_PROCESSED", "AMOUNT_MISSING", "AMOUNT_MISMATCH", "LATE_PAYMENT");
 
     /** Không phải tiền khách vào tài khoản (gửi lại, sai khóa, tiền ra, lỗi sẽ được SePay gửi lại). */
     private static final List<String> NOT_BANK_MONEY_STATUSES =
             List.of("DUPLICATE_DELIVERY", "INVALID_SIGNATURE", "IGNORED_OUTGOING", "ERROR");
 
+    /** Hành động đã xử lý dứt điểm khoản tiền (ghi vào đơn hoặc trả lại khách). */
     private static final Set<ReconciliationItem.Action> MONEY_ACTIONS =
-            EnumSet.of(ReconciliationItem.Action.ASSIGN_ORDER, ReconciliationItem.Action.CREDIT_WALLET);
+            EnumSet.of(ReconciliationItem.Action.ASSIGN_ORDER, ReconciliationItem.Action.RETURNED_TO_CUSTOMER);
 
     private final JdbcTemplate jdbcTemplate;
     private final ReconciliationPeriodRepository periodRepository;
@@ -123,7 +126,16 @@ public class FinanceReconciliationService {
 
         String actionRef = null;
         String actionResult = action.name();
-        if (action != ReconciliationItem.Action.EXPLAINED) {
+        if (action == ReconciliationItem.Action.RETURNED_TO_CUSTOMER) {
+            assertReferenceNotRecorded(item);
+            actionRef = trimUpper(request.getReturnReference());
+            if (actionRef == null) {
+                throw new AppException("Nhập mã giao dịch ngân hàng của lần chuyển trả khách", HttpStatus.BAD_REQUEST);
+            }
+            if (item.getAmount().signum() == 0 && request.getAmount() != null) {
+                item.setAmount(request.getAmount());
+            }
+        } else if (action == ReconciliationItem.Action.ASSIGN_ORDER) {
             BigDecimal amount = item.getAmount().signum() > 0 ? item.getAmount() : request.getAmount();
             if (amount == null || amount.signum() <= 0) {
                 throw new AppException("SePay không báo số tiền của khoản này, hãy nhập số tiền theo sao kê", HttpStatus.BAD_REQUEST);
@@ -131,31 +143,23 @@ public class FinanceReconciliationService {
             assertReferenceNotRecorded(item);
             String reference = item.getReferenceCode() != null ? item.getReferenceCode() : "LOG" + item.getLogId();
 
-            Map<String, Object> result;
-            if (action == ReconciliationItem.Action.ASSIGN_ORDER) {
-                String orderCode = trimUpper(request.getOrderCode());
-                if (orderCode == null) {
-                    throw new AppException("Gán vào đơn cần mã đơn hàng", HttpStatus.BAD_REQUEST);
-                }
-                actionRef = paymentProcessingService.resolvePaymentCode(orderCode, amount);
-                result = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
-                        .content(actionRef).amount(amount).referenceCode(reference).build());
-                String status = String.valueOf(result.get("status"));
-                if ("ORDER_NOT_FOUND".equals(status)) {
-                    throw new AppException("Không tìm thấy đơn hàng " + orderCode, HttpStatus.NOT_FOUND);
-                }
-                if ("ALREADY_PROCESSED".equals(status)) {
-                    throw new AppException("Đơn " + orderCode + " đã được thanh toán, hãy chọn cộng vào ví khách", HttpStatus.CONFLICT);
-                }
-            } else {
-                Long userId = resolveWalletOwner(request);
-                actionRef = "REC-" + reference;
-                result = paymentProcessingService.creditUnmatchedTransfer(userId, amount, actionRef,
-                        "Đối soát kỳ " + period.getPeriodMonth() + ": cộng ví khoản lệch #" + item.getItemId());
-                if ("ALREADY_PROCESSED".equals(result.get("status"))) {
-                    throw new AppException("Khoản " + reference + " đã được cộng vào ví trước đó", HttpStatus.CONFLICT);
-                }
-                actionRef = actionRef + " (user #" + userId + ")";
+            String orderCode = trimUpper(request.getOrderCode());
+            if (orderCode == null) {
+                throw new AppException("Gán vào đơn cần mã đơn hàng", HttpStatus.BAD_REQUEST);
+            }
+            actionRef = orderCode;
+            Map<String, Object> result = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
+                    .content(orderCode).amount(amount).referenceCode(reference).build());
+            String status = String.valueOf(result.get("status"));
+            if ("ORDER_NOT_FOUND".equals(status)) {
+                throw new AppException("Không tìm thấy đơn hàng " + orderCode, HttpStatus.NOT_FOUND);
+            }
+            if ("ALREADY_PROCESSED".equals(status)) {
+                throw new AppException("Đơn " + orderCode + " đã được thanh toán, hãy chuyển trả khoản này cho khách",
+                        HttpStatus.CONFLICT);
+            }
+            if (!"SUCCESS".equals(status)) {
+                throw new AppException(result.get("message") + ". Hãy chuyển trả khoản này cho khách", HttpStatus.CONFLICT);
             }
             actionResult = String.valueOf(result.get("status"));
             if (item.getAmount().signum() == 0) {
@@ -299,9 +303,11 @@ public class FinanceReconciliationService {
         return switch (status) {
             case "ORDER_NOT_FOUND" -> (orderCode == null
                     ? "Nội dung chuyển khoản không có mã đơn"
-                    : "Không có đơn " + orderCode) + ", tiền chưa được ghi vào đơn hay ví" + suffix;
+                    : "Không có đơn " + orderCode) + ", tiền chưa được ghi vào đơn, cần chuyển trả khách" + suffix;
             case "AMOUNT_MISSING" -> "SePay không báo số tiền, chưa ghi nhận; nhập số tiền theo sao kê khi xử lý" + suffix;
-            case "ALREADY_PROCESSED" -> "Chuyển thêm vào đơn " + orderCode + " đã thanh toán, tiền chưa được ghi" + suffix;
+            case "ALREADY_PROCESSED" -> "Chuyển thêm vào đơn " + orderCode + " đã thanh toán, cần chuyển trả khách" + suffix;
+            case "AMOUNT_MISMATCH" -> "Chuyển sai số tiền cho đơn " + orderCode + ", đơn chưa ghi nhận, cần chuyển trả khách" + suffix;
+            case "LATE_PAYMENT" -> "Tiền về sau khi đơn " + orderCode + " hết hiệu lực, cần chuyển trả khách" + suffix;
             default -> "Tiền về chưa được ghi nhận (" + status + ")" + suffix;
         };
     }
@@ -329,7 +335,7 @@ public class FinanceReconciliationService {
         return total != null ? total : BigDecimal.ZERO;
     }
 
-    /** Tiền hệ thống đã ghi từ ngân hàng trong kỳ: đơn / nạp ví đã thu, bỏ bút toán hoàn và đơn trả bằng ví. */
+    /** Tiền hệ thống đã ghi từ ngân hàng trong kỳ: đơn đã thu, bỏ bút toán hoàn (và đơn trả bằng ví của dữ liệu cũ). */
     private BigDecimal systemTotal(YearMonth ym) {
         String sql = """
             SELECT COALESCE(SUM(amount), 0) FROM transactions
@@ -427,24 +433,6 @@ public class FinanceReconciliationService {
         }
     }
 
-    private Long resolveWalletOwner(ResolveDiscrepancyRequest request) {
-        Long userId = request.getUserId();
-        String orderCode = trimUpper(request.getOrderCode());
-        if (userId == null && orderCode != null) {
-            userId = transactionRepository.findByGatewayTransactionId(orderCode)
-                    .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng " + orderCode, HttpStatus.NOT_FOUND))
-                    .getUserId();
-        }
-        if (userId == null) {
-            throw new AppException("Cộng vào ví cần mã khách hàng hoặc mã đơn của khách", HttpStatus.BAD_REQUEST);
-        }
-        Integer exists = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE user_id = ?", Integer.class, userId);
-        if (exists == null || exists == 0) {
-            throw new AppException("Không tìm thấy khách hàng #" + userId, HttpStatus.NOT_FOUND);
-        }
-        return userId;
-    }
-
     private ReconciliationPeriod findOrCreate(YearMonth ym) {
         String month = ym.toString();
         return periodRepository.findByPeriodMonth(month).orElseGet(() -> {
@@ -472,7 +460,7 @@ public class FinanceReconciliationService {
         try {
             return ReconciliationItem.Action.valueOf(action.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new AppException("Hành động không hợp lệ: " + action + " (ASSIGN_ORDER, CREDIT_WALLET, EXPLAINED)", HttpStatus.BAD_REQUEST);
+            throw new AppException("Hành động không hợp lệ: " + action + " (ASSIGN_ORDER, RETURNED_TO_CUSTOMER, EXPLAINED)", HttpStatus.BAD_REQUEST);
         }
     }
 

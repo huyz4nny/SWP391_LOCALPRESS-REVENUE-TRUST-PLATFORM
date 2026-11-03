@@ -88,7 +88,7 @@ flowchart TD
   * SV1: `Campaign Booking` (UC004-UC005), `Quotation Confirmation` (UC006), `Advertising Payment` (UC007), `Creative Submission and Preview` (UC008)
   * SV2: `Pending Booking Queue` (UC016), `Advertising Inventory Calendar` (UC017), `Quotation Management` (UC018), `Creative Review` (UC020-UC022)
   * SV3: `Premium Checkout` (UC034-UC035), `Premium Article Reader` (UC036), `Personal Bookshelf` (UC037-UC039), `Comments and Reports` (UC041-UC042)
-  * SV4: `Payment Processing` (UC047-UC050), `Advertiser Receivables` (UC053)
+  * SV4: `Payment Processing` (UC047-UC050)
   * SV5: `Article Version History` (UC062), `Article Submission and Revision` (UC066-UC067), `Content Access and Paywall` (UC068-UC069)
 * **Iteration 3 — Cuối quy trình (20 màn hình):** Đối soát, Hoàn tiền 4 mắt, Báo cáo & Dashboard, AI Cố vấn, Ad Serving & Admin.
   * SV1: `Advertising Dashboard` (UC001, UC010-UC011), `Creative Replacement` (UC009), `Requests and Business Notifications` (UC013-UC014), `Contracts and Documents` (UC012)
@@ -372,7 +372,6 @@ sequenceDiagram
 | **Chuyển khoản** | `POST` | `/api/v1/finance/transfers/{id}/reject` | UC051 | Kế toán từ chối giao dịch kèm lý do cụ thể. |
 | **Sổ quỹ kép** | `GET` | `/api/v1/finance/ledger` | UC047 | Tra cứu danh sách chứng từ, biến động dòng tiền vào/ra toàn hệ thống. |
 | **Sổ quỹ kép** | `GET` | `/api/v1/finance/ledger/summary` | UC049 | Thống kê số dư khả dụng, tổng thu độc giả, tổng thu quảng cáo, tiền hoàn. |
-| **Công nợ B2B** | `GET` | `/api/v1/finance/receivables` | UC053 | Báo cáo công nợ quảng cáo B2B của Doanh nghiệp (SV1). |
 | **Đối soát** | `GET` | `/api/v1/finance/reconciliation` | UC054 | Đối soát khớp nối dòng tiền giữa hệ thống LocalPress và Sao kê SePay. |
 | **Đối soát** | `POST` | `/api/v1/finance/reconciliation/resolve` | UC054 | Kế toán xử lý giải quyết sai lệch số liệu. |
 | **Hoàn tiền 4 mắt** | `GET` | `/api/v1/finance/refunds` | UC055 | Danh sách yêu cầu hoàn tiền đang chờ hoặc đã xử lý. |

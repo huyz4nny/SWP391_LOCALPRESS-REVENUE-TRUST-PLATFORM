@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { SystemAuditLog } from '../types'
 import { adminApi } from '../api'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { formatDateTime } from '@/lib/format'
 import { History, Shield, Filter } from 'lucide-react'
 
 export function AuditLogsPage() {
   const [logs, setLogs] = useState<SystemAuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [moduleFilter, setModuleFilter] = useState('ALL')
 
   useEffect(() => {
@@ -16,8 +18,11 @@ export function AuditLogsPage() {
   const loadLogs = async () => {
     try {
       setLoading(true)
+      setError('')
       const data = await adminApi.getAuditLogs()
       setLogs(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được nhật ký')
     } finally {
       setLoading(false)
     }
@@ -30,12 +35,15 @@ export function AuditLogsPage() {
 
   return (
     <div className="space-y-6">
+      {error && <p role="alert" className="text-red-700">{error}</p>}
+      {loading && <p role="status">Đang tải nhật ký...</p>}
+      {!loading && !error && filteredLogs.length === 0 && <EmptyState title="Chưa có sự kiện phù hợp" />}
       <div className="pb-4 border-b border-slate-200">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
           Nhật ký Kiểm toán Hệ thống (Audit Trail)
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Ghi nhận bất biến (Append-only) mọi hành động trọng yếu: Thay đổi phân quyền, Phê duyệt xuất bản, Hoàn tiền và Cấu hình máy chủ
+          Hiển thị tối đa 200 sự kiện gần nhất đã được các phân hệ ghi vào nhật ký hệ thống.
         </p>
       </div>
 

@@ -15,9 +15,10 @@ import { Panel, Notice } from '../components/LedgerUI'
 
 /**
  * ==============================================================================
- * KHIẾU NẠI THANH TOÁN CHƯA GHI NHẬN /wallet/complaints (SV4 - UC051, phía khách)
+ * KHIẾU NẠI THANH TOÁN CHƯA GHI NHẬN /payment-complaints (SV4 - UC051, phía khách)
  * ==============================================================================
- * Khách đã chuyển tiền nhưng đơn không chuyển sang "Đã thanh toán" / ví không được cộng.
+ * Khách đã chuyển tiền nhưng đơn không chuyển sang "Đã thanh toán" (chậm, sai số tiền, về sau khi đơn hết hạn).
+ * Kế toán ghi nhận vào đơn hoặc chuyển trả lại tài khoản khách (LocalPress không giữ tiền).
  * ?orderCode=&amount= : điền sẵn khi mở từ trang thanh toán.
  */
 
@@ -65,7 +66,7 @@ export function PaymentComplaintPage() {
 
   useEffect(() => {
     if (isGuest) {
-      navigate('/login', { replace: true, state: { from: { pathname: '/wallet/complaints' } } })
+      navigate('/login', { replace: true, state: { from: { pathname: '/payment-complaints' } } })
       return
     }
     load()
@@ -95,8 +96,8 @@ export function PaymentComplaintPage() {
     <div className="mx-auto max-w-[960px] py-6 font-sans text-slate-900">
       <h1 className="text-2xl font-semibold leading-8 tracking-[-0.01em]">Đã chuyển tiền mà chưa được ghi nhận?</h1>
       <p className="mt-1 max-w-[70ch] text-sm leading-6 text-slate-600">
-        Thường hệ thống ghi nhận trong 1-2 phút sau khi ngân hàng báo có. Sau 15 phút mà đơn vẫn chờ hoặc ví chưa được cộng,
-        hãy gửi thông tin dưới đây. Kế toán đối chiếu sao kê rồi phản hồi; bạn không cần chuyển tiền lại.
+        Thường hệ thống ghi nhận trong 1-2 phút sau khi ngân hàng báo có. Sau 15 phút mà đơn vẫn chờ, hoặc bạn lỡ chuyển sai số tiền / chuyển sau khi đơn hết hạn,
+        hãy gửi thông tin dưới đây. Kế toán đối chiếu sao kê rồi ghi nhận vào đơn hoặc chuyển trả lại tài khoản của bạn; bạn không cần chuyển tiền lại.
       </p>
 
       <div className="mt-5 grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

@@ -1,11 +1,12 @@
 import { httpClient } from '@/lib/http/client'
+import { APP_CONFIG } from '@/app/config'
 import { User } from '@/types'
 import { UserRole } from '@/app/config'
 import { SystemAuditLog, PaywallSettings, AdDeliveryLiveStatus } from '../types'
 
 export const adminApi = {
   getUsers: () => {
-    return httpClient.get<User[]>('/auth/users')
+    return httpClient.get<User[]>(APP_CONFIG.useMockApi ? '/auth/users' : '/admin/users')
   },
 
   updateUserRole: (userId: string, role: UserRole) => {

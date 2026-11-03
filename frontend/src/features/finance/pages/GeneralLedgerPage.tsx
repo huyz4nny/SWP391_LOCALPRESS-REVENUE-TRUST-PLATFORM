@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { GeneralLedgerEntry } from '../types'
+import { GeneralLedgerEntry, LedgerSummary } from '../types'
 import { financeApi } from '../api'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { PageHeader, Panel, KpiStrip, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
 
 export function GeneralLedgerPage() {
   const [entries, setEntries] = useState<GeneralLedgerEntry[]>([])
+  const [summary, setSummary] = useState<LedgerSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -17,8 +18,9 @@ export function GeneralLedgerPage() {
     try {
       setLoading(true)
       setError('')
-      const data = await financeApi.getLedger()
+      const [data, totals] = await Promise.all([financeApi.getLedger(), financeApi.getLedgerSummary()])
       setEntries(data)
+      setSummary(totals)
     } catch (e: any) {
       setError(e?.message || 'Không tải được sổ quỹ')
     } finally {
@@ -26,9 +28,12 @@ export function GeneralLedgerPage() {
     }
   }
 
-  const totalCredit = entries.filter((e) => e.entryType === 'CREDIT').reduce((acc, e) => acc + e.amount, 0)
-  const totalDebit = entries.filter((e) => e.entryType === 'DEBIT').reduce((acc, e) => acc + e.amount, 0)
-  const netBalance = totalCredit - totalDebit
+  const credits = entries.filter((e) => e.entryType === 'CREDIT')
+  const debits = entries.filter((e) => e.entryType === 'DEBIT')
+  // Số tổng lấy từ cả sổ (cùng công thức dashboard); bảng chỉ tải các bút toán mới nhất nên không cộng từ bảng
+  const totalCredit = summary ? summary.grossRevenue : credits.reduce((acc, e) => acc + e.amount, 0)
+  const totalDebit = summary ? summary.refundedAmount : debits.reduce((acc, e) => acc + e.amount, 0)
+  const netBalance = summary ? summary.netRevenue : totalCredit - totalDebit
 
   if (loading && entries.length === 0) return <LoadingBlock rows={8} />
 
@@ -36,7 +41,7 @@ export function GeneralLedgerPage() {
     <div>
       <PageHeader
         title="Sổ quỹ"
-        sub="Bút toán phát sinh: thu tiền dịch vụ ghi Có, hoàn tiền ghi Nợ. Số dư ròng tính từ chính các dòng bên dưới."
+        sub="Bút toán phát sinh: thu tiền dịch vụ ghi Có, hoàn tiền ghi Nợ. Số tổng tính trên toàn bộ sổ, khớp dashboard; bảng hiện các bút toán mới nhất."
       />
 
       {error && <div className="mb-4"><Notice tone="error">{error} <button onClick={loadLedger} className="font-medium underline cursor-pointer">Thử lại</button></Notice></div>}
@@ -44,13 +49,13 @@ export function GeneralLedgerPage() {
       <div className="space-y-4">
         <KpiStrip
           items={[
-            { label: 'Số dư ròng', value: formatCurrency(netBalance), lead: true, note: `${entries.length} bút toán` },
-            { label: 'Phát sinh thu (Có)', value: formatCurrency(totalCredit), note: `${entries.filter((e) => e.entryType === 'CREDIT').length} bút toán` },
-            { label: 'Phát sinh hoàn (Nợ)', value: formatCurrency(totalDebit), note: `${entries.filter((e) => e.entryType === 'DEBIT').length} bút toán` },
+            { label: 'Số dư ròng', value: formatCurrency(netBalance), lead: true, note: summary ? 'toàn bộ sổ, khớp dashboard' : `${entries.length} bút toán` },
+            { label: 'Phát sinh thu (Có)', value: formatCurrency(totalCredit), note: summary ? 'toàn bộ sổ' : `${credits.length} bút toán` },
+            { label: 'Phát sinh hoàn (Nợ)', value: formatCurrency(totalDebit), note: summary ? 'toàn bộ sổ' : `${debits.length} bút toán` },
           ]}
         />
 
-        <Panel title="Bút toán" aside={<span className="num">{entries.length} dòng</span>} bodyClassName="px-0 pb-1">
+        <Panel title="Bút toán" aside={<span className="num">{entries.length} bút toán mới nhất</span>} bodyClassName="px-0 pb-1">
           {entries.length === 0 ? (
             <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Chưa có bút toán nào.</p>
           ) : (
