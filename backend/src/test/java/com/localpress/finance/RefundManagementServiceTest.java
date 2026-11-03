@@ -10,6 +10,7 @@ import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
+import com.localpress.finance.service.FinancialDocumentService;
 import com.localpress.finance.service.RefundManagementService;
 import com.localpress.shared.event.RefundCompletedEvent;
 import com.localpress.shared.exception.AppException;
@@ -48,6 +49,9 @@ class RefundManagementServiceTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+
+    @Mock
+    private FinancialDocumentService documentService;
 
 
     @Mock
@@ -324,6 +328,8 @@ class RefundManagementServiceTest {
                     ReviewRefundRequest.builder().approved(true).payoutReference("FT555").build());
 
             assertEquals(TransactionStatus.REFUNDED, originalTx.getStatus());
+            // UC057: hoàn toàn phần thì hủy chứng từ của đơn gốc
+            verify(documentService).voidFor(eq(40L), any());
             verify(transactionRepository).save(argThat(tx -> tx.getTransactionType() == TransactionType.REFUND
                     && "BANK_TRANSFER".equals(tx.getPaymentMethod()) && tx.getDescription().contains("FT555")));
             verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundCompletedEvent ev
@@ -351,6 +357,8 @@ class RefundManagementServiceTest {
 
             assertEquals(TransactionStatus.SUCCESS, originalTx.getStatus());
             verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundCompletedEvent ev && !ev.isFullRefund()));
+            // Hoàn một phần: chứng từ giữ ISSUED
+            verify(documentService, never()).voidFor(any(), any());
         }
 
         @Test

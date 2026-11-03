@@ -46,6 +46,8 @@ public class SepayGatewayService {
     private static final long ORDER_CHECK_COOLDOWN_MS = 10_000;
     /** Số giao dịch tối đa lấy mỗi lần gọi API SePay. */
     private static final int SYNC_LIMIT = 200;
+    /** Số lần gọi tối đa cho 1 lần đồng bộ (lùi mốc transaction_date_max), tức tối đa 5.000 giao dịch. */
+    private static final int SYNC_MAX_PAGES = 25;
     /** Nút kiểm tra của khách: hỏi từ lúc tạo đơn lùi lại chừng này phút (lệch giờ máy chủ / ngân hàng). */
     private static final long ORDER_CHECK_LOOKBACK_MINUTES = 10;
 
@@ -171,33 +173,35 @@ public class SepayGatewayService {
         }
         String from = since.format(SEPAY_TIME);
 
-        JsonNode root;
-        try {
-            String json = RestClient.create(apiBaseUrl).get()
-                    .uri(uri -> {
-                        uri.path("/transactions/list")
-                                .queryParam("transaction_date_min", from)
-                                .queryParam("limit", SYNC_LIMIT);
-                        if (accountNumber != null && !accountNumber.isBlank()) {
-                            uri.queryParam("account_number", accountNumber);
-                        }
-                        return uri.build();
-                    })
-                    .header("Authorization", "Bearer " + apiToken)
-                    .header("Content-Type", "application/json")
-                    .retrieve()
-                    .body(String.class);
-            root = objectMapper.readTree(json);
-        } catch (RestClientException e) {
-            throw new AppException("Không gọi được API SePay: " + e.getMessage(), HttpStatus.BAD_GATEWAY);
-        } catch (Exception e) {
-            throw new AppException("API SePay trả dữ liệu không đọc được", HttpStatus.BAD_GATEWAY);
+        // API trả mới nhất trước, mỗi lần tối đa SYNC_LIMIT dòng: lùi transaction_date_max về giao dịch cũ nhất
+        // của trang trước để lấy hết cửa sổ thời gian (PAY-06). Mốc max tính cả 2 đầu nên lọc trùng theo id.
+        Map<Long, JsonNode> byId = new LinkedHashMap<>();
+        String max = null;
+        boolean complete = false;
+        int pages = 0;
+        while (pages < SYNC_MAX_PAGES) {
+            List<JsonNode> batch = fetchTransactions(from, max);
+            pages++;
+            batch.forEach(tx -> byId.putIfAbsent(tx.path("id").asLong(), tx));
+            if (batch.size() < SYNC_LIMIT) {
+                complete = true;
+                break;
+            }
+            String oldest = text(batch.get(batch.size() - 1), "transaction_date");
+            if (oldest == null || oldest.equals(max)) {
+                break; // hơn SYNC_LIMIT giao dịch cùng 1 giây: không lùi mốc được nữa
+            }
+            max = oldest;
+        }
+        if (!complete) {
+            log.warn("Đồng bộ SePay từ {} dừng sau {} lần gọi ({} giao dịch), có thể còn giao dịch cũ hơn chưa lấy",
+                    from, pages, byId.size());
         }
 
-        // API trả mới nhất trước; xử lý từ cũ đến mới để thứ tự ghi nhận đúng thời gian
-        List<JsonNode> rows = new ArrayList<>();
-        root.path("transactions").forEach(rows::add);
-        Collections.reverse(rows);
+        // Xử lý từ cũ đến mới để thứ tự ghi nhận đúng thời gian
+        List<JsonNode> rows = new ArrayList<>(byId.values());
+        rows.sort(Comparator.comparing((JsonNode tx) -> Objects.toString(text(tx, "transaction_date"), ""))
+                .thenComparingLong(tx -> tx.path("id").asLong()));
 
         int processed = 0, duplicate = 0, ignored = 0;
         List<Map<String, Object>> items = new ArrayList<>();
@@ -231,11 +235,40 @@ public class SepayGatewayService {
             item.put("status", outcome.body().get("status"));
             items.add(item);
         }
-        if (rows.size() >= SYNC_LIMIT) {
-            log.warn("API SePay trả đủ {} giao dịch từ {}: có thể còn giao dịch cũ hơn chưa lấy, hãy đồng bộ khoảng ngắn hơn", SYNC_LIMIT, from);
-        }
         log.info("Đồng bộ SePay từ {}: lấy {}, xử lý {}, trùng {}, bỏ qua {}", from, rows.size(), processed, duplicate, ignored);
         return new SyncResult(rows.size(), processed, duplicate, ignored, items);
+    }
+
+    /** 1 lần gọi GET /transactions/list: giao dịch từ {from} đến {max} (null = đến hiện tại), mới nhất trước. */
+    private List<JsonNode> fetchTransactions(String from, String max) {
+        JsonNode root;
+        try {
+            String json = RestClient.create(apiBaseUrl).get()
+                    .uri(uri -> {
+                        uri.path("/transactions/list")
+                                .queryParam("transaction_date_min", from)
+                                .queryParam("limit", SYNC_LIMIT);
+                        if (max != null) {
+                            uri.queryParam("transaction_date_max", max);
+                        }
+                        if (accountNumber != null && !accountNumber.isBlank()) {
+                            uri.queryParam("account_number", accountNumber);
+                        }
+                        return uri.build();
+                    })
+                    .header("Authorization", "Bearer " + apiToken)
+                    .header("Content-Type", "application/json")
+                    .retrieve()
+                    .body(String.class);
+            root = objectMapper.readTree(json);
+        } catch (RestClientException e) {
+            throw new AppException("Không gọi được API SePay: " + e.getMessage(), HttpStatus.BAD_GATEWAY);
+        } catch (Exception e) {
+            throw new AppException("API SePay trả dữ liệu không đọc được", HttpStatus.BAD_GATEWAY);
+        }
+        List<JsonNode> rows = new ArrayList<>();
+        root.path("transactions").forEach(rows::add);
+        return rows;
     }
 
     /**

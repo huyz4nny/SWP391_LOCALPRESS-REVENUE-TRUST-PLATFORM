@@ -49,6 +49,7 @@ public class RefundManagementService {
 
     private final RefundRequestRepository refundRequestRepository;
     private final TransactionRepository transactionRepository;
+    private final FinancialDocumentService documentService;
     private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -262,6 +263,8 @@ public class RefundManagementService {
             if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);
                 transactionRepository.save(originalTx);
+                // UC057: hoàn toàn phần thì hủy chứng từ; hoàn một phần giữ ISSUED
+                documentService.voidFor(originalTx.getTransactionId(), now);
             }
 
             // 3. UC056 (Rule 17): phát sự kiện, module SV1 / SV3 tự điều chỉnh quyền của đối tượng mình sở hữu

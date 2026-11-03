@@ -4,11 +4,13 @@ import com.localpress.finance.dto.request.CreateOrderRequest;
 import com.localpress.finance.dto.request.SepayIpnRequest;
 import com.localpress.finance.dto.response.OrderCreateResponse;
 import com.localpress.finance.dto.response.OrderStatusResponse;
+import com.localpress.finance.model.FinancialDocument;
 import com.localpress.finance.model.Transaction;
 import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.finance.service.FinanceCurrentUser;
+import com.localpress.finance.service.FinancialDocumentService;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.SePayService;
 import com.localpress.shared.event.PaymentSuccessEvent;
@@ -58,6 +60,9 @@ class PaymentProcessingServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private FinancialDocumentService documentService;
+
     @Spy
     private SePayService sePayService;
 
@@ -74,6 +79,8 @@ class PaymentProcessingServiceTest {
         ReflectionTestUtils.setField(sePayService, "bankShortName", "vietcombank");
         ReflectionTestUtils.setField(sePayService, "accountNumber", "9981");
         ReflectionTestUtils.setField(sePayService, "accountName", "LOCALPRESS TEST");
+        lenient().when(documentService.issueFor(any(Transaction.class)))
+                .thenAnswer(inv -> FinancialDocument.builder().documentNo("BN-2026-000001").build());
     }
 
     private Transaction pending(TransactionType type, String amount) {
@@ -179,6 +186,9 @@ class PaymentProcessingServiceTest {
 
         assertEquals("SUCCESS", result.get("status"));
         assertEquals(TransactionStatus.SUCCESS, tx.getStatus());
+        // UC057: đơn SUCCESS được phát hành chứng từ trong cùng giao dịch
+        verify(documentService).issueFor(tx);
+        assertEquals("BN-2026-000001", result.get("documentNo"));
         ArgumentCaptor<PaymentSuccessEvent> captor = ArgumentCaptor.forClass(PaymentSuccessEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertEquals(2L, captor.getValue().getTargetId());
@@ -196,6 +206,7 @@ class PaymentProcessingServiceTest {
         assertEquals("ALREADY_PROCESSED", result.get("status"));
         verify(transactionRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
+        verify(documentService, never()).issueFor(any());
     }
 
     @Test
