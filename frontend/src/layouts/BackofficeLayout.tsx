@@ -133,7 +133,9 @@ export function BackofficeLayout() {
   const adminItems: NavItem[] = [
     { label: 'Tài khoản & phân quyền', path: '/backoffice/admin/users', icon: Users },
     { label: 'Paywall & thiết bị', path: '/backoffice/admin/paywall', icon: Settings },
+    { label: 'Vị trí quảng cáo', path: '/backoffice/admin/ad-slots', icon: LayoutGrid },
     { label: 'Phân phối banner', path: '/backoffice/admin/delivery', icon: Activity },
+    { label: 'Giám sát URL quảng cáo', path: '/backoffice/admin/url-monitor', icon: Activity },
     { label: 'Nhật ký kiểm toán', path: '/backoffice/admin/audit-logs', icon: History },
   ]
 

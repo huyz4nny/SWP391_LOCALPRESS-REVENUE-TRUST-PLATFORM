@@ -96,6 +96,21 @@ class PaymentComplaintServiceTest {
     }
 
     @Test
+    @DisplayName("PAY-03: SePay báo mã GD là 1.000 đ, khách khai 15.000 đ -> 409, không chạy luồng ghi nhận")
+    void resolve_order_amountDiffersFromSepayLog() {
+        PaymentComplaint c = open(ORDER);
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(sepayLogRepository.findFirstByReferenceCodeAndAuthOkTrueAndTransferAmountNotNullOrderByReceivedAtAsc("FT123"))
+                .thenReturn(Optional.of(SepayWebhookLog.builder().referenceCode("FT123")
+                        .transferAmount(new BigDecimal("1000")).resultStatus("AMOUNT_MISMATCH").build()));
+
+        AppException ex = assertThrows(AppException.class, () -> service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER, null));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals(PaymentComplaint.Status.OPEN, c.getStatus());
+        verify(paymentProcessingService, never()).processSepayIpn(any());
+    }
+
+    @Test
     @DisplayName("Ghi nhận vào đơn đã thanh toán -> 409, gợi ý chuyển trả khách")
     void resolve_order_alreadyPaid() {
         PaymentComplaint c = open(ORDER);

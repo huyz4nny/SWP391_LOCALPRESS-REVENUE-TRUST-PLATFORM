@@ -19,6 +19,14 @@ export function Dialog({
   children,
   maxWidth = 'md',
 }: DialogProps) {
+  const titleId = React.useId()
+  const panel = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    if (!open) return
+    const previous = document.activeElement as HTMLElement | null
+    if (!panel.current?.contains(document.activeElement)) panel.current?.focus()
+    return () => { previous?.focus() }
+  }, [open])
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) onClose()
@@ -45,10 +53,20 @@ export function Dialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab') return
+        const controls = panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]')
+        const first = controls?.[0], last = controls?.[controls.length - 1]
+        if (!first || !last) { event.preventDefault(); return }
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) { event.preventDefault(); last.focus() }
+        else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panel.current)) { event.preventDefault(); first.focus() }
+      }}>
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
 
       <div
+        ref={panel}
+        tabIndex={-1}
         className={cn(
           'relative z-50 max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-xl',
           maxWidthClasses[maxWidth]
@@ -62,7 +80,7 @@ export function Dialog({
           <span className="sr-only">Đóng</span>
         </button>
 
-        {title && <h3 className="pr-8 text-base font-semibold leading-6 text-slate-900">{title}</h3>}
+        {title && <h3 id={titleId} className="pr-8 text-base font-semibold leading-6 text-slate-900">{title}</h3>}
         {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
 
         <div className={title || description ? 'mt-5' : ''}>{children}</div>

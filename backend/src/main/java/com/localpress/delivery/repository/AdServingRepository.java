@@ -4,19 +4,28 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
 public class AdServingRepository {
     private final JdbcTemplate jdbc;
-    public record Slot(String id,String code,String name,String dimensions,int capacity) {}
+    public record Slot(String id,String code,String name,String dimensions,int capacity,String status) {
+        public Slot(String id,String code,String name,String dimensions,int capacity) {
+            this(id,code,name,dimensions,capacity,"ACTIVE");
+        }
+    }
     public record Creative(long campaignId,long creativeId,String title,String imageUrl,String targetUrl,String companyName) {}
     public List<Slot> slots() {
-        return jdbc.query("SELECT slot_id,slot_code,name,dimensions,capacity FROM ad_slots ORDER BY slot_id",
-                (rs,row)->new Slot(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getInt(5)));
+        return jdbc.query("SELECT slot_id,slot_code,name,dimensions,capacity,status FROM ad_slots ORDER BY slot_id",
+                (rs,row)->new Slot(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getInt(5),rs.getString(6)));
     }
     public List<Creative> eligible(String code,LocalDate today) {
+        return eligible(code,today,LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+    }
+    public List<Creative> eligible(String code,LocalDate today,LocalDateTime now) {
         return jdbc.query("""
                 SELECT c.campaign_id,v.creative_id,c.campaign_name,v.media_url,v.target_url,a.company_name
                 FROM ad_slots s JOIN ad_campaigns c ON c.slot_id=s.slot_id
@@ -24,11 +33,13 @@ public class AdServingRepository {
                 WHERE s.slot_code=? AND s.status='ACTIVE' AND c.status IN ('APPROVED','ACTIVE')
                   AND c.start_date<=? AND c.end_date>=? AND c.payment_status='PAID' AND c.quotation_status='ACCEPTED'
                   AND c.contract_reference IS NOT NULL AND TRIM(c.contract_reference)<>''
+                  AND (v.requested_effective_at IS NULL OR v.requested_effective_at<=?)
                   AND v.review_status='APPROVED' AND (v.scan_status IS NULL OR v.scan_status='SAFE')
                   AND NOT EXISTS(SELECT 1 FROM ad_creatives n WHERE n.campaign_id=c.campaign_id
-                      AND n.review_status='APPROVED' AND n.version_number>v.version_number)
+                      AND n.review_status='APPROVED' AND n.version_number>v.version_number
+                      AND (n.requested_effective_at IS NULL OR n.requested_effective_at<=?))
                 ORDER BY c.campaign_id
-                """,(rs,row)->new Creative(rs.getLong(1),rs.getLong(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6)),code,today,today);
+                """,(rs,row)->new Creative(rs.getLong(1),rs.getLong(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6)),code,today,today,now,now);
     }
     public boolean adFree(String email,LocalDate today) {
         if(email==null) return false;
@@ -46,9 +57,9 @@ public class AdServingRepository {
                 ON DUPLICATE KEY UPDATE ctr=ROUND(clicks*100.0/(impressions+1),4),impressions=impressions+1
                 """,c.campaignId(),c.creativeId(),day);
     }
-    public void click(Creative c,LocalDate day) {
-        jdbc.update("UPDATE ad_stats SET ctr=ROUND((clicks+1)*100.0/impressions,4),clicks=clicks+1 "
-                + "WHERE campaign_id=? AND creative_id=? AND stat_date=? AND clicks<impressions",c.campaignId(),c.creativeId(),day);
+    public boolean click(Creative c,LocalDate day) {
+        return jdbc.update("UPDATE ad_stats SET ctr=ROUND((clicks+1)*100.0/impressions,4),clicks=clicks+1 "
+                + "WHERE campaign_id=? AND creative_id=? AND stat_date=? AND clicks<impressions",c.campaignId(),c.creativeId(),day) == 1;
     }
     public long[] todayStats(String slotId,LocalDate day) {
         return jdbc.queryForObject("SELECT COALESCE(SUM(s.impressions),0),COALESCE(SUM(s.clicks),0) FROM ad_stats s "

@@ -2,6 +2,7 @@ package com.localpress.identity.service;
 
 import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
@@ -27,17 +28,32 @@ public class JwtTokenService {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public LoginResponse issue(User user) {
-        Instant now = Instant.now();
-        String token = Jwts.builder()
-                .issuer("localpress").audience().add("localpress-api").and()
-                .subject(user.getId().toString())
-                .issuedAt(Date.from(now)).expiration(Date.from(now.plusMillis(expirationMs)))
-                .signWith(key, Jwts.SIG.HS256).compact();
-        return new LoginResponse(token, "Bearer", expirationMs / 1000);
+    public long lifetimeMillis() {
+        return expirationMs;
     }
 
-    public long verifyAndGetUserId(String token) {
+    public LoginResponse issue(User user) {
+        return issue(user, null, null);
+    }
+
+    /** sessionId được ghi vào claim sid. Filter dùng claim này để kiểm phiên thiết bị. */
+    public LoginResponse issue(User user, String sessionId, Instant expiresAt) {
+        Instant now = Instant.now();
+        Instant exp = expiresAt == null ? now.plusMillis(expirationMs) : expiresAt;
+        JwtBuilder builder = Jwts.builder()
+                .issuer("localpress").audience().add("localpress-api").and()
+                .subject(user.getId().toString())
+                .claim("ver", user.getAuthVersion() == null ? 0L : user.getAuthVersion())
+                .issuedAt(Date.from(now)).expiration(Date.from(exp));
+        if (sessionId != null && !sessionId.isBlank()) {
+            builder.claim("sid", sessionId.trim());
+        }
+        String token = builder.signWith(key, Jwts.SIG.HS256).compact();
+        long seconds = Math.max(1, java.time.Duration.between(now, exp).getSeconds());
+        return new LoginResponse(token, "Bearer", seconds);
+    }
+
+    public VerifiedToken verify(String token) {
         var claims = Jwts.parser().verifyWith(key)
                 .requireIssuer("localpress").requireAudience("localpress-api")
                 .build().parseSignedClaims(token).getPayload();
@@ -46,6 +62,16 @@ public class JwtTokenService {
         }
         long id = Long.parseLong(claims.getSubject());
         if (id <= 0) throw new IllegalArgumentException("Invalid subject");
-        return id;
+        String sid = claims.get("sid", String.class);
+        if (sid != null && sid.isBlank()) sid = null;
+        Number version = claims.get("ver", Number.class);
+        if (version != null && version.longValue() < 0) throw new IllegalArgumentException("Invalid token version");
+        return new VerifiedToken(id, sid, version == null ? 0L : version.longValue());
     }
+
+    public long verifyAndGetUserId(String token) {
+        return verify(token).userId();
+    }
+
+    public record VerifiedToken(Long userId, String sessionId, Long version) {}
 }

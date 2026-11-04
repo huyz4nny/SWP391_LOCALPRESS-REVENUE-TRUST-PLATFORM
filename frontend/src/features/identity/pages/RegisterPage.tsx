@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { CheckCircle2 } from 'lucide-react'
 import { authApi } from '../api'
+import { vnPhoneError } from '../vnPhone'
 import { AppApiError } from '@/lib/http/errors'
 
 export function RegisterPage() {
@@ -31,9 +32,11 @@ export function RegisterPage() {
     setSubmitError('')
     setFieldErrors({})
 
-    if (password !== confirmPassword) {
+    const invalidPhone = vnPhoneError(phone)
+    if (password !== confirmPassword || invalidPhone) {
       setFieldErrors({
-        confirmPassword: 'Mật khẩu xác nhận không khớp',
+        ...(password !== confirmPassword ? { confirmPassword: 'Mật khẩu xác nhận không khớp' } : {}),
+        ...(invalidPhone ? { phone: invalidPhone } : {}),
       })
       return
     }
@@ -125,7 +128,12 @@ export function RegisterPage() {
                 placeholder="0912345678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                maxLength={20}
+                aria-invalid={fieldErrors.phone ? true : undefined}
               />
+              {fieldErrors.phone && (
+                <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.phone}</p>
+              )}
             </div>
             <div>
               <Label htmlFor="password" required>
@@ -153,9 +161,13 @@ export function RegisterPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
+              {fieldErrors.confirmPassword && (
+                <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.confirmPassword}</p>
+              )}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-3">
+            {submitError && <p role="alert" className="text-sm text-red-700">{submitError}</p>}
             <Button type="submit" className="w-full" isLoading={isSubmitting} disabled={isSubmitting}>
               Đăng ký tài khoản
             </Button>

@@ -3,11 +3,12 @@ import { authApi } from './api'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
 import { cancelLogin } from './authSession'
+import { currentBrowserDevice } from './browserDevice'
 
 export async function loginWithGoogle(idToken: string) {
   httpClient.beginLogin()
   try {
-    const session = await authApi.googleLogin(idToken)
+    const session = await authApi.googleLogin(idToken, currentBrowserDevice())
     httpClient.setBearerToken(session.accessToken)
     const user = await authApi.getMe()
     mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })

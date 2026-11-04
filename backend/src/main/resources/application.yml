@@ -33,3 +33,6 @@ localpress:
     webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
     api-token: ${SEPAY_API_TOKEN:}
     api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}
+  finance:
+    # Thuế suất GTGT (%) ghi trên chứng từ UC057. 8% theo NQ 204/2025/QH15 đến 31/12/2026; từ 01/01/2027 đặt lại 10%.
+    vat-rate: ${LOCALPRESS_VAT_RATE:8}

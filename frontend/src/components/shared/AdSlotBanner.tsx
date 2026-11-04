@@ -1,7 +1,8 @@
+import { trackVisibleAd } from './adViewTracking'
 import { useEffect, useRef, useState } from 'react'
 import { mockStore } from '@/mocks/store'
 import { APP_CONFIG } from '@/app/config'
-import { adDeliveryApi, type AdOffer } from './adDeliveryApi'
+import { adDeliveryApi, resolveAdImageUrl, type AdOffer } from './adDeliveryApi'
 import { ExternalLink, Megaphone } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -11,7 +12,8 @@ interface Props {
 }
 export function AdSlotBanner({ slotCode, className = '' }: Props) {
   const [offer, setOffer] = useState<AdOffer | null>(null)
-  const seen = useRef(new Map<string, Promise<unknown>>())
+  const imageRef = useRef<HTMLImageElement>(null)
+  const tracker = useRef<ReturnType<typeof trackVisibleAd> | null>(null)
   const userId = mockStore.getCurrentUser().id
   useEffect(() => {
     if (APP_CONFIG.useMockApi) return
@@ -31,29 +33,26 @@ export function AdSlotBanner({ slotCode, className = '' }: Props) {
     ? mockCreative && { ...mockCreative, companyName: booking?.companyName }
     : offer?.creative
   const slot = APP_CONFIG.useMockApi ? mockSlot : offer?.slot
-  function impression(): Promise<unknown> {
+  useEffect(() => {
     const token = offer?.trackingToken
-    if (!token) return Promise.resolve()
-    const existing = seen.current.get(token)
-    if (existing) return existing
-    const request = adDeliveryApi.impression(token)
-    seen.current.set(token, request)
-    return request
-  }
-  if (!APP_CONFIG.useMockApi && offer?.hidden) return null
+    const image = imageRef.current
+    if (APP_CONFIG.useMockApi || !image || !token || offer.hidden || offer.slot.status === 'INACTIVE') return
+    const current = trackVisibleAd(image, {
+      impression: () => adDeliveryApi.impression(token),
+      click: () => adDeliveryApi.click(token),
+    })
+    tracker.current = current
+    return () => { current.dispose(); tracker.current = null }
+  }, [offer])
+  if (!APP_CONFIG.useMockApi && (offer?.hidden || offer?.slot.status === 'INACTIVE')) return null
   if (creative) return (
     <div className={'relative overflow-hidden rounded border border-slate-200 bg-white ' + className}>
       <span className="absolute right-1 top-1 rounded bg-slate-900/80 px-1.5 py-0.5 text-xs text-white">Quảng cáo · {creative.companyName}</span>
       <a href={creative.targetUrl} target="_blank" rel="noopener noreferrer sponsored" onClick={() => {
         if (APP_CONFIG.useMockApi) { if (campaign) campaign.clicks += 1; return }
-        if (offer?.trackingToken) {
-          const token = offer.trackingToken
-          void impression().then(() => adDeliveryApi.click(token)).catch(() => {})
-        }
+        tracker.current?.click()
       }}>
-        <img src={creative.imageUrl} alt={creative.title} className="max-h-[200px] w-full object-cover" onLoad={() => {
-          if (!APP_CONFIG.useMockApi) void impression().catch(() => {})
-        }} />
+        <img ref={imageRef} key={offer?.trackingToken ?? creative.imageUrl} src={APP_CONFIG.useMockApi ? creative.imageUrl : resolveAdImageUrl(creative.imageUrl)} alt={creative.title} className="max-h-[200px] w-full object-cover" />
       </a>
     </div>
   )

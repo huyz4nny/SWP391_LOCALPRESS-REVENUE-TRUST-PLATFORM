@@ -493,6 +493,16 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'VIETQR')
   }
 
+  // Iter 3: trạng thái rỗng; hủy/hoàn và thay banner cần backend thật.
+  if (pathname === '/advertiser/dashboard' && method === 'GET') return { campaigns: [], stageCounts: {}, impressions: 0, clicks: 0, ctr: 0, totalPaid: 0, generatedAt: new Date().toISOString(), excludedEventsAvailable: false }
+  if (['/advertiser/performance', '/advertiser/documents', '/advertiser/contracts', '/advertiser/requests'].includes(pathname) && method === 'GET') return []
+  if (pathname === '/advertiser/notifications/unread-count' && method === 'GET') return 0
+  if (pathname === '/advertiser/notifications' && method === 'GET') return { items: [], total: 0, page: Number(params.get('page') || 0), size: 20 }
+  if (pathname === '/advertiser/notifications/read-all' && method === 'POST') return
+  if (pathname.endsWith('/cancellation-quote') && method === 'GET') return { allowed: false, blockedReason: 'Chế độ demo chưa hỗ trợ hủy chiến dịch. Hãy dùng kết nối hệ thống thật để gửi yêu cầu.', paidAmount: 0, totalDays: 0, unusedDays: 0, proposedAmount: 0, refundApplicable: false, policyText: 'Hủy chiến dịch và khoản hoàn cần được xử lý trên hệ thống thật.' }
+  if (pathname.endsWith('/acceptance') && method === 'GET') throw new Error('Chưa có dữ liệu nghiệm thu trong chế độ demo')
+  if (pathname.endsWith('/cancel') && method === 'POST') throw new Error('Hủy chiến dịch cần kết nối hệ thống thật')
+
   if (pathname.startsWith('/advertiser/campaigns/') && method === 'GET') {
     const id = pathname.replace('/advertiser/campaigns/', '')
     const camp = mockStore.getState().campaigns.find((c) => c.id === id || c.bookingId === id)
@@ -1036,6 +1046,30 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       message: 'Lấy danh sách đơn hàng thành công',
       data: { content, totalElements: mine.length, totalPages: Math.ceil(mine.length / size), number: page, size },
     }
+  }
+
+  // UC057: chứng từ của chính user đang đăng nhập (Rule 14), dạng ApiResponse như backend thật
+  if (pathname === '/finance/documents/mine' && method === 'GET') {
+    if (currentUser.role === 'GUEST') {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Chưa đăng nhập', path: pathname })
+    }
+    const type = params.get('type')?.trim().toUpperCase()
+    const docs = mockStore.getFinancialDocuments(currentUser.id).filter((d) => !type || d.type === type)
+    return { success: true, message: 'Lấy danh sách chứng từ thành công', data: docs }
+  }
+
+  // UC057: chứng từ của 1 đơn, chủ đơn hoặc nhân sự tài chính (Rule 14); đơn chưa thu -> 404 như backend
+  if (pathname.startsWith('/finance/documents/transaction/') && method === 'GET') {
+    const orderId = decodeURIComponent(pathname.replace('/finance/documents/transaction/', ''))
+    const row = mockStore.getFinancialDocumentByOrder(orderId)
+    if (!row) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Đơn chưa có chứng từ (chưa thu tiền)', path: pathname })
+    }
+    const isFinance = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN'].includes(currentUser.role)
+    if (!isFinance && row.owner !== currentUser.id) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 403, error: 'Forbidden', message: 'Bạn không có quyền xem chứng từ này', path: pathname })
+    }
+    return { success: true, message: 'Lấy chứng từ thành công', data: row.doc }
   }
 
   if (pathname.startsWith('/finance/orders/') && method === 'GET') {

@@ -6,6 +6,8 @@ import com.localpress.identity.controller.GoogleLoginExceptionHandler;
 import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.service.*;
+import com.localpress.shared.device.DeviceLimitReachedException;
+import com.localpress.shared.device.DeviceSessionService;
 import com.localpress.shared.security.SecurityConfig;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -50,6 +52,7 @@ class GoogleLoginSecurityTest {
     @MockBean GoogleLoginService login;
     @MockBean ProfileService profileService;
     @MockBean JdbcTemplate jdbc;
+    @MockBean DeviceSessionService devices;
     ResultSet account;
     User reader;
 
@@ -69,6 +72,18 @@ class GoogleLoginSecurityTest {
         }).when(jdbc).query(anyString(), any(RowMapper.class), any(Object[].class));
     }
 
+    @Test void sessionAndAuthVersionMustBothRemainValid() throws Exception {
+        ReflectionTestUtils.setField(reader,"authVersion",3L);
+        when(account.getLong("auth_version")).thenReturn(3L);
+        when(devices.isActive("session-test")).thenReturn(true);
+        String token=tokens.issue(reader,"session-test",Instant.now().plusSeconds(600)).accessToken();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isOk());
+        when(account.getLong("auth_version")).thenReturn(4L);
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
+        when(account.getLong("auth_version")).thenReturn(3L);
+        when(devices.isActive("session-test")).thenReturn(false);
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
+    }
     @Test void nonceIsPublicAndCookieIsHttpOnly() throws Exception {
         mvc.perform(get("/api/v1/auth/google/nonce"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.nonce").isNotEmpty())
@@ -76,12 +91,13 @@ class GoogleLoginSecurityTest {
                 .andExpect(header().string("Cache-Control", "no-store"));
     }
     @Test void googleExchangeIsPublicAndDoesNotCacheToken() throws Exception {
-        when(login.login("google-id-token", "nonce")).thenReturn(new LoginResponse("local-token", "Bearer", 3600));
+        when(login.login("google-id-token", "nonce", null, null, "127.0.0.1"))
+                .thenReturn(new LoginResponse("local-token", "Bearer", 3600));
         mvc.perform(post("/api/v1/auth/google").cookie(new Cookie(GoogleLoginNonceService.COOKIE, "nonce"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"google-id-token\",\"role\":\"SYSTEM_ADMIN\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").value("local-token"))
                 .andExpect(header().string("Cache-Control", "no-store"));
-        verify(login).login("google-id-token", "nonce");
+        verify(login).login("google-id-token", "nonce", null, null, "127.0.0.1");
     }
     @Test void emptyGoogleTokenIsRejected() throws Exception {
         mvc.perform(post("/api/v1/auth/google").contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"\"}"))
@@ -90,6 +106,27 @@ class GoogleLoginSecurityTest {
     }
     @Test void meRequiresAuthentication() throws Exception {
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
+    }
+    @Test void deviceLimitOnGoogleLoginIsConflict() throws Exception {
+        when(login.login(anyString(), any(), nullable(String.class), nullable(String.class), anyString()))
+                .thenThrow(new DeviceLimitReachedException());
+        mvc.perform(post("/api/v1/auth/google").cookie(new Cookie(GoogleLoginNonceService.COOKIE, "nonce"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"google-id-token\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DEVICE_LIMIT_REACHED"));
+    }
+    @Test void revokedDeviceSessionIsRejected() throws Exception {
+        when(devices.isActive("sid-revoked")).thenReturn(false);
+        String token = tokens.issue(reader, "sid-revoked", Instant.now().plusSeconds(3600)).accessToken();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(jdbc);
+    }
+    @Test void activeDeviceSessionAuthenticatesAndKeepsTokenWithoutSidWorking() throws Exception {
+        when(devices.isActive("sid-live")).thenReturn(true);
+        String token = tokens.issue(reader, "sid-live", Instant.now().plusSeconds(3600)).accessToken();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value("42"));
     }
     @Test void localJwtAuthenticatesMeWithDatabaseIdentity() throws Exception {
         mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + tokens.issue(reader).accessToken()))

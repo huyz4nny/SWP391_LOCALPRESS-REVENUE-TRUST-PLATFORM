@@ -50,6 +50,34 @@ export interface Order {
   updatedAt: string
 }
 
+/** UC057: INVOICE cho đơn quảng cáo (doanh nghiệp), RECEIPT cho đơn độc giả. */
+export type FinancialDocumentType = 'RECEIPT' | 'INVOICE'
+/** VOIDED khi đơn đã hoàn tiền toàn phần. */
+export type FinancialDocumentStatus = 'ISSUED' | 'VOIDED'
+
+/**
+ * Một dòng của GET /finance/documents/mine (bảng financial_documents).
+ * Hệ thống tự phát hành khi đơn SUCCESS; thông tin người mua lưu lại tại thời điểm phát hành.
+ */
+export interface FinancialDocument {
+  documentNo: string // HD-2026-000001 (INVOICE), BN-2026-000001 (RECEIPT), tăng liên tục theo năm
+  type: FinancialDocumentType
+  orderCode: string
+  targetType: OrderType
+  targetId: string
+  description: string
+  buyerName: string
+  buyerTaxCode?: string
+  buyerAddress?: string
+  vatRate: number // % lúc phát hành (8 đến 31/12/2026)
+  amountBeforeVat: number
+  vatAmount: number
+  totalAmount: number
+  status: FinancialDocumentStatus
+  issuedAt: string
+  voidedAt?: string
+}
+
 export type RefundStatus =
   | 'PENDING'
   | 'REQUESTED'

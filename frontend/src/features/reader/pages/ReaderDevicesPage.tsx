@@ -1,4 +1,4 @@
-// Tác dụng: trang `/account/devices` (UC043) — list tối đa 2 phiên, nút thu hồi. Login chưa ghi phiên thì danh sách trống.
+// Tác dụng: trang `/account/devices` (UC043) — list tối đa 2 phiên, nút thu hồi.
 import React, { useState } from 'react'
 import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
