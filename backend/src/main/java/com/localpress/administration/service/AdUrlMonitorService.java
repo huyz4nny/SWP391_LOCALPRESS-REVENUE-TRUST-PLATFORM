@@ -71,8 +71,10 @@ public class AdUrlMonitorService {
           AND c.start_date<=? AND c.end_date>=? AND c.payment_status='PAID'
           AND c.quotation_status='ACCEPTED' AND c.contract_reference IS NOT NULL AND TRIM(c.contract_reference)<>''
           AND v.review_status='APPROVED'
+          AND (v.requested_effective_at IS NULL OR v.requested_effective_at<=CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+07:00'))
           AND NOT EXISTS(SELECT 1 FROM ad_creatives n WHERE n.campaign_id=v.campaign_id
-              AND n.review_status='APPROVED' AND n.version_number>v.version_number)
+              AND n.review_status='APPROVED' AND n.version_number>v.version_number
+              AND (n.requested_effective_at IS NULL OR n.requested_effective_at<=CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+07:00')))
           AND (v.last_scanned_at IS NULL OR v.last_scanned_at<=DATE_SUB(NOW(),INTERVAL ? HOUR))
         """;
     private java.time.LocalDate today() { return java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")); }

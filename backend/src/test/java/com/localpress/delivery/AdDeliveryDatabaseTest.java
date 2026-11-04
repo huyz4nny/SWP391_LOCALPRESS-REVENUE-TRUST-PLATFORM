@@ -70,6 +70,26 @@ class AdDeliveryDatabaseTest {
         if(advUser>0)jdbc.update("DELETE FROM users WHERE user_id=?",advUser);
         if(code!=null)Files.deleteIfExists(images.resolve(code+".png"));
     }
+    @Test void replacementUsesExactEffectiveTimeAndPreservesSafetyGate() {
+        var repo=new com.localpress.delivery.repository.AdServingRepository(jdbc);
+        var now=today.atTime(12,0);
+        jdbc.update("INSERT INTO ad_creatives(campaign_id,version_number,title,media_url,target_url,review_status,scan_status,requested_effective_at) VALUES (?,2,'Replacement',?,'https://example.test/new','APPROVED','SAFE',?)",campaign,imagePath,now.plusSeconds(1));
+        long replacement=jdbc.queryForObject("SELECT creative_id FROM ad_creatives WHERE campaign_id=? AND version_number=2",Long.class,campaign);
+        assertEquals(creative,repo.eligible(code,today,now).get(0).creativeId());
+        assertEquals(replacement,repo.eligible(code,today,now.plusSeconds(1)).get(0).creativeId());
+        assertEquals(replacement,repo.eligible(code,today,now.plusSeconds(2)).get(0).creativeId());
+        jdbc.update("UPDATE ad_creatives SET requested_effective_at=NULL WHERE creative_id=?",replacement);
+        assertEquals(replacement,repo.eligible(code,today,now).get(0).creativeId());
+        jdbc.update("UPDATE ad_creatives SET scan_status='SUSPICIOUS' WHERE creative_id=?",replacement);
+        assertTrue(repo.eligible(code,today,now).isEmpty());
+        jdbc.update("UPDATE ad_creatives SET requested_effective_at=? WHERE creative_id=?",now.plusDays(1),replacement);
+        assertEquals(creative,repo.eligible(code,today,now).get(0).creativeId());
+        jdbc.update("UPDATE ad_creatives SET requested_effective_at=? WHERE creative_id=?",now.plusSeconds(1),creative);
+        assertTrue(repo.eligible(code,today,now).isEmpty());
+        jdbc.update("UPDATE ad_creatives SET requested_effective_at=NULL WHERE creative_id=?",creative);
+        jdbc.update("UPDATE ad_creatives SET requested_effective_at=NULL,review_status='PENDING',scan_status='SAFE' WHERE creative_id=?",replacement);
+        assertEquals(creative,repo.eligible(code,today,now).get(0).creativeId());
+    }
     @Test void approvedInternalBannerIsOfferedAndItsImageCanBeLoadedByGuest() throws Exception {
         mvc.perform(get("/api/v1/delivery/ad-slots/"+code+"/serve"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.creative.imageUrl").value(imagePath))

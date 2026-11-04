@@ -89,6 +89,15 @@ class AdUrlMonitorDatabaseTest {
         probeResult("BLOCKED",null);monitor.scan(auth,creative,"127.0.0.1");
         assertEquals("FAILURE",jdbc.queryForObject("SELECT result FROM audit_logs WHERE user_id=? ORDER BY audit_id DESC LIMIT 1",String.class,actor));
     }
+    @Test void scheduledScanKeepsCurrentCreativeUntilReplacementIsEffective() {
+        jdbc.update("INSERT INTO ad_creatives(campaign_id,version_number,title,media_url,target_url,review_status,scan_status,requested_effective_at) VALUES (?,2,'Future',?,'https://example.test/future','APPROVED','SAFE',DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+07:00'),INTERVAL 1 DAY))",campaign,imagePath);
+        long replacement=jdbc.queryForObject("SELECT creative_id FROM ad_creatives WHERE campaign_id=? AND version_number=2",Long.class,campaign);
+        java.util.List<Long> due=org.springframework.test.util.ReflectionTestUtils.invokeMethod(monitor,"due",6,50);
+        assertTrue(due.contains(creative));assertFalse(due.contains(replacement));
+        jdbc.update("UPDATE ad_creatives SET requested_effective_at=DATE_SUB(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+07:00'),INTERVAL 1 MINUTE) WHERE creative_id=?",replacement);
+        due=org.springframework.test.util.ReflectionTestUtils.invokeMethod(monitor,"due",6,50);
+        assertFalse(due.contains(creative));assertTrue(due.contains(replacement));
+    }
     @Test void changedUrlStopsServingUntilAdminAcceptsAndAudits() {
         probeResult("CHANGED","https://other.example/landing");
         var changed=monitor.scan(auth,creative,"127.0.0.1");
