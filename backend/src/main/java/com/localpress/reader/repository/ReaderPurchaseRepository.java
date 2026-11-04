@@ -158,19 +158,20 @@ public class ReaderPurchaseRepository {
     // block tạo bản ghi gói mới ở trạng thái PENDING và bật gia hạn
     // cột auto_renew mặc định false, nếu không bật ở đây thì độc giả không có gì để tắt sau khi trả tiền
     // start_date và end_date là cột bắt buộc nên ghi tạm bằng ngày tạo và sẽ được ghi đè bằng ngày thật khi thanh toán xong
-    public Long insertPendingSubscription(Long userId, Long planId, LocalDate today) {
+    public Long insertPendingSubscription(Long userId, Long planId, LocalDate today, BigDecimal lockedPrice) {
         return insertAndReturnId("""
-                INSERT INTO subscriptions (user_id, plan_id, start_date, end_date, status, auto_renew)
-                VALUES (?, ?, ?, ?, 'PENDING', TRUE)
-                """, userId, planId, Date.valueOf(today), Date.valueOf(today));
+                INSERT INTO subscriptions (user_id, plan_id, start_date, end_date, status, auto_renew, locked_price)
+                VALUES (?, ?, ?, ?, 'PENDING', TRUE, ?)
+                """, userId, planId, Date.valueOf(today), Date.valueOf(today), lockedPrice);
     }
 
     // block làm mới ngày tạm của bản ghi chờ cũ và chỉ động vào bản ghi vẫn còn PENDING
-    public int refreshPendingSubscription(Long subscriptionId, LocalDate today) {
+    public int refreshPendingSubscription(Long subscriptionId, LocalDate today, BigDecimal lockedPrice) {
         return jdbcTemplate.update("""
-                UPDATE subscriptions SET start_date = ?, end_date = ?, auto_renew = TRUE
+                UPDATE subscriptions
+                SET start_date = ?, end_date = ?, auto_renew = TRUE, locked_price = ?
                 WHERE subscription_id = ? AND status = 'PENDING'
-                """, Date.valueOf(today), Date.valueOf(today), subscriptionId);
+                """, Date.valueOf(today), Date.valueOf(today), lockedPrice, subscriptionId);
     }
 
     // hàm dùng chung để chạy câu INSERT rồi lấy id tự tăng vừa sinh ra

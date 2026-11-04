@@ -42,6 +42,24 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     boolean existsByGatewayTransactionId(String gatewayTransactionId);
 
+    /** Khóa dòng đơn gốc khi lập / duyệt hoàn tiền, để 2 phiếu cùng lúc không cùng vượt hạn mức (Rule 11). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Transaction t WHERE t.transactionId = :id")
+    Optional<Transaction> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * Đơn còn PENDING của cùng 1 đối tượng (bài lẻ / gói / chiến dịch). Khi module nguồn tạo đơn mới thay đơn cũ
+     * (đổi giá, đổi báo giá) thì đơn cũ phải đóng, nếu không khách trả cả 2 QR sẽ bị thu 2 lần.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT t FROM Transaction t
+        WHERE t.status = com.localpress.finance.model.TransactionStatus.PENDING
+          AND t.transactionType = :type
+          AND (t.purchaseId = :targetId OR t.subscriptionId = :targetId OR t.campaignId = :targetId)
+    """)
+    List<Transaction> findPendingByTargetForUpdate(@Param("type") TransactionType type, @Param("targetId") Long targetId);
+
     /** "Đơn của tôi" (UC045 của SV3): đơn của 1 user, lọc theo loại nếu có. Dùng index idx_transactions_user_created. */
     @Query("""
         SELECT t FROM Transaction t

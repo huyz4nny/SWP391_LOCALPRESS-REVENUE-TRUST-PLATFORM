@@ -6,20 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authApi } from '@/features/identity/api'
+import { vnPhoneError } from '@/features/identity/vnPhone'
 import { mockStore } from '@/mocks/store'
 import { useReaderLibrary } from '../hooks/useReaderLibrary'
 import { useReaderSubscription } from '../hooks/useReaderSubscription'
 import { useReaderDevices } from '../hooks/useReaderDevices'
-
-function phoneError(raw: string): string | null {
-  const compact = raw.trim().replace(/[\s.-]/g, '')
-  if (!compact) return null
-  let local = compact
-  if (local.startsWith('+84')) local = `0${local.slice(3)}`
-  else if (local.startsWith('84') && local.length > 9) local = `0${local.slice(2)}`
-  if (/^0(3|5|7|8|9)\d{8}$/.test(local) || /^02\d{8,9}$/.test(local)) return null
-  return 'Số điện thoại không đúng định dạng Việt Nam'
-}
 
 // trang /account: form ho so + the goi + 4 o so lieu
 export function ReaderAccountPage() {
@@ -56,7 +47,7 @@ export function ReaderAccountPage() {
       setError(fullName ? 'Họ tên tối đa 150 ký tự' : 'Vui lòng nhập họ tên')
       return
     }
-    const invalidPhone = phoneError(phone)
+    const invalidPhone = vnPhoneError(phone)
     if (invalidPhone) {
       setError(invalidPhone)
       return

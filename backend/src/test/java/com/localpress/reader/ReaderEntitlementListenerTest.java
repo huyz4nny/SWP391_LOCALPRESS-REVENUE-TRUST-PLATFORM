@@ -6,11 +6,14 @@ import com.localpress.reader.repository.ReaderEntitlementRepository.Subscription
 import com.localpress.reader.service.ReaderEntitlementListener;
 import com.localpress.shared.event.PaymentSuccessEvent;
 import com.localpress.shared.event.RefundCompletedEvent;
+import com.localpress.shared.event.RightsGrantFailedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -34,6 +38,9 @@ class ReaderEntitlementListenerTest {
     @Mock
     private ReaderEntitlementRepository repository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private ReaderEntitlementListener listener;
 
@@ -44,11 +51,11 @@ class ReaderEntitlementListenerTest {
     }
 
     private PurchaseForGrant purchase(String status) {
-        return new PurchaseForGrant(2L, USER, new BigDecimal("15000.00"), status);
+        return new PurchaseForGrant(2L, USER, new BigDecimal("15000.00"), status, null);
     }
 
     private SubscriptionForGrant subscription(String status) {
-        return new SubscriptionForGrant(5L, USER, status, new BigDecimal("50000.00"), 30);
+        return new SubscriptionForGrant(5L, USER, status, new BigDecimal("50000.00"), 30, "ALL", null, null);
     }
 
     // ---------- bài lẻ ----------
@@ -59,7 +66,7 @@ class ReaderEntitlementListenerTest {
 
         listener.onPaymentSuccess(paid("ARTICLE", 2L, 15000));
 
-        verify(repository).activatePurchase(2L, PAID_AT);
+        verify(repository).activatePurchase(2L, PAID_AT, 100L);
     }
 
     @Test
@@ -68,17 +75,36 @@ class ReaderEntitlementListenerTest {
 
         listener.onPaymentSuccess(paid("ARTICLE", 2L, 5000));
 
-        verify(repository, never()).activatePurchase(any(), any());
+        verify(repository, never()).activatePurchase(any(), any(), any());
+        ArgumentCaptor<RightsGrantFailedEvent> failed = ArgumentCaptor.forClass(RightsGrantFailedEvent.class);
+        verify(eventPublisher).publishEvent(failed.capture());
+        assertEquals(100L, failed.getValue().getTransactionId());
+        assertEquals("ARTICLE", failed.getValue().getTransactionType());
+        assertEquals(2L, failed.getValue().getTargetId());
+        assertEquals(USER, failed.getValue().getUserId());
+        assertEquals(BigDecimal.valueOf(5000), failed.getValue().getAmount());
+        assertEquals("SV3", failed.getValue().getSourceModule());
     }
 
     @Test
     void rejectsPurchaseOfAnotherUser() {
         when(repository.findPurchaseForGrant(2L))
-                .thenReturn(Optional.of(new PurchaseForGrant(2L, 99L, new BigDecimal("15000.00"), "PENDING")));
+                .thenReturn(Optional.of(new PurchaseForGrant(2L, 99L, new BigDecimal("15000.00"), "PENDING", null)));
 
         listener.onPaymentSuccess(paid("ARTICLE", 2L, 15000));
 
-        verify(repository, never()).activatePurchase(any(), any());
+        verify(repository, never()).activatePurchase(any(), any(), any());
+    }
+
+    @Test
+    void secondPaymentOnActivePurchaseReportsFailure() {
+        when(repository.findPurchaseForGrant(2L))
+                .thenReturn(Optional.of(new PurchaseForGrant(2L, USER, new BigDecimal("15000.00"), "ACTIVE", 50L)));
+
+        listener.onPaymentSuccess(paid("ARTICLE", 2L, 15000));
+
+        verify(repository, never()).activatePurchase(any(), any(), any());
+        verify(eventPublisher).publishEvent(any(RightsGrantFailedEvent.class));
     }
 
     @Test
@@ -87,7 +113,7 @@ class ReaderEntitlementListenerTest {
 
         listener.onPaymentSuccess(paid("ARTICLE", 2L, 15000));
 
-        verify(repository, never()).activatePurchase(any(), any());
+        verify(repository, never()).activatePurchase(any(), any(), any());
     }
 
     @Test
@@ -96,7 +122,7 @@ class ReaderEntitlementListenerTest {
 
         listener.onPaymentSuccess(paid("ARTICLE", 2L, 15000));
 
-        verify(repository, never()).activatePurchase(any(), any());
+        verify(repository, never()).activatePurchase(any(), any(), any());
     }
 
     @Test
@@ -105,7 +131,7 @@ class ReaderEntitlementListenerTest {
 
         assertDoesNotThrow(() -> listener.onPaymentSuccess(paid("ARTICLE", 2L, 15000)));
 
-        verify(repository, never()).activatePurchase(any(), any());
+        verify(repository, never()).activatePurchase(any(), any(), any());
     }
 
     // ---------- gói cước ----------
@@ -113,32 +139,32 @@ class ReaderEntitlementListenerTest {
     @Test
     void activatesSubscriptionFromPaidDateWhenNoCurrentPlan() {
         when(repository.findSubscriptionForGrant(5L)).thenReturn(Optional.of(subscription("PENDING")));
-        when(repository.findLatestActiveEndDate(USER, PAID_DATE)).thenReturn(Optional.empty());
+        when(repository.findLatestActiveEndDate(USER, PAID_DATE, "ALL", null)).thenReturn(Optional.empty());
 
         listener.onPaymentSuccess(paid("SUBSCRIPTION", 5L, 50000));
 
-        verify(repository).activateSubscription(5L, PAID_DATE, PAID_DATE.plusDays(30));
+        verify(repository).activateSubscription(5L, PAID_DATE, PAID_DATE.plusDays(29), 100L);
     }
 
     @Test
     void renewalStartsDayAfterCurrentPlanEnds() {
         LocalDate currentEnd = PAID_DATE.plusDays(10);
         when(repository.findSubscriptionForGrant(5L)).thenReturn(Optional.of(subscription("PENDING")));
-        when(repository.findLatestActiveEndDate(USER, PAID_DATE)).thenReturn(Optional.of(currentEnd));
+        when(repository.findLatestActiveEndDate(USER, PAID_DATE, "ALL", null)).thenReturn(Optional.of(currentEnd));
 
         listener.onPaymentSuccess(paid("SUBSCRIPTION", 5L, 50000));
 
-        verify(repository).activateSubscription(5L, currentEnd.plusDays(1), currentEnd.plusDays(1).plusDays(30));
+        verify(repository).activateSubscription(5L, currentEnd.plusDays(1), currentEnd.plusDays(30), 100L);
     }
 
     @Test
     void planEndingTodayDoesNotDelayNewPlanBeyondPaidDate() {
         when(repository.findSubscriptionForGrant(5L)).thenReturn(Optional.of(subscription("PENDING")));
-        when(repository.findLatestActiveEndDate(USER, PAID_DATE)).thenReturn(Optional.of(PAID_DATE));
+        when(repository.findLatestActiveEndDate(USER, PAID_DATE, "ALL", null)).thenReturn(Optional.of(PAID_DATE));
 
         listener.onPaymentSuccess(paid("SUBSCRIPTION", 5L, 50000));
 
-        verify(repository).activateSubscription(5L, PAID_DATE.plusDays(1), PAID_DATE.plusDays(31));
+        verify(repository).activateSubscription(5L, PAID_DATE.plusDays(1), PAID_DATE.plusDays(30), 100L);
     }
 
     @Test
@@ -147,7 +173,7 @@ class ReaderEntitlementListenerTest {
 
         listener.onPaymentSuccess(paid("SUBSCRIPTION", 5L, 10000));
 
-        verify(repository, never()).activateSubscription(any(), any(), any());
+        verify(repository, never()).activateSubscription(any(), any(), any(), any());
     }
 
     @Test
@@ -156,17 +182,17 @@ class ReaderEntitlementListenerTest {
 
         listener.onPaymentSuccess(paid("SUBSCRIPTION", 5L, 50000));
 
-        verify(repository, never()).activateSubscription(any(), any(), any());
+        verify(repository, never()).activateSubscription(any(), any(), any(), any());
     }
 
     @Test
     void rejectsSubscriptionOfAnotherUser() {
         when(repository.findSubscriptionForGrant(5L))
-                .thenReturn(Optional.of(new SubscriptionForGrant(5L, 99L, "PENDING", new BigDecimal("50000.00"), 30)));
+                .thenReturn(Optional.of(new SubscriptionForGrant(5L, 99L, "PENDING", new BigDecimal("50000.00"), 30, "ALL", null, null)));
 
         listener.onPaymentSuccess(paid("SUBSCRIPTION", 5L, 50000));
 
-        verify(repository, never()).activateSubscription(any(), any(), any());
+        verify(repository, never()).activateSubscription(any(), any(), any(), any());
     }
 
     // ---------- an toàn transaction của SV4 ----------

@@ -8,6 +8,7 @@ import com.localpress.finance.service.SepayGatewayService;
 import com.localpress.finance.model.SepayWebhookLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,15 +18,18 @@ import java.util.Map;
 
 /**
  * ==============================================================================
- * CHỈ DÙNG KHI DEMO (profile dev): GIẢ LẬP SEPAY BẮN WEBHOOK
+ * CHỈ DÙNG KHI DEMO (profile dev + cờ bật): GIẢ LẬP SEPAY BẮN WEBHOOK
  * ==============================================================================
  * Máy local không nhận được webhook thật từ SePay, nên nút "Giả lập đã chuyển khoản" trên trang
  * thanh toán gọi endpoint này. Nó dựng payload IPN rồi đi qua đúng hàm processSepayIpn như webhook
  * thật, nên idempotency / tiền về muộn / chuyển thiếu vẫn được kiểm chứng.
- * Bean không tồn tại ở profile khác dev.
+ * Bean chỉ tồn tại khi profile dev VÀ localpress.payment.simulation-enabled=true (đặt trong
+ * backend/config/application-local.yml, gitignored). Mặc định tắt: deploy quên đổi profile thì chủ đơn vẫn
+ * không tự đánh dấu đã trả được (audit PAY-07, Rule 4).
  */
 @Slf4j
 @Profile("dev")
+@ConditionalOnProperty(prefix = "localpress.payment", name = "simulation-enabled", havingValue = "true")
 @RestController
 @RequestMapping("/api/v1/finance/orders/code/{orderCode}")
 @RequiredArgsConstructor

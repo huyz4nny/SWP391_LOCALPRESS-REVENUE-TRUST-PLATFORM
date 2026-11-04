@@ -12,8 +12,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.sun.net.httpserver.HttpServer;
 
 import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -166,5 +172,55 @@ class SepayGatewayServiceTest {
         verify(logs).save(saved.capture());
         assertThat(saved.getValue().getSepayId()).isEqualTo(92704L);
         assertThat(saved.getValue().getResultStatus()).isEqualTo(SepayWebhookLog.RECORDED_BY_COMPLAINT);
+    }
+    @Test
+    @DisplayName("PAY-06: đồng bộ API SePay lấy hết cửa sổ thời gian khi có hơn 200 giao dịch (lùi transaction_date_max)")
+    void syncPagesBackWhenMoreThanLimit() throws Exception {
+        // 250 giao dịch tiền vào, id 1..250, id càng lớn càng mới; API trả mới nhất trước, tối đa limit dòng
+        List<String> queries = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/transactions/list", ex -> {
+            String q = java.net.URLDecoder.decode(ex.getRequestURI().getRawQuery(), StandardCharsets.UTF_8);
+            queries.add(q);
+            String max = null;
+            for (String part : q.split("&")) {
+                if (part.startsWith("transaction_date_max=")) max = part.substring("transaction_date_max=".length());
+            }
+            StringBuilder rows = new StringBuilder();
+            int emitted = 0;
+            for (int id = 250; id >= 1 && emitted < 200; id--) {
+                String date = String.format("2026-11-03 %02d:%02d:00", 8 + id / 60, id % 60);
+                if (max != null && date.compareTo(max) > 0) continue;
+                if (emitted++ > 0) rows.append(',');
+                rows.append(String.format("{\"id\":%d,\"transaction_date\":\"%s\",\"amount_in\":\"15000.00\","
+                        + "\"transaction_content\":\"CK %d\",\"reference_number\":\"REF%d\"}", id, date, id, id));
+            }
+            byte[] body = ("{\"status\":200,\"transactions\":[" + rows + "]}").getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(200, body.length);
+            ex.getResponseBody().write(body);
+            ex.close();
+        });
+        server.start();
+        try {
+            ReflectionTestUtils.setField(gateway, "apiToken", "token");
+            ReflectionTestUtils.setField(gateway, "apiBaseUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+            when(processing.processSepayIpn(any())).thenReturn(new LinkedHashMap<>(Map.of("status", "ORDER_NOT_FOUND", "message", "x")));
+            when(logs.existsBySepayId(any())).thenReturn(false);
+
+            SepayGatewayService.SyncResult r = gateway.syncFromSepay(48, null);
+
+            assertThat(queries).hasSize(2);
+            assertThat(queries.get(1)).contains("transaction_date_max=");
+            // 250 giao dịch khác nhau, trùng ở mốc max được lọc theo id
+            assertThat(r.fetched()).isEqualTo(250);
+            assertThat(r.processed()).isEqualTo(250);
+            ArgumentCaptor<SepayIpnRequest> ipns = ArgumentCaptor.forClass(SepayIpnRequest.class);
+            verify(processing, times(250)).processSepayIpn(ipns.capture());
+            // xử lý từ cũ đến mới
+            assertThat(ipns.getAllValues().get(0).getSepayId()).isEqualTo(1L);
+            assertThat(ipns.getAllValues().get(249).getSepayId()).isEqualTo(250L);
+        } finally {
+            server.stop(0);
+        }
     }
 }

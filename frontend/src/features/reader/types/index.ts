@@ -37,6 +37,8 @@ export interface Article {
   tags: string[]
   isPremium: boolean
   isLocked?: boolean
+  // danh sách bài: true khi người đang đăng nhập đã được đọc toàn văn
+  accessible?: boolean
   price: number // Single article price if premium (e.g. 15.000 VND)
   status: ArticleStatus
   reviewNotes?: string

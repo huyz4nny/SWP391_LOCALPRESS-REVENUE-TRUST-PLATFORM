@@ -235,7 +235,7 @@ class ReaderPurchaseServiceTest {
     void createsPendingSubscriptionWithPlanPrice() {
         when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
         when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.empty());
-        when(repository.insertPendingSubscription(eq(USER), eq(1L), any(LocalDate.class))).thenReturn(40L);
+        when(repository.insertPendingSubscription(eq(USER), eq(1L), any(LocalDate.class), any(BigDecimal.class))).thenReturn(40L);
 
         PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
 
@@ -254,15 +254,15 @@ class ReaderPurchaseServiceTest {
         PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
 
         assertEquals(33L, response.getTargetId());
-        verify(repository).refreshPendingSubscription(eq(33L), any(LocalDate.class));
-        verify(repository, never()).insertPendingSubscription(any(), any(), any());
+        verify(repository).refreshPendingSubscription(eq(33L), any(LocalDate.class), any(BigDecimal.class));
+        verify(repository, never()).insertPendingSubscription(any(), any(), any(), any());
     }
 
     @Test
     void allowsBuyingSubscriptionWhileAnotherIsActiveForRenewal() {
         when(repository.findPlan(1L)).thenReturn(Optional.of(new PlanRow(1L, "Gói Tháng", new BigDecimal("50000.00"), "ACTIVE")));
         when(repository.findPendingSubscription(USER, 1L)).thenReturn(Optional.empty());
-        when(repository.insertPendingSubscription(eq(USER), eq(1L), any(LocalDate.class))).thenReturn(41L);
+        when(repository.insertPendingSubscription(eq(USER), eq(1L), any(LocalDate.class), any(BigDecimal.class))).thenReturn(41L);
 
         PendingOrderTargetResponse response = service.createSubscription(USER, 1L);
 

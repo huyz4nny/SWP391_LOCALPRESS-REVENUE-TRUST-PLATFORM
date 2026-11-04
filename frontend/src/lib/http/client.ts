@@ -9,20 +9,21 @@ interface RequestOptions {
     credentials?: RequestCredentials
 }
 
-const AUTH_STORAGE_KEY = 'localpress_basic_auth'
+const BASIC_STORAGE_KEY = 'localpress_basic_auth'
+const BEARER_STORAGE_KEY = 'localpress_bearer_token'
 
-function readStoredAuth(): string {
+function readStored(key: string): string {
     try {
-        return window.sessionStorage.getItem(AUTH_STORAGE_KEY) ?? ''
+        return window.sessionStorage.getItem(key) ?? ''
     } catch {
         return ''
     }
 }
 
-function writeStoredAuth(value: string) {
+function writeStored(key: string, value: string) {
     try {
-        if (value) window.sessionStorage.setItem(AUTH_STORAGE_KEY, value)
-        else window.sessionStorage.removeItem(AUTH_STORAGE_KEY)
+        if (value) window.sessionStorage.setItem(key, value)
+        else window.sessionStorage.removeItem(key)
     } catch {
         // storage unavailable: login only lasts until reload
     }
@@ -55,9 +56,10 @@ async function readJson<T>(response: Response): Promise<T> {
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
-    // Preserve main's Basic session across reloads; Google Bearer remains in memory.
-    private basicAuth = readStoredAuth()
-    private bearerToken = ''
+    // Basic và Bearer đều sống trong sessionStorage của tab. Đóng hết tab là hết phiên.
+    // Bearer giữ đúng sid của phiên thiết bị, reload không tạo phiên mới.
+    private basicAuth = readStored(BASIC_STORAGE_KEY)
+    private bearerToken = readStored(BEARER_STORAGE_KEY)
     private channel = openAuthChannel()
     // Set while a login is being checked: the login this tab had before (empty strings if none)
     private confirmedAuth: { basicAuth: string; bearerToken: string } | null = null
@@ -75,19 +77,22 @@ class HttpClient {
     public setBasicAuth(email: string, password: string) {
         this.bearerToken = ''
         this.basicAuth = `Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${email}:${password}`)))}`
-        writeStoredAuth(this.basicAuth)
+        writeStored(BEARER_STORAGE_KEY, '')
+        writeStored(BASIC_STORAGE_KEY, this.basicAuth)
     }
 
     public clearBasicAuth() {
         this.basicAuth = ''
         this.bearerToken = ''
-        writeStoredAuth('')
+        writeStored(BASIC_STORAGE_KEY, '')
+        writeStored(BEARER_STORAGE_KEY, '')
     }
 
     public setBearerToken(token: string) {
         this.basicAuth = ''
-        writeStoredAuth('')
         this.bearerToken = token
+        writeStored(BASIC_STORAGE_KEY, '')
+        writeStored(BEARER_STORAGE_KEY, token)
     }
 
     /** Call before trying new credentials: until the backend accepts them, other tabs keep seeing the previous login. */
@@ -160,7 +165,33 @@ class HttpClient {
     private adoptAuth(basicAuth: string, bearerToken: string) {
         this.basicAuth = basicAuth
         this.bearerToken = bearerToken
-        writeStoredAuth(basicAuth)
+        writeStored(BASIC_STORAGE_KEY, basicAuth)
+        writeStored(BEARER_STORAGE_KEY, bearerToken)
+    }
+
+    /** Bearer bị từ chối sau khi đăng nhập xong: phiên này đã bị thu hồi. Không đăng xuất các tab khác. */
+    private dropRejectedBearer(status: number, options?: RequestOptions) {
+        if (status !== 401 || options?.skipAuth || !this.bearerToken || this.confirmedAuth) return
+        this.bearerToken = ''
+        writeStored(BEARER_STORAGE_KEY, '')
+        try {
+            window.dispatchEvent(new CustomEvent('localpress-bearer-rejected'))
+        } catch {
+            // môi trường không có window
+        }
+    }
+
+    private async fail(response: Response, path: string, fallback: string, options?: RequestOptions): Promise<never> {
+        const errorJson = await response.json().catch(() => ({} as { message?: string; fieldErrors?: Record<string, string> }))
+        this.dropRejectedBearer(response.status, options)
+        throw new AppApiError({
+            timestamp: new Date().toISOString(),
+            status: response.status,
+            error: response.statusText,
+            message: errorJson.message || fallback,
+            path,
+            fieldErrors: errorJson.fieldErrors,
+        })
     }
 
     private broadcast(message: AuthMessage) {
@@ -214,17 +245,7 @@ class HttpClient {
             credentials: options?.credentials,
         })
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Lỗi kết nối máy chủ backend',
-                path,
-                fieldErrors: errorJson.fieldErrors,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Lỗi kết nối máy chủ backend', options)
 
         return readJson<T>(response)
     }
@@ -246,17 +267,7 @@ class HttpClient {
 
         const response = await fetch(url, {method: 'GET', headers,})
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Không tải được ảnh bản nháp',
-                path,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Không tải được ảnh bản nháp', options)
 
         const contentType = response.headers.get('Content-Type') ?? ''
         if (!contentType.toLowerCase().startsWith('image/png')) {
@@ -275,16 +286,7 @@ class HttpClient {
         const headers = new Headers(this.headers(options))
         headers.delete('Content-Type')
         const response = await fetch(url, { method: 'GET', headers })
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Không tải được file',
-                path,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Không tải được file', options)
         const disposition = response.headers.get('Content-Disposition') ?? ''
         const match = /filename="?([^";]+)"?/i.exec(disposition)
         return { blob: await response.blob(), filename: match?.[1] ?? 'download' }
@@ -304,17 +306,7 @@ class HttpClient {
             body: JSON.stringify(body),
         })
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Lỗi gửi dữ liệu lên máy chủ',
-                path,
-                fieldErrors: errorJson.fieldErrors,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Lỗi gửi dữ liệu lên máy chủ', options)
 
         return readJson<T>(response)
     }
@@ -333,17 +325,7 @@ class HttpClient {
             body: JSON.stringify(body),
         })
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Lỗi gửi dữ liệu lên máy chủ',
-                path,
-                fieldErrors: errorJson.fieldErrors,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Lỗi gửi dữ liệu lên máy chủ', options)
 
         return readJson<T>(response)
     }
@@ -361,17 +343,7 @@ class HttpClient {
             body: JSON.stringify(body),
         })
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Lỗi cập nhật dữ liệu',
-                path,
-                fieldErrors: errorJson.fieldErrors,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Lỗi cập nhật dữ liệu', options)
 
         return readJson<T>(response)
     }
@@ -407,18 +379,7 @@ class HttpClient {
             body,
         })
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Không upload được ảnh',
-                path,
-                fieldErrors: errorJson.fieldErrors,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Không upload được ảnh', options)
 
         return readJson<T>(response)
     }
@@ -435,16 +396,7 @@ class HttpClient {
             headers: this.headers(options),
         })
 
-        if (!response.ok) {
-            const errorJson = await response.json().catch(() => ({}))
-            throw new AppApiError({
-                timestamp: new Date().toISOString(),
-                status: response.status,
-                error: response.statusText,
-                message: errorJson.message || 'Lỗi xóa dữ liệu',
-                path,
-            })
-        }
+        if (!response.ok) await this.fail(response, path, 'Lỗi xóa dữ liệu', options)
 
         if (response.status === 204) {
             return undefined as T

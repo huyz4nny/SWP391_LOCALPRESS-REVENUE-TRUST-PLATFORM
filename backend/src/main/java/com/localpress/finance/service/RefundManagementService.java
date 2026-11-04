@@ -11,6 +11,7 @@ import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
 import com.localpress.shared.event.RefundCompletedEvent;
+import com.localpress.shared.event.RefundRejectedEvent;
 import com.localpress.shared.exception.AppException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,7 @@ public class RefundManagementService {
 
     private final RefundRequestRepository refundRequestRepository;
     private final TransactionRepository transactionRepository;
+    private final FinancialDocumentService documentService;
     private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -132,7 +134,7 @@ public class RefundManagementService {
         log.info("Lập đề xuất hoàn tiền: proposer={}, orderId={}, amount={}",
                 proposerUserId, request.getOrderId(), request.getRefundAmount());
 
-        Transaction originalTx = transactionRepository.findById(request.getOrderId())
+        Transaction originalTx = transactionRepository.findByIdForUpdate(request.getOrderId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng #" + request.getOrderId(), HttpStatus.NOT_FOUND));
 
         // Dữ liệu cũ có thể thiếu transaction_type: chỉ chặn khi biết chắc là REFUND
@@ -220,14 +222,28 @@ public class RefundManagementService {
         refund.setReviewNotes(request.getReviewNotes());
         refund.setResolvedAt(now);
 
-        Transaction originalTx = transactionRepository.findById(refund.getTransactionId())
+        Transaction originalTx = transactionRepository.findByIdForUpdate(refund.getTransactionId())
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng gốc #" + refund.getTransactionId(), HttpStatus.NOT_FOUND));
 
         refund.setStatus(request.isApproved() ? RefundStatus.COMPLETED : RefundStatus.REJECTED);
         refundRequestRepository.save(refund);
 
         if (!request.isApproved()) {
-            log.info("Yêu cầu hoàn tiền #{} đã bị từ chối bởi Reviewer #{}", refundId, reviewerUserId);
+            // Không ghi tiền; báo module đã lập đề xuất (vd SV1 hủy chiến dịch) để họ cập nhật yêu cầu của mình
+            Target target = target(originalTx);
+            eventPublisher.publishEvent(RefundRejectedEvent.builder()
+                    .refundId(refund.getRefundId())
+                    .originalTransactionId(originalTx.getTransactionId())
+                    .userId(originalTx.getUserId())
+                    .transactionType(target.type())
+                    .targetId(target.id())
+                    .refundAmount(refund.getRefundAmount())
+                    .reviewNotes(refund.getReviewNotes())
+                    .reviewedBy(reviewerUserId)
+                    .rejectedAt(now)
+                    .build());
+            log.info("Yêu cầu hoàn tiền #{} đã bị từ chối bởi Reviewer #{}, phát RefundRejectedEvent {}#{}",
+                    refundId, reviewerUserId, target.type(), target.id());
         } else {
             // 1. Tạo bút toán đảo hoàn tiền trong transactions (Bút toán kép kế toán)
             Transaction savedRefundTx = transactionRepository.save(Transaction.builder()
@@ -252,10 +268,18 @@ public class RefundManagementService {
             BigDecimal totalRefunded = Optional.ofNullable(
                     refundRequestRepository.sumCompletedRefundsByTransactionId(originalTx.getTransactionId()))
                     .orElse(refund.getRefundAmount());
+            // Rule 11 kiểm lại lúc duyệt (đơn gốc đã khóa): 2 phiếu lập cùng lúc vẫn không hoàn vượt số đã thu
+            if (totalRefunded.compareTo(originalTx.getAmount()) > 0) {
+                throw new AppException(String.format(
+                        "Vi phạm Rule 11 (Refund Cap): duyệt phiếu này thì tổng đã hoàn (%,.0f đ) vượt số tiền đã thu của đơn (%,.0f đ). Hãy từ chối phiếu.",
+                        totalRefunded, originalTx.getAmount()), HttpStatus.CONFLICT);
+            }
             boolean fullRefund = totalRefunded.compareTo(originalTx.getAmount()) >= 0;
             if (fullRefund) {
                 originalTx.setStatus(TransactionStatus.REFUNDED);
                 transactionRepository.save(originalTx);
+                // UC057: hoàn toàn phần thì hủy chứng từ; hoàn một phần giữ ISSUED
+                documentService.voidFor(originalTx.getTransactionId(), now);
             }
 
             // 3. UC056 (Rule 17): phát sự kiện, module SV1 / SV3 tự điều chỉnh quyền của đối tượng mình sở hữu
@@ -289,21 +313,9 @@ public class RefundManagementService {
      */
     private RefundCompletedEvent buildRefundEvent(RefundRequest refund, Transaction originalTx, Transaction refundTx,
                                                   BigDecimal totalRefunded, boolean fullRefund, LocalDateTime now) {
-        String type;
-        Long targetId;
-        if (originalTx.getPurchaseId() != null) {
-            type = TransactionType.ARTICLE.name();
-            targetId = originalTx.getPurchaseId();
-        } else if (originalTx.getSubscriptionId() != null) {
-            type = TransactionType.SUBSCRIPTION.name();
-            targetId = originalTx.getSubscriptionId();
-        } else if (originalTx.getCampaignId() != null) {
-            type = TransactionType.AD.name();
-            targetId = originalTx.getCampaignId();
-        } else {
-            type = originalTx.getTransactionType() != null ? originalTx.getTransactionType().name() : null;
-            targetId = null;
-        }
+        Target t = target(originalTx);
+        String type = t.type();
+        Long targetId = t.id();
         return RefundCompletedEvent.builder()
                 .refundId(refund.getRefundId())
                 .originalTransactionId(originalTx.getTransactionId())
@@ -318,6 +330,36 @@ public class RefundManagementService {
                 .paymentMethod(originalTx.getPaymentMethod())
                 .reason(refund.getReason())
                 .refundedAt(now)
+                .build();
+    }
+
+    private record Target(String type, Long id) {}
+
+    /** Loại đơn + đối tượng nghiệp vụ, suy từ khóa ngoại đang có (đúng cả với dữ liệu cũ chưa ghi transaction_type). */
+    private static Target target(Transaction originalTx) {
+        if (originalTx.getPurchaseId() != null) return new Target(TransactionType.ARTICLE.name(), originalTx.getPurchaseId());
+        if (originalTx.getSubscriptionId() != null) return new Target(TransactionType.SUBSCRIPTION.name(), originalTx.getSubscriptionId());
+        if (originalTx.getCampaignId() != null) return new Target(TransactionType.AD.name(), originalTx.getCampaignId());
+        return new Target(originalTx.getTransactionType() != null ? originalTx.getTransactionType().name() : null, null);
+    }
+
+    /**
+     * Trạng thái 1 phiếu hoàn cho module đã lập đề xuất (SV1 / SV3), thay vì quét getRefundsList (Rule 17).
+     * Không kiểm quyền ở đây: chỉ gọi từ server của module, module tự kiểm phiếu thuộc đối tượng của mình.
+     */
+    @Transactional(readOnly = true)
+    public RefundDetailResponse getRefund(Long refundId) {
+        RefundRequest r = refundRequestRepository.findById(refundId)
+                .orElseThrow(() -> new AppException("Không tìm thấy yêu cầu hoàn tiền #" + refundId, HttpStatus.NOT_FOUND));
+        return RefundDetailResponse.builder()
+                .id(String.valueOf(r.getRefundId()))
+                .orderId(String.valueOf(r.getTransactionId()))
+                .userId(String.valueOf(r.getUserId()))
+                .status(r.getStatus().name())
+                .refundAmount(r.getRefundAmount())
+                .reviewedBy(r.getReviewedBy() != null ? String.valueOf(r.getReviewedBy()) : null)
+                .reviewNotes(r.getReviewNotes())
+                .resolvedAt(r.getResolvedAt())
                 .build();
     }
 

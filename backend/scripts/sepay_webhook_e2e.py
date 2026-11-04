@@ -2,7 +2,8 @@
 KIỂM THỬ ĐẦU CUỐI WEBHOOK SEPAY (SV4 - UC048, UC049) với backend thật + MySQL.
 
 Cần: MySQL80 đang chạy, backend profile dev ở cổng 8080, seed_data.sql đã nạp (reader.an@gmail.com / ketoan@localpress.vn, mật khẩu "password").
-Backend phải bật localpress.payment.client-orders-enabled=true (ví dụ trong config/application-secrets.yml) vì script tạo đơn thử trực tiếp, mặc định bị chặn (Rule 4).
+Backend phải bật localpress.payment.client-orders-enabled=true (ví dụ trong config/application-secrets.yml) vì script tạo đơn thử trực tiếp, mặc định bị chặn (Rule 4),
+và localpress.payment.simulation-enabled=true (config/application-local.yml) cho bước 12 giả lập.
 Chạy ở thư mục gốc repo:
     python backend/scripts/sepay_webhook_e2e.py backend/config/application-secrets.yml
 Gửi payload đúng định dạng webhook của SePay (camelCase) vào /api/v1/finance/webhook/sepay và kiểm tra:
@@ -143,7 +144,7 @@ check("Kế toán xem nhật ký", s == 200 and isinstance(logs, list) and len(l
 s, b = call("GET", "/finance/sepay/logs", None, {"Authorization": READER})
 check("Khách xem nhật ký -> 403", s == 403, f"HTTP {s}")
 
-# 12. Giả lập (profile dev) ghi nguồn SIMULATION
+# 12. Giả lập (profile dev + simulation-enabled) ghi nguồn SIMULATION
 s, b = call("POST", "/finance/orders", {"orderType": "ARTICLE", "targetId": 1, "amount": 15000, "description": "E2E giả lập"}, {"Authorization": READER})
 code4 = data((s, b)).get("orderCode")
 s, b = call("POST", f"/finance/orders/code/{code4}/simulate-ipn", {}, {"Authorization": READER})
