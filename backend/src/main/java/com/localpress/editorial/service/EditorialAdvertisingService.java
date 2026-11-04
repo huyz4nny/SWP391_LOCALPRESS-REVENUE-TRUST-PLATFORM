@@ -1176,6 +1176,13 @@ public class EditorialAdvertisingService {
 
     /**
      * Cập nhật phân hạng VIP và mức chiết khấu cho đối tác doanh nghiệp B2B (UC019, UC025).
+     *
+     * QUY TẮC NGHIỆP VỤ & TÀI CHÍNH (Lưu ý quan trọng):
+     * - `vip_discount_percent` lưu trên bảng `advertisers` đại diện cho mức ưu đãi theo hạng đối tác B2B (STANDARD/SILVER/GOLD/DIAMOND).
+     * - Khi Tòa soạn gửi báo giá (UC018 sendQuotation), mức giá chốt `quoted_amount` (và sau này là `accepted_amount`)
+     *   bắt buộc phải là GIÁ CUỐI CÙNG ĐÃ ĐƯỢC GIẢM TRỪ CHIẾT KHẤU trước khi Doanh nghiệp tạo đơn thanh toán (Payment Order).
+     * - Lý do: Phía Module Finance (SV4) chỉ thu đúng số tiền ghi nhận trên đơn thanh toán; hệ thống không lưu công nợ
+     *   và không hỗ trợ trừ tiền sau khi đơn hàng đã chốt thanh toán.
      */
     @Transactional
     public AdvertiserVipDto updateVipTier(Long advertiserId, UpdateVipTierRequest request, String editorEmail) {
@@ -1220,7 +1227,11 @@ public class EditorialAdvertisingService {
     // =========================================================================
 
     /**
-     * Lấy tổng quan hoạt động kinh doanh: Doanh thu kép B2B + B2C, Lấp đầy kho slot, Hàng việc khẩn.
+     * Lấy tổng quan hoạt động kinh doanh: Lấp đầy kho slot, Hàng việc khẩn tòa soạn.
+     * Lưu ý Rule 17 (Module boundary):
+     * Các chỉ số doanh thu (B2B thực thu, B2C gói đọc, B2C bài lẻ đã trừ hoàn tiền REFUND)
+     * được ủy quyền cung cấp qua API tổng hợp từ Module Finance (SV4), không query trực tiếp bảng transactions.
+     * Hệ thống đã xóa bỏ công nợ quảng cáo (b2bReceivables = 0).
      */
     public EditorialDashboardDto getDashboardOverview() {
         BigDecimal b2bTotalSigned = BigDecimal.ZERO;
@@ -1228,37 +1239,7 @@ public class EditorialAdvertisingService {
         BigDecimal b2bReceivables = BigDecimal.ZERO;
         BigDecimal b2cSubscriptions = BigDecimal.ZERO;
         BigDecimal b2cSingleArticles = BigDecimal.ZERO;
-
-        try {
-            b2bTotalSigned = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(accepted_amount), 0) FROM ad_campaigns WHERE quotation_status = 'ACCEPTED'",
-                    BigDecimal.class
-            )).orElse(BigDecimal.ZERO);
-
-            b2bActualPaid = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(accepted_amount), 0) FROM ad_campaigns WHERE payment_status = 'PAID'",
-                    BigDecimal.class
-            )).orElse(BigDecimal.ZERO);
-
-            b2bReceivables = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(accepted_amount), 0) FROM ad_campaigns WHERE quotation_status = 'ACCEPTED' AND payment_status <> 'PAID'",
-                    BigDecimal.class
-            )).orElse(BigDecimal.ZERO);
-
-            b2cSubscriptions = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE transaction_type = 'SUBSCRIPTION' AND status = 'SUCCESS'",
-                    BigDecimal.class
-            )).orElse(BigDecimal.ZERO);
-
-            b2cSingleArticles = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE transaction_type = 'ARTICLE' AND status = 'SUCCESS'",
-                    BigDecimal.class
-            )).orElse(BigDecimal.ZERO);
-        } catch (Exception e) {
-            log.warn("Cảnh báo tính toán doanh thu: {}", e.getMessage());
-        }
-
-        BigDecimal totalPlatformRevenue = b2bActualPaid.add(b2cSubscriptions).add(b2cSingleArticles);
+        BigDecimal totalPlatformRevenue = BigDecimal.ZERO;
 
         List<SlotOccupancyDto> slotOccupancies = new ArrayList<>();
         try {
