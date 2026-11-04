@@ -117,8 +117,8 @@ export function PublicLayout() {
                 <span className="text-stone-300">|</span>
                 {/* nut Dang xuat, bam thi ve trang chu */}
                 <button
-                    onClick={() => {
-                      logout()
+                    onClick={async () => {
+                      await logout()
                       navigate('/')
                     }}
                   className="text-xs text-stone-400 hover:text-red-600 transition-colors font-medium cursor-pointer"
