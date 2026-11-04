@@ -493,6 +493,16 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'VIETQR')
   }
 
+  // Iter 3: trạng thái rỗng; hủy/hoàn và thay banner cần backend thật.
+  if (pathname === '/advertiser/dashboard' && method === 'GET') return { campaigns: [], stageCounts: {}, impressions: 0, clicks: 0, ctr: 0, totalPaid: 0, generatedAt: new Date().toISOString(), excludedEventsAvailable: false }
+  if (['/advertiser/performance', '/advertiser/documents', '/advertiser/contracts', '/advertiser/requests'].includes(pathname) && method === 'GET') return []
+  if (pathname === '/advertiser/notifications/unread-count' && method === 'GET') return 0
+  if (pathname === '/advertiser/notifications' && method === 'GET') return { items: [], total: 0, page: Number(params.get('page') || 0), size: 20 }
+  if (pathname === '/advertiser/notifications/read-all' && method === 'POST') return
+  if (pathname.endsWith('/cancellation-quote') && method === 'GET') return { allowed: false, blockedReason: 'Chế độ demo chưa hỗ trợ hủy chiến dịch. Hãy dùng kết nối hệ thống thật để gửi yêu cầu.', paidAmount: 0, totalDays: 0, unusedDays: 0, proposedAmount: 0, refundApplicable: false, policyText: 'Hủy chiến dịch và khoản hoàn cần được xử lý trên hệ thống thật.' }
+  if (pathname.endsWith('/acceptance') && method === 'GET') throw new Error('Chưa có dữ liệu nghiệm thu trong chế độ demo')
+  if (pathname.endsWith('/cancel') && method === 'POST') throw new Error('Hủy chiến dịch cần kết nối hệ thống thật')
+
   if (pathname.startsWith('/advertiser/campaigns/') && method === 'GET') {
     const id = pathname.replace('/advertiser/campaigns/', '')
     const camp = mockStore.getState().campaigns.find((c) => c.id === id || c.bookingId === id)
