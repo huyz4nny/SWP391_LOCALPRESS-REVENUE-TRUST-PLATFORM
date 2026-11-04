@@ -1,10 +1,7 @@
 package com.localpress.editorial;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.localpress.editorial.dto.EditorialCampaignDto;
-import com.localpress.editorial.dto.RejectBookingRequest;
-import com.localpress.editorial.dto.ReviewCreativeRequest;
-import com.localpress.editorial.dto.SendQuotationRequest;
+import com.localpress.editorial.dto.*;
 import com.localpress.editorial.service.EditorialAdvertisingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -329,5 +326,184 @@ class EditorialAdvertisingServiceTest {
         assertEquals(updatedTs.toLocalDateTime(), dto.getUpdatedAt());
         assertEquals(startDate.toLocalDate(), dto.getStartDate());
         assertEquals(new BigDecimal("20000000"), dto.getTotalBudget());
+    }
+
+    // =========================================================================
+    // Iteration 3: Campaign Control, Emergency Kill-Switch & Make-Good (UC023, UC024)
+    // =========================================================================
+
+    @Test
+    @DisplayName("suspendCampaign: Dừng khẩn cấp thành công khi chiến dịch đang ACTIVE và ghi audit")
+    void suspendCampaign_whenActive_setsSuspendedStatus() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(101L))).thenReturn(List.of(
+                Map.of("campaign_id", 101L, "status", "ACTIVE")
+        ));
+
+        when(jdbc.query(contains("FROM ad_campaigns c"), any(RowMapper.class))).thenReturn(List.of(
+                CampaignControlDto.builder().campaignId(101L).status("SUSPENDED").suspensionReason("Nghi ngờ mã độc").build()
+        ));
+
+        SuspendCampaignRequest req = SuspendCampaignRequest.builder().reason("Nghi ngờ mã độc").build();
+        CampaignControlDto result = service.suspendCampaign(101L, req, "editor@localpress.vn");
+
+        assertNotNull(result);
+        assertEquals("SUSPENDED", result.getStatus());
+        verify(jdbc).update(contains("UPDATE ad_campaigns SET status = 'SUSPENDED'"), eq("Nghi ngờ mã độc"), eq(101L));
+        verify(jdbc).update(contains("INSERT INTO audit_logs"), eq(3L), eq("CAMPAIGN_SUSPENDED"), eq("AD_CAMPAIGN"), eq(101L), any());
+    }
+
+    @Test
+    @DisplayName("suspendCampaign: Ném 409 khi chiến dịch đã COMPLETED hoặc REJECTED")
+    void suspendCampaign_whenCompleted_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(102L))).thenReturn(List.of(
+                Map.of("campaign_id", 102L, "status", "COMPLETED")
+        ));
+
+        SuspendCampaignRequest req = SuspendCampaignRequest.builder().reason("Dừng thử nghiệm").build();
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.suspendCampaign(102L, req, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Chỉ có thể dừng khẩn cấp chiến dịch"));
+    }
+
+    @Test
+    @DisplayName("resumeCampaign: Ném 409 khi chiến dịch không ở trạng thái SUSPENDED")
+    void resumeCampaign_whenNotSuspended_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(103L))).thenReturn(List.of(
+                Map.of("campaign_id", 103L, "status", "DRAFT")
+        ));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.resumeCampaign(103L, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Chỉ có thể mở lại chiến dịch đang bị tạm ngưng"));
+    }
+
+    @Test
+    @DisplayName("makeGoodCampaign: Bù ngày phát sóng cập nhật end_date mới")
+    void makeGoodCampaign_extendsEndDate() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        LocalDate oldEndDate = LocalDate.of(2026, 10, 10);
+        when(jdbc.query(contains("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?"), any(RowMapper.class), eq(104L)))
+                .thenReturn(List.of(1L));
+        when(jdbc.queryForList(contains("SELECT slot_id, capacity"), eq(1L)))
+                .thenReturn(List.of(Map.of("slot_id", 1L, "capacity", 5, "status", "ACTIVE", "name", "Top Slot", "slot_code", "TOP")));
+        when(jdbc.queryForList(contains("SELECT campaign_id, slot_id, start_date, end_date"), eq(104L))).thenReturn(List.of(
+                Map.of("campaign_id", 104L, "slot_id", 1L, "end_date", java.sql.Date.valueOf(oldEndDate), "status", "ACTIVE")
+        ));
+        when(jdbc.query(contains("SELECT start_date, end_date FROM ad_campaigns WHERE slot_id = ?"), any(RowMapper.class), eq(1L), eq(104L), any(), any()))
+                .thenReturn(List.of());
+
+        when(jdbc.query(contains("FROM ad_campaigns c"), any(RowMapper.class))).thenReturn(List.of(
+                CampaignControlDto.builder().campaignId(104L).endDate(oldEndDate.plusDays(5)).makeGoodDaysAdded(1).build()
+        ));
+
+        MakeGoodRequest req = MakeGoodRequest.builder().extraDays(5).reason("Bù do dừng sự cố 5 ngày").build();
+        CampaignControlDto result = service.makeGoodCampaign(104L, req, "editor@localpress.vn");
+
+        assertNotNull(result);
+        assertEquals(oldEndDate.plusDays(5), result.getEndDate());
+        verify(jdbc).update(contains("UPDATE ad_campaigns SET end_date = ?"), eq(oldEndDate.plusDays(5)), eq(104L));
+    }
+
+    @Test
+    @DisplayName("makeGoodCampaign: Ném 409 khi vị trí quảng cáo hết sức chứa trong các ngày bù thêm")
+    void makeGoodCampaign_whenCapacityExceeded_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        LocalDate oldEndDate = LocalDate.of(2026, 10, 10);
+        when(jdbc.query(contains("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?"), any(RowMapper.class), eq(104L)))
+                .thenReturn(List.of(1L));
+        when(jdbc.queryForList(contains("SELECT slot_id, capacity"), eq(1L)))
+                .thenReturn(List.of(Map.of("slot_id", 1L, "capacity", 1, "status", "ACTIVE", "name", "Top Slot", "slot_code", "TOP")));
+        when(jdbc.queryForList(contains("SELECT campaign_id, slot_id, start_date, end_date"), eq(104L))).thenReturn(List.of(
+                Map.of("campaign_id", 104L, "slot_id", 1L, "end_date", java.sql.Date.valueOf(oldEndDate), "status", "ACTIVE")
+        ));
+        when(jdbc.query(contains("SELECT start_date, end_date FROM ad_campaigns WHERE slot_id = ?"), any(RowMapper.class), eq(1L), eq(104L), any(), any()))
+                .thenReturn(List.of(new EditorialAdvertisingService.SlotReservationRange(oldEndDate.plusDays(1), oldEndDate.plusDays(5))));
+
+        MakeGoodRequest req = MakeGoodRequest.builder().extraDays(5).reason("Bù do dừng sự cố").build();
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.makeGoodCampaign(104L, req, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("tối đa sức chứa"));
+    }
+
+    @Test
+    @DisplayName("resumeCampaign: Ném 409 khi chiến dịch chưa thanh toán hoặc đã hoàn tiền (payment_status <> PAID)")
+    void resumeCampaign_whenPaymentNotPaid_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(103L))).thenReturn(List.of(
+                Map.of("campaign_id", 103L, "status", "SUSPENDED", "payment_status", "REFUNDED")
+        ));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.resumeCampaign(103L, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("chưa thanh toán đủ hoặc đã hoàn tiền"));
+    }
+
+    @Test
+    @DisplayName("updateContract: Ném 409 khi mã hợp đồng bị trùng trên chiến dịch khác")
+    void updateContract_whenDuplicate_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(105L))).thenReturn(List.of(
+                Map.of("campaign_id", 105L, "contract_reference", "HD-2026-OLD")
+        ));
+        when(jdbc.query(contains("WHERE contract_reference = ? AND campaign_id <> ?"), any(RowMapper.class), eq("HD-DUPLICATE"), eq(105L)))
+                .thenReturn(List.of(999L));
+
+        UpdateContractRequest req = UpdateContractRequest.builder()
+                .contractReference("HD-DUPLICATE")
+                .contractFileUrl("https://example.com/contract.pdf")
+                .build();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateContract(105L, req, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("đã tồn tại trên một chiến dịch khác"));
+    }
+
+    @Test
+    @DisplayName("activateCampaign: Ném 409 khi chưa đủ 5 điều kiện tiên quyết phát sóng")
+    void activateCampaign_whenConditionsNotMet_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(106L))).thenReturn(List.of(
+                Map.of("campaign_id", 106L, "status", "PENDING")
+        ));
+
+        // When evaluating eligibility, payment is UNPAID (not overall eligible)
+        when(jdbc.query(contains("FROM ad_campaigns c"), any(RowMapper.class))).thenReturn(List.of(
+                CampaignEligibilityDto.builder()
+                        .campaignId(106L)
+                        .overallEligible(false)
+                        .paymentPassed(false)
+                        .quotationPassed(true)
+                        .contractPassed(true)
+                        .creativePassed(true)
+                        .slotPassed(true)
+                        .build()
+        ));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.activateCampaign(106L, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Không đủ điều kiện kích hoạt phát sóng"));
     }
 }

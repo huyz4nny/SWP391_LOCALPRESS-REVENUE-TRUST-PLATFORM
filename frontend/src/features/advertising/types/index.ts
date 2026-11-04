@@ -149,7 +149,7 @@ export interface AdCampaign {
   startDate: string
   endDate: string
   totalBudget: number
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'REJECTED'
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'REJECTED' | 'SUSPENDED'
   stage?: string
   stageReason?: string
   activeCreativeVersion?: number
