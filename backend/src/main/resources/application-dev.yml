@@ -56,4 +56,3 @@ localpress:
     api-base-url: ${SEPAY_API_BASE_URL:https://my.sepay.vn/userapi}
   payment:
     order-ttl-minutes: 15
-
