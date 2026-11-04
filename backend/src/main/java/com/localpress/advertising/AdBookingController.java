@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /** SV1 Iteration 2: Campaign Booking, Quotation Confirmation, Advertising Payment, Creative Submission. */
@@ -92,10 +93,13 @@ public class AdBookingController {
 
     @PostMapping(value = "/advertiser/campaigns/{id}/creatives", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AdCreativeService.Creative uploadCreative(Authentication auth, @PathVariable long id,
-                                                     @RequestPart("file") MultipartFile file,
+                                                     @RequestPart(value="file",required=false) MultipartFile file,
                                                      @RequestPart("title") String title,
-                                                     @RequestPart("targetUrl") String targetUrl) {
-        return creatives.upload(auth.getName(), id, file, title, targetUrl);
+                                                     @RequestPart("targetUrl") String targetUrl,
+                                                     @RequestParam(required=false) String replacementReason,
+                                                     @RequestParam(required=false) LocalDateTime requestedEffectiveAt,
+                                                     @RequestParam(defaultValue="false") boolean keepCurrentImage) {
+        return creatives.upload(auth.getName(), id, file, title, targetUrl,replacementReason,requestedEffectiveAt,keepCurrentImage);
     }
 
     /** Ảnh banner là nội dung công khai (sẽ hiện trên trang báo), tên file là UUID ngẫu nhiên. */

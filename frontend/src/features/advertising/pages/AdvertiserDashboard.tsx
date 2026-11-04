@@ -1,175 +1,229 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { mockStore } from '@/mocks/store'
-import { AdBooking, AdCampaign } from '../types'
 import { advertisingApi } from '../api'
-import { formatCurrency, formatDate } from '@/lib/format'
+import type { AdBooking, AdvertiserDashboardData, DailyPerformance } from '../types'
+import { downloadCsv, toCsv } from '../lib/csv'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import {
-  Megaphone,
-  Eye,
-  MousePointerClick,
-  Percent,
-  PlusCircle,
-  Calendar,
-  ArrowRight,
-  TrendingUp,
-} from 'lucide-react'
 
+function localDate(offset = 0) {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date)
+}
 export function AdvertiserDashboard() {
-  const currentUser = mockStore.getCurrentUser()
-  const [bookings, setBookings] = useState<AdBooking[]>([])
-  const [campaigns, setCampaigns] = useState<AdCampaign[]>([])
-  const [loading, setLoading] = useState(true)
-
+  const [from, setFrom] = useState(() => localDate(-29))
+  const [to, setTo] = useState(() => localDate())
+  const [campaignId, setCampaignId] = useState('')
+  const [choices, setChoices] = useState<AdBooking[]>([])
+  const [data, setData] = useState<AdvertiserDashboardData | null>(null)
+  const [daily, setDaily] = useState<DailyPerformance[]>([])
+  const [error, setError] = useState('')
+  const [refresh, setRefresh] = useState(0)
   useEffect(() => {
-    loadData()
-  }, [currentUser.id])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const bData = await advertisingApi.getMyBookings()
-      setBookings(bData)
-      const allCamps = mockStore.getState().campaigns.filter((c) => c.advertiserId === currentUser.id)
-      setCampaigns(allCamps)
-    } finally {
-      setLoading(false)
+    let active = true
+    setData(null)
+    setDaily([])
+    setError('')
+    const params = { from, to, campaignId: campaignId || undefined }
+    Promise.all([
+      advertisingApi.getDashboard(params),
+      advertisingApi.getPerformance(params),
+      advertisingApi.getMyBookings(),
+    ])
+      .then(([dashboard, performance, bookings]) => {
+        if (active) {
+          setData(dashboard)
+          setDaily(performance)
+          setChoices(bookings)
+        }
+      })
+      .catch((e: Error) => {
+        if (active) setError(e.message)
+      })
+    return () => {
+      active = false
     }
-  }
-
-  // Aggregate stats
-  const totalImpressions = campaigns.reduce((acc, c) => acc + c.impressions, 0)
-  const totalClicks = campaigns.reduce((acc, c) => acc + c.clicks, 0)
-  const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0.00'
-  const liveCampaignsCount = bookings.filter((b) => b.deliveryStatus === 'LIVE').length
-
+  }, [from, to, campaignId, refresh])
+  const exportCsv = () =>
+    downloadCsv(
+      `hieu-suat-${from}-${to}.csv`,
+      toCsv(
+        daily.map((row) => ({ ...row })),
+        [
+          ['campaignName', 'Chiến dịch'],
+          ['date', 'Ngày'],
+          ['impressions', 'Lượt hiển thị'],
+          ['clicks', 'Click hợp lệ'],
+          ['ctr', 'CTR (%)'],
+        ],
+      ),
+    )
   return (
-    <div className="space-y-6">
-      {/* Welcome Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+    <div className="ad-page">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Tổng quan chiến dịch quảng cáo
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Đối tác: <strong className="text-slate-800">{currentUser.companyName}</strong> (Mã: {currentUser.companyId})
-          </p>
+          <h1>Tổng quan quảng cáo</h1>
+          <p className="mt-1 text-sm text-slate-600">Hiệu suất và tiến độ các chiến dịch của doanh nghiệp.</p>
         </div>
-
         <Link to="/advertiser/bookings/new">
-          <Button className="text-xs font-bold">
-            <PlusCircle className="w-4 h-4 mr-1.5" />
-            Đặt vị trí quảng cáo mới (Booking)
-          </Button>
+          <Button size="sm">Đặt vị trí mới</Button>
         </Link>
       </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Đang phát (LIVE)</span>
-            <Megaphone className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-2xl font-black text-slate-900">{liveCampaignsCount}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Vị trí hoạt động</div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Lượt hiển thị (Imp.)</span>
-            <Eye className="w-4 h-4 text-primary-900" />
-          </div>
-          <div className="text-2xl font-black text-slate-900">{totalImpressions.toLocaleString()}</div>
-          <div className="text-[11px] text-emerald-600 mt-1 flex items-center">
-            <TrendingUp className="w-3 h-3 mr-1" /> +12.4% so với tuần trước
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Lượt nhấp (Clicks)</span>
-            <MousePointerClick className="w-4 h-4 text-sky-600" />
-          </div>
-          <div className="text-2xl font-black text-slate-900">{totalClicks.toLocaleString()}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Lượt chuyển đổi về web</div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold">Tỷ lệ CTR trung bình</span>
-            <Percent className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl font-black text-slate-900">{avgCtr}%</div>
-          <div className="text-[11px] text-slate-400 mt-1">Chuẩn hiển thị báo chí địa phương</div>
-        </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="grid gap-1 text-xs text-slate-600">
+          Từ ngày
+          <input className="ad-filter" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="grid gap-1 text-xs text-slate-600">
+          Đến ngày
+          <input className="ad-filter" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <label className="grid min-w-0 flex-1 basis-48 gap-1 text-xs text-slate-600">
+          Chiến dịch
+          <select className="ad-filter" value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
+            <option value="">Tất cả chiến dịch</option>
+            {choices.map((b) => (
+              <option key={b.id} value={b.campaignId ?? b.id}>
+                {b.campaignName || b.slotName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button variant="outline" size="sm" onClick={() => setRefresh((n) => n + 1)}>
+          Tải lại
+        </Button>
       </div>
-
-      {/* Bookings / Campaigns Table */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900">Danh sách các Booking của Doanh nghiệp</h2>
-          <Link to="/advertiser/bookings" className="text-xs text-primary-900 font-semibold hover:underline">
-            Xem tất cả ({bookings.length})
-          </Link>
-        </div>
-
-        {bookings.length === 0 ? (
-          <div className="text-center py-8 text-xs text-slate-500">
-            Chưa có booking nào. Bấm "Đặt vị trí mới" để bắt đầu gửi yêu cầu lên tòa soạn.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="px-3 py-2.5">Mã Booking</th>
-                  <th className="px-3 py-2.5">Vị trí quảng cáo</th>
-                  <th className="px-3 py-2.5">Thời hạn</th>
-                  <th className="px-3 py-2.5">Báo giá</th>
-                  <th className="px-3 py-2.5">Xử lý</th>
-                  <th className="px-3 py-2.5">Thanh toán</th>
-                  <th className="px-3 py-2.5">Phân phối</th>
-                  <th className="px-3 py-2.5 text-right">Chi tiết</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {bookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-3 py-3 font-mono font-bold text-slate-900">{b.id}</td>
-                    <td className="px-3 py-3 font-medium text-slate-800">{b.slotName}</td>
-                    <td className="px-3 py-3 text-slate-500">
-                      {formatDate(b.startDate)} → {formatDate(b.endDate)} ({b.daysCount} ngày)
-                    </td>
-                    <td className="px-3 py-3 font-bold text-slate-900">
-                      {formatCurrency(b.finalPrice)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <StatusBadge type="booking" status={b.bookingStatus} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <StatusBadge type="payment" status={b.paymentStatus} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <StatusBadge type="delivery" status={b.deliveryStatus} />
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <Link
-                        to={`/advertiser/bookings/${b.id}`}
-                        className="text-primary-900 font-bold hover:underline inline-flex items-center"
-                      >
-                        Quản lý <ArrowRight className="w-3 h-3 ml-0.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      {!data && !error && (
+        <p role="status" className="text-sm text-slate-600">
+          Đang tải hiệu suất quảng cáo…
+        </p>
+      )}
+      {data && (
+        <>
+          <dl className="grid grid-cols-2 divide-x divide-slate-200 rounded-lg border border-slate-200 lg:grid-cols-4">
+            {[
+              ['Lượt hiển thị', data.impressions.toLocaleString('vi-VN')],
+              ['Click hợp lệ', data.clicks.toLocaleString('vi-VN')],
+              ['CTR trong kỳ', `${data.ctr.toFixed(2)}%`],
+              ['Đã thanh toán cho chiến dịch', formatCurrency(data.totalPaid)],
+            ].map(([label, value]) => (
+              <div key={label} className="p-4">
+                <dt className="text-xs text-slate-600">{label}</dt>
+                <dd className="mt-2 break-words text-xl font-medium tabular-nums lg:text-2xl">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <section className="space-y-3">
+            <h2>Tiến độ chiến dịch</h2>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {Object.entries(data.stageCounts).map(([stage, count]) => (
+                <span key={stage} className="flex items-center gap-1.5">
+                  <StatusBadge type="stage" status={stage} />
+                  <span className="tabular-nums">{count}</span>
+                </span>
+              ))}
+            </div>
+            {data.campaigns.length === 0 ? (
+              <EmptyState
+                title="Chưa có chiến dịch trong khoảng ngày này"
+                description="Chọn khoảng ngày khác hoặc đặt vị trí quảng cáo mới."
+              />
+            ) : (
+              <div className="ad-table-frame">
+                <table className="ad-table">
+                  <thead>
+                    <tr>
+                      <th>Chiến dịch / vị trí</th>
+                      <th>Tiến độ</th>
+                      <th className="ad-number">Hiển thị</th>
+                      <th className="ad-number">Click</th>
+                      <th className="ad-number">CTR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.campaigns.map((c) => (
+                      <tr key={c.campaignId}>
+                        <td>
+                          <Link to={`/advertiser/bookings/${c.campaignId}`}>{c.campaignName}</Link>
+                          <div className="mt-1 text-xs text-slate-600">
+                            {c.slotName}
+                            <br />
+                            {formatDate(c.startDate)} – {formatDate(c.endDate)}
+                          </div>
+                        </td>
+                        <td>
+                          <StatusBadge type="stage" status={c.stage} />
+                          <p className="mt-1 max-w-56 text-xs text-slate-600">{c.stageReason}</p>
+                        </td>
+                        <td className="ad-number">{c.impressions.toLocaleString('vi-VN')}</td>
+                        <td className="ad-number">{c.clicks.toLocaleString('vi-VN')}</td>
+                        <td className="ad-number">{c.ctr.toFixed(2)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2>Hiệu suất theo ngày</h2>
+              <Button size="sm" variant="outline" onClick={exportCsv} disabled={daily.length === 0}>
+                Xuất CSV
+              </Button>
+            </div>
+            {daily.length === 0 ? (
+              <EmptyState title="Chưa ghi nhận lượt hiển thị trong kỳ" />
+            ) : (
+              <div className="ad-table-frame max-h-96">
+                <table className="ad-table">
+                  <thead>
+                    <tr>
+                      <th>Ngày</th>
+                      <th>Chiến dịch</th>
+                      <th className="ad-number">Hiển thị</th>
+                      <th className="ad-number">Click</th>
+                      <th className="ad-number">CTR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {daily.map((r) => (
+                      <tr key={`${r.campaignId}:${r.date}`}>
+                        <td>{formatDate(r.date)}</td>
+                        <td>{r.campaignName}</td>
+                        <td className="ad-number">{r.impressions.toLocaleString('vi-VN')}</td>
+                        <td className="ad-number">{r.clicks.toLocaleString('vi-VN')}</td>
+                        <td className="ad-number">{r.ctr.toFixed(2)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+          <aside className="space-y-1 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-600">
+            <h2>Định nghĩa chỉ số</h2>
+            <p>
+              Impression = lượt banner được hiển thị hợp lệ. Click hợp lệ = click đã qua bộ lọc của hệ thống phát. CTR =
+              click ÷ impression × 100, tính trên tổng.
+            </p>
+            <p>
+              Tổng đã thanh toán tính cho các chiến dịch có lịch giao với kỳ chọn; đây là tổng tiền chiến dịch, không
+              phải tiền thu riêng trong kỳ.
+            </p>
+            {!data.excludedEventsAvailable && <p>Sự kiện bị loại: Chưa có dữ liệu.</p>}
+            <p>Cập nhật lúc {formatDateTime(data.generatedAt)}</p>
+          </aside>
+        </>
+      )}
     </div>
   )
 }

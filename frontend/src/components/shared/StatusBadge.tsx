@@ -3,6 +3,7 @@ import { Badge, BadgeProps } from '@/components/ui/badge'
 
 type StatusType =
   | 'adSlot'
+  | 'stage'
   | 'article'
   | 'booking'
   | 'payment'
@@ -22,6 +23,17 @@ type Variant = NonNullable<BadgeProps['variant']>
 // màu chỉ dùng khi trạng thái cần người xem chú ý (chờ xử lý, lỗi, hoàn tất).
 const STATUS_MAP: Record<StatusType, Record<string, [string, Variant]>> = {
   adSlot: { ACTIVE: ['Đang bật', 'success'], INACTIVE: ['Đã tắt', 'secondary'] },
+  stage: {
+    QUOTE_PENDING: ['Chờ báo giá / xác nhận', 'warning'],
+    AWAITING_PAYMENT: ['Chờ thanh toán', 'warning'],
+    AWAITING_CONTRACT: ['Chờ hợp đồng', 'warning'],
+    AWAITING_ACTIVATION: ['Chờ kích hoạt', 'warning'],
+    AWAITING_CREATIVE: ['Chờ banner hợp lệ', 'warning'],
+    SCHEDULED: ['Đã lên lịch', 'info'], RUNNING: ['Đang chạy', 'success'],
+    ENDED: ['Đã kết thúc', 'secondary'], REJECTED: ['Bị từ chối', 'destructive'],
+    PAUSED: ['Tạm dừng', 'warning'], CANCELLED: ['Đã hủy', 'secondary'],
+    PAYMENT_ISSUE: ['Thanh toán cần xử lý', 'destructive'],
+  },
   article: {
     DRAFT: ['Bản nháp', 'secondary'],
     IN_REVIEW: ['Chờ duyệt', 'warning'],
@@ -52,6 +64,7 @@ const STATUS_MAP: Record<StatusType, Record<string, [string, Variant]>> = {
   delivery: {
     DISABLED: ['Vị trí đã tắt', 'secondary'],
     OVER_CAPACITY: ['Vượt sức chứa', 'warning'],
+    CANCELLED: ['Đã hủy', 'secondary'],
     NOT_STARTED: ['Chưa bắt đầu', 'secondary'],
     ELIGIBLE: ['Đủ điều kiện phát', 'info'],
     LIVE: ['Đang phát', 'success'],
@@ -63,6 +76,9 @@ const STATUS_MAP: Record<StatusType, Record<string, [string, Variant]>> = {
     IN_REVIEW: ['Chờ duyệt banner', 'warning'],
     CHANGES_REQUESTED: ['Cần sửa banner', 'destructive'],
     APPROVED: ['Banner đã duyệt', 'success'],
+    // Backend trả review_status của ad_creatives: PENDING / APPROVED / REJECTED
+    PENDING: ['Chờ duyệt banner', 'warning'],
+    REJECTED: ['Banner bị từ chối', 'destructive'],
   },
   refund: {
     REQUESTED: ['Chờ kế toán trưởng duyệt', 'warning'],

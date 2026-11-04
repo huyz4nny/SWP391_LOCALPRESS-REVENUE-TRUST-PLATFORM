@@ -35,6 +35,7 @@ import {
 // Advertising
 import {
   AdvertiserDashboard,
+  CreativeReplacementPage, AdvertiserRequestsPage, AdvertiserNotificationsPage, AdvertiserDocumentsPage, AcceptanceReportPage,
   AdSlotsExplorerPage,
   CompanyProfilePage,
   NewBookingPage,
@@ -192,6 +193,11 @@ export const router = createBrowserRouter([
       { path: 'bookings/:id', element: <BookingDetailPage /> },
       { path: 'campaigns/:id', element: <CampaignDetailPage /> },
       { path: 'billing', element: <AdvertiserBillingPage /> },
+      { path: 'campaigns/:id/creative', element: <CreativeReplacementPage /> },
+      { path: 'campaigns/:id/acceptance', element: <AcceptanceReportPage /> },
+      { path: 'requests', element: <AdvertiserRequestsPage /> },
+      { path: 'notifications', element: <AdvertiserNotificationsPage /> },
+      { path: 'documents', element: <AdvertiserDocumentsPage /> },
     ],
   },
 

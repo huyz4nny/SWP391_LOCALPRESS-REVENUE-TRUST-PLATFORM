@@ -13,6 +13,7 @@ class GoogleIdentityMigrationTest {
     @Test void migrationVersionsAreUniqueAndGoogleUsesV7() throws Exception {
         Path migrations = Path.of("src/main/resources/db/migration");
         var versionPattern = Pattern.compile("V(\\d+)__.*\\.sql");
+        // Long: version theo thời gian (Rule 20) như 202611041000 vượt int.
         var versions = new HashSet<Long>();
 
         try (var files = Files.list(migrations)) {

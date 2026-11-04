@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
+import { z } from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Upload } from 'lucide-react'
 import { advertisingApi, readImageSize } from '../api'
 import { AdCampaign } from '../types'
-import { creativeSchema, CreativeInput, CREATIVE_TYPES, parseDimensions } from '../schemas/creative'
+import { creativeSchema, CREATIVE_TYPES, parseDimensions } from '../schemas/creative'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AppApiError } from '@/lib/http/errors'
 
 /** Khung xem trước trong cổng doanh nghiệp, không dùng PublicLayout của trang báo. */
-function AdPreview({ src, width, height, device }: { src: string; width: number; height: number; device: 'desktop' | 'mobile' }) {
+export function AdPreview({ src, width, height, device }: { src: string; width: number; height: number; device: 'desktop' | 'mobile' }) {
   const frame = device === 'desktop' ? 'w-full' : 'w-[240px]'
   return (
     <div>
@@ -30,18 +31,31 @@ function AdPreview({ src, width, height, device }: { src: string; width: number;
   )
 }
 
-export function CreativeUploadForm({ campaign, onUploaded }: { campaign: AdCampaign; onUploaded: () => void }) {
+export function CreativeUploadForm({ campaign, onUploaded, replacement = false }: { campaign: AdCampaign; onUploaded: () => void; replacement?: boolean }) {
+  const approved = campaign.creatives.find((c) => c.status === 'APPROVED')
+  const schema = creativeSchema.omit({ file: true }).extend({
+    file: z.instanceof(File).optional(), keepCurrentImage: z.boolean(),
+    replacementReason: z.string().max(1000, 'Lý do tối đa 1.000 ký tự'), requestedEffectiveAt: z.string(),
+  }).superRefine((data, ctx) => {
+    if (!data.keepCurrentImage) {
+      const result = creativeSchema.shape.file.safeParse(data.file)
+      if (!result.success) ctx.addIssue({ code: 'custom', path: ['file'], message: result.error.issues[0].message })
+    }
+    if (replacement && !data.replacementReason.trim()) ctx.addIssue({ code: 'custom', path: ['replacementReason'], message: 'Vui lòng nhập lý do thay banner' })
+  })
+  type Submission = z.infer<typeof schema>
   const expected = parseDimensions(campaign.slotDimensions)
   const [previewUrl, setPreviewUrl] = useState('')
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
   const [message, setMessage] = useState('')
   const [fileInputKey, setFileInputKey] = useState(0)
   const [requestError, setRequestError] = useState('')
-  const { register, control, handleSubmit, reset, setError, setValue, formState: { errors, isSubmitting } } = useForm<CreativeInput>({
-    resolver: zodResolver(creativeSchema),
-    defaultValues: { title: '', targetUrl: 'https://' },
+  const { register, control, handleSubmit, reset, setError, setValue, formState: { errors, isSubmitting } } = useForm<Submission>({
+    resolver: zodResolver(schema),
+    defaultValues: { title: replacement ? approved?.title ?? '' : '', targetUrl: replacement ? approved?.targetUrl ?? 'https://' : 'https://', keepCurrentImage: replacement, replacementReason: '', requestedEffectiveAt: '' },
   })
   const file = useWatch({ control, name: 'file' })
+  const keepCurrentImage = useWatch({ control, name: 'keepCurrentImage' })
 
   useEffect(() => {
     if (!(file instanceof File)) return
@@ -52,10 +66,10 @@ export function CreativeUploadForm({ campaign, onUploaded }: { campaign: AdCampa
     return () => URL.revokeObjectURL(url)
   }, [file])
 
-  const sizeMismatch = Boolean(expected && imageSize &&
+  const sizeMismatch = Boolean(!keepCurrentImage && expected && imageSize &&
     (imageSize.width !== expected.width || imageSize.height !== expected.height))
 
-  const submit = async (values: CreativeInput) => {
+  const submit = async (values: Submission) => {
     setMessage('')
     setRequestError('')
     if (sizeMismatch) {
@@ -63,16 +77,18 @@ export function CreativeUploadForm({ campaign, onUploaded }: { campaign: AdCampa
       return
     }
     try {
-      const creative = await advertisingApi.uploadCreative(campaign.id, values)
+      const creative = replacement
+        ? await advertisingApi.replaceCreative(campaign.id, { ...values, requestedEffectiveAt: values.requestedEffectiveAt || undefined })
+        : await advertisingApi.uploadCreative(campaign.id, { title: values.title, targetUrl: values.targetUrl, file: values.file! })
       setMessage(`Đã gửi phiên bản v${creative.versionNumber} để tòa soạn duyệt.`)
-      reset({ title: '', targetUrl: values.targetUrl })
+      reset({ title: '', targetUrl: values.targetUrl, keepCurrentImage: replacement, replacementReason: '', requestedEffectiveAt: '' })
       setPreviewUrl('')
       setImageSize(null)
       setFileInputKey((key) => key + 1)
       onUploaded()
     } catch (error) {
       if (error instanceof AppApiError && error.fieldErrors) {
-        Object.entries(error.fieldErrors).forEach(([field, msg]) => setError(field as keyof CreativeInput, { message: String(msg) }))
+        Object.entries(error.fieldErrors).forEach(([field, msg]) => setError(field as keyof Submission, { message: String(msg) }))
       }
       setRequestError(error instanceof Error ? error.message : 'Lỗi tải lên banner')
     }
@@ -84,7 +100,7 @@ export function CreativeUploadForm({ campaign, onUploaded }: { campaign: AdCampa
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-xs font-bold text-slate-900 flex items-center">
             <Upload className="w-4 h-4 mr-1.5 text-primary-900" />
-            Nộp banner mới
+            {replacement ? 'Thay banner' : 'Nộp banner mới'}
           </h4>
           {campaign.slotDimensions && (
             <span className="text-[11px] text-slate-500">Kích thước bắt buộc: {campaign.slotDimensions} px • JPEG/PNG</span>
@@ -104,7 +120,13 @@ export function CreativeUploadForm({ campaign, onUploaded }: { campaign: AdCampa
           </div>
         </div>
 
-        <div className="text-xs">
+        {replacement && <div className="space-y-3 text-sm">
+          <label className="flex items-center gap-2"><input type="checkbox" {...register('keepCurrentImage')} />Giữ ảnh hiện tại, chỉ thay URL</label>
+          <div><Label htmlFor="crReason" required>Lý do thay banner</Label><Input id="crReason" {...register('replacementReason')} maxLength={1000} error={errors.replacementReason?.message} /></div>
+          <div><Label htmlFor="crEffective">Thời điểm hiệu lực mong muốn (giờ Việt Nam)</Label><Input id="crEffective" type="datetime-local" {...register('requestedEffectiveAt')} /></div>
+          <p className="text-xs text-slate-600">Thời điểm mong muốn được gửi cho tòa soạn tham khảo. Bản được duyệt sẽ phát ngay sau khi duyệt nếu đủ điều kiện; lịch hẹn chưa được áp dụng tự động.</p>
+        </div>}
+        {!keepCurrentImage && <div className="text-xs">
           <Label htmlFor="crFile" required>File ảnh banner</Label>
           <input
             key={fileInputKey}
@@ -124,19 +146,19 @@ export function CreativeUploadForm({ campaign, onUploaded }: { campaign: AdCampa
               Ảnh đang là {imageSize.width}x{imageSize.height} px, vị trí này cần {campaign.slotDimensions} px.
             </p>
           )}
-        </div>
+        </div>}
 
-        {previewUrl && (
+        {(previewUrl || (keepCurrentImage && approved)) && (
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-start">
-            <AdPreview src={previewUrl} device="desktop" width={expected?.width ?? imageSize?.width ?? 16} height={expected?.height ?? imageSize?.height ?? 9} />
-            <AdPreview src={previewUrl} device="mobile" width={expected?.width ?? imageSize?.width ?? 16} height={expected?.height ?? imageSize?.height ?? 9} />
+            <AdPreview src={keepCurrentImage ? approved?.imageUrl ?? '' : previewUrl} device="desktop" width={expected?.width ?? imageSize?.width ?? 16} height={expected?.height ?? imageSize?.height ?? 9} />
+            <AdPreview src={keepCurrentImage ? approved?.imageUrl ?? '' : previewUrl} device="mobile" width={expected?.width ?? imageSize?.width ?? 16} height={expected?.height ?? imageSize?.height ?? 9} />
           </div>
         )}
 
         {requestError && <p role="alert" className="text-xs text-red-700">{requestError}</p>}
         {message && <p role="status" className="text-xs font-semibold text-emerald-700">{message}</p>}
         <div className="flex justify-end">
-          <Button type="submit" size="sm" isLoading={isSubmitting} disabled={sizeMismatch}>
+          <Button type="submit" size="sm" isLoading={isSubmitting} disabled={sizeMismatch || (replacement && campaign.creatives.some((c) => c.status === 'IN_REVIEW'))}>
             Gửi banner để tòa soạn duyệt
           </Button>
         </div>
