@@ -74,6 +74,15 @@ public class ReaderDeviceSessionService implements DeviceSessionService {
         return repository.isActive(sessionId.trim(), clock.instant());
     }
 
+    @Override
+    @Transactional
+    public void revoke(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        repository.revokeBySessionId(sessionId.trim(), clock.instant());
+    }
+
     @Transactional(readOnly = true)
     public List<ReaderDeviceResponse> listMine(long userId, String currentSessionId) {
         String current = currentSessionId == null ? "" : currentSessionId.trim();

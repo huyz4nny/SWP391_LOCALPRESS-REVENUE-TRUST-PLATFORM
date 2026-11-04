@@ -56,15 +56,41 @@ it('keeps the Bearer session across a same-tab reload and drops the previous Bas
   expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer google-login-local-jwt')
 })
 
+it('logout asks the server to revoke the session before clearing the token', async () => {
+  const current = await client()
+  const { APP_CONFIG } = await import('../app/config')
+  const { logout } = await import('../features/identity/authSession')
+  APP_CONFIG.useMockApi = false
+  current.setBearerToken('local-jwt')
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
+  logout()
+  await vi.waitFor(() => expect(current.hasAuth()).toBe(false))
+  expect(String(fetchMock.mock.calls[0][0])).toContain('/auth/logout')
+  expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer local-jwt')
+  APP_CONFIG.useMockApi = true
+})
+
+it('logout still clears the token when the revoke request fails', async () => {
+  const current = await client()
+  const { APP_CONFIG } = await import('../app/config')
+  const { logout } = await import('../features/identity/authSession')
+  APP_CONFIG.useMockApi = false
+  current.setBearerToken('local-jwt')
+  fetchMock.mockResolvedValueOnce(new Response('{}', { status: 500, headers: { 'Content-Type': 'application/json' } }))
+  logout()
+  await vi.waitFor(() => expect(current.hasAuth()).toBe(false))
+  APP_CONFIG.useMockApi = true
+})
+
 it('logout clears persisted Basic auth and in-memory Bearer auth', async () => {
   const current = await client()
   const { logout } = await import('../features/identity/authSession')
   current.setBasicAuth('reader@example.test', 'test-password')
-  logout()
+  await logout()
   expect(storedAuth.size).toBe(0)
   expect(current.hasAuth()).toBe(false)
   current.setBearerToken('local-jwt')
-  logout()
+  await logout()
   expect(current.hasAuth()).toBe(false)
   vi.resetModules()
   expect((await client()).hasAuth()).toBe(false)

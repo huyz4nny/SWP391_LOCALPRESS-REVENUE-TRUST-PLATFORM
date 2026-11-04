@@ -69,13 +69,14 @@ it('rolls back login when me fails after token exchange', async () => {
 
 it('logout removes Bearer and switching back to Basic removes Bearer', async () => {
   httpClient.setBearerToken('local-jwt')
-  logout()
+  await logout()
   expect(httpClient.hasAuth()).toBe(false)
   httpClient.setBearerToken('local-jwt')
   httpClient.setBasicAuth('reader@gmail.com', 'password')
   fetchMock.mockResolvedValueOnce(json(user))
   await authApi.getMe()
-  expect(fetchMock.mock.calls[0][1].headers.Authorization).toMatch(/^Basic /)
+  const meCall = fetchMock.mock.calls.at(-1)
+  expect(meCall?.[1].headers.Authorization).toMatch(/^Basic /)
 })
 
 it('uses Bearer for private images and uploads without forcing Basic Auth', async () => {
