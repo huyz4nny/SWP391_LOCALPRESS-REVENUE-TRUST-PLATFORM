@@ -149,8 +149,9 @@ public class DemoStoreService {
             if (pending != null) return pending;
         }
 
+        // Gói tính cả 2 đầu như SV3 (end = start + days - 1): gói 30 ngày đọc đúng 30 ngày
         jdbc.update("INSERT INTO subscriptions (user_id, plan_id, start_date, end_date, status) VALUES (?, ?, ?, ?, 'PENDING')",
-                userId, planId, today, today.plusDays(days));
+                userId, planId, today, today.plusDays(Math.max(days, 1) - 1L));
         Long subscriptionId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 
         String title = (String) plan.get("name");
@@ -173,7 +174,7 @@ public class DemoStoreService {
             log.info("[Cửa hàng thử] Mở bài: lượt mua #{} -> {} dòng", event.getTargetId(), n);
         } else if ("SUBSCRIPTION".equals(event.getTransactionType())) {
             int n = jdbc.update("UPDATE subscriptions s JOIN subscription_plans p ON p.plan_id = s.plan_id "
-                            + "SET s.status = 'ACTIVE', s.start_date = CURDATE(), s.end_date = CURDATE() + INTERVAL p.duration_days DAY "
+                            + "SET s.status = 'ACTIVE', s.start_date = CURDATE(), s.end_date = CURDATE() + INTERVAL (GREATEST(p.duration_days, 1) - 1) DAY "
                             + "WHERE s.subscription_id = ? AND s.user_id = ? AND p.price <= ? AND s.status = 'PENDING'",
                     event.getTargetId(), event.getUserId(), event.getAmount());
             log.info("[Cửa hàng thử] Kích hoạt gói: subscription #{} -> {} dòng", event.getTargetId(), n);

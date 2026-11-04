@@ -51,6 +51,7 @@ public class PaymentProcessingService {
 
     private final TransactionRepository transactionRepository;
     private final SePayService sePayService;
+    private final FinancialDocumentService documentService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Value("${localpress.payment.order-ttl-minutes:15}")
@@ -87,10 +88,42 @@ public class PaymentProcessingService {
             default -> { }
         }
 
+        // Đơn mới thay đơn cũ cùng đối tượng: đóng đơn cũ, tiền về đơn cũ sau đó thành LATE_PAYMENT (kế toán chuyển trả)
+        closePending(type, request.getTargetId(), "đã có đơn mới thay thế");
+
         Transaction savedTx = transactionRepository.save(txBuilder.build());
         log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(), savedTx.getGatewayTransactionId());
 
         return toPaymentView(savedTx);
+    }
+
+    /**
+     * Module sở hữu đối tượng hủy nó (vd SV1 hủy chiến dịch, SV3 hủy lượt mua) thì gọi hàm này TỪ SERVER, trong
+     * cùng transaction với việc hủy: mọi đơn PENDING của đối tượng bị đóng (FAILED). Tiền khách lỡ chuyển vào
+     * QR cũ sau đó thành LATE_PAYMENT: không ghi vào đơn, không phát hành chứng từ, không cần đề xuất hoàn;
+     * kế toán chuyển trả qua khiếu nại / đối soát (LocalPress không giữ tiền).
+     * Đơn đã SUCCESS không bị đụng tới: muốn trả lại tiền đã thu thì lập đề xuất hoàn (proposeRefund).
+     *
+     * @return số đơn vừa đóng
+     */
+    @Transactional
+    public int closePendingOrders(String orderType, Long targetId, String reason) {
+        TransactionType type = parseOrderType(orderType);
+        if (!type.isPurchase() || targetId == null) {
+            throw new AppException("Chỉ đóng được đơn mua có đối tượng (ARTICLE, SUBSCRIPTION, AD)", HttpStatus.BAD_REQUEST);
+        }
+        return closePending(type, targetId, reason == null || reason.isBlank() ? "module sở hữu đã hủy đối tượng" : reason.trim());
+    }
+
+    private int closePending(TransactionType type, Long targetId, String reason) {
+        int closed = 0;
+        for (Transaction old : transactionRepository.findPendingByTargetForUpdate(type, targetId)) {
+            old.markExpired();
+            transactionRepository.save(old);
+            closed++;
+            log.info("Đóng đơn {} của {}#{}: {}", old.getGatewayTransactionId(), type, targetId, reason);
+        }
+        return closed;
     }
 
     // =========================================================================
@@ -138,7 +171,7 @@ public class PaymentProcessingService {
      *    Không có số tiền                     -> AMOUNT_MISSING, không đổi gì (Rule 4).
      * 3. Đơn đã đóng / booking quá hạn giữ chỗ -> LATE_PAYMENT, không cấp quyền (Rule 6).
      * 4. Số tiền khác số tiền đơn             -> AMOUNT_MISMATCH, đơn giữ nguyên.
-     * 5. Đúng số tiền                         -> SUCCESS + PaymentSuccessEvent.
+     * 5. Đúng số tiền                         -> SUCCESS + chứng từ (UC057) + PaymentSuccessEvent.
      * Nhánh 3, 4 không giữ tiền trong hệ thống: kế toán đối chiếu sao kê và chuyển trả lại khách.
      */
     @Transactional
@@ -189,10 +222,13 @@ public class PaymentProcessingService {
         // 5. Đúng số tiền
         tx.markPaidByGateway(sePayService.getBankCode());
         Transaction savedTx = transactionRepository.save(tx);
+        // UC057: cùng giao dịch với việc ghi tiền nên đơn SUCCESS nào cũng có đúng 1 chứng từ
+        String documentNo = documentService.issueFor(savedTx).getDocumentNo();
         publishPaymentSuccess(savedTx);
 
         Map<String, Object> body = result(true, "SUCCESS", orderCode, "Xác nhận thanh toán thành công");
         body.put("transactionId", savedTx.getTransactionId());
+        body.put("documentNo", documentNo);
         return body;
     }
 

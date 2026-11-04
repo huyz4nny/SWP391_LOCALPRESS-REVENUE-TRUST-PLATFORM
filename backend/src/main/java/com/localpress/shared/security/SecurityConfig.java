@@ -82,6 +82,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/orders/**").authenticated()
                         // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
+                        // Chứng từ (UC057): khách xem của mình, chi tiết đơn kiểm chủ đơn / kế toán trong service
+                        .requestMatchers(HttpMethod.GET, "/api/v1/finance/documents/**").authenticated()
                         // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
                         .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
