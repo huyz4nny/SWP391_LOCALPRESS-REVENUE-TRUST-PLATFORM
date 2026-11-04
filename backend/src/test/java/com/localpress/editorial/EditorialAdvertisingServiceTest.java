@@ -393,9 +393,15 @@ class EditorialAdvertisingServiceTest {
         when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
                 .thenReturn(List.of(3L));
         LocalDate oldEndDate = LocalDate.of(2026, 10, 10);
-        when(jdbc.queryForList(contains("FOR UPDATE"), eq(104L))).thenReturn(List.of(
-                Map.of("campaign_id", 104L, "end_date", java.sql.Date.valueOf(oldEndDate))
+        when(jdbc.query(contains("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?"), any(RowMapper.class), eq(104L)))
+                .thenReturn(List.of(1L));
+        when(jdbc.queryForList(contains("SELECT slot_id, capacity"), eq(1L)))
+                .thenReturn(List.of(Map.of("slot_id", 1L, "capacity", 5, "status", "ACTIVE", "name", "Top Slot", "slot_code", "TOP")));
+        when(jdbc.queryForList(contains("SELECT campaign_id, slot_id, start_date, end_date"), eq(104L))).thenReturn(List.of(
+                Map.of("campaign_id", 104L, "slot_id", 1L, "end_date", java.sql.Date.valueOf(oldEndDate), "status", "ACTIVE")
         ));
+        when(jdbc.query(contains("SELECT start_date, end_date FROM ad_campaigns WHERE slot_id = ?"), any(RowMapper.class), eq(1L), eq(104L), any(), any()))
+                .thenReturn(List.of());
 
         when(jdbc.query(contains("FROM ad_campaigns c"), any(RowMapper.class))).thenReturn(List.of(
                 CampaignControlDto.builder().campaignId(104L).endDate(oldEndDate.plusDays(5)).makeGoodDaysAdded(1).build()
@@ -407,6 +413,46 @@ class EditorialAdvertisingServiceTest {
         assertNotNull(result);
         assertEquals(oldEndDate.plusDays(5), result.getEndDate());
         verify(jdbc).update(contains("UPDATE ad_campaigns SET end_date = ?"), eq(oldEndDate.plusDays(5)), eq(104L));
+    }
+
+    @Test
+    @DisplayName("makeGoodCampaign: Ném 409 khi vị trí quảng cáo hết sức chứa trong các ngày bù thêm")
+    void makeGoodCampaign_whenCapacityExceeded_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        LocalDate oldEndDate = LocalDate.of(2026, 10, 10);
+        when(jdbc.query(contains("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?"), any(RowMapper.class), eq(104L)))
+                .thenReturn(List.of(1L));
+        when(jdbc.queryForList(contains("SELECT slot_id, capacity"), eq(1L)))
+                .thenReturn(List.of(Map.of("slot_id", 1L, "capacity", 1, "status", "ACTIVE", "name", "Top Slot", "slot_code", "TOP")));
+        when(jdbc.queryForList(contains("SELECT campaign_id, slot_id, start_date, end_date"), eq(104L))).thenReturn(List.of(
+                Map.of("campaign_id", 104L, "slot_id", 1L, "end_date", java.sql.Date.valueOf(oldEndDate), "status", "ACTIVE")
+        ));
+        when(jdbc.query(contains("SELECT start_date, end_date FROM ad_campaigns WHERE slot_id = ?"), any(RowMapper.class), eq(1L), eq(104L), any(), any()))
+                .thenReturn(List.of(new EditorialAdvertisingService.SlotReservationRange(oldEndDate.plusDays(1), oldEndDate.plusDays(5))));
+
+        MakeGoodRequest req = MakeGoodRequest.builder().extraDays(5).reason("Bù do dừng sự cố").build();
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.makeGoodCampaign(104L, req, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("tối đa sức chứa"));
+    }
+
+    @Test
+    @DisplayName("resumeCampaign: Ném 409 khi chiến dịch chưa thanh toán hoặc đã hoàn tiền (payment_status <> PAID)")
+    void resumeCampaign_whenPaymentNotPaid_throwsConflict409() {
+        when(jdbc.query(contains("SELECT user_id FROM users"), any(RowMapper.class), eq("editor@localpress.vn")))
+                .thenReturn(List.of(3L));
+        when(jdbc.queryForList(contains("FOR UPDATE"), eq(103L))).thenReturn(List.of(
+                Map.of("campaign_id", 103L, "status", "SUSPENDED", "payment_status", "REFUNDED")
+        ));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.resumeCampaign(103L, "editor@localpress.vn"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("chưa thanh toán đủ hoặc đã hoàn tiền"));
     }
 
     @Test

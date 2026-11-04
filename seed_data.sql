@@ -155,6 +155,11 @@ INSERT INTO ad_creatives (creative_id, campaign_id, reviewed_by, version_number,
 INSERT INTO ad_stats (stat_id, campaign_id, creative_id, stat_date, impressions, clicks, ctr) VALUES
 (1, 1, 1, '2026-09-28', 15200, 684, 4.5000);
 
+-- 13.1 AD CONTRACTS (Hợp đồng B2B SV2 - Trọng Phan)
+INSERT INTO ad_contracts (contract_id, campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, notes) VALUES
+(1, 1, 1, 'HD-2026-DV-001', '2026-08-25', 45000000.00, 'https://example.com/contracts/HD-2026-DV-001.pdf', 'SIGNED', 'Hợp đồng quảng cáo B2B Cảng Logistics Đình Vũ 2026')
+ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number);
+
 -- 14. TRANSACTIONS (Sổ cái thu tiền)
 -- Giao dịch 1: Độc giả Mai mua gói năm 480k
 INSERT INTO transactions (transaction_id, user_id, subscription_id, transaction_type, amount, currency, payment_method, gateway_transaction_id, bank_code, status, paid_at, reconciled_at, reconciled_by) VALUES

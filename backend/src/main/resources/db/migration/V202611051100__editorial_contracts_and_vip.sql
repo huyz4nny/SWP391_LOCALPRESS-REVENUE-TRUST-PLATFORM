@@ -1,5 +1,5 @@
 -- =============================================================================
--- V18: AD CONTRACTS, ADDENDUMS & VIP TIERING (SV2 - Trọng Phan, Iteration 3, UC019, UC025)
+-- V202611051100: AD CONTRACTS, ADDENDUMS & VIP TIERING (SV2 - Trọng Phan, Iteration 3, UC019, UC025)
 -- =============================================================================
 
 ALTER TABLE advertisers
@@ -39,7 +39,4 @@ CREATE TABLE IF NOT EXISTS ad_contract_addendums (
     CONSTRAINT fk_addendum_creator FOREIGN KEY (created_by) REFERENCES users(user_id) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE = InnoDB;
 
--- Dữ liệu mẫu hợp đồng đã ký kết giữa Tòa soạn và Doanh nghiệp để Demo (phục vụ cả SV1 và SV2)
-INSERT INTO ad_contracts (contract_id, campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, notes)
-VALUES (1, 1, 1, 'HD-2026-DV-001', '2026-08-25', 45000000.00, 'https://example.com/contracts/HD-2026-DV-001.pdf', 'SIGNED', 'Hợp đồng quảng cáo B2B Cảng Logistics Đình Vũ 2026')
-ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number);
+

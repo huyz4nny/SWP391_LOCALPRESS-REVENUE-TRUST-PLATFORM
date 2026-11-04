@@ -1,6 +1,7 @@
 package com.localpress.editorial.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.localpress.advertising.BookingOccupancy;
 import com.localpress.editorial.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -625,7 +626,7 @@ public class EditorialAdvertisingService {
             LocalDate today = LocalDate.now();
             boolean dateValid = startDate != null && endDate != null && !today.isBefore(startDate) && !today.isAfter(endDate);
             boolean statusEligible = "PENDING".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status);
-            boolean overallEligible = paymentPassed && quotationPassed && contractPassed && creativePassed && slotPassed && statusEligible;
+            boolean overallEligible = paymentPassed && quotationPassed && contractPassed && creativePassed && slotPassed && statusEligible && dateValid;
             boolean canActivate = overallEligible;
 
             return CampaignEligibilityDto.builder()
@@ -699,6 +700,7 @@ public class EditorialAdvertisingService {
             if (!item.isContractPassed()) sb.append("[Chưa có hợp đồng] ");
             if (!item.isCreativePassed()) sb.append("[Banner chưa duyệt/URL có rủi ro] ");
             if (!item.isSlotPassed()) sb.append("[Vị trí quảng cáo không mở] ");
+            if (!item.isDateRangeValid()) sb.append("[Thời gian phát sóng không hợp lệ hoặc đã quá hạn] ");
             throw new ResponseStatusException(HttpStatus.CONFLICT, sb.toString().trim());
         }
 
@@ -749,14 +751,24 @@ public class EditorialAdvertisingService {
                 }
             }
 
-            Integer makeGoodDays = 0;
-            try {
-                makeGoodDays = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM audit_logs WHERE target_type = 'AD_CAMPAIGN' AND target_id = ? AND action = 'CAMPAIGN_MAKE_GOOD'",
-                        Integer.class,
-                        campId
-                );
-            } catch (Exception ignored) {}
+            List<String> auditLogs = jdbc.queryForList(
+                    "SELECT new_value FROM audit_logs WHERE target_type = 'AD_CAMPAIGN' AND target_id = ? AND action = 'CAMPAIGN_MAKE_GOOD'",
+                    String.class,
+                    campId
+            );
+            int makeGoodDays = 0;
+            for (String val : auditLogs) {
+                if (val != null && !val.isBlank()) {
+                    try {
+                        var node = json.readTree(val);
+                        if (node.has("extraDays")) {
+                            makeGoodDays += node.get("extraDays").asInt(0);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Lỗi đọc audit log bù ngày cho chiến dịch #{}: {}", campId, e.getMessage());
+                    }
+                }
+            }
 
             return CampaignControlDto.builder()
                     .campaignId(campId)
@@ -772,7 +784,7 @@ public class EditorialAdvertisingService {
                     .suspensionReason(rs.getString("rejection_reason"))
                     .totalPlannedDays(totalDays)
                     .elapsedDays(elapsedDays)
-                    .makeGoodDaysAdded(makeGoodDays != null ? makeGoodDays : 0)
+                    .makeGoodDaysAdded(makeGoodDays)
                     .lastControlledAt(toLocalDateTime(rs.getTimestamp("updated_at")))
                     .build();
         });
@@ -821,7 +833,7 @@ public class EditorialAdvertisingService {
     public CampaignControlDto resumeCampaign(Long campaignId, String editorEmail) {
         Long userId = resolveUserId(editorEmail);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT campaign_id, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                "SELECT campaign_id, status, payment_status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
                 campaignId
         );
         if (rows.isEmpty()) {
@@ -830,6 +842,11 @@ public class EditorialAdvertisingService {
         String currentStatus = (String) rows.get(0).get("status");
         if (!"SUSPENDED".equalsIgnoreCase(currentStatus)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ có thể mở lại chiến dịch đang bị tạm ngưng (SUSPENDED)");
+        }
+        String paymentStatus = (String) rows.get(0).get("payment_status");
+        if (!"PAID".equalsIgnoreCase(paymentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể mở lại chiến dịch chưa thanh toán đủ hoặc đã hoàn tiền (Trạng thái thanh toán: " + paymentStatus + "). Yêu cầu thanh toán: PAID (Rule 9)");
         }
 
         jdbc.update("UPDATE ad_campaigns SET status = 'ACTIVE' WHERE campaign_id = ?", campaignId);
@@ -851,9 +868,29 @@ public class EditorialAdvertisingService {
      */
     @Transactional
     public CampaignControlDto makeGoodCampaign(Long campaignId, MakeGoodRequest request, String editorEmail) {
+        if (request.getExtraDays() == null || request.getExtraDays() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số ngày bù phát sóng phải lớn hơn 0");
+        }
         Long userId = resolveUserId(editorEmail);
+
+        // Khóa theo thứ tự: ad_slots trước, ad_campaigns sau (Rule 18 để chống deadlock)
+        Long slotId = jdbc.query("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?",
+                (rs, r) -> rs.getLong(1), campaignId).stream().findFirst().orElse(null);
+        if (slotId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        List<Map<String, Object>> slotRows = jdbc.queryForList(
+                "SELECT slot_id, capacity, status, name, slot_code FROM ad_slots WHERE slot_id = ? FOR UPDATE",
+                slotId
+        );
+        if (slotRows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy vị trí quảng cáo #" + slotId);
+        }
+        int capacity = ((Number) slotRows.get(0).get("capacity")).intValue();
+
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT campaign_id, end_date, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                "SELECT campaign_id, slot_id, start_date, end_date, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
                 campaignId
         );
         if (rows.isEmpty()) {
@@ -866,6 +903,31 @@ public class EditorialAdvertisingService {
         }
         LocalDate oldEndDate = toLocalDate(rows.get(0).get("end_date"));
         LocalDate newEndDate = oldEndDate != null ? oldEndDate.plusDays(request.getExtraDays()) : LocalDate.now().plusDays(request.getExtraDays());
+
+        // Kiểm tra sức chứa slot (Rule 7 & AdBookingService) cho các ngày bù thêm
+        LocalDate checkStart = (oldEndDate != null) ? oldEndDate.plusDays(1) : LocalDate.now();
+        if (!checkStart.isAfter(newEndDate)) {
+            List<SlotReservationRange> ranges = jdbc.query(
+                    "SELECT start_date, end_date FROM ad_campaigns WHERE slot_id = ? " +
+                    "AND campaign_id <> ? AND start_date <= ? AND end_date >= ? AND " + BookingOccupancy.SQL + " FOR SHARE",
+                    (rs, row) -> new SlotReservationRange(rs.getDate("start_date").toLocalDate(), rs.getDate("end_date").toLocalDate()),
+                    slotId, campaignId, newEndDate, checkStart
+            );
+
+            List<LocalDate> fullDates = new ArrayList<>();
+            for (LocalDate day = checkStart; !day.isAfter(newEndDate); day = day.plusDays(1)) {
+                LocalDate d = day;
+                long used = ranges.stream().filter(r -> !d.isBefore(r.start()) && !d.isAfter(r.end())).count();
+                if (used >= capacity) {
+                    fullDates.add(day);
+                }
+            }
+
+            if (!fullDates.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Không thể bù ngày vì vị trí quảng cáo đã đạt tối đa sức chứa (" + capacity + " banner) trong các ngày: " + fullDates);
+            }
+        }
 
         jdbc.update("UPDATE ad_campaigns SET end_date = ? WHERE campaign_id = ?", newEndDate, campaignId);
         logAudit(userId, "CAMPAIGN_MAKE_GOOD", "AD_CAMPAIGN", campaignId, Map.of(
@@ -1426,6 +1488,8 @@ public class EditorialAdvertisingService {
         if (obj instanceof java.util.Date d) return new Timestamp(d.getTime()).toLocalDateTime();
         return null;
     }
+
+    public record SlotReservationRange(LocalDate start, LocalDate end) {}
 
     private static LocalDate toLocalDate(Object obj) {
         if (obj == null) return null;
