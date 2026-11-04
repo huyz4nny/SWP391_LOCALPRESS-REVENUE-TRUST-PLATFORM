@@ -1,6 +1,9 @@
 package com.localpress.shared.security;
 
 import com.localpress.identity.service.JwtTokenService;
+import com.localpress.identity.service.JwtTokenService.VerifiedToken;
+import com.localpress.shared.device.DeviceSessionContext;
+import com.localpress.shared.device.DeviceSessionService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -20,10 +23,12 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenService tokens;
     private final JdbcTemplate jdbc;
+    private final DeviceSessionService devices;
 
-    public JwtAuthenticationFilter(JwtTokenService tokens, JdbcTemplate jdbc) {
+    public JwtAuthenticationFilter(JwtTokenService tokens, JdbcTemplate jdbc, DeviceSessionService devices) {
         this.tokens = tokens;
         this.jdbc = jdbc;
+        this.devices = devices;
     }
 
     @Override
@@ -35,8 +40,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         try {
-            var identity = tokens.verify(header.substring(7));
-            long id = identity.userId();
+            VerifiedToken verified = tokens.verify(header.substring(7));
+            long id = verified.userId();
+            String sessionId = verified.sessionId();
+            if (sessionId != null && (devices == null || !devices.isActive(sessionId))) {
+                reject(response, 401, "Phiên đăng nhập đã bị thu hồi hoặc hết hạn");
+                return;
+            }
             // Reload role/lock state on every request; a valid token cannot bypass an account lock.
             var accounts = jdbc.query(
                     "SELECT email, role, status, locked_until, auth_version FROM users WHERE user_id = ?",
@@ -51,7 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             Account account = accounts.get(0);
-            if (account.version() != identity.version()) {
+            if (account.version() != verified.version()) {
                 reject(response,401,"Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.");
                 return;
             }
@@ -63,6 +73,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             context.setAuthentication(new UsernamePasswordAuthenticationToken(account.email(), null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + account.role()))));
             SecurityContextHolder.setContext(context);
+            if (sessionId != null) {
+                request.setAttribute(DeviceSessionContext.SESSION_ID, sessionId);
+            }
         } catch (JwtException | IllegalArgumentException exception) {
             SecurityContextHolder.clearContext();
             reject(response, 401, "Phiên đăng nhập đã hết hạn hoặc không hợp lệ");

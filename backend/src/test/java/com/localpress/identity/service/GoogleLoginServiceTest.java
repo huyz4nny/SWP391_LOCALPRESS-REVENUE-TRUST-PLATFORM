@@ -4,6 +4,8 @@ import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.entity.UserIdentity;
 import com.localpress.identity.repository.*;
+import com.localpress.shared.device.DeviceSessionService;
+import com.localpress.shared.device.RegisteredSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -23,7 +25,8 @@ class GoogleLoginServiceTest {
     UserRepository users = mock(UserRepository.class);
     PasswordEncoder passwords = mock(PasswordEncoder.class);
     JwtTokenService tokens = mock(JwtTokenService.class);
-    GoogleLoginService service = new GoogleLoginService(verifier, nonces, identities, users, passwords, tokens);
+    DeviceSessionService devices = mock(DeviceSessionService.class);
+    GoogleLoginService service = new GoogleLoginService(verifier, nonces, identities, users, passwords, tokens, devices);
     String nonce;
 
     @BeforeEach void setup() {
@@ -37,7 +40,10 @@ class GoogleLoginServiceTest {
             ReflectionTestUtils.setField(user, "id", 42L);
             return user;
         });
-        when(tokens.issue(any())).thenReturn(new LoginResponse("local-token", "Bearer", 3600));
+        when(devices.register(anyLong(), nullable(String.class), nullable(String.class), nullable(String.class), any()))
+                .thenReturn(new RegisteredSession(7L, "sid-test"));
+        when(tokens.issue(any(), eq("sid-test"), any())).thenReturn(new LoginResponse("local-token", "Bearer", 3600));
+        when(tokens.lifetimeMillis()).thenReturn(3_600_000L);
     }
 
     User existing() {
@@ -68,22 +74,28 @@ class GoogleLoginServiceTest {
         when(users.existsByEmail("reader@gmail.com")).thenReturn(true);
         assertEquals(409, assertThrows(ResponseStatusException.class,
                 () -> service.login("google-token", nonce)).getStatusCode().value());
-        verifyNoInteractions(tokens);
+        verifyNoInteractions(tokens, devices);
         verify(users, never()).saveAndFlush(any());
     }
     @Test void lockedAccountIsRejected() {
         ReflectionTestUtils.setField(existing(), "status", User.Status.LOCKED);
         assertEquals(403, assertThrows(ResponseStatusException.class,
                 () -> service.login("google-token", nonce)).getStatusCode().value());
-        verifyNoInteractions(tokens);
+        verifyNoInteractions(tokens, devices);
     }
     @Test void temporarilyLockedAccountIsRejected() {
         ReflectionTestUtils.setField(existing(), "lockedUntil", LocalDateTime.now().plusMinutes(5));
         assertThrows(ResponseStatusException.class, () -> service.login("google-token", nonce));
-        verifyNoInteractions(tokens);
+        verifyNoInteractions(tokens, devices);
     }
     @Test void invalidNonceCannotCreateUser() {
         assertThrows(ResponseStatusException.class, () -> service.login("google-token", "other-browser"));
-        verifyNoInteractions(users, tokens);
+        verifyNoInteractions(users, tokens, devices);
+    }
+    @Test void successOpensDeviceSessionBeforeIssuingToken() {
+        existing();
+        assertEquals("local-token", service.login("google-token", nonce, "Máy tính", "DESKTOP", "127.0.0.1").accessToken());
+        verify(devices).register(eq(42L), eq("Máy tính"), eq("DESKTOP"), eq("127.0.0.1"), any());
+        verify(tokens).issue(any(User.class), eq("sid-test"), any());
     }
 }

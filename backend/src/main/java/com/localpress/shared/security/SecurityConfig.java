@@ -1,5 +1,7 @@
 package com.localpress.shared.security;
 
+import com.localpress.shared.device.DeviceSessionService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.annotation.Value;
 import com.localpress.identity.service.JwtTokenService;
@@ -41,7 +43,8 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JdbcTemplate jdbc) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JdbcTemplate jdbc,
+                                                   ObjectProvider<DeviceSessionService> devices) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -82,6 +85,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/orders/**").authenticated()
                         // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
+                        // Chứng từ (UC057): khách xem của mình, chi tiết đơn kiểm chủ đơn / kế toán trong service
+                        .requestMatchers(HttpMethod.GET, "/api/v1/finance/documents/**").authenticated()
                         // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
                         .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
@@ -93,7 +98,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .httpBasic(Customizer.withDefaults())
-                .addFilterBefore(new JwtAuthenticationFilter(tokens, jdbc), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthenticationFilter(tokens, jdbc, devices.getIfAvailable()),
+                        UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

@@ -100,7 +100,7 @@ public class AdUrlMonitorService {
                 if(fresh==null||fresh!=1||!Set.of("OK","CHANGED").contains(Objects.toString(before.outcome(),""))||!"APPROVED".equals(before.reviewStatus()))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"Cần kiểm tra lại thành công; banner phải đang được duyệt.");
                 jdbc.update("UPDATE ad_creatives SET resolved_url=?,scan_status='SAFE' WHERE creative_id=?",before.resolvedUrl(),id);
-            } else jdbc.update("UPDATE ad_creatives SET review_status='BLOCKED',scan_status='SUSPICIOUS' WHERE creative_id=?",id);
+            } else jdbc.update("UPDATE ad_creatives SET scan_status='SUSPICIOUS' WHERE creative_id=?",id);
             audit(actor.getId(),id,"AD_URL_"+action,before,read(id),ip,note.strip());
             return read(id);
         });

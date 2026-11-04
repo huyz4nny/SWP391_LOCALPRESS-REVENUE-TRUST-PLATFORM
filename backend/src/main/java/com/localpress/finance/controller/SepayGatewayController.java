@@ -63,8 +63,8 @@ public class SepayGatewayController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkOrder(@PathVariable String orderCode) {
         FinanceCurrentUser.Principal principal = currentUser.require();
         // Kiểm tra chủ đơn (403 nếu không phải) trước khi hỏi SePay
-        paymentProcessingService.getOrderStatusByCode(principal, orderCode);
-        Map<String, Object> check = sepayGatewayService.checkOrderWithSepay(orderCode);
+        OrderStatusResponse before = paymentProcessingService.getOrderStatusByCode(principal, orderCode);
+        Map<String, Object> check = sepayGatewayService.checkOrderWithSepay(orderCode, before.getCreatedAt());
         OrderStatusResponse status = paymentProcessingService.getOrderStatusByCode(principal, orderCode);
         Map<String, Object> body = new LinkedHashMap<>(check);
         body.put("order", status);

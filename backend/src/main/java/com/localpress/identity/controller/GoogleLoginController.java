@@ -37,7 +37,8 @@ public class GoogleLoginController {
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody GoogleLoginRequest body,
             @CookieValue(name = GoogleLoginNonceService.COOKIE, required = false) String nonce,
             HttpServletRequest request) {
-        LoginResponse response = login.login(body.idToken(), nonce);
+        LoginResponse response = login.login(
+                body.idToken(), nonce, body.deviceName(), body.deviceType(), request.getRemoteAddr());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.SET_COOKIE, cookie("", request.isSecure(), 0).toString()).body(response);
     }

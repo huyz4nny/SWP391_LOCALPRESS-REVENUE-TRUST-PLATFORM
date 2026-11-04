@@ -136,7 +136,10 @@ export function PaymentPage() {
       setLastSim({ amount, ref })
       await load()
     } catch (e: any) {
-      setActionError(e?.message || 'Giả lập webhook thất bại')
+      // Backend tắt giả lập (PAY-07): endpoint không tồn tại
+      setActionError(e?.status === 404
+        ? 'Giả lập đang tắt. Bật localpress.payment.simulation-enabled=true trong backend/config/application-local.yml rồi chạy lại backend.'
+        : e?.message || 'Giả lập webhook thất bại')
     } finally {
       setBusy(false)
     }

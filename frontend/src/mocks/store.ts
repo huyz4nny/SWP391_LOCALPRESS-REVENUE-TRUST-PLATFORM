@@ -3,7 +3,7 @@ import { Article, Category, SubscriptionPlan, Comment, ReaderEntitlement } from 
 import { AdSlot, AdBooking, AdCampaign, AdCreative, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange } from '@/features/advertising/types'
 import { companyProfileSchema } from '@/features/advertising/schemas/companyProfile'
 import { bookingSchema, getBookingDays } from '@/features/advertising/schemas/booking'
-import { Order, RefundRequest, ReconciliationPeriod, GeneralLedgerEntry, PaymentAttempt } from '@/features/finance/types'
+import { Order, RefundRequest, ReconciliationPeriod, GeneralLedgerEntry, PaymentAttempt, FinancialDocument } from '@/features/finance/types'
 import { SystemAuditLog, PaywallSettings, AdDeliveryLiveStatus } from '@/features/administration/types'
 import {
   SEED_USERS,
@@ -44,6 +44,9 @@ export interface MockStoreState {
   adDeliveryStatus: AdDeliveryLiveStatus[]
   entitlements: Record<string, ReaderEntitlement>
 }
+
+/** Thuế suất GTGT (%) trên chứng từ UC057, khớp localpress.finance.vat-rate của backend (NQ 204/2025/QH15). */
+export const MOCK_VAT_RATE = 8
 
 const STORAGE_KEY = 'localpress_mock_store_haiphong_v4'
 
@@ -352,6 +355,65 @@ class MockStore {
     this.state.users = this.state.users.map((user) =>
       user.id === id ? { ...user, companyName } : user)
     this.persist()
+  }
+
+  /**
+   * UC057 (mock): dựng bảng financial_documents từ các đơn đã thu.
+   * Backend thật lưu một dòng lúc đơn SUCCESS; ở mock đánh số lại theo thời điểm thu, mỗi loại một dãy theo năm.
+   */
+  public getFinancialDocuments(userId: string): FinancialDocument[] {
+    return this.getAllFinancialDocuments()
+      .filter((row) => row.owner === userId)
+      .map((row) => row.doc)
+  }
+
+  /** Chứng từ của 1 đơn (chi tiết đơn ở backoffice), undefined nếu đơn chưa thu. */
+  public getFinancialDocumentByOrder(orderIdOrCode: string): { owner: string; doc: FinancialDocument } | undefined {
+    const order = this.state.orders.find((o) => o.id === orderIdOrCode || o.orderCode === orderIdOrCode)
+    if (!order) return undefined
+    return this.getAllFinancialDocuments().find((row) => row.doc.orderCode === order.orderCode)
+  }
+
+  private getAllFinancialDocuments(): { owner: string; doc: FinancialDocument }[] {
+    const counters: Record<string, number> = {}
+    return this.state.orders
+      .filter((o) => o.paymentStatus === 'PAID' || o.paymentStatus === 'PARTIALLY_REFUNDED' || o.paymentStatus === 'REFUNDED')
+      // Mốc phát hành không đổi khi đơn bị hoàn (updatedAt đổi) nên số chứng từ giữ nguyên
+      .map((o) => ({
+        order: o,
+        issuedAt: o.invoiceIssuedAt || o.paymentAttempts.find((a) => a.status === 'SUCCESS')?.verifiedAt || o.createdAt,
+      }))
+      .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))
+      .map(({ order, issuedAt }) => {
+        const type = order.orderType === 'AD_CAMPAIGN' ? 'INVOICE' : 'RECEIPT'
+        const year = issuedAt.slice(0, 4)
+        const key = `${type}-${year}`
+        counters[key] = (counters[key] || 0) + 1
+        const profile = type === 'INVOICE' ? this.state.advertiserProfiles[order.userId] : undefined
+        // Giá đã gồm VAT; cùng công thức backend: trước thuế = round(tổng * 100 / (100 + thuế suất))
+        const amountBeforeVat = Math.round((order.finalAmount * 100) / (100 + MOCK_VAT_RATE))
+        const voided = order.paymentStatus === 'REFUNDED'
+        const doc: FinancialDocument = {
+          documentNo: `${type === 'INVOICE' ? 'HD' : 'BN'}-${year}-${String(counters[key]).padStart(6, '0')}`,
+          type,
+          orderCode: order.orderCode,
+          targetType: order.orderType,
+          targetId: order.targetId,
+          description: order.targetTitle,
+          buyerName: profile?.invoiceName || order.userName,
+          buyerTaxCode: profile?.invoiceTaxCode,
+          buyerAddress: profile?.invoiceAddress,
+          vatRate: MOCK_VAT_RATE,
+          amountBeforeVat,
+          vatAmount: order.finalAmount - amountBeforeVat,
+          totalAmount: order.finalAmount,
+          status: voided ? 'VOIDED' : 'ISSUED',
+          issuedAt,
+          voidedAt: voided ? order.updatedAt : undefined,
+        }
+        return { owner: order.userId, doc }
+      })
+      .reverse()
   }
 
   public getAdvertiserProfile(): AdvertiserProfile | null {

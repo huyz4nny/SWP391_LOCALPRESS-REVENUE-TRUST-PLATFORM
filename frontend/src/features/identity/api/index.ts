@@ -17,8 +17,12 @@ export const authApi = {
     skipAuth: true, credentials: 'include',
   }),
 
-  googleLogin: (idToken: string) => httpClient.post<LoginResponse>(
-    '/auth/google', { idToken }, { skipAuth: true, credentials: 'include' },
+  login: (request: PasswordLoginRequest) => httpClient.post<LoginResponse>(
+    '/auth/login', request, { skipAuth: true },
+  ),
+
+  googleLogin: (idToken: string, device?: { deviceName?: string; deviceType?: string }) => httpClient.post<LoginResponse>(
+    '/auth/google', { idToken, ...device }, { skipAuth: true, credentials: 'include' },
   ),
 
   register: (request: RegisterReaderRequest) =>
@@ -27,6 +31,13 @@ export const authApi = {
           request,
           { skipAuth: true },
       ),
+}
+
+export interface PasswordLoginRequest {
+  email: string
+  password: string
+  deviceName?: string
+  deviceType?: string
 }
 
 export interface LoginResponse {

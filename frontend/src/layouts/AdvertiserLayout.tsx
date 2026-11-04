@@ -31,7 +31,7 @@ export function AdvertiserLayout() {
   }, [])
 
   // Guard: Must have role ADVERTISER, or SYSTEM_ADMIN
-  if (!APP_CONFIG.useMockApi && !httpClient.hasBasicAuth()) return <Navigate to="/login" replace />
+  if (!APP_CONFIG.useMockApi && !httpClient.hasAuth()) return <Navigate to="/login" replace />
   const isAdvertiser = currentUser.role === 'ADVERTISER' || currentUser.role === 'SYSTEM_ADMIN'
 
   if (!isAdvertiser) {

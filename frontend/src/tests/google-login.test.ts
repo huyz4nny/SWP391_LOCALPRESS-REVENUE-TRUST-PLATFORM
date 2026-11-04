@@ -36,7 +36,9 @@ it('exchanges Google credential then uses LocalPress Bearer for me', async () =>
   expect((await loginWithGoogle('google-id-token')).id).toBe('42')
   const [url, exchange] = fetchMock.mock.calls[0]
   expect(url).toMatch(/\/auth\/google$/)
-  expect(JSON.parse(exchange.body)).toEqual({ idToken: 'google-id-token' })
+  expect(JSON.parse(exchange.body)).toEqual({
+    idToken: 'google-id-token', deviceName: 'Máy tính', deviceType: 'DESKTOP',
+  })
   expect(exchange.credentials).toBe('include')
   expect(exchange.headers.Authorization).toBeUndefined()
   expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer local-jwt')

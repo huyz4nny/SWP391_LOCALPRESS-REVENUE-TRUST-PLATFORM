@@ -15,6 +15,7 @@ import { AppApiError } from '@/lib/http/errors'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import { loginWithGoogle } from '../googleAuthSession'
 import { cancelLogin } from '../authSession'
+import { currentBrowserDevice } from '../browserDevice'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -42,6 +43,9 @@ export function LoginPage() {
       } else {
         navigate(from === '/login' ? '/' : from, { replace: true })
       }
+    } catch (error: unknown) {
+      if (error instanceof AppApiError && error.message) setLoginError(error.message)
+      else setLoginError('Không thể đăng nhập Google. Vui lòng thử lại.')
     } finally {
       setIsLoading(false)
     }
@@ -55,9 +59,15 @@ export function LoginPage() {
     if (!APP_CONFIG.useMockApi) {
       try {
         const normalizedEmail = email.trim().toLowerCase()
+        const device = currentBrowserDevice()
         httpClient.beginLogin()
-        httpClient.setBasicAuth(normalizedEmail, password)
-        // 1. Gọi endpoint định danh chung /api/v1/auth/me (xác thực bất kỳ role nào từ MySQL)
+        const session = await authApi.login({
+          email: normalizedEmail,
+          password,
+          deviceName: device.deviceName,
+          deviceType: device.deviceType,
+        })
+        httpClient.setBearerToken(session.accessToken)
         const user = await authApi.getMe()
         mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
         httpClient.shareLoginWithOtherTabs()
@@ -79,8 +89,8 @@ export function LoginPage() {
             setLoginError(
                 'Email hoặc mật khẩu không chính xác, hoặc tài khoản đã bị khóa.',
             )
-          } else if (error.status === 403) {
-            setLoginError('Bạn không có quyền truy cập chức năng này.')
+          } else if (error.status === 403 || error.status === 409) {
+            setLoginError(error.message)
           } else {
             setLoginError('Không thể đăng nhập. Vui lòng thử lại sau.')
           }

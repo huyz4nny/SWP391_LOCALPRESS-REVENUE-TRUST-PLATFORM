@@ -17,6 +17,12 @@ export function cancelLogin(): void {
  * Real API mode: a tab without credentials first borrows them from another open tab;
  * if none is logged in, the remembered user is shown as Guest.
  */
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('localpress-bearer-rejected', () => {
+        mockStore.setCurrentUser('user-guest')
+    })
+}
+
 export async function syncAuthSession(): Promise<void> {
     if (APP_CONFIG.useMockApi || httpClient.hasAuth()) return
     if (await httpClient.requestAuthFromOtherTabs()) return

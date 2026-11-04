@@ -9,6 +9,8 @@ import {
   LedgerSummary,
   ResolveDiscrepancyInput,
   FinanceAlert,
+  FinancialDocument,
+  FinancialDocumentType,
 } from '../types'
 import { complaintApi } from './payment'
 
@@ -258,6 +260,31 @@ export const financeApi = {
     return {
       blob: new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
       filename: `Bao_cao_tai_chinh_${fromDate || 'dau'}_${toDate || 'nay'}.csv`,
+    }
+  },
+
+  /**
+   * UC057: chứng từ của chính user đang đăng nhập (doanh nghiệp xem hóa đơn, độc giả xem biên nhận).
+   * GET /finance/documents/mine -> ApiResponse<FinancialDocument[]>, mới nhất trước.
+   */
+  getMyDocuments: async (type?: FinancialDocumentType): Promise<FinancialDocument[]> => {
+    const res = await httpClient.get<{ data: FinancialDocument[] }>('/finance/documents/mine', {
+      params: type ? { type } : undefined,
+    })
+    return res?.data ?? []
+  },
+
+  /**
+   * UC057: chứng từ của 1 đơn (chi tiết đơn II.4.7). GET /finance/documents/transaction/{id}.
+   * Đơn chưa thu (backend 404) thì trả null.
+   */
+  getOrderDocument: async (orderId: string): Promise<FinancialDocument | null> => {
+    try {
+      const res = await httpClient.get<{ data: FinancialDocument }>(`/finance/documents/transaction/${orderId}`)
+      return res?.data ?? null
+    } catch (e: any) {
+      if (e?.status === 404) return null
+      throw e
     }
   },
 }

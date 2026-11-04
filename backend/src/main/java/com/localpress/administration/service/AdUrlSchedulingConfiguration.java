@@ -5,7 +5,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 @Configuration
 @EnableScheduling
 public class AdUrlSchedulingConfiguration {
-    @Bean(name="adUrlScheduler")
+    @Bean("adUrlScheduler")
     public ThreadPoolTaskScheduler scheduler() {
         var scheduler=new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);scheduler.setThreadNamePrefix("ad-url-monitor-");

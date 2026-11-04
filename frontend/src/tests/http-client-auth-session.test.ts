@@ -40,19 +40,20 @@ it('restores main Basic authentication after a same-tab reload', async () => {
   expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe(authorization)
 })
 
-it('switching to Google cannot restore the previous Basic account on reload', async () => {
+it('keeps the Bearer session across a same-tab reload and drops the previous Basic header', async () => {
   const first = await client()
   first.setBasicAuth('previous@example.test', 'test-password')
   first.setBearerToken('google-login-local-jwt')
   expect(first.hasBasicAuth()).toBe(false)
   expect(storedAuth.get('localpress_basic_auth')).toBeUndefined()
+  expect(storedAuth.get('localpress_bearer_token')).toBe('google-login-local-jwt')
   await first.get('/auth/me')
   expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer google-login-local-jwt')
   vi.resetModules()
   const reloaded = await client()
-  expect(reloaded.hasAuth()).toBe(false)
+  expect(reloaded.hasAuth()).toBe(true)
   await reloaded.get('/auth/me')
-  expect(fetchMock.mock.calls[1][1].headers.Authorization).toBeUndefined()
+  expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer google-login-local-jwt')
 })
 
 it('logout clears persisted Basic auth and in-memory Bearer auth', async () => {

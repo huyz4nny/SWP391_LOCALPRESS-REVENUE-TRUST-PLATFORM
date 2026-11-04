@@ -38,7 +38,7 @@ public class ReaderRegistrationService {
         // chuẩn hóa dữ liệu đầu vào họ tên cắt khoảng trắng email đổi chữ thường số điện thoại null nếu để trống
         String fullName = request.fullName().trim();
         String email = request.email().trim().toLowerCase(Locale.ROOT);
-        String phone = normalizedPhone(request.phone());
+        String phone = VnPhone.normalizeOrNull(request.phone());
 
         // bcrypt chỉ nhận tối đa 72 byte nên nếu mật khẩu dài hơn thì chặn và trả lỗi 400
         if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
@@ -56,7 +56,7 @@ public class ReaderRegistrationService {
             );
         }
 
-        // số điện thoại chỉ kiểm tra khi có nhập và đã có người dùng thì trả lỗi 409
+        // số đã chuẩn hóa về dạng 0...; sai định dạng thì VnPhone trả 400, trùng thì 409
         if (phone != null && userRepository.existsByPhone(phone)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
@@ -89,11 +89,4 @@ public class ReaderRegistrationService {
         );
     }
 
-    // hàm phụ chuẩn hóa số điện thoại trả null nếu không nhập còn có thì cắt khoảng trắng
-    private String normalizedPhone(String phone) {
-        if(phone == null || phone.isBlank()){
-            return null;
-        }
-        return phone.trim();
-    }
 }

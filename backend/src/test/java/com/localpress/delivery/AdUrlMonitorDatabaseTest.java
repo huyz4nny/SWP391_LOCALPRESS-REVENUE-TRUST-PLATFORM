@@ -120,8 +120,9 @@ class AdUrlMonitorDatabaseTest {
         assertThrows(org.springframework.web.server.ResponseStatusException.class,()->monitor.resolve(auth,creative,failed.checkId(),"ACCEPT","Review","127.0.0.1"));
         monitor.resolve(auth,creative,failed.checkId(),"BLOCK","Unavailable","127.0.0.1");
         probeResult("OK","https://example.test/landing");var next=monitor.scan(auth,creative,"127.0.0.1");
-        assertEquals("BLOCKED",next.reviewStatus());assertNull(delivery.serve(code,null).creative());
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->monitor.resolve(auth,creative,next.checkId(),"ACCEPT","Review","127.0.0.1"));
+        assertEquals("APPROVED",next.reviewStatus());assertEquals("SUSPICIOUS",next.scanStatus());assertNull(delivery.serve(code,null).creative());
+        monitor.resolve(auth,creative,next.checkId(),"ACCEPT","Review","127.0.0.1");
+        assertNotNull(delivery.serve(code,null).creative());
     }
     @Test void staleOrExpiredChecksCannotBeAccepted() {
         probeResult("OK","https://example.test/landing");var first=monitor.scan(auth,creative,"127.0.0.1");
