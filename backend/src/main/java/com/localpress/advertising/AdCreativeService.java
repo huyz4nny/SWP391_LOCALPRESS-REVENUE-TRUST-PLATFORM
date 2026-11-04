@@ -112,7 +112,7 @@ public class AdCreativeService {
     }
 
     private List<Creative> creatives(long campaignId) {
-        Integer serving = !stages.forCampaign(campaignId).stage().equals("RUNNING") ? null : jdbc.query("SELECT MAX(version_number) FROM ad_creatives WHERE campaign_id = ? AND review_status = 'APPROVED'",
+        Integer serving = !stages.forCampaign(campaignId).stage().equals("RUNNING") ? null : jdbc.query("SELECT MAX(version_number) FROM ad_creatives WHERE campaign_id = ? AND " + CampaignStage.IN_EFFECT,
                 (rs, r) -> {
                     int v = rs.getInt(1);
                     return rs.wasNull() ? null : v;

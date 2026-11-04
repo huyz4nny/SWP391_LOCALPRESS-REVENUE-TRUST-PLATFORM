@@ -381,6 +381,17 @@ class AdBookingIntegrationTest {
         String code=jdbc.queryForObject("SELECT slot_code FROM ad_slots WHERE slot_id=?",String.class,exclusiveSlot);
         assertTrue(serving.eligible(code,today).isEmpty());
     }
+    @Test void portalReplacementNotYetEffectiveKeepsCurrentBannerLikeServing() {
+        String id=paidCampaign(); long campaign=Long.parseLong(id); long v1=approvedCreative(id);
+        LocalDate today=LocalDate.now(AdBookingService.VIETNAM);
+        jdbc.update("UPDATE ad_campaigns SET status='APPROVED',start_date=?,end_date=?,contract_reference=? WHERE campaign_id=?",today,today.plusDays(5),"HD"+id,campaign);
+        jdbc.update("INSERT INTO ad_creatives(campaign_id,uploaded_by,version_number,title,media_url,target_url,review_status,scan_status,requested_effective_at) "
+                + "VALUES (?,?,2,'Tomorrow','https://example.test/b2.png','https://example.test/new','APPROVED','CHANGED',?)",campaign,userA,LocalDateTime.now(AdBookingService.VIETNAM).plusDays(1));
+        var c=creatives.campaign(emailA,campaign);
+        // Khớp AdServingRepository.eligible của SV5 (PR #35 có test riêng phía phát).
+        assertEquals("RUNNING",c.stage()); assertEquals(1,c.activeCreativeVersion());
+        assertTrue(c.creatives().stream().anyMatch(x->x.id().equals(String.valueOf(v1))&&x.isActiveServing()));
+    }
     @Test void portalAcceptanceAndNotificationOwnership() {
         String id=paidCampaign(); long campaign=Long.parseLong(id); long cr=approvedCreative(id);
         LocalDate today=LocalDate.now(AdBookingService.VIETNAM);

@@ -23,16 +23,22 @@ public class CampaignStage {
 
     public record State(String stage, String reason) {}
 
-    // Mỗi dòng: campaign + slot + bản APPROVED có version cao nhất (approved_*) + bản mới nhất bất kỳ (latest_*).
+    /** Bản banner được phát: đã duyệt và tới giờ hiệu lực (giờ VN), như AdServingRepository.eligible của SV5. */
+    static final String IN_EFFECT = "review_status = 'APPROVED' AND (requested_effective_at IS NULL "
+            + "OR requested_effective_at <= CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+07:00'))";
+
+    // Mỗi dòng: campaign + slot + bản đang có hiệu lực, version cao nhất (approved_*) + bản mới nhất bất kỳ (latest_*).
     private static final String SELECT = """
             SELECT c.*, s.name slot_name, s.status slot_status, s.dimensions,
                    v.creative_id approved_creative_id, v.version_number approved_version, v.scan_status,
                    latest.review_status latest_review, latest.rejection_reason creative_rejection
             FROM ad_campaigns c
             JOIN ad_slots s ON s.slot_id = c.slot_id
-            LEFT JOIN ad_creatives v ON v.campaign_id = c.campaign_id AND v.review_status = 'APPROVED'
+            LEFT JOIN ad_creatives v ON v.campaign_id = c.campaign_id
                  AND v.version_number = (SELECT MAX(n.version_number) FROM ad_creatives n
-                                         WHERE n.campaign_id = c.campaign_id AND n.review_status = 'APPROVED')
+                                         WHERE n.campaign_id = c.campaign_id AND n.review_status = 'APPROVED'
+                                           AND (n.requested_effective_at IS NULL OR n.requested_effective_at
+                                                <= CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+07:00')))
             LEFT JOIN ad_creatives latest ON latest.campaign_id = c.campaign_id
                  AND latest.version_number = (SELECT MAX(n.version_number) FROM ad_creatives n
                                               WHERE n.campaign_id = c.campaign_id)

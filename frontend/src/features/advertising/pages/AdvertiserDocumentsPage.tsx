@@ -5,23 +5,54 @@ import type { AdvertiserContract, CampaignSummary } from '../types'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { financeApi } from '@/features/finance/api'
+import type { FinancialDocument } from '@/features/finance/types'
 
 function fileLink(url: string) {
   return /^https?:\/\//i.test(url) || /^\/api\//.test(url) ? url : undefined
 }
+/** Một chiến dịch có thể có hơn một đơn đã thu (vd trả lại sau khi hoàn), nên liệt kê hết. */
+function InvoiceCell({ invoices, campaignId }: { invoices: FinancialDocument[] | null; campaignId: string }) {
+  if (invoices === null) return <span className="text-slate-600">Không tải được hóa đơn</span>
+  const mine = invoices.filter((d) => d.targetType === 'AD_CAMPAIGN' && d.targetId === campaignId)
+  if (mine.length === 0) return <span className="text-slate-600">Chưa phát hành</span>
+  return (
+    <div className="space-y-2">
+      {mine.map((d) => (
+        <div key={d.documentNo}>
+          <span className="font-mono">{d.documentNo}</span>
+          {d.status === 'VOIDED' && <span className="ml-2 text-xs text-slate-600">Đã hủy</span>}
+          <p className="text-xs text-slate-600">
+            {formatCurrency(d.amountBeforeVat)} + VAT {d.vatRate}% {formatCurrency(d.vatAmount)} ={' '}
+            {formatCurrency(d.totalAmount)} · {formatDate(d.issuedAt)}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function AdvertiserDocumentsPage() {
   const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null)
   const [contracts, setContracts] = useState<AdvertiserContract[]>([])
   const [available, setAvailable] = useState(false)
+  // Hóa đơn của SV4 (UC057), ghép với chiến dịch qua targetId = campaign_id; không đọc bảng của SV4 (Rule 17).
+  const [invoices, setInvoices] = useState<FinancialDocument[] | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
     let active = true
-    Promise.all([advertisingApi.getDocuments(), advertisingApi.getMyContracts()])
-      .then(([c, result]) => {
+    Promise.all([
+      advertisingApi.getDocuments(),
+      advertisingApi.getMyContracts(),
+      // Lỗi bên hóa đơn không được làm hỏng cả trang: null = không tải được, hiện riêng ở cột hóa đơn.
+      financeApi.getMyDocuments('INVOICE').catch(() => null),
+    ])
+      .then(([c, result, docs]) => {
         if (active) {
           setCampaigns(c)
           setContracts(result.items)
           setAvailable(result.available)
+          setInvoices(docs)
         }
       })
       .catch((e: Error) => {
@@ -140,8 +171,7 @@ export function AdvertiserDocumentsPage() {
                     <tr>
                       <th>Chiến dịch</th>
                       <th>Thanh toán / vận hành</th>
-                      <th>Hóa đơn mô phỏng</th>
-                      <th>Biên nhận</th>
+                      <th>Hóa đơn VAT</th>
                       <th>Nghiệm thu</th>
                     </tr>
                   </thead>
@@ -160,8 +190,9 @@ export function AdvertiserDocumentsPage() {
                             <StatusBadge type="stage" status={c.stage} />
                           </div>
                         </td>
-                        <td className="text-slate-600">Chưa có dữ liệu</td>
-                        <td className="text-slate-600">Chưa có</td>
+                        <td>
+                          <InvoiceCell invoices={invoices} campaignId={c.campaignId} />
+                        </td>
                         <td>
                           {c.acceptanceAvailable ? (
                             <Link to={`/advertiser/campaigns/${c.campaignId}/acceptance`}>Có · Xem biên bản</Link>
