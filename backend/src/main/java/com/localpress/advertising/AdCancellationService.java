@@ -5,8 +5,6 @@ import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.RefundManagementService;
-import com.localpress.shared.event.RefundCompletedEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -19,13 +17,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 import static com.localpress.advertising.CampaignStage.date;
-import static com.localpress.advertising.CampaignStage.number;
 import static com.localpress.advertising.CampaignStage.text;
 
 /**
@@ -146,6 +141,8 @@ public class AdCancellationService {
                     .build());
             refundId = Long.valueOf(refund.getId());
         }
+        // Đơn QR còn chờ thì đóng luôn: tiền lỡ chuyển sau đó thành LATE_PAYMENT của SV4, không ghi sổ, không hoàn.
+        payments.closePendingOrders("AD", id, "Chiến dịch đã hủy");
 
         // Đơn đã thu tiền nhưng SV1 chưa ghi nhận (event chưa tới) thì ghi PAID luôn để event đến sau bỏ qua.
         jdbc.update("UPDATE ad_campaigns SET status = 'CANCELLED', hold_expires_at = NOW(), "
@@ -168,34 +165,11 @@ public class AdCancellationService {
                 .findFirst().orElseThrow();
     }
 
-    /** SV4 không phát event khi từ chối hoàn tiền, nên đồng bộ các yêu cầu còn PENDING mỗi lần đọc. */
-    @Transactional
+    /** Quyết định hoàn của SV4 do AdRefundListener ghi vào khi nhận event, ở đây chỉ đọc. */
     public List<CancellationRequest> myRequests(String email) {
         var me = bookings.advertiser(email);
         if (me.advertiserId() == null) return List.of();
-        var pending = jdbc.queryForList("SELECT * FROM ad_cancellation_requests "
-                + "WHERE advertiser_id = ? AND refund_decision = 'PENDING' AND refund_request_id IS NOT NULL",
-                me.advertiserId());
-        if (!pending.isEmpty()) syncRejected(me, pending);
         return requests(me.advertiserId());
-    }
-
-    // ponytail: quét cả danh sách của SV4 rồi lọc theo id; đổi sang getRefund(id)/RefundRejectedEvent khi SV4 có.
-    private void syncRejected(AdBookingService.Advertiser me, List<Map<String, Object>> pending) {
-        var all = refunds.getRefundsList();
-        for (var request : pending) {
-            for (var refund : all) {
-                boolean same = refund.getId().equals(text(request, "refund_request_id"))
-                        && refund.getUserId().equals(String.valueOf(me.userId()));
-                if (!same || !"REJECTED".equals(refund.getStatus())) continue;
-                jdbc.update("UPDATE ad_cancellation_requests SET refund_decision = 'REJECTED', review_notes = ?, "
-                                + "decided_at = ? WHERE cancellation_id = ? AND refund_decision = 'PENDING'",
-                        refund.getReviewNotes(), refund.getResolvedAt(), request.get("cancellation_id"));
-                notifications.notify(me.userId(), number(request, "campaign_id"), "AD_REFUND_REJECTED",
-                        "Khoản hoàn bị từ chối",
-                        Objects.toString(refund.getReviewNotes(), "Liên hệ kế toán để biết lý do"), refund.getId());
-            }
-        }
     }
 
     private List<CancellationRequest> requests(long advertiserId) {
@@ -211,22 +185,5 @@ public class AdCancellationService {
                         rs.getString("review_notes"), AdBookingService.time(rs, "decided_at"),
                         AdBookingService.time(rs, "refunded_at")),
                 advertiserId);
-    }
-
-    /** Ghép kết quả hoàn của SV4 với yêu cầu hủy qua refundId. Chiến dịch giữ nguyên CANCELLED. */
-    @EventListener
-    public void onRefundCompleted(RefundCompletedEvent event) {
-        if (!"AD".equals(event.getTransactionType()) || event.getTargetId() == null) return;
-        int changed = jdbc.update("UPDATE ad_cancellation_requests SET refund_decision = 'APPROVED', "
-                        + "refund_status = 'REFUNDED', refunded_amount = ?, decided_at = ?, refunded_at = ? "
-                        + "WHERE campaign_id = ? AND refund_request_id = ?",
-                event.getRefundAmount(), event.getRefundedAt(), event.getRefundedAt(),
-                event.getTargetId(), event.getRefundId());
-        if (changed == 0) return;
-        String refundId = String.valueOf(event.getRefundId());
-        notifications.notify(event.getUserId(), event.getTargetId(), "AD_REFUND_APPROVED",
-                "Khoản hoàn đã được duyệt", "Kế toán đã duyệt khoản hoàn của chiến dịch.", refundId);
-        notifications.notify(event.getUserId(), event.getTargetId(), "AD_REFUNDED",
-                "Đã hoàn tiền chiến dịch", String.format(Locale.forLanguageTag("vi-VN"), "Số tiền đã hoàn: %,.0f đ", event.getRefundAmount()), refundId);
     }
 }

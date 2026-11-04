@@ -434,6 +434,15 @@ class AdBookingIntegrationTest {
             outcomes.sort(Integer::compare); assertEquals(List.of(200,409),outcomes);
         } finally { pool.shutdownNow(); }
     }
+    @Test void portalCancelClosesPendingOrderSoLateMoneyIsNotBooked() {
+        var b=book(emailA,exclusiveSlot,start,start); quote(b.id(),1,500000); long id=Long.parseLong(b.id());
+        bookings.acceptQuotation(emailA,id,1,true);
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(emailA,null,"ROLE_ADVERTISER"));
+        bookings.createPayment(emailA,id);
+        cancellations.cancel(emailA,id,"Hủy khi QR còn chờ");
+        assertEquals(List.of("FAILED"),jdbc.queryForList("SELECT status FROM transactions WHERE campaign_id=?",String.class,id));
+        assertEquals("NOT_APPLICABLE",cancellations.myRequests(emailA).get(0).refundDecision());
+    }
     @Test void portalRejectedRefundUpdatesRequestAndNotification() {
         String id=paidCampaign(); var r=cancellations.cancel(emailA,Long.parseLong(id),"Đổi kế hoạch");
         long refund=jdbc.queryForObject("SELECT refund_request_id FROM ad_cancellation_requests WHERE cancellation_id=?",Long.class,Long.parseLong(r.id()));

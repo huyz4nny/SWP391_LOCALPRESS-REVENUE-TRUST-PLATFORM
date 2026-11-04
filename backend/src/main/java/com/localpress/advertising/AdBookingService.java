@@ -423,17 +423,23 @@ public class AdBookingService {
         if (transactionId == null || amount == null || amount.signum() <= 0) return;
         try {
             newTransaction.executeWithoutResult(status -> {
-                Integer proposed = jdbc.queryForObject("SELECT COUNT(*) FROM audit_logs WHERE action='AD_PAYMENT_REFUND_PROPOSED' " +
-                        "AND JSON_UNQUOTE(JSON_EXTRACT(new_value,'$.transactionId'))=?", Integer.class, String.valueOf(transactionId));
-                if (proposed != null && proposed > 0) return;
+                // Chiến dịch đã hủy: yêu cầu hủy đã gắn phiếu hoàn thì thôi.
+                Integer linked = jdbc.queryForObject("SELECT COUNT(*) FROM ad_cancellation_requests " +
+                        "WHERE campaign_id = ? AND refund_request_id IS NOT NULL", Integer.class, campaignId);
+                // Các trường hợp khác không có yêu cầu hủy: mỗi giao dịch một lần, tra theo cột (không JSON).
+                Integer proposed = jdbc.queryForObject("SELECT COUNT(*) FROM audit_logs WHERE action = 'AD_PAYMENT_REFUND_PROPOSED' " +
+                        "AND target_type = 'AD_TRANSACTION' AND target_id = ?", Integer.class, transactionId);
+                if (linked > 0 || proposed > 0) return;
                 var refund = refunds.proposeRefund(null, ProposeRefundRequest.builder()
                         .orderId(transactionId)
                         .refundAmount(amount)
                         .reason("Không kích hoạt được chiến dịch quảng cáo #" + campaignId + ": " + reason)
                         .affectedBenefit("Chiến dịch #" + campaignId + " không được kích hoạt")
                         .build());
-                audit(null, "AD_PAYMENT_REFUND_PROPOSED", campaignId,
-                        Map.of("transactionId", transactionId, "amount", amount, "reason", reason));
+                jdbc.update("INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value) " +
+                                "VALUES (NULL, 'AD_PAYMENT_REFUND_PROPOSED', 'AD_TRANSACTION', ?, ?)", transactionId,
+                        json.valueToTree(Map.of("campaignId", campaignId, "refundId", refund.getId(),
+                                "amount", amount, "reason", reason)).toString());
                 // Tiền về sau khi hủy: gắn khoản hoàn vào chính yêu cầu hủy để doanh nghiệp theo dõi được.
                 jdbc.update("UPDATE ad_cancellation_requests SET refund_request_id=?,refund_decision='PENDING',paid_amount=?,proposed_amount=? " +
                         "WHERE campaign_id=? AND refund_request_id IS NULL", Long.valueOf(refund.getId()), amount, amount, campaignId);

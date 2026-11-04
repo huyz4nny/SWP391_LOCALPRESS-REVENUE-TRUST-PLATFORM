@@ -82,18 +82,15 @@ public class AdPortalController {
         return dashboard.documents(auth.getName());
     }
 
-    // Đồng bộ quyết định hoàn tiền từ SV4 trước, để thông báo "bị từ chối" có mặt trong danh sách.
     @GetMapping("/notifications")
     public AdNotificationService.NotificationPage notifications(Authentication auth,
                                                                 @RequestParam(defaultValue = "0") int page,
                                                                 @RequestParam(defaultValue = "20") int size) {
-        cancellations.myRequests(auth.getName());
         return notifications.list(auth.getName(), page, size);
     }
 
     @GetMapping("/notifications/unread-count")
     public long unread(Authentication auth) {
-        cancellations.myRequests(auth.getName());
         return notifications.unreadCount(auth.getName());
     }
 
