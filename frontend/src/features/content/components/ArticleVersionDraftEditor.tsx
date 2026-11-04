@@ -1,3 +1,4 @@
+import { EditorialAiAssistant } from './EditorialAiAssistant'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -71,6 +72,7 @@ export function ArticleVersionDraftEditor({
         setError,
         clearErrors,
         getValues,
+        setValue,
         formState: { errors, isSubmitting, isDirty },
     } = useForm<FormValues>({
         resolver: zodResolver(schema),
@@ -81,6 +83,14 @@ export function ArticleVersionDraftEditor({
             changelog: '',
         },
     })
+
+    const aiDisabled = isSubmitting || sending || submitted || conflict || submissionUncertain || confirmSubmit
+
+    function applyAiText(field: 'title' | 'sapo', value: string) {
+        if (aiDisabled || inFlight.current) return
+        setValue(field, value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })
+        setSuccess('')
+    }
 
     async function save(values: FormValues) {
         if (inFlight.current || conflict || submitted || submissionUncertain || confirmSubmit) return
@@ -210,6 +220,13 @@ export function ArticleVersionDraftEditor({
                         : 'Chỉnh nội dung bản nháp trước khi gửi duyệt. Bản đang xuất bản được giữ nguyên.'}
                 </p>
             </header>
+            <EditorialAiAssistant
+                key={`version-ai:${articleId}:${versionNumber}`}
+                getTitle={() => getValues('title')}
+                disabled={aiDisabled}
+                onApplyTitle={value => applyAiText('title', value)}
+                onApplySapo={value => applyAiText('sapo', value)}
+            />
 
             {revisionFeedback !== null && (
                 <section className="rounded-lg border border-slate-200 p-4">

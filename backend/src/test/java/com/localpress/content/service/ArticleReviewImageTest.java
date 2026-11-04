@@ -41,6 +41,23 @@ class ArticleReviewImageTest {
         when(versions.findByArticleIdAndVersionNumber(10L,1)).thenReturn(Optional.of(version));
         when(storage.load(filename)).thenReturn(new ByteArrayResource(new byte[]{1,2,3}));
     }
+    @Test void publishedImageIsReadableWithoutIdentity() {
+        when(versions.existsPublishedCoverImage(Article.Status.PUBLISHED, "/api/v1/content/images/" + filename)).thenReturn(true);
+        when(storage.load(filename)).thenReturn(new ByteArrayResource(new byte[]{1}));
+        assertNotNull(service.getCoverImage(filename));
+        verifyNoInteractions(current);
+    }
+    @Test void unpublishedImageNeverLoadsForGuest() {
+        when(current.requireCurrentAuthor()).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
+        assertEquals(401, assertThrows(ResponseStatusException.class, () -> service.getCoverImage(filename)).getStatusCode().value());
+        verifyNoInteractions(storage);
+    }
+    @Test void nonPublishedImageMustStillBeOwnedLatestDraft() {
+        identity(4L, User.Role.AUTHOR);
+        assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.getCoverImage(filename)).getStatusCode().value());
+        verify(versions).findOwnedDraftCoverImage(4L, Article.Status.DRAFT, "/api/v1/content/images/" + filename);
+        verifyNoInteractions(storage);
+    }
     @Test void editorCanReadAnotherAuthorsDraftImage() {
         identity(3L,User.Role.EDITOR);image();
         assertNotNull(service.getReviewCoverImage(10L,1));

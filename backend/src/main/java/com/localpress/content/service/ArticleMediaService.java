@@ -165,9 +165,12 @@ public class ArticleMediaService {
 
     @Transactional(readOnly = true)
     public Resource getCoverImage(String filename) {
-        User author = currentUserService.requireCurrentAuthor();
-
         String imageUrl = "/api/v1/content/images/" + filename;
+        // Only the currently published version is public; latest drafts remain private.
+        if (articleVersionRepository.existsPublishedCoverImage(Article.Status.PUBLISHED, imageUrl)) {
+            return imageStorageService.load(filename);
+        }
+        User author = currentUserService.requireCurrentAuthor();
 
         articleVersionRepository.findOwnedDraftCoverImage(
                 author.getId(),

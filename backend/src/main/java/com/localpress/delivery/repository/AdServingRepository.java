@@ -10,11 +10,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdServingRepository {
     private final JdbcTemplate jdbc;
-    public record Slot(String id,String code,String name,String dimensions,int capacity) {}
+    public record Slot(String id,String code,String name,String dimensions,int capacity,String status) {
+        public Slot(String id,String code,String name,String dimensions,int capacity) {
+            this(id,code,name,dimensions,capacity,"ACTIVE");
+        }
+    }
     public record Creative(long campaignId,long creativeId,String title,String imageUrl,String targetUrl,String companyName) {}
     public List<Slot> slots() {
-        return jdbc.query("SELECT slot_id,slot_code,name,dimensions,capacity FROM ad_slots ORDER BY slot_id",
-                (rs,row)->new Slot(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getInt(5)));
+        return jdbc.query("SELECT slot_id,slot_code,name,dimensions,capacity,status FROM ad_slots ORDER BY slot_id",
+                (rs,row)->new Slot(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getInt(5),rs.getString(6)));
     }
     public List<Creative> eligible(String code,LocalDate today) {
         return jdbc.query("""
@@ -46,9 +50,9 @@ public class AdServingRepository {
                 ON DUPLICATE KEY UPDATE ctr=ROUND(clicks*100.0/(impressions+1),4),impressions=impressions+1
                 """,c.campaignId(),c.creativeId(),day);
     }
-    public void click(Creative c,LocalDate day) {
-        jdbc.update("UPDATE ad_stats SET ctr=ROUND((clicks+1)*100.0/impressions,4),clicks=clicks+1 "
-                + "WHERE campaign_id=? AND creative_id=? AND stat_date=? AND clicks<impressions",c.campaignId(),c.creativeId(),day);
+    public boolean click(Creative c,LocalDate day) {
+        return jdbc.update("UPDATE ad_stats SET ctr=ROUND((clicks+1)*100.0/impressions,4),clicks=clicks+1 "
+                + "WHERE campaign_id=? AND creative_id=? AND stat_date=? AND clicks<impressions",c.campaignId(),c.creativeId(),day) == 1;
     }
     public long[] todayStats(String slotId,LocalDate day) {
         return jdbc.queryForObject("SELECT COALESCE(SUM(s.impressions),0),COALESCE(SUM(s.clicks),0) FROM ad_stats s "

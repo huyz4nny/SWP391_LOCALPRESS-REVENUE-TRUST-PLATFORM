@@ -32,12 +32,15 @@ public class JwtTokenService {
         String token = Jwts.builder()
                 .issuer("localpress").audience().add("localpress-api").and()
                 .subject(user.getId().toString())
+                .claim("ver", user.getAuthVersion() == null ? 0L : user.getAuthVersion())
                 .issuedAt(Date.from(now)).expiration(Date.from(now.plusMillis(expirationMs)))
                 .signWith(key, Jwts.SIG.HS256).compact();
         return new LoginResponse(token, "Bearer", expirationMs / 1000);
     }
 
-    public long verifyAndGetUserId(String token) {
+    public record Identity(long userId,long version) {}
+    public long verifyAndGetUserId(String token) { return verify(token).userId(); }
+    public Identity verify(String token) {
         var claims = Jwts.parser().verifyWith(key)
                 .requireIssuer("localpress").requireAudience("localpress-api")
                 .build().parseSignedClaims(token).getPayload();
@@ -46,6 +49,8 @@ public class JwtTokenService {
         }
         long id = Long.parseLong(claims.getSubject());
         if (id <= 0) throw new IllegalArgumentException("Invalid subject");
-        return id;
+        Number version=claims.get("ver",Number.class);
+        if(version!=null && version.longValue()<0) throw new IllegalArgumentException("Invalid token version");
+        return new Identity(id,version==null?0L:version.longValue());
     }
 }

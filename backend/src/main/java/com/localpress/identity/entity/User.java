@@ -49,6 +49,9 @@ public class User {
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
+    @Column(name = "auth_version", nullable = false)
+    private Long authVersion = 0L;
+
     // hàm tạo độc giả mới với role READER và status ACTIVE và số lần sai ban đầu là 0
     // luồng đi là ReaderRegistrationService gọi hàm này rồi lưu xuống bảng users
     public static User createReader(

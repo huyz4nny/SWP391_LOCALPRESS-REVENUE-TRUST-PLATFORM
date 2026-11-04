@@ -83,6 +83,8 @@ import {
   UserManagementPage,
   PaywallConfigPage,
   AdDeliveryMonitorPage,
+  AdUrlMonitorPage,
+  AdSlotConfigPage,
   AuditLogsPage,
 } from '@/features/administration'
 
@@ -365,12 +367,20 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'admin/ad-slots',
+        element: <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Cấu hình vị trí quảng cáo (SV5)"><AdSlotConfigPage /></ProtectedRoute>,
+      },
+      {
         path: 'admin/delivery',
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Quản Trị Hệ Thống (SV5)">
             <AdDeliveryMonitorPage />
           </ProtectedRoute>
         ),
+      },
+      {
+        path: 'admin/url-monitor',
+        element: <ProtectedRoute allowedRoles={ADMIN_ROLES} subsystemName="Giám sát URL (SV5)"><AdUrlMonitorPage /></ProtectedRoute>,
       },
       {
         path: 'admin/audit-logs',

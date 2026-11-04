@@ -2,6 +2,7 @@ import React from 'react'
 import { Badge, BadgeProps } from '@/components/ui/badge'
 
 type StatusType =
+  | 'adSlot'
   | 'article'
   | 'booking'
   | 'payment'
@@ -20,6 +21,7 @@ type Variant = NonNullable<BadgeProps['variant']>
 // Một pill cho mỗi trạng thái: nền nhạt + chữ đậm cùng sắc độ. Xám cho trạng thái trung tính,
 // màu chỉ dùng khi trạng thái cần người xem chú ý (chờ xử lý, lỗi, hoàn tất).
 const STATUS_MAP: Record<StatusType, Record<string, [string, Variant]>> = {
+  adSlot: { ACTIVE: ['Đang bật', 'success'], INACTIVE: ['Đã tắt', 'secondary'] },
   article: {
     DRAFT: ['Bản nháp', 'secondary'],
     IN_REVIEW: ['Chờ duyệt', 'warning'],
@@ -48,6 +50,8 @@ const STATUS_MAP: Record<StatusType, Record<string, [string, Variant]>> = {
     PARTIALLY_REFUNDED: ['Hoàn một phần', 'warning'],
   },
   delivery: {
+    DISABLED: ['Vị trí đã tắt', 'secondary'],
+    OVER_CAPACITY: ['Vượt sức chứa', 'warning'],
     NOT_STARTED: ['Chưa bắt đầu', 'secondary'],
     ELIGIBLE: ['Đủ điều kiện phát', 'info'],
     LIVE: ['Đang phát', 'success'],

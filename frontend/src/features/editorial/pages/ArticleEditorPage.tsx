@@ -1,3 +1,4 @@
+import { EditorialAiAssistant } from '@/features/content/components/EditorialAiAssistant'
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { Article, ArticleVersion } from '@/features/reader/types'
@@ -16,7 +17,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
 import {
-  Sparkles,
   History,
   Send,
   Save,
@@ -65,12 +65,6 @@ export function ArticleEditorPage() {
   const [saveError, setSaveError] = useState('')
   const { setValue, trigger, setError, clearErrors, formState: { errors: fieldErrors } } =
     useForm<ArticleEditorValues>({ resolver: zodResolver(articleEditorSchema) })
-
-  // AI Modal
-  const [showAiModal, setShowAiModal] = useState(false)
-  const [aiTopic, setAiTopic] = useState('')
-  const [isAiLoading, setIsAiLoading] = useState(false)
-  const [aiResults, setAiResults] = useState<{ suggestedTitles: string[]; suggestedSapo: string; suggestedTags: string[] } | null>(null)
 
   // Version Drawer
   const [showVersionDrawer, setShowVersionDrawer] = useState(false)
@@ -307,22 +301,14 @@ export function ArticleEditorPage() {
     }
   }
 
-  const handleRunAiAssistant = async () => {
-    setIsAiLoading(true)
-    try {
-      const data = await editorialApi.getAiSuggestions(aiTopic || title || 'kinh tế logistics Hải Phòng')
-      setAiResults(data)
-    } finally {
-      setIsAiLoading(false)
-    }
-  }
-
-  const handleApplyAiTitle = (suggestedTitle: string) => {
-    setTitle(suggestedTitle)
-  }
-
-  const handleApplyAiSapo = (suggestedSapo: string) => {
-    setSapo(suggestedSapo)
+  const applySuggestedTag = (tag: string): string => {
+    const value = tag.trim()
+    if (!value || value.length > 100 || value.includes(',')) return 'Thẻ tag không hợp lệ.'
+    const current = tags.split(',').map(item => item.trim()).filter(Boolean)
+    if (current.some(item => item.toLocaleLowerCase('vi') === value.toLocaleLowerCase('vi'))) return 'Thẻ tag này đã có trong bài viết.'
+    if (current.length >= 50) return 'Bài viết đã có tối đa 50 thẻ tag.'
+    setTags([...current, value].join(', '))
+    return 'Đã thêm thẻ tag. Hãy kiểm tra và lưu bản nháp.'
   }
 
   const handleRestoreVersion = (v: ArticleVersion) => {
@@ -389,17 +375,14 @@ export function ArticleEditorPage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* AI Helper trigger */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAiModal(true)}
-            className="text-xs bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 font-semibold"
-          >
-            <Sparkles className="w-3.5 h-3.5 mr-1 text-purple-600" />
-            Trợ lý AI gợi ý
-          </Button>
+          <EditorialAiAssistant
+            key={`article-ai:${id ?? 'new'}:${location.search}`}
+            getTitle={() => title}
+            disabled={isSaving || loading || status !== 'DRAFT'}
+            onApplyTitle={setTitle}
+            onApplySapo={setSapo}
+            onApplyTag={applySuggestedTag}
+          />
 
           {/* Versions button */}
           {versions.length > 0 && (
@@ -437,7 +420,7 @@ export function ArticleEditorPage() {
             className="text-xs bg-sky-700 hover:bg-sky-800 font-bold"
           >
             <Send className="w-3.5 h-3.5 mr-1" />
-            {APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Gửi kiểm duyệt (Submit)'}
+            {APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Lưu và tiếp tục gửi duyệt'}
           </Button>
         </div>
       </div>
@@ -644,90 +627,6 @@ export function ArticleEditorPage() {
           </Card>
         </div>
       </fieldset>
-
-      {/* AI Assistant Modal */}
-      <Dialog
-        open={showAiModal}
-        onClose={() => setShowAiModal(false)}
-        title="Trợ lý AI Tòa soạn (AI Copilot Simulation)"
-        maxWidth="lg"
-      >
-        <div className="space-y-4 text-xs">
-          <p className="text-slate-600">
-            AI hỗ trợ gợi ý tiêu đề thu hút, viết mở đầu (Sapo) và thẻ tag. Người dùng có toàn quyền xem xét và quyết định áp dụng, không tự động xuất bản.
-          </p>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder="Nhập chủ đề hoặc từ khóa trọng tâm (VD: Cảng Lạch Huyện, du lịch Cát Bà)..."
-              value={aiTopic}
-              onChange={(e) => setAiTopic(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={handleRunAiAssistant} isLoading={isAiLoading} size="sm">
-              <Sparkles className="w-3.5 h-3.5 mr-1" />
-              Tạo gợi ý AI
-            </Button>
-          </div>
-
-          {aiResults && (
-            <div className="space-y-4 pt-3 border-t border-slate-200">
-              <div>
-                <span className="font-bold text-slate-800 block mb-1.5 uppercase tracking-wider text-[11px]">
-                  Gợi ý tiêu đề bài báo:
-                </span>
-                <div className="space-y-1.5">
-                  {aiResults.suggestedTitles.map((t, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded border border-slate-200 flex items-center justify-between gap-2"
-                    >
-                      <span className="font-serif font-bold text-slate-900">{t}</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          handleApplyAiTitle(t)
-                          alert('Đã áp dụng tiêu đề vào bài viết!')
-                        }}
-                        className="text-[11px] h-7"
-                      >
-                        Áp dụng
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <span className="font-bold text-slate-800 block mb-1.5 uppercase tracking-wider text-[11px]">
-                  Gợi ý Sapo mở đầu:
-                </span>
-                <div className="p-3 bg-slate-50 rounded border border-slate-200 text-slate-700 italic flex items-center justify-between gap-3">
-                  <p>{aiResults.suggestedSapo}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      handleApplyAiSapo(aiResults.suggestedSapo)
-                      alert('Đã áp dụng Sapo!')
-                    }}
-                    className="text-[11px] h-7 shrink-0"
-                  >
-                    Áp dụng
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end pt-2">
-            <Button variant="secondary" size="sm" onClick={() => setShowAiModal(false)}>
-              Đóng trợ lý
-            </Button>
-          </div>
-        </div>
-      </Dialog>
 
       {/* Version History Drawer Dialog */}
       <Dialog

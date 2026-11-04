@@ -86,7 +86,7 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
             return response;
         }
         // nhánh không được phép chỉ gán đoạn preview 30 phần trăm và bài không có nội dung thì preview rỗng
-        response.setPreviewContent(rawContent == null ? "" : rawContent.substring(0, previewCut(rawContent)));
+        response.setPreviewContent(paywallEngine.buildLockedPreview(rawContent));
         // xóa sạch toàn văn ở server để bấm F12 cũng không thấy phần còn lại
         response.setContent(null);
         // bật cờ khóa để frontend hiện khung paywall mời mua

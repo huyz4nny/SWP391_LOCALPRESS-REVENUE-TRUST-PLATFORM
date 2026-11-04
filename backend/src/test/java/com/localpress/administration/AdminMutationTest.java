@@ -17,7 +17,7 @@ class AdminMutationTest {
         var jdbc=mock(JdbcTemplate.class);
         var actor=User.createReader("Admin","admin@example.test","unused",null);
         ReflectionTestUtils.setField(actor,"id",1L);
-        when(access.requireAdmin(null)).thenReturn(actor);
+        when(access.lockAdminMutation(null)).thenReturn(actor);
         var service=new AdministrationService(access,jdbc,new ObjectMapper(),mock(AdServingRepository.class),mock(PaywallPolicyService.class));
         assertEquals(409,assertThrows(ResponseStatusException.class,()->service.updateRole(null,1L,"READER","127.0.0.1")).getStatusCode().value());
         assertEquals(400,assertThrows(ResponseStatusException.class,()->service.updateRole(null,2L,"GUEST","127.0.0.1")).getStatusCode().value());

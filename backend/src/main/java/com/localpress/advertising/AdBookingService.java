@@ -52,8 +52,7 @@ public class AdBookingService {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /** Campaign đang chiếm lịch: chưa bị từ chối/kết thúc, không vướng xung đột tiền về muộn, đã trả tiền hoặc còn hạn giữ chỗ. */
-    static final String OCCUPYING = "status IN ('PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED') AND payment_issue IS NULL " +
-            "AND (payment_status = 'PAID' OR hold_expires_at IS NULL OR hold_expires_at > NOW())";
+    static final String OCCUPYING = BookingOccupancy.SQL;
 
     private static final String BOOKING_SELECT = "SELECT c.*, s.slot_code, s.name AS slot_name, s.base_price, " +
             "s.pricing_type, a.company_name FROM ad_campaigns c JOIN ad_slots s ON s.slot_id = c.slot_id " +
