@@ -70,6 +70,7 @@ class ReaderArticleServiceTest {
 
         when(projection.getId()).thenReturn(1L);
         when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.LOGIN_REQUIRED));
+        when(paywallEngine.buildLockedPreview(full)).thenReturn(full.substring(0, 30));
         ArticleReaderResponse response = readerArticleService.getArticleBySlug("bai-vip");
 
         assertTrue(response.getIsLocked());
@@ -113,6 +114,7 @@ class ReaderArticleServiceTest {
         when(readerArticleRepository.findPublishedBySlug("bai-rong")).thenReturn(Optional.of(projection));
         when(projection.getId()).thenReturn(1L);
         when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.NO_ENTITLEMENT));
+        when(paywallEngine.buildLockedPreview(null)).thenReturn("");
         var response = readerArticleService.getArticleBySlug("bai-rong");
         assertTrue(response.getIsLocked());
         assertNull(response.getContent());
@@ -130,6 +132,7 @@ class ReaderArticleServiceTest {
         when(paywallEngine.checkCurrentAccess(1L)).thenReturn(
                 new PaywallEngine.Decision(true, PaywallEngine.Reason.ARTICLE_PURCHASE),
                 new PaywallEngine.Decision(false, PaywallEngine.Reason.LOGIN_REQUIRED));
+        when(paywallEngine.buildLockedPreview(full)).thenReturn(full.substring(0, 30));
         assertEquals(full, readerArticleService.getArticleBySlug("cung-bai").getContent());
         var guestResponse = readerArticleService.getArticleBySlug("cung-bai");
         assertNull(guestResponse.getContent());
@@ -148,6 +151,7 @@ class ReaderArticleServiceTest {
 
         when(projection.getId()).thenReturn(1L);
         when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.NO_ENTITLEMENT));
+        when(paywallEngine.buildLockedPreview(full)).thenReturn(full.substring(0, 20));
         ArticleReaderResponse response = readerArticleService.getArticleBySlug("bai-vip-dai");
 
         assertTrue(response.getIsLocked());
@@ -170,16 +174,37 @@ class ReaderArticleServiceTest {
     @Test
     void premiumListItemIsMarkedPremiumWithoutAnyBody() {
         ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getId()).thenReturn(8L);
         when(projection.getAccessType()).thenReturn("PREMIUM");
         when(projection.getViewCount()).thenReturn(3420L);
         when(readerArticleRepository.findAllPublishedArticles(isNull(), isNull(), eq("PREMIUM"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(projection)));
+        when(paywallEngine.checkCurrentAccess(8L)).thenReturn(
+                new PaywallEngine.Decision(false, PaywallEngine.Reason.NO_ENTITLEMENT));
 
         ArticleSummaryResponse row = readerArticleService.getArticles(null, null, "PREMIUM", Pageable.unpaged())
                 .getContent().get(0);
 
         assertTrue(row.getIsPremium());
         assertEquals(3420L, row.getViewCount());
+        assertFalse(row.getAccessible());
+    }
+
+    @Test
+    void premiumListItemIsAccessibleOnlyWhenTheCallerAlreadyHasRights() {
+        ArticleProjection projection = mock(ArticleProjection.class);
+        when(projection.getId()).thenReturn(2L);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        when(readerArticleRepository.findAllPublishedArticles(isNull(), isNull(), eq("PREMIUM"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(projection)));
+        when(paywallEngine.checkCurrentAccess(2L)).thenReturn(
+                new PaywallEngine.Decision(true, PaywallEngine.Reason.ARTICLE_PURCHASE));
+
+        ArticleSummaryResponse row = readerArticleService.getArticles(null, null, "PREMIUM", Pageable.unpaged())
+                .getContent().get(0);
+
+        assertTrue(row.getAccessible());
+        verify(paywallEngine).checkCurrentAccess(2L);
     }
 
     @Test
@@ -195,6 +220,8 @@ class ReaderArticleServiceTest {
         ArticleSummaryResponse row = page.getContent().get(0);
         assertEquals("FDI", row.getTitle());
         assertFalse(row.getIsPremium());
+        assertTrue(row.getAccessible());
+        verify(paywallEngine, org.mockito.Mockito.never()).checkCurrentAccess(any());
         verify(readerArticleRepository).findAllPublishedArticles(eq("kinh-te"), eq("FDI"), eq("FREE"), any(Pageable.class));
         verify(readerArticleRepository, org.mockito.Mockito.never()).findPublishedBySlug(isNull());
     }

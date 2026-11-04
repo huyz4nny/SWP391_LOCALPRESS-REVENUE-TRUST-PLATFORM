@@ -1,6 +1,7 @@
 // Tác dụng: trang chủ `/` (UC029) — tin mới, khối Premium, chuyên mục. Guest đọc không bắt login.
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
+import { mockStore } from '@/mocks/store'
 import { Article, Category } from '../types'
 import { readerApi } from '../api'
 import { useReaderLibrary } from '../hooks/useReaderLibrary'
@@ -27,12 +28,16 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const library = useReaderLibrary()
+  const userId = useSyncExternalStore(
+    (listener) => mockStore.subscribe(listener),
+    () => mockStore.getCurrentUser().id,
+  )
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false)
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [userId])
 
   const loadData = async () => {
     try {
@@ -94,7 +99,9 @@ export function HomePage() {
 
   const featuredArticle = articles[0]
   const secondaryArticles = articles.slice(1, 4)
-  const premiumArticles = articles.filter((a) => a.isPremium).slice(0, 3)
+  const premiumArticles = articles.filter((a) => a.isPremium)
+  const premiumSpotlight = premiumArticles.slice(0, 3)
+  const everyPremiumOpen = premiumArticles.length > 0 && premiumArticles.every((art) => art.accessible)
   const trendingArticles = [...articles].sort((a, b) => b.views - a.views).slice(0, 5)
 
   // Fast live timeline items (latest 4 published articles)
@@ -201,20 +208,33 @@ export function HomePage() {
             </p>
           </div>
 
-          {/* nut vang sang /premium */}
-          <Link
-            to="/premium"
-            className="inline-flex items-center bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 shrink-0 cursor-pointer"
-          >
-            <Crown className="w-4 h-4 mr-2 text-stone-950" />
-            <span>Khám phá các gói hội viên</span>
-            <ArrowRight className="w-4 h-4 ml-1.5" />
-          </Link>
+          {/* da mo het bai premium dang hien thi thi khong chao mua goi nua */}
+          {everyPremiumOpen ? (
+            <Link
+              to={`/articles/${premiumSpotlight[0].slug}`}
+              className="inline-flex items-center bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 shrink-0 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2 text-stone-950" />
+              <span>Đọc các bài đã mở</span>
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </Link>
+          ) : (
+            <Link
+              to="/premium"
+              className="inline-flex items-center bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 shrink-0 cursor-pointer"
+            >
+              <Crown className="w-4 h-4 mr-2 text-stone-950" />
+              <span>Khám phá các gói hội viên</span>
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* vong lap 3 the bai premium: gia + link Doc thu */}
-          {premiumArticles.map((art) => (
+          {/* vong lap 3 the bai premium: bai da mo thi khong chao gia va khong noi doc thu */}
+          {premiumSpotlight.map((art) => {
+            const opened = art.accessible === true
+            return (
             <div
               key={art.id}
               className="bg-stone-900/80 rounded-xl p-5 border border-stone-800 flex flex-col justify-between hover:border-amber-500/50 hover:bg-stone-900 transition-all duration-300 group"
@@ -225,7 +245,7 @@ export function HomePage() {
                     {art.categoryName}
                   </span>
                   <span className="bg-amber-500/15 text-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-amber-500/30">
-                    {art.price ? `${(art.price / 1000).toFixed(0)}k ₫ / bài` : 'GÓI VIP'}
+                    {opened ? 'Đã mở khóa' : art.price ? `${(art.price / 1000).toFixed(0)}k ₫ / bài` : 'GÓI VIP'}
                   </span>
                 </div>
                 <Link to={`/articles/${art.slug}`}>
@@ -244,11 +264,12 @@ export function HomePage() {
                   to={`/articles/${art.slug}`}
                   className="text-amber-400 hover:text-amber-300 font-bold text-xs flex items-center group-hover:translate-x-1 transition-transform"
                 >
-                  Đọc thử nội dung <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                  {opened ? 'Đọc tiếp' : 'Đọc thử nội dung'} <ArrowRight className="w-3.5 h-3.5 ml-1" />
                 </Link>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 

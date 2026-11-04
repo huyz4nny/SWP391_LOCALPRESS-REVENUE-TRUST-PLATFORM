@@ -80,11 +80,11 @@ public class ReaderPurchaseService {
         LocalDate today = LocalDate.now(VN_ZONE);
         PendingSubscriptionRow pending = repository.findPendingSubscription(userId, planId)
                 .map(existing -> {
-                    repository.refreshPendingSubscription(existing.subscriptionId(), today);
+                    repository.refreshPendingSubscription(existing.subscriptionId(), today, plan.price());
                     return existing;
                 })
                 .orElseGet(() -> new PendingSubscriptionRow(
-                        repository.insertPendingSubscription(userId, planId, today), null));
+                        repository.insertPendingSubscription(userId, planId, today, plan.price()), null));
 
         return attachFinanceOrder(
                 userId, "SUBSCRIPTION", pending.subscriptionId(), plan.price(), plan.name(),
