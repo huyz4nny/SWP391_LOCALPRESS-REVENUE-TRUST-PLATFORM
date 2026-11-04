@@ -67,6 +67,7 @@ public class SecurityConfig {
 
                         // 5. Cổng xác thực & Webhook IPN cổng thanh toán (SV4 - Rule 4, 5)
                         .requestMatchers("/api/v1/auth/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/finance/webhook/**").permitAll()
 

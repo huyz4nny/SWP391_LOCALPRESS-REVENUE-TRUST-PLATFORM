@@ -17,4 +17,10 @@ public interface DeviceSessionService {
 
     /** Phiên còn hiệu lực khi chưa thu hồi và chưa quá expiresAt. Mã trống thì false. */
     boolean isActive(String sessionId);
+
+    /**
+     * Thu hồi đúng phiên mang sessionId này. Mã trống hoặc phiên đã thu hồi thì không làm gì.
+     * Đăng xuất gọi method này với sid của request hiện tại.
+     */
+    void revoke(String sessionId);
 }

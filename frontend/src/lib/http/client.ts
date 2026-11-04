@@ -302,6 +302,7 @@ class HttpClient {
 
         if (!response.ok) await this.fail(response, path, 'Lỗi gửi dữ liệu lên máy chủ', options)
 
+        if (response.status === 204) return undefined as T
         return response.json()
     }
 
