@@ -624,8 +624,9 @@ public class EditorialAdvertisingService {
 
             LocalDate today = LocalDate.now();
             boolean dateValid = startDate != null && endDate != null && !today.isBefore(startDate) && !today.isAfter(endDate);
-            boolean overallEligible = paymentPassed && quotationPassed && contractPassed && creativePassed && slotPassed;
-            boolean canActivate = overallEligible && !"ACTIVE".equalsIgnoreCase(status);
+            boolean statusEligible = "PENDING".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status);
+            boolean overallEligible = paymentPassed && quotationPassed && contractPassed && creativePassed && slotPassed && statusEligible;
+            boolean canActivate = overallEligible;
 
             return CampaignEligibilityDto.builder()
                     .campaignId(campaignId)
@@ -677,6 +678,12 @@ public class EditorialAdvertisingService {
         );
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String currentStatus = (String) rows.get(0).get("status");
+        if (!"PENDING".equalsIgnoreCase(currentStatus) && !"APPROVED".equalsIgnoreCase(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể kích hoạt chiến dịch đang ở trạng thái [" + currentStatus + "]. Chỉ chiến dịch PENDING hoặc APPROVED mới được kích hoạt phát sóng.");
         }
 
         List<CampaignEligibilityDto> list = getEligibilityChecklist();
@@ -846,11 +853,16 @@ public class EditorialAdvertisingService {
     public CampaignControlDto makeGoodCampaign(Long campaignId, MakeGoodRequest request, String editorEmail) {
         Long userId = resolveUserId(editorEmail);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT campaign_id, end_date FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                "SELECT campaign_id, end_date, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
                 campaignId
         );
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+        String campStatus = (String) rows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể bù ngày phát sóng cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
         }
         LocalDate oldEndDate = toLocalDate(rows.get(0).get("end_date"));
         LocalDate newEndDate = oldEndDate != null ? oldEndDate.plusDays(request.getExtraDays()) : LocalDate.now().plusDays(request.getExtraDays());
@@ -956,11 +968,17 @@ public class EditorialAdvertisingService {
         Long campaignId = request.getCampaignId();
 
         List<Map<String, Object>> campRows = jdbc.queryForList(
-                "SELECT campaign_id, advertiser_id, contract_reference FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                "SELECT campaign_id, advertiser_id, contract_reference, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
                 campaignId
         );
         if (campRows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String campStatus = (String) campRows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể tạo hợp đồng cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
         }
 
         Long advertiserId = ((Number) campRows.get(0).get("advertiser_id")).longValue();
@@ -1034,11 +1052,17 @@ public class EditorialAdvertisingService {
     public EditorialContractDto updateContract(Long campaignId, UpdateContractRequest request, String editorEmail) {
         Long userId = resolveUserId(editorEmail);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT campaign_id, advertiser_id, contract_reference FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                "SELECT campaign_id, advertiser_id, contract_reference, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
                 campaignId
         );
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String campStatus = (String) rows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể cập nhật hợp đồng cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
         }
 
         List<Long> duplicate = jdbc.query(
@@ -1093,11 +1117,17 @@ public class EditorialAdvertisingService {
     public EditorialContractDto createAddendum(Long campaignId, CreateContractAddendumRequest request, String editorEmail) {
         Long userId = resolveUserId(editorEmail);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT campaign_id FROM ad_campaigns WHERE campaign_id = ?",
+                "SELECT campaign_id, status FROM ad_campaigns WHERE campaign_id = ?",
                 campaignId
         );
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String campStatus = (String) rows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể tạo phụ lục cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
         }
 
         try {
@@ -1241,124 +1271,110 @@ public class EditorialAdvertisingService {
         BigDecimal b2cSingleArticles = BigDecimal.ZERO;
         BigDecimal totalPlatformRevenue = BigDecimal.ZERO;
 
-        List<SlotOccupancyDto> slotOccupancies = new ArrayList<>();
-        try {
-            String slotSql = "SELECT slot_code, name, dimensions, capacity, base_price, pricing_type FROM ad_slots ORDER BY slot_id";
-            slotOccupancies = jdbc.query(slotSql, (rs, rowNum) -> {
-                String slotCode = rs.getString("slot_code");
-                int capacity = rs.getInt("capacity");
-                Integer activeCount = Optional.ofNullable(jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM ad_campaigns c JOIN ad_slots s ON s.slot_id = c.slot_id " +
-                        "WHERE s.slot_code = ? AND c.status = 'ACTIVE' AND c.start_date <= CURRENT_DATE AND c.end_date >= CURRENT_DATE",
-                        Integer.class, slotCode
-                )).orElse(0);
+        String slotSql = "SELECT slot_code, name, dimensions, capacity, base_price, pricing_type FROM ad_slots ORDER BY slot_id";
+        List<SlotOccupancyDto> slotOccupancies = jdbc.query(slotSql, (rs, rowNum) -> {
+            String slotCode = rs.getString("slot_code");
+            int capacity = rs.getInt("capacity");
+            Integer activeCount = Optional.ofNullable(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ad_campaigns c JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                    "WHERE s.slot_code = ? AND c.status = 'ACTIVE' AND c.start_date <= CURRENT_DATE AND c.end_date >= CURRENT_DATE",
+                    Integer.class, slotCode
+            )).orElse(0);
 
-                double occupancy = capacity > 0 ? Math.min(100.0, (activeCount * 100.0) / capacity) : 0.0;
-                String status = occupancy >= 100.0 ? "FULL" : (occupancy >= 70.0 ? "NEAR_FULL" : "NORMAL");
+            double occupancy = capacity > 0 ? Math.min(100.0, (activeCount * 100.0) / capacity) : 0.0;
+            String status = occupancy >= 100.0 ? "FULL" : (occupancy >= 70.0 ? "NEAR_FULL" : "NORMAL");
 
-                return SlotOccupancyDto.builder()
-                        .slotCode(slotCode)
-                        .slotName(rs.getString("name"))
-                        .dimensions(rs.getString("dimensions"))
-                        .capacity(capacity)
-                        .basePrice(rs.getBigDecimal("base_price"))
-                        .pricingType(rs.getString("pricing_type"))
-                        .activeCampaignsCount(activeCount)
-                        .occupancyPercentage(Math.round(occupancy * 10.0) / 10.0)
-                        .status(status)
-                        .build();
-            });
-        } catch (Exception e) {
-            log.warn("Cảnh báo tính toán tỷ lệ lấp đầy: {}", e.getMessage());
-        }
+            return SlotOccupancyDto.builder()
+                    .slotCode(slotCode)
+                    .slotName(rs.getString("name"))
+                    .dimensions(rs.getString("dimensions"))
+                    .capacity(capacity)
+                    .basePrice(rs.getBigDecimal("base_price"))
+                    .pricingType(rs.getString("pricing_type"))
+                    .activeCampaignsCount(activeCount)
+                    .occupancyPercentage(Math.round(occupancy * 10.0) / 10.0)
+                    .status(status)
+                    .build();
+        });
 
-        long pendingArticlesCount = 0;
-        long pendingBookingsCount = 0;
-        long pendingCreativesCount = 0;
-        long pendingCommentsCount = 0;
+        long pendingArticlesCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM articles WHERE status = 'IN_REVIEW'", Long.class)).orElse(0L);
+        long pendingBookingsCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ad_campaigns WHERE quotation_status = 'PENDING'", Long.class)).orElse(0L);
+        long pendingCreativesCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ad_creatives WHERE review_status = 'PENDING'", Long.class)).orElse(0L);
+        long pendingCommentsCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE status = 'PENDING'", Long.class)).orElse(0L);
         List<UrgentItemDto> urgentItems = new ArrayList<>();
 
-        try {
-            pendingArticlesCount = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM articles WHERE status = 'IN_REVIEW'", Long.class)).orElse(0L);
-            pendingBookingsCount = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ad_campaigns WHERE quotation_status = 'PENDING'", Long.class)).orElse(0L);
-            pendingCreativesCount = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ad_creatives WHERE review_status = 'PENDING'", Long.class)).orElse(0L);
-            pendingCommentsCount = Optional.ofNullable(jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM comments WHERE status = 'PENDING'", Long.class)).orElse(0L);
+        // 1. Bài viết chờ duyệt
+        jdbc.query("SELECT a.article_id, v.title, a.created_at FROM articles a " +
+                   "JOIN article_versions v ON v.article_id = a.article_id AND v.version_number = a.latest_version " +
+                   "WHERE a.status = 'IN_REVIEW' ORDER BY a.article_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("art-" + rs.getLong("article_id"))
+                            .type("ARTICLE")
+                            .title("Bài viết: " + rs.getString("title"))
+                            .description("Đang chờ tòa soạn thẩm định và phê duyệt xuất bản")
+                            .priority("HIGH")
+                            .link("/backoffice/editorial/articles")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                            .build());
+                    return null;
+                });
 
-            // 1. Bài viết chờ duyệt
-            jdbc.query("SELECT a.article_id, v.title, a.created_at FROM articles a " +
-                       "JOIN article_versions v ON v.article_id = a.article_id AND v.version_number = a.latest_version " +
-                       "WHERE a.status = 'IN_REVIEW' ORDER BY a.article_id DESC LIMIT 3",
-                    (rs, rowNum) -> {
-                        urgentItems.add(UrgentItemDto.builder()
-                                .id("art-" + rs.getLong("article_id"))
-                                .type("ARTICLE")
-                                .title("Bài viết: " + rs.getString("title"))
-                                .description("Đang chờ tòa soạn thẩm định và phê duyệt xuất bản")
-                                .priority("HIGH")
-                                .link("/backoffice/editorial/articles")
-                                .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
-                                .build());
-                        return null;
-                    });
+        // 2. Booking chờ báo giá
+        jdbc.query("SELECT c.campaign_id, c.campaign_name, a.company_name, c.created_at FROM ad_campaigns c " +
+                   "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
+                   "WHERE c.quotation_status = 'PENDING' ORDER BY c.campaign_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("bk-" + rs.getLong("campaign_id"))
+                            .type("BOOKING")
+                            .title("Booking: " + rs.getString("campaign_name"))
+                            .description("Doanh nghiệp " + rs.getString("company_name") + " đang chờ báo giá")
+                            .priority("URGENT")
+                            .link("/backoffice/editorial/bookings")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                            .build());
+                    return null;
+                });
 
-            // 2. Booking chờ báo giá
-            jdbc.query("SELECT c.campaign_id, c.campaign_name, a.company_name, c.created_at FROM ad_campaigns c " +
-                       "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
-                       "WHERE c.quotation_status = 'PENDING' ORDER BY c.campaign_id DESC LIMIT 3",
-                    (rs, rowNum) -> {
-                        urgentItems.add(UrgentItemDto.builder()
-                                .id("bk-" + rs.getLong("campaign_id"))
-                                .type("BOOKING")
-                                .title("Booking: " + rs.getString("campaign_name"))
-                                .description("Doanh nghiệp " + rs.getString("company_name") + " đang chờ báo giá")
-                                .priority("URGENT")
-                                .link("/backoffice/editorial/bookings")
-                                .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
-                                .build());
-                        return null;
-                    });
+        // 3. Creative chờ duyệt
+        jdbc.query("SELECT cr.creative_id, c.campaign_name, cr.uploaded_at FROM ad_creatives cr " +
+                   "JOIN ad_campaigns c ON c.campaign_id = cr.campaign_id " +
+                   "WHERE cr.review_status = 'PENDING' ORDER BY cr.creative_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("cr-" + rs.getLong("creative_id"))
+                            .type("CREATIVE")
+                            .title("Creative: Banner mới cho " + rs.getString("campaign_name"))
+                            .description("Cần kiểm tra quy cách kích thước và quét mã độc URL")
+                            .priority("HIGH")
+                            .link("/backoffice/editorial/creatives")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("uploaded_at")))
+                            .build());
+                    return null;
+                });
 
-            // 3. Creative chờ duyệt
-            jdbc.query("SELECT cr.creative_id, c.campaign_name, cr.uploaded_at FROM ad_creatives cr " +
-                       "JOIN ad_campaigns c ON c.campaign_id = cr.campaign_id " +
-                       "WHERE cr.review_status = 'PENDING' ORDER BY cr.creative_id DESC LIMIT 3",
-                    (rs, rowNum) -> {
-                        urgentItems.add(UrgentItemDto.builder()
-                                .id("cr-" + rs.getLong("creative_id"))
-                                .type("CREATIVE")
-                                .title("Creative: Banner mới cho " + rs.getString("campaign_name"))
-                                .description("Cần kiểm tra quy cách kích thước và quét mã độc URL")
-                                .priority("HIGH")
-                                .link("/backoffice/editorial/creatives")
-                                .createdAt(toLocalDateTime(rs.getTimestamp("uploaded_at")))
-                                .build());
-                        return null;
-                    });
-
-            // 4. Bình luận chờ duyệt
-            jdbc.query("SELECT comment_id, content, created_at FROM comments " +
-                       "WHERE status = 'PENDING' ORDER BY comment_id DESC LIMIT 3",
-                    (rs, rowNum) -> {
-                        String content = rs.getString("content");
-                        String shortContent = (content != null && content.length() > 50) ? content.substring(0, 50) + "..." : content;
-                        urgentItems.add(UrgentItemDto.builder()
-                                .id("cmt-" + rs.getLong("comment_id"))
-                                .type("COMMENT")
-                                .title("Bình luận: " + shortContent)
-                                .description("Bình luận mới của độc giả cần kiểm duyệt quy chuẩn")
-                                .priority("NORMAL")
-                                .link("/backoffice/editorial/comments")
-                                .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
-                                .build());
-                        return null;
-                    });
-        } catch (Exception e) {
-            log.warn("Cảnh báo hàng việc khẩn: {}", e.getMessage());
-        }
+        // 4. Bình luận chờ duyệt
+        jdbc.query("SELECT comment_id, content, created_at FROM comments " +
+                   "WHERE status = 'PENDING' ORDER BY comment_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    String content = rs.getString("content");
+                    String shortContent = (content != null && content.length() > 50) ? content.substring(0, 50) + "..." : content;
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("cmt-" + rs.getLong("comment_id"))
+                            .type("COMMENT")
+                            .title("Bình luận: " + shortContent)
+                            .description("Bình luận mới của độc giả cần kiểm duyệt quy chuẩn")
+                            .priority("NORMAL")
+                            .link("/backoffice/editorial/comments")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                            .build());
+                    return null;
+                });
 
         return EditorialDashboardDto.builder()
                 .b2bTotalSigned(b2bTotalSigned)

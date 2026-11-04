@@ -96,127 +96,44 @@ export const BusinessOperationDashboardPage: React.FC = () => {
         </div>
       ) : data ? (
         <>
-          {/* SECTION 1: HYBRID REVENUE OVERVIEW */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary-700" />
-                Mô Hình Doanh Thu Kép (Hybrid Revenue B2B + B2C)
-              </h2>
-              <span className="text-xs text-slate-500 font-medium">Chốt số liệu theo thời gian thực</span>
-            </div>
-
-            {/* Platform Total Hero Card */}
-            <div className="mb-4 rounded-xl border border-primary-200 bg-gradient-to-r from-primary-900 to-slate-900 p-6 text-white shadow-md">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          {/* SECTION 1: HYBRID REVENUE OVERVIEW (PENDING FINANCE API) */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-amber-100 p-2 text-amber-700">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
                 <div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">
-                    <DollarSign className="h-3.5 w-3.5" /> Tổng Doanh Thu Toàn Nền Tảng (Hybrid Total)
-                  </span>
-                  <div className="mt-3 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                    {formatCurrency(data.totalPlatformRevenue)}
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-slate-900">
+                      Mô Hình Doanh Thu Kép (Hybrid Revenue B2B + B2C)
+                    </h2>
+                    <span className="inline-flex items-center rounded-full bg-amber-200/80 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+                      Đang đồng bộ API Finance (Rule 17)
+                    </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-300">
-                    Bao gồm Doanh thu B2B thực thu + Doanh thu B2C Gói thuê bao + Doanh thu B2C Bán lẻ bài viết
+                  <p className="mt-1 text-sm text-slate-600 max-w-2xl">
+                    Chỉ số doanh thu thực thu (B2B quảng cáo sau thanh toán, B2C gói đọc, B2C bán lẻ trừ hoàn tiền REFUND)
+                    tạm thời được ẩn tại Tòa soạn để chờ kết nối qua API tập trung của Module Kế toán (SV4).
+                    Hệ thống đã loại bỏ cơ chế công nợ quảng cáo B2B.
                   </p>
                 </div>
-
-                <div className="flex items-center gap-4 border-t border-white/20 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                  <div>
-                    <p className="text-xs text-slate-400">Tỷ trọng B2B</p>
-                    <p className="text-lg font-bold text-emerald-400">
-                      {data.totalPlatformRevenue > 0
-                        ? Math.round((data.b2bActualPaid / data.totalPlatformRevenue) * 100)
-                        : 0}
-                      %
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Tỷ trọng B2C</p>
-                    <p className="text-lg font-bold text-amber-400">
-                      {data.totalPlatformRevenue > 0
-                        ? Math.round(
-                            ((data.b2cSubscriptions + data.b2cSingleArticles) / data.totalPlatformRevenue) * 100
-                          )
-                        : 0}
-                      %
-                    </p>
-                  </div>
-                </div>
               </div>
-            </div>
-
-            {/* Split cards: B2B vs B2C */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* B2B Advertising Block */}
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Building className="h-5 w-5 text-primary-700" />
-                    <h3 className="font-bold text-slate-900">Phân Hệ Doanh Nghiệp (B2B Quảng Cáo)</h3>
-                  </div>
-                  <Link
-                    to="/backoffice/editorial/bookings"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline"
-                  >
-                    Xem bookings <ArrowUpRight className="h-3 w-3" />
-                  </Link>
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500">Đã chốt ký</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">
-                      {formatCurrency(data.b2bTotalSigned)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">Hợp đồng chốt</p>
-                  </div>
-
-                  <div className="rounded-lg bg-emerald-50 p-3">
-                    <p className="text-xs text-emerald-700 font-medium">Thực thu (PAID)</p>
-                    <p className="mt-1 text-base font-bold text-emerald-900">
-                      {formatCurrency(data.b2bActualPaid)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-emerald-600">Đã qua QR/Ngân hàng</p>
-                  </div>
-
-                  <div className="rounded-lg bg-amber-50 p-3">
-                    <p className="text-xs text-amber-700 font-medium">Phải thu còn chờ</p>
-                    <p className="mt-1 text-base font-bold text-amber-900">
-                      {formatCurrency(data.b2bReceivables)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-amber-600">Chờ hoàn tất thanh toán</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* B2C Reader Block */}
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-amber-600" />
-                    <h3 className="font-bold text-slate-900">Phân Hệ Độc Giả (B2C Thu Phí Đọc Báo)</h3>
-                  </div>
-                  <span className="text-xs text-slate-400">Cổng thanh toán tự động</span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500">Gói Hội Viên VIP</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">
-                      {formatCurrency(data.b2cSubscriptions)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">Thuê bao tháng, quý, năm</p>
-                  </div>
-
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500">Bán lẻ bài viết (Paywall)</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">
-                      {formatCurrency(data.b2cSingleArticles)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">15.000 ₫/lượt mở khóa</p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <Link
+                  to="/backoffice/editorial/bookings"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+                >
+                  <Building className="h-3.5 w-3.5 text-primary-700" />
+                  Xem Bookings B2B
+                </Link>
+                <Link
+                  to="/backoffice/editorial/contracts"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary-800 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-900 transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Quản lý Hợp đồng
+                </Link>
               </div>
             </div>
           </div>
