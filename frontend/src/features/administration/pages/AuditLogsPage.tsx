@@ -1,113 +1,57 @@
-import React, { useState, useEffect } from 'react'
-import { SystemAuditLog } from '../types'
-import { adminApi } from '../api'
-import { EmptyState } from '@/components/shared/EmptyState'
+import { useEffect, useRef, useState } from 'react'
+import { httpClient } from '@/lib/http/client'
+import { APP_CONFIG } from '@/app/config'
 import { formatDateTime } from '@/lib/format'
-import { History, Shield, Filter } from 'lucide-react'
 
+type Entry = { id: string; userName: string; action: string; targetType: string; targetId: string | null; description: string | null; ipAddress: string | null; timestamp: string; result: 'SUCCESS' | 'FAILURE' | 'UNKNOWN' }
+type Filters = { actor: string; action: string; target: string; from: string; to: string; result: string }
+const empty: Filters = { actor: '', action: '', target: '', from: '', to: '', result: '' }
 export function AuditLogsPage() {
-  const [logs, setLogs] = useState<SystemAuditLog[]>([])
+  const [draft, setDraft] = useState(empty)
+  const [query, setQuery] = useState<{ filters: Filters; cursor?: string }>({ filters: empty })
+  const [history, setHistory] = useState<(string | undefined)[]>([])
+  const [data, setData] = useState<{ items: Entry[]; nextCursor: string | null }>({ items: [], nextCursor: null })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [moduleFilter, setModuleFilter] = useState('ALL')
-
+  const request = useRef(0)
   useEffect(() => {
-    loadLogs()
-  }, [])
-
-  const loadLogs = async () => {
-    try {
-      setLoading(true)
-      setError('')
-      const data = await adminApi.getAuditLogs()
-      setLogs(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được nhật ký')
-    } finally {
-      setLoading(false)
+    const id = ++request.current
+    setLoading(true); setError(''); setData({ items: [], nextCursor: null })
+    const params = new URLSearchParams()
+    Object.entries(query.filters).forEach(([key, value]) => { if (value.trim()) params.set(key, value.trim()) })
+    if (query.cursor) params.set('before', query.cursor)
+    const load = async () => {
+      try {
+        if (APP_CONFIG.useMockApi) throw new Error('Tra cứu nhật ký cần API thật.')
+        const result = await httpClient.get<{ items: Entry[]; nextCursor: string | null }>(`/admin/audit-logs/search?${params}`)
+        if (id === request.current) setData(result)
+      } catch (e) {
+        if (id === request.current) setError(e instanceof Error ? e.message : 'Không tải được nhật ký')
+      } finally { if (id === request.current) setLoading(false) }
     }
-  }
-
-  const filteredLogs = logs.filter((l) => {
-    if (moduleFilter !== 'ALL' && l.module !== moduleFilter) return false
-    return true
-  })
-
-  return (
-    <div className="space-y-6">
-      {error && <p role="alert" className="text-red-700">{error}</p>}
-      {loading && <p role="status">Đang tải nhật ký...</p>}
-      {!loading && !error && filteredLogs.length === 0 && <EmptyState title="Chưa có sự kiện phù hợp" />}
-      <div className="pb-4 border-b border-slate-200">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Nhật ký Kiểm toán Hệ thống (Audit Trail)
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Hiển thị tối đa 200 sự kiện gần nhất đã được các phân hệ ghi vào nhật ký hệ thống.
-        </p>
-      </div>
-
-      {/* Filter toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex items-center space-x-2 text-xs">
-        <span className="font-semibold text-slate-500 flex items-center">
-          <Filter className="w-3.5 h-3.5 mr-1" /> Phân hệ:
-        </span>
-        {['ALL', 'EDITORIAL', 'ADVERTISING', 'FINANCE', 'SECURITY', 'PAYWALL'].map((m) => (
-          <button
-            key={m}
-            onClick={() => setModuleFilter(m)}
-            className={`px-3 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-              moduleFilter === m
-                ? 'bg-slate-900 text-white font-semibold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {m === 'ALL' && 'Tất cả'}
-            {m === 'EDITORIAL' && 'Tòa soạn'}
-            {m === 'ADVERTISING' && 'Quảng cáo'}
-            {m === 'FINANCE' && 'Tài chính'}
-            {m === 'SECURITY' && 'Bảo mật'}
-            {m === 'PAYWALL' && 'Paywall'}
-          </button>
-        ))}
-      </div>
-
-      {/* Logs Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-        <table className="w-full text-xs text-left">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-            <tr>
-              <th className="px-4 py-3">Mã log</th>
-              <th className="px-4 py-3">Thời gian (Asia/Ho_Chi_Minh)</th>
-              <th className="px-4 py-3">Người thực hiện</th>
-              <th className="px-4 py-3">Phân hệ</th>
-              <th className="px-4 py-3">Hành động</th>
-              <th className="px-4 py-3">Chi tiết diễn giải</th>
-              <th className="px-4 py-3">Địa chỉ IP</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredLogs.map((log) => (
-              <tr key={log.id} className="hover:bg-slate-50/80">
-                <td className="px-4 py-3 font-mono font-bold text-slate-900">{log.id}</td>
-                <td className="px-4 py-3 text-slate-500">{formatDateTime(log.timestamp)}</td>
-                <td className="px-4 py-3 font-medium text-slate-800">
-                  {log.userName}{' '}
-                  <span className="text-[10px] text-slate-400">({log.userRole})</span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="font-mono text-[10px] font-semibold bg-slate-100 px-2 py-0.5 rounded text-slate-700">
-                    {log.module}
-                  </span>
-                </td>
-                <td className="px-4 py-3 font-bold text-primary-950">{log.action}</td>
-                <td className="px-4 py-3 text-slate-600 max-w-sm">{log.description}</td>
-                <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">{log.ipAddress}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    void load()
+    return () => { request.current++ }
+  }, [query])
+  return <div className="space-y-4">
+    <h1 className="text-2xl font-bold">Nhật ký kiểm toán hệ thống</h1>
+    <p className="text-sm text-slate-500">Tra cứu toàn bộ sự kiện đã được ghi nhận, 50 sự kiện mỗi trang. Thời gian theo Asia/Ho_Chi_Minh. Nhật ký chưa được phân loại có kết quả “Chưa xác định”.</p>
+    <form className="flex flex-wrap gap-3 bg-white p-4 rounded-xl border" onSubmit={e => { e.preventDefault(); setHistory([]); setQuery({ filters: { ...draft } }) }}>
+      {([['actor', 'Người thực hiện (tên/email/ID)'], ['action', 'Hành động'], ['target', 'Đối tượng (loại/ID)'], ['from', 'Từ ngày'], ['to', 'Đến ngày']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input className="block border rounded p-2" type={key === 'from' || key === 'to' ? 'date' : 'text'} maxLength={120} value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
+      <label className="text-sm">Kết quả<select className="block border rounded p-2" value={draft.result} onChange={e => setDraft({ ...draft, result: e.target.value })}><option value="">Tất cả</option><option value="SUCCESS">Thành công</option><option value="FAILURE">Thất bại</option><option value="UNKNOWN">Chưa xác định</option></select></label>
+      <button className="border rounded px-4" disabled={loading || !!(draft.from && draft.to && draft.from > draft.to)}>Tìm kiếm</button>
+      <button type="button" className="border rounded px-4" disabled={loading} onClick={() => { setDraft(empty); setHistory([]); setQuery({ filters: empty }) }}>Xóa bộ lọc</button>
+    </form>
+    {draft.from && draft.to && draft.from > draft.to && <p role="alert">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</p>}
+    {loading && <p role="status">Đang tải nhật ký...</p>}
+    {error && <div role="alert">{error} <button onClick={() => setQuery({ ...query })}>Thử lại</button></div>}
+    {!loading && !error && data.items.length === 0 && <p>Không có sự kiện phù hợp.</p>}
+    <div className="overflow-x-auto bg-white border rounded-xl"><table className="w-full text-sm text-left"><thead><tr>{['Mã log', 'Thời gian', 'Người thực hiện', 'Hành động', 'Đối tượng', 'Kết quả', 'Chi tiết', 'IP'].map(t => <th key={t} className="p-3">{t}</th>)}</tr></thead>
+      <tbody>{data.items.map(row => <tr key={row.id} className="border-t"><td className="p-3">{row.id}</td><td className="p-3 whitespace-nowrap">{formatDateTime(row.timestamp)}</td><td className="p-3">{row.userName}</td><td className="p-3">{row.action}</td><td className="p-3">{row.targetType} #{row.targetId ?? '—'}</td><td className="p-3">{{ SUCCESS: 'Thành công', FAILURE: 'Thất bại', UNKNOWN: 'Chưa xác định' }[row.result] ?? 'Chưa xác định'}</td><td className="p-3 max-w-md break-words"><details><summary>Xem chi tiết</summary><pre className="whitespace-pre-wrap break-all">{row.description ?? 'Không có dữ liệu bổ sung'}</pre></details></td><td className="p-3">{row.ipAddress ?? '—'}</td></tr>)}</tbody>
+    </table></div>
+    <div className="flex gap-4 items-center">
+      <button disabled={loading || history.length === 0} onClick={() => { setQuery({ ...query, cursor: history[history.length - 1] }); setHistory(history.slice(0, -1)) }}>Trang trước</button>
+      <span>Trang {history.length + 1}</span>
+      <button disabled={loading || !!error || !data.nextCursor} onClick={() => { if (data.nextCursor) { setHistory([...history, query.cursor]); setQuery({ ...query, cursor: data.nextCursor }) } }}>Trang sau</button>
     </div>
-  )
+  </div>
 }

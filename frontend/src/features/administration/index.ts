@@ -5,3 +5,7 @@ export * from './pages/AdDeliveryMonitorPage'
 export * from './pages/AuditLogsPage'
 export * from './types'
 export * from './api'
+
+export * from './pages/AdSlotConfigPage'
+
+export * from './pages/AdUrlMonitorPage'

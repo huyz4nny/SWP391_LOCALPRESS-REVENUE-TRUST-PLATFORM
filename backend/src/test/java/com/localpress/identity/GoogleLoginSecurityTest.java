@@ -72,6 +72,18 @@ class GoogleLoginSecurityTest {
         }).when(jdbc).query(anyString(), any(RowMapper.class), any(Object[].class));
     }
 
+    @Test void sessionAndAuthVersionMustBothRemainValid() throws Exception {
+        ReflectionTestUtils.setField(reader,"authVersion",3L);
+        when(account.getLong("auth_version")).thenReturn(3L);
+        when(devices.isActive("session-test")).thenReturn(true);
+        String token=tokens.issue(reader,"session-test",Instant.now().plusSeconds(600)).accessToken();
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isOk());
+        when(account.getLong("auth_version")).thenReturn(4L);
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
+        when(account.getLong("auth_version")).thenReturn(3L);
+        when(devices.isActive("session-test")).thenReturn(false);
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
+    }
     @Test void nonceIsPublicAndCookieIsHttpOnly() throws Exception {
         mvc.perform(get("/api/v1/auth/google/nonce"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.nonce").isNotEmpty())

@@ -51,8 +51,8 @@ public class RightsGrantFailureService {
             detail.put("reason", event.getReason());
             // Sự kiện lặp (webhook gửi lại, kế toán ghi nhận khiếu nại) chỉ ghi một lần
             int inserted = jdbc.update("""
-                    INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value)
-                    SELECT NULL, ?, 'transactions', ?, ? FROM DUAL
+                    INSERT INTO audit_logs (user_id, action, target_type, target_id, new_value, result)
+                    SELECT NULL, ?, 'transactions', ?, ?, 'FAILURE' FROM DUAL
                     WHERE NOT EXISTS (SELECT 1 FROM audit_logs
                                       WHERE action = ? AND target_type = 'transactions' AND target_id = ?)
                     """, ACTION, event.getTransactionId(), json.writeValueAsString(detail), ACTION, event.getTransactionId());
