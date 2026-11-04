@@ -43,6 +43,7 @@ public class JwtTokenService {
         JwtBuilder builder = Jwts.builder()
                 .issuer("localpress").audience().add("localpress-api").and()
                 .subject(user.getId().toString())
+                .claim("ver", user.getAuthVersion() == null ? 0L : user.getAuthVersion())
                 .issuedAt(Date.from(now)).expiration(Date.from(exp));
         if (sessionId != null && !sessionId.isBlank()) {
             builder.claim("sid", sessionId.trim());
@@ -63,12 +64,14 @@ public class JwtTokenService {
         if (id <= 0) throw new IllegalArgumentException("Invalid subject");
         String sid = claims.get("sid", String.class);
         if (sid != null && sid.isBlank()) sid = null;
-        return new VerifiedToken(id, sid);
+        Number version = claims.get("ver", Number.class);
+        if (version != null && version.longValue() < 0) throw new IllegalArgumentException("Invalid token version");
+        return new VerifiedToken(id, sid, version == null ? 0L : version.longValue());
     }
 
     public long verifyAndGetUserId(String token) {
         return verify(token).userId();
     }
 
-    public record VerifiedToken(long userId, String sessionId) {}
+    public record VerifiedToken(Long userId, String sessionId, Long version) {}
 }

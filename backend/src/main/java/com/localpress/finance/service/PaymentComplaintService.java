@@ -119,6 +119,7 @@ public class PaymentComplaintService {
             if (c.getOrderCode() == null) {
                 throw new AppException("Khiếu nại không có mã đơn, hãy chuyển trả lại khách", HttpStatus.BAD_REQUEST);
             }
+            assertAmountMatchesGateway(c);
             Map<String, Object> result = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
                     .content(c.getOrderCode())
                     .amount(c.getAmount())
@@ -185,6 +186,20 @@ public class PaymentComplaintService {
             throw new AppException("Mã GD " + c.getBankReference() + " đã được ghi nhận khi đối soát kỳ. "
                     + "Hãy từ chối khiếu nại và báo khách kiểm tra đơn hàng.", HttpStatus.CONFLICT);
         }
+    }
+
+    /**
+     * Số tiền trên khiếu nại do khách tự khai. SePay đã báo về mã GD này (vd AMOUNT_MISMATCH) thì lấy số SePay báo làm chuẩn:
+     * khác số khách khai -> 409, không ghi nhận vào đơn (Rule 4). Chưa có log thì kế toán đối chiếu sao kê như cũ.
+     */
+    private void assertAmountMatchesGateway(PaymentComplaint c) {
+        sepayLogRepository.findFirstByReferenceCodeAndAuthOkTrueAndTransferAmountNotNullOrderByReceivedAtAsc(c.getBankReference())
+                .filter(logEntry -> logEntry.getTransferAmount().compareTo(c.getAmount()) != 0)
+                .ifPresent(logEntry -> {
+                    throw new AppException("SePay báo mã GD " + c.getBankReference() + " là "
+                            + logEntry.getTransferAmount().toPlainString() + " VND, khác số khách khai "
+                            + c.getAmount().toPlainString() + " VND. Hãy chuyển trả lại khách.", HttpStatus.CONFLICT);
+                });
     }
 
     private PaymentComplaint lockComplaint(Long complaintId) {

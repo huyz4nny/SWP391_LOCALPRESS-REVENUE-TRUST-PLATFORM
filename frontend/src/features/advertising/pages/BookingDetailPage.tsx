@@ -3,25 +3,17 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { AdBooking, AdCampaign } from '../types'
 import { advertisingApi } from '../api'
 import { CreativeUploadForm } from '../components/CreativeUploadForm'
-import { mockStore } from '@/mocks/store'
-import { httpClient } from '@/lib/http/client'
+import { CancelCampaignDialog } from '../components/CancelCampaignDialog'
 import { paymentPath } from '@/features/finance/api/payment'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import {
-  Calendar,
   CreditCard,
-  Image as ImageIcon,
-  CheckCircle2,
   Clock,
   AlertCircle,
   ExternalLink,
-  ArrowRight,
-  ShieldCheck,
   RotateCcw,
 } from 'lucide-react'
 
@@ -39,8 +31,6 @@ export function BookingDetailPage() {
 
   // Cancel/Refund dialog state
   const [showRefundDialog, setShowRefundDialog] = useState(false)
-  const [refundReason, setRefundReason] = useState('')
-  const [isRefunding, setIsRefunding] = useState(false)
 
   useEffect(() => {
     if (id) loadData(id)
@@ -92,30 +82,6 @@ export function BookingDetailPage() {
     }
   }
 
-  const handleRequestCancel = async () => {
-    if (!booking || !refundReason.trim()) return
-    setIsRefunding(true)
-    try {
-      // Find matching order
-      const matchingOrder = mockStore.getState().orders.find((o) => o.targetId === booking.id)
-      if (matchingOrder) {
-        await httpClient.post('/finance/refunds/propose', {
-          orderId: matchingOrder.id,
-          refundAmount: booking.finalPrice,
-          reason: refundReason,
-          affectedBenefit: `Hủy hợp đồng booking quảng cáo ${booking.id} (${booking.slotName})`,
-        })
-      }
-      alert('Yêu cầu hủy hợp đồng và hoàn tiền đã được gửi tới Ban Tài chính tòa soạn kiểm tra!')
-      setShowRefundDialog(false)
-      loadData(booking.id)
-    } catch (err: any) {
-      alert(err.message || 'Lỗi gửi yêu cầu hoàn tiền')
-    } finally {
-      setIsRefunding(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto py-12 animate-pulse space-y-4">
@@ -138,6 +104,8 @@ export function BookingDetailPage() {
   }
 
   const activeCreative = campaign?.creatives.find((c) => c.isActiveServing)
+  // Backend suy trạng thái phát từ cùng điều kiện với SV5.
+  const isLive = booking?.deliveryStatus === 'LIVE'
 
   return (
     <div className="space-y-6">
@@ -155,7 +123,7 @@ export function BookingDetailPage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          {booking.paymentStatus === 'PAID' && (
+          {!['CANCELLED', 'REJECTED'].includes(booking.bookingStatus) && booking.paymentStatus !== 'REFUNDED' && (
             <Button
               variant="outline"
               size="sm"
@@ -163,7 +131,7 @@ export function BookingDetailPage() {
               className="text-xs text-red-600 border-red-200 hover:bg-red-50"
             >
               <RotateCcw className="w-3.5 h-3.5 mr-1" />
-              Yêu cầu hủy / Hoàn tiền
+              Hủy chiến dịch
             </Button>
           )}
           <Link to="/advertiser/bookings">
@@ -265,7 +233,7 @@ export function BookingDetailPage() {
             <p className="text-amber-800">
               {booking.paymentStatus === 'PENDING'
                 ? 'Hệ thống chỉ ghi nhận khi cổng thanh toán xác nhận. Nếu đã chuyển tiền, bấm kiểm tra lại; đơn cũ được dùng lại, không phải trả lần hai.'
-                : 'Bạn đã xác nhận báo giá. Bấm nút để mở trang thanh toán (QR hoặc ví LocalPress).'}
+                : 'Bạn đã xác nhận báo giá. Bấm nút để mở trang thanh toán (quét QR SePay).'}
               {booking.holdExpiresAt && <> Giữ chỗ đến <strong>{formatDateTime(booking.holdExpiresAt)}</strong>.</>}
             </p>
           </div>
@@ -350,7 +318,9 @@ export function BookingDetailPage() {
                 </div>
 
                 <div>
-                  <span className="text-slate-500 font-medium block mb-1">Banner đang phát trực tiếp:</span>
+                  <span className="text-slate-500 font-medium block mb-1">
+                    {isLive ? 'Banner đang phát trực tiếp:' : 'Banner sẽ phát (bản đã duyệt mới nhất):'}
+                  </span>
                   {activeCreative ? (
                     <div className="rounded-lg border border-slate-200 p-2 bg-slate-50">
                       <img
@@ -372,7 +342,7 @@ export function BookingDetailPage() {
                     </div>
                   ) : (
                     <div className="p-4 bg-stone-50 border border-dashed border-stone-200 text-center text-stone-500 text-xs rounded-lg">
-                      Chưa có banner nào được duyệt phát trực tiếp.
+                      Chưa có banner nào được duyệt.
                     </div>
                   )}
                 </div>
@@ -434,7 +404,7 @@ export function BookingDetailPage() {
                           </span>
                           {cr.isActiveServing && (
                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                              ✓ Đang phát (LIVE)
+                              {isLive ? '✓ Đang phát (LIVE)' : '✓ Bản sẽ phát'}
                             </span>
                           )}
                         </div>
@@ -461,7 +431,7 @@ export function BookingDetailPage() {
           )}
 
           {/* UC008: nộp banner sau khi đã xác nhận báo giá */}
-          {campaign && booking.bookingStatus === 'CONFIRMED' && (
+          {campaign && booking.bookingStatus === 'CONFIRMED' && !campaign.creatives.some((c) => c.status === 'APPROVED') && (
             <CreativeUploadForm campaign={campaign} onUploaded={() => loadData(booking.id)} />
           )}
           {booking.bookingStatus !== 'CONFIRMED' && booking.bookingStatus !== 'REJECTED' && (
@@ -470,48 +440,11 @@ export function BookingDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Cancel / Refund Modal */}
-      {showRefundDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="font-bold text-base text-slate-900">Yêu cầu hủy hợp đồng & Hoàn tiền</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Theo quy định, doanh nghiệp không thể tự đánh dấu hoàn tiền. Yêu cầu của bạn sẽ được gửi tới Kế toán (Finance Staff) để lập đề xuất và Kế toán trưởng xem xét.
-            </p>
+      {campaign?.stage && <p className="text-sm text-slate-600">{campaign.stageReason}</p>}
+      {campaign?.creatives.some((c) => c.status === 'APPROVED') && !['CANCELLED', 'REJECTED', 'PAUSED', 'COMPLETED'].includes(campaign.status) && <Link to={`/advertiser/campaigns/${campaign.id}/creative`} className="inline-block text-sm text-primary-900 hover:underline">Thay banner hoặc URL đích</Link>}
+      <Link to="/advertiser/documents" className="block text-sm text-primary-900 hover:underline">Xem hợp đồng, chứng từ và tình trạng nghiệm thu</Link>
+      {showRefundDialog && <CancelCampaignDialog campaignId={booking.campaignId ?? booking.id} onClose={() => setShowRefundDialog(false)} onCancelled={() => { setShowRefundDialog(false); loadData(booking.id) }} />}
 
-            <div className="text-xs space-y-3">
-              <div>
-                <Label htmlFor="rfReason" required>Lý do hủy hợp đồng</Label>
-                <Input
-                  id="rfReason"
-                  placeholder="Nêu rõ lý do thay đổi kế hoạch kinh doanh..."
-                  value={refundReason}
-                  onChange={(e) => setRefundReason(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="p-3 bg-stone-50 rounded text-slate-600 border border-stone-200">
-                Số tiền hợp đồng: <strong>{formatCurrency(booking.finalPrice)}</strong>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setShowRefundDialog(false)}>
-                Hủy bỏ
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleRequestCancel}
-                isLoading={isRefunding}
-              >
-                Gửi yêu cầu hoàn tiền
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -84,6 +84,7 @@ public class AdServingService {
     private Offer createOffer(String code, String email) {
         Slot slot = ads.slots().stream().filter(s -> s.code().equals(code)).findFirst().orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Vị trí quảng cáo không tồn tại"));
+        if (!"ACTIVE".equals(slot.status())) return new Offer(slot, null, null, true);
         LocalDate today = LocalDate.now(clock.withZone(ZONE));
         if (ads.adFree(email, today)) return new Offer(slot, null, null, true);
         List<Creative> candidates = ads.eligible(code, today).stream().filter(AdServingService::validCreative).toList();
@@ -125,7 +126,7 @@ public class AdServingService {
                 return true;
             }
             if (click && ticket.seen && !ticket.clicked) {
-                ads.click(ticket.creative, ticket.date);
+                if (!ads.click(ticket.creative, ticket.date)) return false;
                 ticket.clicked = true;
                 synchronized (tickets) { tickets.remove(token); }
                 return true;
@@ -135,7 +136,10 @@ public class AdServingService {
     }
 
     public static boolean validCreative(Creative creative) {
-        return safeUrl(creative.imageUrl()) && safeUrl(creative.targetUrl());
+        // Only the exact server-owned image route may be relative. Destination links stay HTTP(S).
+        boolean internalImage = creative.imageUrl() != null && creative.imageUrl().matches(
+                "/api/v1/ad-slots/creative-files/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.png");
+        return (internalImage || safeUrl(creative.imageUrl())) && safeUrl(creative.targetUrl());
     }
 
     private static boolean safeUrl(String url) {

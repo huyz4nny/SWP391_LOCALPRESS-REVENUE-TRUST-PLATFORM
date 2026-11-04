@@ -40,6 +40,28 @@ class ReaderArticleServiceTest {
     @Mock
     private PaywallEngine paywallEngine;
 
+    @org.junit.jupiter.api.BeforeEach
+    void previewPolicy() {
+        org.mockito.Mockito.lenient().when(paywallEngine.buildLockedPreview(any()))
+                .thenAnswer(invocation -> new PaywallEngine(null, null, (com.localpress.administration.service.PaywallPolicyService) null)
+                        .buildLockedPreview(invocation.getArgument(0)));
+    }
+
+    @Test
+    void configuredPreviewIsUsedByReaderAndFullTextIsRemoved() {
+        var projection = mock(ArticleProjection.class);
+        when(projection.getId()).thenReturn(1L);
+        when(projection.getAccessType()).thenReturn("PREMIUM");
+        when(projection.getContent()).thenReturn("word ".repeat(2000));
+        when(readerArticleRepository.findPublishedBySlug("policy")).thenReturn(Optional.of(projection));
+        when(paywallEngine.checkCurrentAccess(1L)).thenReturn(new PaywallEngine.Decision(false, PaywallEngine.Reason.NO_ENTITLEMENT));
+        when(paywallEngine.buildLockedPreview("word ".repeat(2000))).thenReturn("word ".repeat(20).strip());
+        var result = readerArticleService.getArticleBySlug("policy");
+        assertEquals(20, result.getPreviewContent().split(" ").length);
+        assertNull(result.getContent());
+        verify(paywallEngine).buildLockedPreview("word ".repeat(2000));
+    }
+
     @InjectMocks
     private ReaderArticleServiceImpl readerArticleService;
 

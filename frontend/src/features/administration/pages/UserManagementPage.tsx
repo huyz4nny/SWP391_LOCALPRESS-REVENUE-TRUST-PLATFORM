@@ -10,6 +10,10 @@ import { Label } from '@/components/ui/label'
 import { Users, Edit, ShieldCheck, Check, X } from 'lucide-react'
 
 export function UserManagementPage() {
+  const [accountAction, setAccountAction] = useState<{ user: User; action: 'LOCK' | 'UNLOCK' | 'REVOKE' } | null>(null)
+  const [reason, setReason] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionBusy, setActionBusy] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -55,6 +59,17 @@ export function UserManagementPage() {
     } finally {
       setIsUpdating(false)
     }
+  }
+
+  const changeAccount = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!accountAction || actionBusy) return
+    setActionBusy(true); setActionError('')
+    try {
+      await adminApi.accountAction(accountAction.user.id, accountAction.action, reason.trim())
+      setAccountAction(null); setReason(''); await loadUsers()
+    } catch (e) { setActionError(e instanceof Error ? e.message : 'Không xử lý được yêu cầu') }
+    finally { setActionBusy(false) }
   }
 
   // Permission Matrix Definition
@@ -104,6 +119,7 @@ export function UserManagementPage() {
                 <th className="px-4 py-3">Vai trò (Role)</th>
                 <th className="px-4 py-3">Doanh nghiệp (nếu có)</th>
                 <th className="px-4 py-3">Ngày tạo</th>
+                <th className="px-4 py-3">Trạng thái</th>
                 <th className="px-4 py-3 text-right">Thao tác</th>
               </tr>
             </thead>
@@ -126,6 +142,7 @@ export function UserManagementPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-500">{u.companyName || '—'}</td>
                   <td className="px-4 py-3 text-slate-400">{formatDateTime(u.createdAt)}</td>
+                  <td className="px-4 py-3">{u.isActive ? 'Đang hoạt động' : 'Đã khóa'}</td>
                   <td className="px-4 py-3 text-right">
                     <Button
                       variant="outline"
@@ -134,8 +151,12 @@ export function UserManagementPage() {
                       className="text-xs h-7"
                     >
                       <Edit className="w-3 h-3 mr-1" />
-                      Đổi Role
+                      Đổi vai trò
                     </Button>
+                    {!APP_CONFIG.useMockApi && <div className="mt-2 flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => { setAccountAction({ user: u, action: u.isActive ? 'LOCK' : 'UNLOCK' }); setReason(''); setActionError('') }}>{u.isActive ? 'Khóa' : 'Mở khóa'}</Button>
+                      <Button variant="outline" size="sm" onClick={() => { setAccountAction({ user: u, action: 'REVOKE' }); setReason(''); setActionError('') }}>Thu hồi phiên JWT</Button>
+                    </div>}
                   </td>
                 </tr>
               ))}
@@ -144,8 +165,8 @@ export function UserManagementPage() {
         </div>
       </div>
 
-      {/* Role / Permission Matrix Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+      {/* Demo-only matrix; real permissions are enforced by the backend. */}
+      {APP_CONFIG.useMockApi && <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
         <div className="p-4 border-b border-slate-200">
           <h3 className="font-bold text-sm text-slate-900">
             Ma trận Phân quyền Chức năng (Role & Permission Matrix)
@@ -187,8 +208,16 @@ export function UserManagementPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
 
+      {accountAction && <Dialog open onClose={() => { if (!actionBusy) setAccountAction(null) }} title={`${accountAction.action === 'LOCK' ? 'Khóa tài khoản' : accountAction.action === 'UNLOCK' ? 'Mở khóa tài khoản' : 'Thu hồi phiên JWT'}: ${accountAction.user.name}`}>
+        <form onSubmit={changeAccount} className="space-y-4">
+          <p className="text-sm">{accountAction.action === 'REVOKE' ? 'Phiên JWT và phiên thiết bị hiện có sẽ mất hiệu lực. HTTP Basic xác thực lại bằng mật khẩu ở mỗi yêu cầu nên không thuộc thao tác này.' : 'Phiên JWT hiện có sẽ bị thu hồi. Mở khóa không khôi phục các phiên cũ.'}</p>
+          <Label htmlFor="account-reason">Lý do</Label><textarea id="account-reason" required maxLength={500} value={reason} onChange={e => setReason(e.target.value)} className="w-full rounded border p-2" />
+          {actionError && <p role="alert" className="text-red-700">{actionError}</p>}
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={actionBusy} onClick={() => setAccountAction(null)}>Hủy</Button><Button type="submit" disabled={actionBusy || !reason.trim()}>Xác nhận</Button></div>
+        </form>
+      </Dialog>}
       {/* Edit Role Dialog */}
       {editingUser && (
         <Dialog
@@ -214,7 +243,7 @@ export function UserManagementPage() {
             </div>
 
             <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setEditingUser(null)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingUser(null)}>
                 Hủy bỏ
               </Button>
               <Button type="submit" size="sm" isLoading={isUpdating}>

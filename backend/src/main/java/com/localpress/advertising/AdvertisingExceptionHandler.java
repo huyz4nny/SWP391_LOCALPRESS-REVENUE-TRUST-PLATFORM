@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /** Trả {message, fieldErrors} để httpClient của frontend hiện đúng lỗi tiếng Việt. */
-@RestControllerAdvice(assignableTypes = AdBookingController.class)
+@RestControllerAdvice(assignableTypes = {AdBookingController.class, AdPortalController.class})
 public class AdvertisingExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> status(ResponseStatusException error) {

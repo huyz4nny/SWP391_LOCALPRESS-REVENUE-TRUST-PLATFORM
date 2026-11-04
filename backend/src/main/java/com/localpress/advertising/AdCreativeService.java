@@ -49,22 +49,25 @@ public class AdCreativeService {
     private final TransactionTemplate transaction;
     private final Path directory;
     private final long maxBytes;
+    private final CampaignStage stages;
 
     public AdCreativeService(JdbcTemplate jdbc, AdBookingService bookings, PlatformTransactionManager txManager,
                              @Value("${localpress.storage.creative-directory:uploads/creatives}") String directory,
                              // ponytail: chưa có đặc tả dung lượng banner; chỉnh cấu hình khi SV1/SV5 chốt giới hạn.
-                             @Value("${localpress.advertising.creative.max-bytes:2097152}") long maxBytes) {
+                             @Value("${localpress.advertising.creative.max-bytes:2097152}") long maxBytes,
+                             CampaignStage stages) {
         this.jdbc = jdbc;
         this.bookings = bookings;
         this.transaction = new TransactionTemplate(txManager);
         this.directory = Path.of(directory).toAbsolutePath().normalize();
         this.maxBytes = maxBytes;
+        this.stages = stages;
     }
 
     public record Creative(String id, String campaignId, int versionNumber, String title, String imageUrl,
                            String targetUrl, Integer width, Integer height, Integer fileSizeKb, String status,
                            String reviewNotes, LocalDateTime uploadedAt, LocalDateTime reviewedAt,
-                           boolean isActiveServing) {}
+                           boolean isActiveServing, String replacementReason, LocalDateTime requestedEffectiveAt) {}
 
     public record DailyStat(LocalDate date, long impressions, long clicks, BigDecimal ctr) {}
 
@@ -72,12 +75,14 @@ public class AdCreativeService {
                            String slotName, String slotDimensions, String name, LocalDate startDate, LocalDate endDate,
                            BigDecimal totalBudget, String status, Integer activeCreativeVersion,
                            List<Creative> creatives, long impressions, long clicks, BigDecimal ctr,
-                           List<DailyStat> dailyStats, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+                           List<DailyStat> dailyStats, LocalDateTime createdAt, LocalDateTime updatedAt,
+                           String stage, String stageReason) {}
 
-    private record Target(long campaignId, String quotationStatus, String status, String dimensions) {}
+    private record Target(long campaignId, String quotationStatus, String status, String dimensions, LocalDate endDate) {}
 
     public Campaign campaign(String email, long id) {
         bookings.owned(bookings.advertiser(email), id, false);
+        var stage = stages.forCampaign(id);
         List<Creative> creatives = creatives(id);
         Integer active = creatives.stream().filter(Creative::isActiveServing).map(Creative::versionNumber)
                 .findFirst().orElse(null);
@@ -95,20 +100,19 @@ public class AdCreativeService {
                         rs.getDate("start_date").toLocalDate(), rs.getDate("end_date").toLocalDate(),
                         rs.getBigDecimal("accepted_amount") != null ? rs.getBigDecimal("accepted_amount") : rs.getBigDecimal("quoted_amount"),
                         campaignStatus(rs.getString("status")), active, creatives, totals[0], totals[1], ctr, List.of(),
-                        AdBookingService.time(rs, "created_at"), AdBookingService.time(rs, "updated_at")), id).get(0);
+                        AdBookingService.time(rs, "created_at"), AdBookingService.time(rs, "updated_at"), stage.stage(), stage.reason()), id).get(0);
     }
 
     private static String campaignStatus(String status) {
         return switch (status) {
             case "PENDING" -> "PENDING_APPROVAL";
             case "SUSPENDED" -> "PAUSED";
-            case "REJECTED" -> "CANCELLED";
             default -> status;
         };
     }
 
     private List<Creative> creatives(long campaignId) {
-        Integer serving = jdbc.query("SELECT MAX(version_number) FROM ad_creatives WHERE campaign_id = ? AND review_status = 'APPROVED'",
+        Integer serving = !stages.forCampaign(campaignId).stage().equals("RUNNING") ? null : jdbc.query("SELECT MAX(version_number) FROM ad_creatives WHERE campaign_id = ? AND " + CampaignStage.IN_EFFECT,
                 (rs, r) -> {
                     int v = rs.getInt(1);
                     return rs.wasNull() ? null : v;
@@ -127,7 +131,7 @@ public class AdCreativeService {
                             publicUrl(rs.getString("media_url")), rs.getString("target_url"), w, h, kb,
                             creativeStatus(rs.getString("review_status")), rs.getString("rejection_reason"),
                             AdBookingService.time(rs, "uploaded_at"), AdBookingService.time(rs, "approved_at"),
-                            serving != null && serving == version);
+                            serving != null && serving == version, rs.getString("replacement_reason"), AdBookingService.time(rs,"requested_effective_at"));
                 }, campaignId);
     }
 
@@ -146,6 +150,11 @@ public class AdCreativeService {
     }
 
     public Creative upload(String email, long campaignId, MultipartFile file, String title, String targetUrl) {
+        return upload(email,campaignId,file,title,targetUrl,null,null,false);
+    }
+
+    public Creative upload(String email, long campaignId, MultipartFile file, String title, String targetUrl,
+                           String replacementReason, LocalDateTime requestedEffectiveAt, boolean keepCurrentImage) {
         AdBookingService.Advertiser me = bookings.advertiser(email);
         bookings.owned(me, campaignId, false);
         Target target = target(campaignId, false);
@@ -154,6 +163,18 @@ public class AdCreativeService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tiêu đề banner bắt buộc, tối đa 255 ký tự");
         }
         String url = safeTargetUrl(targetUrl);
+        if (keepCurrentImage) {
+            long creativeId = transaction.execute(status -> {
+                var current = target(campaignId,true);
+                var source = jdbc.queryForList("SELECT * FROM ad_creatives WHERE campaign_id=? AND review_status='APPROVED' ORDER BY version_number DESC LIMIT 1 FOR UPDATE",campaignId);
+                if (source.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Chưa có banner được duyệt để giữ ảnh");
+                var image = source.get(0);
+                return insertCreative(me,campaignId,current,title,url,image.get("media_url").toString(),
+                    image.get("width")==null?null:((Number)image.get("width")).intValue(),image.get("height")==null?null:((Number)image.get("height")).intValue(),
+                    image.get("file_size_bytes")==null?null:((Number)image.get("file_size_bytes")).longValue(),replacementReason,requestedEffectiveAt);
+            });
+            return creatives(campaignId).stream().filter(c->c.id().equals(""+creativeId)).findFirst().orElseThrow();
+        }
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng chọn file ảnh banner");
         }
@@ -173,18 +194,8 @@ public class AdCreativeService {
         String filename = store(image);
         try {
             long creativeId = transaction.execute(status -> {
-                checkCanSubmit(target(campaignId, true));
-                int version = jdbc.queryForObject("SELECT COALESCE(MAX(version_number), 0) + 1 FROM ad_creatives WHERE campaign_id = ?",
-                        Integer.class, campaignId);
-                jdbc.update("INSERT INTO ad_creatives (campaign_id, uploaded_by, version_number, title, media_url, target_url, " +
-                                "width, height, file_size_bytes, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')",
-                        campaignId, me.userId(), version, title.trim(), FILE_PATH + filename, url,
-                        image.getWidth(), image.getHeight(), file.getSize());
-                long id = jdbc.queryForObject("SELECT creative_id FROM ad_creatives WHERE campaign_id = ? AND version_number = ?",
-                        Long.class, campaignId, version);
-                bookings.audit(me.userId(), "AD_CREATIVE_SUBMITTED", campaignId,
-                        Map.of("creativeId", id, "version", version, "targetUrl", url));
-                return id;
+                return insertCreative(me,campaignId,target(campaignId,true),title,url,FILE_PATH+filename,
+                    image.getWidth(),image.getHeight(),file.getSize(),replacementReason,requestedEffectiveAt);
             });
             return creatives(campaignId).stream().filter(c -> c.id().equals(String.valueOf(creativeId))).findFirst().orElseThrow();
         } catch (RuntimeException e) {
@@ -198,16 +209,42 @@ public class AdCreativeService {
     }
 
     private Target target(long campaignId, boolean lock) {
-        return jdbc.query("SELECT c.campaign_id, c.quotation_status, c.status, s.dimensions FROM ad_campaigns c " +
+        if (lock) {
+            Long slot = jdbc.queryForObject("SELECT slot_id FROM ad_campaigns WHERE campaign_id=?",Long.class,campaignId);
+            jdbc.queryForList("SELECT slot_id FROM ad_slots WHERE slot_id=? FOR UPDATE",slot);
+        }
+        return jdbc.query("SELECT c.campaign_id, c.quotation_status, c.status, s.dimensions, c.end_date FROM ad_campaigns c " +
                         "JOIN ad_slots s ON s.slot_id = c.slot_id WHERE c.campaign_id = ?" + (lock ? " FOR UPDATE" : ""),
-                (rs, r) -> new Target(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4)), campaignId).get(0);
+                (rs, r) -> new Target(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),rs.getDate(5).toLocalDate()), campaignId).get(0);
     }
 
-    private static void checkCanSubmit(Target target) {
+    private long insertCreative(AdBookingService.Advertiser me,long campaignId,Target target,String title,String url,
+            String imageUrl,Integer width,Integer height,Long bytes,String reason,LocalDateTime effectiveAt) {
+        checkCanSubmit(target);
+        // Đọc bản commit mới nhất sau khi chờ khóa campaign, tránh hai tab cùng tạo bản PENDING.
+        var versions=jdbc.queryForList("SELECT version_number,review_status FROM ad_creatives WHERE campaign_id=? FOR UPDATE",campaignId);
+        boolean replacement = versions.stream().anyMatch(v -> "APPROVED".equals(v.get("review_status")));
+        if(replacement) {
+            if("SUSPENDED".equals(target.status())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Chiến dịch đang tạm dừng");
+            if(reason==null || reason.isBlank() || reason.length()>1000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Lý do thay banner bắt buộc, tối đa 1.000 ký tự");
+            if(versions.stream().anyMatch(v -> "PENDING".equals(v.get("review_status"))))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Đã có banner chờ duyệt, vui lòng chờ kết quả");
+        } else if(reason!=null || effectiveAt!=null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Chưa có banner được duyệt để thay thế");
+        if(effectiveAt!=null && (effectiveAt.isBefore(bookings.now()) || effectiveAt.toLocalDate().isAfter(target.endDate())))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Thời điểm mong muốn phải từ hiện tại đến hết lịch quảng cáo");
+        int version=versions.stream().mapToInt(v -> ((Number)v.get("version_number")).intValue()).max().orElse(0)+1;
+        jdbc.update("INSERT INTO ad_creatives(campaign_id,uploaded_by,version_number,title,media_url,target_url,width,height,file_size_bytes,review_status,replacement_reason,requested_effective_at) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,'PENDING',?,?)",campaignId,me.userId(),version,title.trim(),imageUrl,url,width,height,bytes,reason==null?null:reason.trim(),effectiveAt);
+        long id=jdbc.queryForObject("SELECT creative_id FROM ad_creatives WHERE campaign_id=? AND version_number=?",Long.class,campaignId,version);
+        bookings.audit(me.userId(),replacement?"AD_CREATIVE_REPLACED":"AD_CREATIVE_SUBMITTED",campaignId,Map.of("creativeId",id,"version",version,"targetUrl",url));
+        return id;
+    }
+
+    private void checkCanSubmit(Target target) {
         if (!"ACCEPTED".equals(target.quotationStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vui lòng xác nhận báo giá trước khi nộp banner");
         }
-        if ("REJECTED".equals(target.status()) || "COMPLETED".equals(target.status())) {
+        if ("REJECTED".equals(target.status()) || "COMPLETED".equals(target.status()) || "CANCELLED".equals(target.status()) || target.endDate().isBefore(stages.today())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Chiến dịch đã đóng, không nhận banner mới");
         }
     }

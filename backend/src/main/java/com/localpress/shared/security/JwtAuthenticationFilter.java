@@ -49,18 +49,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             // Reload role/lock state on every request; a valid token cannot bypass an account lock.
             var accounts = jdbc.query(
-                    "SELECT email, role, status, locked_until FROM users WHERE user_id = ?",
+                    "SELECT email, role, status, locked_until, auth_version FROM users WHERE user_id = ?",
                     (rs, row) -> {
                         var lockedUntil = rs.getTimestamp("locked_until");
                         boolean active = "ACTIVE".equals(rs.getString("status"))
                                 && (lockedUntil == null || !lockedUntil.toLocalDateTime().isAfter(LocalDateTime.now()));
-                        return new Account(rs.getString("email"), rs.getString("role"), active);
+                        return new Account(rs.getString("email"), rs.getString("role"), active, rs.getLong("auth_version"));
                     }, id);
             if (accounts.isEmpty()) {
                 reject(response, 401, "Phiên đăng nhập không hợp lệ");
                 return;
             }
             Account account = accounts.get(0);
+            if (account.version() != verified.version()) {
+                reject(response,401,"Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.");
+                return;
+            }
             if (!account.active()) {
                 reject(response, 403, "Tài khoản đang bị khóa");
                 return;
@@ -87,5 +91,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.getWriter().write("{\"message\":\"" + message + "\"}");
     }
 
-    private record Account(String email, String role, boolean active) {}
+    private record Account(String email, String role, boolean active, long version) {}
 }

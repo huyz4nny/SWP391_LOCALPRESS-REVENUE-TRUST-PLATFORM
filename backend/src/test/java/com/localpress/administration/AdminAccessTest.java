@@ -22,16 +22,16 @@ class AdminAccessTest {
         ReflectionTestUtils.setField(user,"role",role);
         when(users.findByEmail("reader@example.test")).thenReturn(Optional.of(user));
         var auth=UsernamePasswordAuthenticationToken.authenticated("reader@example.test",null,List.of());
-        assertEquals(403,assertThrows(ResponseStatusException.class,()->new AdminAccess(users).requireAdmin(auth)).getStatusCode().value());
+        assertEquals(403,assertThrows(ResponseStatusException.class,()->new AdminAccess(users,mock(org.springframework.jdbc.core.JdbcTemplate.class)).requireAdmin(auth)).getStatusCode().value());
     }
     @Test void guestRequiresAuthentication() {
-        assertEquals(401,assertThrows(ResponseStatusException.class,()->new AdminAccess(mock(UserRepository.class)).requireAdmin(null)).getStatusCode().value());
+        assertEquals(401,assertThrows(ResponseStatusException.class,()->new AdminAccess(mock(UserRepository.class),mock(org.springframework.jdbc.core.JdbcTemplate.class)).requireAdmin(null)).getStatusCode().value());
     }
     @Test void activeAdministratorIsAccepted() {
         var users=mock(UserRepository.class);
         User user=User.createReader("Admin","admin@example.test","unused",null);
         ReflectionTestUtils.setField(user,"role",User.Role.SYSTEM_ADMIN);
         when(users.findByEmail("admin@example.test")).thenReturn(Optional.of(user));
-        assertSame(user,new AdminAccess(users).requireAdmin(UsernamePasswordAuthenticationToken.authenticated("admin@example.test",null,List.of())));
+        assertSame(user,new AdminAccess(users,mock(org.springframework.jdbc.core.JdbcTemplate.class)).requireAdmin(UsernamePasswordAuthenticationToken.authenticated("admin@example.test",null,List.of())));
     }
 }

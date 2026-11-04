@@ -60,6 +60,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/articles/**", "/api/v1/categories/**",
                                 "/api/v1/comments/**", "/api/v1/subscription-plans/**").permitAll()
 
+                        // The media service checks published_version before allowing anonymous access.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/content/images/*").permitAll()
+
                         // 4. API Tra cứu vị trí quảng cáo công khai cho Doanh nghiệp (SV1 - UC003)
                         .requestMatchers(HttpMethod.GET, "/api/v1/delivery/ad-slots/*/serve").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/delivery/impressions", "/api/v1/delivery/clicks").permitAll()
@@ -83,6 +86,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/orders/**").authenticated()
                         // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
+                        // Chứng từ (UC057): khách xem của mình, chi tiết đơn kiểm chủ đơn / kế toán trong service
+                        .requestMatchers(HttpMethod.GET, "/api/v1/finance/documents/**").authenticated()
                         // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
                         .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
@@ -109,11 +114,12 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService(JdbcTemplate jdbc) {
         return email -> jdbc.query(
-                "SELECT email, password_hash, role, status FROM users WHERE email = ?",
+                "SELECT email, password_hash, role, status, locked_until FROM users WHERE email = ?",
                 (rs, row) -> User.withUsername(rs.getString("email"))
                         .password(rs.getString("password_hash"))
                         .roles(rs.getString("role"))
-                        .accountLocked(!"ACTIVE".equals(rs.getString("status")))
+                        .accountLocked(!"ACTIVE".equals(rs.getString("status")) || (rs.getTimestamp("locked_until") != null
+                                && rs.getTimestamp("locked_until").toLocalDateTime().isAfter(java.time.LocalDateTime.now())))
                         .build(), email).stream().findFirst()
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản với email: " + email));
     }

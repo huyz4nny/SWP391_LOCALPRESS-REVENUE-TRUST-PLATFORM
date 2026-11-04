@@ -47,6 +47,12 @@ function openAuthChannel(): BroadcastChannel | null {
     }
 }
 
+// API void (vd. đánh dấu đã đọc) trả 200 body rỗng; response.json() sẽ ném "Unexpected end of JSON input".
+async function readJson<T>(response: Response): Promise<T> {
+    const text = await response.text()
+    return (text ? JSON.parse(text) : undefined) as T
+}
+
 class HttpClient {
     private baseUrl: string
     private useMock: boolean
@@ -241,7 +247,7 @@ class HttpClient {
 
         if (!response.ok) await this.fail(response, path, 'Lỗi kết nối máy chủ backend', options)
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async getBlob(path: string, options?: RequestOptions,): Promise<Blob> {
@@ -302,8 +308,7 @@ class HttpClient {
 
         if (!response.ok) await this.fail(response, path, 'Lỗi gửi dữ liệu lên máy chủ', options)
 
-        if (response.status === 204) return undefined as T
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async patch<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
@@ -322,7 +327,7 @@ class HttpClient {
 
         if (!response.ok) await this.fail(response, path, 'Lỗi gửi dữ liệu lên máy chủ', options)
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async put<T>(path: string, body?: any, options?: RequestOptions): Promise<T> {
@@ -340,7 +345,7 @@ class HttpClient {
 
         if (!response.ok) await this.fail(response, path, 'Lỗi cập nhật dữ liệu', options)
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async postFormData<T>(path: string, body: FormData, options?: RequestOptions): Promise<T> {
@@ -376,7 +381,7 @@ class HttpClient {
 
         if (!response.ok) await this.fail(response, path, 'Không upload được ảnh', options)
 
-        return response.json()
+        return readJson<T>(response)
     }
 
     public async delete<T>(path: string, options?: RequestOptions): Promise<T> {

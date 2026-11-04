@@ -34,7 +34,7 @@ public class AdministrationService {
     public List<UserView> users(Authentication auth) {
         access.requireAdmin(auth);
         return jdbc.query("""
-                SELECT u.user_id,u.full_name,u.email,u.phone,u.role,u.avatar_url,a.advertiser_id,a.company_name,u.created_at,u.status
+                SELECT u.user_id,u.full_name,u.email,u.phone,u.role,u.avatar_url,a.advertiser_id,a.company_name,u.created_at,CASE WHEN u.status='ACTIVE' AND (u.locked_until IS NULL OR u.locked_until<=NOW()) THEN 'ACTIVE' ELSE 'LOCKED' END
                 FROM users u LEFT JOIN advertisers a ON a.user_id=u.user_id ORDER BY u.user_id
                 """,(rs,row)->new UserView(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),
                 rs.getString(6),rs.getString(7),rs.getString(8),rs.getString(9),"ACTIVE".equals(rs.getString(10))));
@@ -42,7 +42,7 @@ public class AdministrationService {
 
     @Transactional
     public UserView updateRole(Authentication auth,Long userId,String role,String ip) {
-        User actor=access.requireAdmin(auth);
+        User actor=access.lockAdminMutation(auth);
         try {User.Role.valueOf(role);} catch(Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Vai trò không được backend hỗ trợ");
         }
@@ -50,9 +50,10 @@ public class AdministrationService {
         String oldRole=jdbc.query("SELECT role FROM users WHERE user_id=? FOR UPDATE",(rs,row)->rs.getString(1),userId)
                 .stream().findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy tài khoản"));
         if(!oldRole.equals(role)) {
-            jdbc.update("UPDATE users SET role=? WHERE user_id=?",role,userId);
-            try {jdbc.update("INSERT INTO audit_logs(user_id,action,target_type,target_id,old_value,new_value,ip_address) "
-                    +"VALUES (?,'UPDATE_USER_ROLE','USER_ROLE',?,?,?,?)",actor.getId(),userId,
+            jdbc.update("UPDATE users SET role=?,auth_version=auth_version+1 WHERE user_id=?",role,userId);
+            jdbc.update("UPDATE user_devices SET revoked_at=NOW() WHERE user_id=? AND revoked_at IS NULL",userId);
+            try {jdbc.update("INSERT INTO audit_logs(user_id,action,target_type,target_id,old_value,new_value,ip_address,result) "
+                    +"VALUES (?,'UPDATE_USER_ROLE','USER_ROLE',?,?,?,?,'SUCCESS')",actor.getId(),userId,
                     json.writeValueAsString(Map.of("role",oldRole)),json.writeValueAsString(Map.of("role",role)),ip);
             } catch(com.fasterxml.jackson.core.JsonProcessingException e) {throw new IllegalStateException(e);}
         }
@@ -82,10 +83,10 @@ public class AdministrationService {
         access.requireAdmin(auth);
         LocalDate today=LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
         return ads.slots().stream().map(slot->{
-            int count=(int)ads.eligible(slot.code(),today).stream().filter(AdServingService::validCreative).count();
+            int count="ACTIVE".equals(slot.status()) ? (int)ads.eligible(slot.code(),today).stream().filter(AdServingService::validCreative).count() : 0;
             long[] stats=ads.todayStats(slot.id(),today);
             return new DeliveryView(slot.id(),slot.name(),slot.code(),count,slot.capacity(),
-                    count>slot.capacity()?"OVER_CAPACITY":count>0?"SERVING":"IDLE",stats[0],stats[1],
+                    !"ACTIVE".equals(slot.status())?"INACTIVE":count>slot.capacity()?"OVER_CAPACITY":count>0?"SERVING":"IDLE",stats[0],stats[1],
                     stats[0]==0?0:stats[1]*100.0/stats[0]);
         }).toList();
     }

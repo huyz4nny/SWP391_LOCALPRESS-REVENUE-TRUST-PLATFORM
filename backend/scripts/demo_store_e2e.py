@@ -4,7 +4,7 @@ Cần: MySQL80, seed_data.sql, backend profile dev với localpress.demo-store.e
 KHÔNG cần bật client-orders-enabled (đơn tạo từ server nên trình duyệt vẫn bị 403 khi tự tạo đơn).
 Chạy: python backend/scripts/demo_store_e2e.py [base_url]   (mặc định http://localhost:8080/api/v1)
 Dùng reader.an@gmail.com (user 6: chưa mua bài 1, không có gói, nên thấy được paywall đóng / mở);
-giả lập tiền về qua simulate-ipn (chỉ có ở profile dev). Đầu và cuối script tự dọn dữ liệu thử của user 6.
+giả lập tiền về qua simulate-ipn (profile dev + localpress.payment.simulation-enabled=true trong application-local.yml). Đầu và cuối script tự dọn dữ liệu thử của user 6.
 """
 import base64
 import json

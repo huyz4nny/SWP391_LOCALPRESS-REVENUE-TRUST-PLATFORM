@@ -10,8 +10,10 @@ import com.localpress.finance.model.TransactionStatus;
 import com.localpress.finance.model.TransactionType;
 import com.localpress.finance.repository.RefundRequestRepository;
 import com.localpress.finance.repository.TransactionRepository;
+import com.localpress.finance.service.FinancialDocumentService;
 import com.localpress.finance.service.RefundManagementService;
 import com.localpress.shared.event.RefundCompletedEvent;
+import com.localpress.shared.event.RefundRejectedEvent;
 import com.localpress.shared.exception.AppException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -49,6 +51,9 @@ class RefundManagementServiceTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    @Mock
+    private FinancialDocumentService documentService;
+
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -71,7 +76,7 @@ class RefundManagementServiceTest {
                     .status(TransactionStatus.SUCCESS)
                     .build();
 
-            when(transactionRepository.findById(10L)).thenReturn(Optional.of(tx));
+            when(transactionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(tx));
             when(refundRequestRepository.sumCommittedRefundsByTransactionId(10L, null))
                     .thenReturn(BigDecimal.valueOf(20_000));
 
@@ -109,7 +114,7 @@ class RefundManagementServiceTest {
             Transaction tx = Transaction.builder()
                     .transactionId(10L).userId(5L).gatewayTransactionId("LP-ORDER-10")
                     .amount(BigDecimal.valueOf(100_000)).status(TransactionStatus.SUCCESS).build();
-            when(transactionRepository.findById(10L)).thenReturn(Optional.of(tx));
+            when(transactionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(tx));
             when(refundRequestRepository.sumCommittedRefundsByTransactionId(10L, null)).thenReturn(BigDecimal.ZERO);
             when(refundRequestRepository.save(any(RefundRequest.class))).thenAnswer(inv -> {
                 RefundRequest r = inv.getArgument(0);
@@ -134,7 +139,7 @@ class RefundManagementServiceTest {
                     .status(TransactionStatus.SUCCESS)
                     .build();
 
-            when(transactionRepository.findById(10L)).thenReturn(Optional.of(tx));
+            when(transactionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(tx));
             when(refundRequestRepository.sumCommittedRefundsByTransactionId(10L, null))
                     .thenReturn(BigDecimal.valueOf(70_000)); // Đã hoàn hoặc chờ hoàn 70k, chỉ còn 30k
 
@@ -161,7 +166,7 @@ class RefundManagementServiceTest {
                         .amount(BigDecimal.valueOf(100_000))
                         .status(TransactionStatus.SUCCESS)
                         .build();
-                when(transactionRepository.findById(11L)).thenReturn(Optional.of(tx));
+                when(transactionRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(tx));
 
                 ProposeRefundRequest req = ProposeRefundRequest.builder()
                         .orderId(11L)
@@ -184,7 +189,7 @@ class RefundManagementServiceTest {
                     .status(TransactionStatus.PENDING)
                     .build();
 
-            when(transactionRepository.findById(10L)).thenReturn(Optional.of(tx));
+            when(transactionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(tx));
 
             ProposeRefundRequest req = ProposeRefundRequest.builder()
                     .orderId(10L)
@@ -226,6 +231,29 @@ class RefundManagementServiceTest {
         }
 
         @Test
+        @DisplayName("PAY-04: Duyệt phiếu làm tổng đã hoàn vượt số đã thu -> 409, không phát sự kiện")
+        void reviewRefund_RechecksRefundCap() {
+            RefundRequest refund = RefundRequest.builder()
+                    .refundId(6L).transactionId(60L).userId(5L)
+                    .refundAmount(BigDecimal.valueOf(500_000)).proposedBy(4L).status(RefundStatus.PENDING).build();
+            Transaction originalTx = Transaction.builder()
+                    .transactionId(60L).userId(5L).gatewayTransactionId("LP-AD-60").campaignId(7L)
+                    .amount(BigDecimal.valueOf(500_000)).currency("VND").paymentMethod("SEPAY")
+                    .status(TransactionStatus.REFUNDED).build();
+
+            when(refundRequestRepository.findByIdForUpdate(6L)).thenReturn(Optional.of(refund));
+            when(transactionRepository.findByIdForUpdate(60L)).thenReturn(Optional.of(originalTx));
+            // Phiếu song song đã hoàn 500.000 đ, cộng phiếu này thành 1.000.000 đ
+            when(refundRequestRepository.sumCompletedRefundsByTransactionId(60L)).thenReturn(BigDecimal.valueOf(1_000_000));
+
+            AppException ex = assertThrows(AppException.class, () -> refundManagementService.reviewRefund(2L, 6L,
+                    ReviewRefundRequest.builder().approved(true).reviewNotes("ok").build()));
+
+            assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
         @DisplayName("Phê duyệt thành công: tạo bút toán hoàn tiền và phát RefundCompletedEvent cho SV3 thu hồi quyền (UC056, Rule 17)")
         void reviewRefund_ApproveAndRevokePurchase() {
             RefundRequest refund = RefundRequest.builder()
@@ -249,7 +277,7 @@ class RefundManagementServiceTest {
                     .build();
 
             when(refundRequestRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(refund));
-            when(transactionRepository.findById(10L)).thenReturn(Optional.of(originalTx));
+            when(transactionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(originalTx));
             when(refundRequestRepository.sumCompletedRefundsByTransactionId(10L))
                     .thenReturn(BigDecimal.valueOf(15_000)); // Hoàn đủ 15.000đ -> originalTx thành REFUNDED
 
@@ -292,7 +320,7 @@ class RefundManagementServiceTest {
                     .status(TransactionStatus.SUCCESS).build();
 
             when(refundRequestRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(refund));
-            when(transactionRepository.findById(40L)).thenReturn(Optional.of(originalTx));
+            when(transactionRepository.findByIdForUpdate(40L)).thenReturn(Optional.of(originalTx));
             when(refundRequestRepository.sumCompletedRefundsByTransactionId(40L)).thenReturn(BigDecimal.valueOf(15_000));
 
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -301,6 +329,8 @@ class RefundManagementServiceTest {
                     ReviewRefundRequest.builder().approved(true).payoutReference("FT555").build());
 
             assertEquals(TransactionStatus.REFUNDED, originalTx.getStatus());
+            // UC057: hoàn toàn phần thì hủy chứng từ của đơn gốc
+            verify(documentService).voidFor(eq(40L), any());
             verify(transactionRepository).save(argThat(tx -> tx.getTransactionType() == TransactionType.REFUND
                     && "BANK_TRANSFER".equals(tx.getPaymentMethod()) && tx.getDescription().contains("FT555")));
             verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundCompletedEvent ev
@@ -319,7 +349,7 @@ class RefundManagementServiceTest {
                     .status(TransactionStatus.SUCCESS).build();
 
             when(refundRequestRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(refund));
-            when(transactionRepository.findById(50L)).thenReturn(Optional.of(originalTx));
+            when(transactionRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(originalTx));
             // Chỉ phiếu vừa duyệt đã COMPLETED; phiếu 50k còn lại vẫn PENDING nên không được cộng
             when(refundRequestRepository.sumCompletedRefundsByTransactionId(50L)).thenReturn(BigDecimal.valueOf(50_000));
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -328,6 +358,8 @@ class RefundManagementServiceTest {
 
             assertEquals(TransactionStatus.SUCCESS, originalTx.getStatus());
             verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundCompletedEvent ev && !ev.isFullRefund()));
+            // Hoàn một phần: chứng từ giữ ISSUED
+            verify(documentService, never()).voidFor(any(), any());
         }
 
         @Test
@@ -342,11 +374,15 @@ class RefundManagementServiceTest {
 
             Transaction originalTx = Transaction.builder()
                     .transactionId(20L)
+                    .userId(5L)
+                    .campaignId(31L)
+                    .transactionType(TransactionType.AD)
                     .status(TransactionStatus.SUCCESS)
                     .build();
+            refund.setRefundAmount(BigDecimal.valueOf(300_000));
 
             when(refundRequestRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(refund));
-            when(transactionRepository.findById(20L)).thenReturn(Optional.of(originalTx));
+            when(transactionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(originalTx));
 
             ReviewRefundRequest req = ReviewRefundRequest.builder()
                     .approved(false)
@@ -356,8 +392,32 @@ class RefundManagementServiceTest {
             RefundDetailResponse res = refundManagementService.reviewRefund(3L, 2L, req);
 
             assertEquals("REJECTED", res.getStatus());
-            verifyNoInteractions(eventPublisher);
+            // Không ghi tiền, không hủy chứng từ; chỉ báo module đã lập đề xuất (SV1 hủy chiến dịch)
+            verify(transactionRepository, never()).save(any());
+            verify(documentService, never()).voidFor(any(), any());
+            verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof RefundRejectedEvent ev
+                    && ev.getRefundId().equals(2L) && "AD".equals(ev.getTransactionType()) && ev.getTargetId().equals(31L)
+                    && ev.getUserId().equals(5L) && ev.getReviewedBy().equals(3L)
+                    && "Không đủ chứng từ ngân hàng".equals(ev.getReviewNotes())));
+            verify(eventPublisher, never()).publishEvent(any(RefundCompletedEvent.class));
             verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
         }
+    }
+
+    @Test
+    @DisplayName("getRefund: module đọc trạng thái 1 phiếu (REJECTED + lý do), không có thì 404")
+    void getRefund_returnsStatus() {
+        when(refundRequestRepository.findById(7L)).thenReturn(Optional.of(RefundRequest.builder()
+                .refundId(7L).transactionId(70L).userId(5L).refundAmount(BigDecimal.valueOf(50_000))
+                .status(RefundStatus.REJECTED).reviewedBy(3L).reviewNotes("Sai số tài khoản").build()));
+        when(refundRequestRepository.findById(8L)).thenReturn(Optional.empty());
+
+        RefundDetailResponse r = refundManagementService.getRefund(7L);
+
+        assertEquals("REJECTED", r.getStatus());
+        assertEquals("70", r.getOrderId());
+        assertEquals("Sai số tài khoản", r.getReviewNotes());
+        AppException ex = assertThrows(AppException.class, () -> refundManagementService.getRefund(8L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
     }
 }

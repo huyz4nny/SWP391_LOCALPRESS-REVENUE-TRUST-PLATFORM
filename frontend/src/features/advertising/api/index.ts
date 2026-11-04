@@ -1,4 +1,5 @@
 import { APP_CONFIG } from '@/app/config'
+import { portalApi } from './portal'
 import { httpClient } from '@/lib/http/client'
 import { User } from '@/types'
 import { AdSlot, AdBooking, AdCampaign, AdCreative, AdPaymentOrder, AdvertiserProfile, AdvertiserProfileInput, AdvertiserProfileChange, SlotAvailability } from '../types'
@@ -12,6 +13,7 @@ export async function readImageSize(file: File) {
 }
 
 export const advertisingApi = {
+  ...portalApi,
   getMe: () => httpClient.get<User>('/advertiser/me'),
   getProfile: () => httpClient.get<AdvertiserProfile>('/advertiser/profile'),
   getProfileHistory: () => httpClient.get<AdvertiserProfileChange[]>('/advertiser/profile/history'),
@@ -86,6 +88,20 @@ export const advertisingApi = {
     form.append('file', data.file)
     form.append('title', data.title)
     form.append('targetUrl', data.targetUrl)
+    return httpClient.postFormData<AdCreative>(`/advertiser/campaigns/${campaignId}/creatives`, form)
+  },
+
+  replaceCreative: async (campaignId: string, data: { title: string; targetUrl: string; file?: File; keepCurrentImage: boolean; replacementReason: string; requestedEffectiveAt?: string }) => {
+    if (APP_CONFIG.useMockApi) {
+      throw new Error('Thay banner cần kết nối hệ thống thật. Vui lòng chuyển sang chế độ API thật để gửi yêu cầu.')
+    }
+    const form = new FormData()
+    if (data.file && !data.keepCurrentImage) form.append('file', data.file)
+    form.append('title', data.title)
+    form.append('targetUrl', data.targetUrl)
+    form.append('keepCurrentImage', String(data.keepCurrentImage))
+    form.append('replacementReason', data.replacementReason)
+    if (data.requestedEffectiveAt) form.append('requestedEffectiveAt', data.requestedEffectiveAt)
     return httpClient.postFormData<AdCreative>(`/advertiser/campaigns/${campaignId}/creatives`, form)
   },
 }

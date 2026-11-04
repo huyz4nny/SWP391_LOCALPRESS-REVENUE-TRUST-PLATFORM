@@ -38,6 +38,14 @@ public interface ArticleVersionRepository
             @Param("imageUrl") String imageUrl
     );
 
+    @Query("""
+            SELECT (COUNT(v) > 0) FROM ArticleVersion v, Article a
+            WHERE v.articleId = a.id AND a.status = :status
+              AND v.versionNumber = a.publishedVersion AND v.coverImageUrl = :imageUrl
+            """)
+    boolean existsPublishedCoverImage(@Param("status") Article.Status status,
+                                      @Param("imageUrl") String imageUrl);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT v

@@ -1,0 +1,114 @@
+.ad-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 24px;
+}
+.ad-page > *,
+.ad-page .grid > * {
+  min-width: 0;
+}
+.ad-page h1 {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+}
+.ad-page h2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.ad-table-frame {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgb(var(--slate-200));
+  border-radius: 8px;
+}
+.ad-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ad-table th {
+  padding: 12px;
+  text-align: left;
+  color: rgb(var(--slate-600));
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ad-table td {
+  padding: 12px;
+  border-top: 1px solid rgb(var(--slate-200));
+  vertical-align: top;
+}
+.ad-table tbody tr:hover {
+  background: rgb(var(--slate-50));
+}
+.ad-table .ad-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ad-table a {
+  color: var(--chart-bar);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ad-filter {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid rgb(var(--slate-300));
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: rgb(var(--slate-900));
+  background: rgb(var(--surface));
+  font-size: 13px;
+  max-width: 100%;
+}
+.ad-filter:focus-visible {
+  outline: 2px solid var(--chart-bar);
+  outline-offset: 2px;
+}
+.ad-print {
+  max-width: 800px;
+  margin: auto;
+}
+.ad-print .ad-table td,
+.ad-print .ad-table th {
+  color: inherit;
+}
+@media print {
+  @page ad-acceptance {
+    size: A4;
+    margin: 12mm;
+  }
+  body:has(.ad-print) {
+    page: ad-acceptance;
+  }
+  body:has(.ad-print) * {
+    visibility: hidden;
+  }
+  body:has(.ad-print) .ad-print,
+  body:has(.ad-print) .ad-print * {
+    visibility: visible;
+  }
+  body:has(.ad-print) .ad-print {
+    page: ad-acceptance;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    background: white !important;
+  }
+  body:has(.ad-print) .ad-print * {
+    color: black !important;
+    background: transparent !important;
+  }
+  body:has(.ad-print) .ad-no-print {
+    display: none;
+  }
+}

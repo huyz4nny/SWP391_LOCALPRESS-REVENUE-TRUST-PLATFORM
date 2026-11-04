@@ -261,7 +261,7 @@ export function ArticleVersionHistoryDialog({
             restoreInFlight.current ||
             selectedVersion === null ||
             !latestVersion ||
-            selectedVersion === latestVersion.versionNumber ||
+            (selectedVersion === latestVersion.versionNumber && !latestVersion.published) ||
             restoreBlocked
         ) {
             return
@@ -468,7 +468,7 @@ export function ArticleVersionHistoryDialog({
 
                                         <div className="mt-5 space-y-2 border-t border-slate-200 pt-4">
                                             {latestVersion &&
-                                                selectedVersion !== latestVersion.versionNumber && (
+                                                (selectedVersion !== latestVersion.versionNumber || latestVersion.published) && (
                                                     <Button
                                                         type="button"
                                                         variant="outline"

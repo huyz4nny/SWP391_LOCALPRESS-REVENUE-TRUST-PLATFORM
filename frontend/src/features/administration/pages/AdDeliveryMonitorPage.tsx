@@ -1,106 +1,64 @@
-import React, { useState, useEffect } from 'react'
-import { AdDeliveryLiveStatus } from '../types'
+import { useEffect, useState } from 'react'
+import type { AdDeliveryLiveStatus } from '../types'
 import { adminApi } from '../api'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { formatDateTime } from '@/lib/format'
-import { Activity, Megaphone, CheckCircle2, PauseCircle, Clock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export function AdDeliveryMonitorPage() {
   const [stats, setStats] = useState<AdDeliveryLiveStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [refresh, setRefresh] = useState(0)
 
   useEffect(() => {
-    loadStats()
-  }, [])
+    let active = true
+    void adminApi.getAdDeliveryStatus().then(data => {
+      if (active) setStats(data)
+    }).catch((e: unknown) => {
+      if (active) setError(e instanceof Error ? e.message : 'Không tải được trạng thái quảng cáo')
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [refresh])
 
-  const loadStats = async () => {
-    try {
-      setLoading(true)
-      setError('')
-      const data = await adminApi.getAdDeliveryStatus()
-      setStats(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được trạng thái quảng cáo')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {error && <p role="alert" className="text-red-700">{error}</p>}
-      {loading && <p role="status">Đang tải trạng thái quảng cáo...</p>}
-      {!loading && !error && stats.length === 0 && <EmptyState title="Chưa có vị trí quảng cáo" />}
-      <div className="pb-4 border-b border-slate-200">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Giám sát Động cơ Phân phối Quảng cáo (Ad Delivery Engine)
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Trạng thái chiến dịch đủ điều kiện và số lượt hiển thị, lượt nhấp đã ghi nhận trong ngày.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((slot) => {
-          const isServing = slot.status === 'SERVING'
-          return (
-            <div
-              key={slot.slotId}
-              className={`p-6 rounded-xl border bg-white shadow-2xs space-y-4 ${
-                isServing ? 'border-sky-300 ring-2 ring-sky-50' : 'border-slate-200'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-slate-500">{slot.slotCode}</span>
-                <StatusBadge type="delivery" status={isServing ? 'ELIGIBLE' : slot.status === 'OVER_CAPACITY' ? 'PAUSED' : 'NOT_STARTED'} />
-              </div>
-
-              <div>
-                <h3 className="font-bold text-base text-slate-900">{slot.slotName}</h3>
-                <div className="text-xs text-slate-500 mt-1">
-                  Sức chứa hiện tại: <strong>{slot.currentActiveCampaigns} / {slot.maxCapacity}</strong> chiến dịch luân phiên
-                  {slot.status === 'OVER_CAPACITY' && <p className="mt-1 text-red-700">Số chiến dịch vượt sức chứa; cần kiểm tra lịch đặt chỗ.</p>}
-                </div>
-              </div>
-
-              {isServing && slot.lastServedCreativeTitle ? (
-                <div className="p-3 bg-sky-50 rounded-lg border border-sky-100 text-xs space-y-1">
-                  <span className="text-[10px] text-sky-600 font-semibold uppercase block">
-                    Banner phát gần nhất:
-                  </span>
-                  <div className="font-bold text-slate-900 truncate">
-                    {slot.lastServedCreativeTitle}
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    Lúc: {formatDateTime(slot.lastServedAt)}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-400 italic text-center">
-                  Hiện tại vị trí này đang để trống hoặc chưa có banner được duyệt.
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Hiển thị hôm nay</span>
-                  <span className="font-bold text-slate-900">{slot.todayImpressions.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Lượt nhấp</span>
-                  <span className="font-bold text-slate-900">{slot.todayClicks.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Tỷ lệ CTR</span>
-                  <span className="font-bold text-primary-900">{slot.todayCtr}%</span>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+  return <div className="space-y-6">
+    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
+      <div><h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Giám sát phân phối quảng cáo</h1>
+        <p className="mt-2 text-sm text-slate-600">Chiến dịch đủ điều kiện phát và lượt hiển thị, lượt nhấp đã ghi nhận trong ngày.</p>
+        <p className="mt-1 text-xs text-slate-500">Đủ điều kiện phát không đồng nghĩa banner đang được một độc giả xem.</p></div>
+      <Button variant="outline" disabled={loading} onClick={() => {
+        setLoading(true); setError(''); setRefresh(value => value + 1)
+      }}>Làm mới dữ liệu</Button>
+    </header>
+    {error && <p role="alert" className="text-crimson">{error}</p>}
+    {loading && <p role="status">Đang tải trạng thái quảng cáo...</p>}
+    {!loading && !error && stats.length === 0 && <EmptyState title="Chưa có vị trí quảng cáo" />}
+    {!loading && !error && <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {stats.map(slot => {
+        const disabled = slot.status === 'INACTIVE'
+        const overCapacity = slot.status === 'OVER_CAPACITY'
+        const eligible = slot.currentActiveCampaigns > 0 && !disabled
+        const badge = disabled ? 'DISABLED' : overCapacity ? 'OVER_CAPACITY' : eligible ? 'ELIGIBLE' : 'NOT_STARTED'
+        return <section key={slot.slotId} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-mono text-xs text-slate-500">{slot.slotCode}</span>
+            <StatusBadge type="delivery" status={badge} />
+          </div>
+          <h2 className="text-base font-bold text-slate-900">{slot.slotName}</h2>
+          <p className="text-sm text-slate-600">Chiến dịch đủ điều kiện: <strong>{slot.currentActiveCampaigns}</strong> · Sức chứa: <strong>{slot.maxCapacity}</strong></p>
+          <p className={overCapacity ? 'text-sm text-crimson' : 'text-sm text-slate-600'}>
+            {disabled ? 'Vị trí đã tắt; không nhận booking mới và không phân phối banner.'
+              : overCapacity ? 'Số chiến dịch đủ điều kiện vượt sức chứa. Cần kiểm tra lịch đặt chỗ.'
+              : eligible ? 'Có banner đủ điều kiện để phân phối cho độc giả không có quyền miễn quảng cáo.'
+              : 'Chưa có banner đáp ứng đầy đủ điều kiện phát tại thời điểm cập nhật.'}
+          </p>
+          <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-sm">
+            <div><span className="block text-xs text-slate-500">Hiển thị hôm nay</span><strong>{slot.todayImpressions.toLocaleString('vi-VN')}</strong></div>
+            <div><span className="block text-xs text-slate-500">Lượt nhấp</span><strong>{slot.todayClicks.toLocaleString('vi-VN')}</strong></div>
+            <div><span className="block text-xs text-slate-500">CTR</span><strong>{slot.todayCtr.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%</strong></div>
+          </div>
+        </section>
+      })}
+    </div>}
+  </div>
 }

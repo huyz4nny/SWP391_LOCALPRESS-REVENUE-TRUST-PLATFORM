@@ -75,8 +75,8 @@ public class PaywallPolicyService {
         Settings saved = new Settings(input.previewWordLimit(), 2, true, 15000, false,
                 LocalDateTime.now(clock).toString(), actorName);
         try {
-            jdbc.update("INSERT INTO audit_logs(user_id,action,target_type,old_value,new_value,ip_address) "
-                    + "VALUES (?,'UPDATE_PAYWALL_SETTINGS','PAYWALL_SETTINGS',?,?,?)", actorId,
+            jdbc.update("INSERT INTO audit_logs(user_id,action,target_type,old_value,new_value,ip_address,result) "
+                    + "VALUES (?,'UPDATE_PAYWALL_SETTINGS','PAYWALL_SETTINGS',?,?,?,'SUCCESS')", actorId,
                     json.writeValueAsString(read()), json.writeValueAsString(saved), ip);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException(e); }
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
