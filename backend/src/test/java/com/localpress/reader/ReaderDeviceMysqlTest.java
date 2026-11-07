@@ -4,6 +4,8 @@ import com.localpress.reader.service.ArticlePublishedNotificationService;
 import com.localpress.reader.service.ReaderDeviceSessionService;
 import com.localpress.shared.device.DeviceLimitReachedException;
 import com.localpress.shared.event.ArticlePublishedEvent;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,17 +14,24 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// Chạy sau khi backend đã áp V11. Không bật trong mvn test thường.
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+// Schema riêng, không ghi localpress_db. Không bật trong mvn test thường:
+// mvn test -Dtest=ReaderDeviceMysqlTest -Dlocalpress.device.it=true
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = "spring.datasource.url=jdbc:mysql://localhost:3306/localpress_sv3_device_it?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true"
+)
 @ActiveProfiles("dev")
 @EnabledIfSystemProperty(named = "localpress.device.it", matches = "true")
 class ReaderDeviceMysqlTest {
+
+    private static final String SCHEMA = "localpress_sv3_device_it";
 
     @Autowired
     private ReaderDeviceSessionService sessions;
@@ -33,9 +42,46 @@ class ReaderDeviceMysqlTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    private long userId;
+    private long categoryId;
+
+    @BeforeEach
+    void createFixture() {
+        assertEquals(SCHEMA, jdbc.queryForObject("SELECT DATABASE()", String.class));
+        String token = UUID.randomUUID().toString().substring(0, 8);
+        jdbc.update("""
+                INSERT INTO users (email, password_hash, full_name, role)
+                VALUES (?, 'x', 'Doc gia IT', 'READER')
+                """, "sv3-device-" + token + "@it.test");
+        userId = jdbc.queryForObject(
+                "SELECT user_id FROM users WHERE email = ?",
+                Long.class,
+                "sv3-device-" + token + "@it.test");
+        jdbc.update("""
+                INSERT INTO categories (name, slug, status)
+                VALUES ('Chuyen muc IT', ?, 'ACTIVE')
+                """, "sv3-device-" + token);
+        categoryId = jdbc.queryForObject(
+                "SELECT category_id FROM categories WHERE slug = ?",
+                Long.class,
+                "sv3-device-" + token);
+    }
+
+    @AfterEach
+    void deleteFixture() {
+        if (userId > 0) {
+            jdbc.update("DELETE FROM notifications WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM category_follows WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM user_devices WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM users WHERE user_id = ?", userId);
+        }
+        if (categoryId > 0) {
+            jdbc.update("DELETE FROM categories WHERE category_id = ?", categoryId);
+        }
+    }
+
     @Test
     void registerStopsAtTwoAndNotificationIsUnique() {
-        long userId = Long.parseLong(System.getProperty("localpress.device.userId"));
         Instant expiresAt = Instant.now().plusSeconds(3600);
 
         var first = sessions.register(userId, "Máy tính E2E", "DESKTOP", "127.0.0.1", expiresAt);
@@ -56,13 +102,12 @@ class ReaderDeviceMysqlTest {
         assertEquals("Trình duyệt", defaultName);
 
         jdbc.update("""
-                INSERT INTO category_follows (user_id, category_id) VALUES (?, 2)
-                ON DUPLICATE KEY UPDATE user_id = user_id
-                """, userId);
+                INSERT INTO category_follows (user_id, category_id) VALUES (?, ?)
+                """, userId, categoryId);
         ArticlePublishedEvent event = ArticlePublishedEvent.builder()
                 .eventId("e2e-device")
                 .articleId(1L)
-                .categoryId(2L)
+                .categoryId(categoryId)
                 .versionNumber(1)
                 .title("Bài thông báo E2E")
                 .slug("bai-thong-bao-e2e")
