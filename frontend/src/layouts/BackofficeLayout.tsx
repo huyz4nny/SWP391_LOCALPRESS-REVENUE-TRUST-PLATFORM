@@ -64,9 +64,10 @@ export function BackofficeLayout() {
   }, [location.pathname])
 
   const isStaff = PERMISSION_CHECKERS.canAccessBackoffice(currentUser.role)
-  const canSeeEditorial = PERMISSION_CHECKERS.canAccessEditorial(currentUser.role)
-    || PERMISSION_CHECKERS.canComposeArticles(currentUser.role)
-  const canSeeFinance = PERMISSION_CHECKERS.canAccessFinance(currentUser.role)
+  const isSystemAdmin = currentUser.role === 'SYSTEM_ADMIN'
+  const canSeeEditorial = !isSystemAdmin && (PERMISSION_CHECKERS.canAccessEditorial(currentUser.role)
+    || PERMISSION_CHECKERS.canComposeArticles(currentUser.role))
+  const canSeeFinance = !isSystemAdmin && PERMISSION_CHECKERS.canAccessFinance(currentUser.role)
   const canSeeAdmin = PERMISSION_CHECKERS.canAccessAdmin(currentUser.role)
 
   if (!isStaff) {
