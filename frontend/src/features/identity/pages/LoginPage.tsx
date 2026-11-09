@@ -109,11 +109,18 @@ export function LoginPage() {
       const matched = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
       if (matched) {
         mockStore.setCurrentUser(matched.id)
+        if (PERMISSION_CHECKERS.canAccessBackoffice(matched.role)) {
+          navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(matched.role), { replace: true })
+        } else if (matched.role === 'ADVERTISER') {
+          navigate('/advertiser', { replace: true })
+        } else {
+          navigate(from === '/login' ? '/' : from, { replace: true })
+        }
       } else {
         mockStore.setCurrentUser('user-reader-free')
+        navigate(from === '/login' ? '/' : from, { replace: true })
       }
       setIsLoading(false)
-      navigate(from, { replace: true })
     }, 400)
   }
 
