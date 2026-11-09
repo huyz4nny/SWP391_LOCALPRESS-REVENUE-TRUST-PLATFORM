@@ -153,8 +153,8 @@ export function BackofficeLayout() {
     .filter((p) => location.pathname === p || location.pathname.startsWith(p + '/'))
     .sort((a, b) => b.length - a.length)[0]
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
   }
 

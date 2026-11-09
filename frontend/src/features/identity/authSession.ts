@@ -3,9 +3,18 @@ import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
 
-export function logout(): void {
-    httpClient.logoutAllTabs()
-    mockStore.setCurrentUser('user-guest')
+export function logout(): Promise<void> {
+    const finish = () => {
+        httpClient.logoutAllTabs()
+        mockStore.setCurrentUser('user-guest')
+    }
+    // Token phải còn khi gọi, server mới đọc được sid và thu hồi user_devices.
+    // API lỗi hoặc không có mạng thì vẫn xóa token trên trình duyệt.
+    if (APP_CONFIG.useMockApi || !httpClient.hasAuth()) {
+        finish()
+        return Promise.resolve()
+    }
+    return httpClient.post<void>('/auth/logout', {}).catch(() => undefined).finally(finish).then(() => undefined)
 }
 
 /** Failed login: this tab goes back to the login it had before; other tabs are not logged out. */
