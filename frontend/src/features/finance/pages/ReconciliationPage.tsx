@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { ReconciliationPeriod, ReconciliationDiscrepancy, DiscrepancyAction } from '../types'
 import { financeApi } from '../api'
 import { mockStore } from '@/mocks/store'
+import { PERMISSION_CHECKERS } from '@/app/config'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,7 +34,7 @@ const currentMonth = () => new Date().toISOString().slice(0, 7)
  */
 export function ReconciliationPage() {
   const currentUser = mockStore.getCurrentUser()
-  const isManager = currentUser.role === 'FINANCE_MANAGER' || currentUser.role === 'SYSTEM_ADMIN'
+  const isManager = PERMISSION_CHECKERS.canApproveRefunds(currentUser.role)
 
   const [month, setMonth] = useState(currentMonth())
   const [period, setPeriod] = useState<ReconciliationPeriod | null>(null)

@@ -1065,7 +1065,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (!row) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Đơn chưa có chứng từ (chưa thu tiền)', path: pathname })
     }
-    const isFinance = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN'].includes(currentUser.role)
+    const isFinance = ['ACCOUNTANT', 'FINANCE_STAFF', 'CHIEF_ACCOUNTANT', 'STAFF'].includes(currentUser.role)
     if (!isFinance && row.owner !== currentUser.id) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 403, error: 'Forbidden', message: 'Bạn không có quyền xem chứng từ này', path: pathname })
     }
@@ -1142,7 +1142,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   }
 
   if (pathname === '/finance/reconciliation/close' && method === 'POST') {
-    if (currentUser.role !== 'FINANCE_MANAGER' && currentUser.role !== 'SYSTEM_ADMIN') {
+    if (currentUser.role !== 'CHIEF_ACCOUNTANT') {
       throw mockError(403, 'Chỉ Kế toán trưởng được chốt kỳ đối soát')
     }
     const rec = withReconciliationCounts(mockStore.getState().reconciliation)

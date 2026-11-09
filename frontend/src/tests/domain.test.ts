@@ -261,21 +261,24 @@ describe('LocalPress Core Business Domain Tests', () => {
       expect(PERMISSION_CHECKERS.canAccessEditorial('ACCOUNTANT')).toBe(false)
       expect(PERMISSION_CHECKERS.canAccessFinance('ACCOUNTANT')).toBe(true)
       expect(PERMISSION_CHECKERS.canAccessAdmin('ACCOUNTANT')).toBe(false)
-      expect(PERMISSION_CHECKERS.canApproveRefunds('ACCOUNTANT')).toBe(true)
+      // Kế toán viên là mắt 1 (lập đề xuất), không tự duyệt hoàn tiền
+      expect(PERMISSION_CHECKERS.canApproveRefunds('ACCOUNTANT')).toBe(false)
       expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('ACCOUNTANT')).toBe('/backoffice/finance')
 
       // Regular Finance Staff cannot approve refunds (4-eyes principle)
       expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_STAFF')).toBe(false)
-      expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_MANAGER')).toBe(true)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('CHIEF_ACCOUNTANT')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessFinance('CHIEF_ACCOUNTANT')).toBe(true)
+      expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('CHIEF_ACCOUNTANT')).toBe('/backoffice/finance')
     })
 
-    it('System Admin has access across all backoffice subsystems', async () => {
+    it('System Admin manages the system but never touches money', async () => {
       const { PERMISSION_CHECKERS } = await import('../app/config')
 
       expect(PERMISSION_CHECKERS.canAccessEditorial('SYSTEM_ADMIN')).toBe(true)
-      expect(PERMISSION_CHECKERS.canAccessFinance('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canAccessFinance('SYSTEM_ADMIN')).toBe(false)
       expect(PERMISSION_CHECKERS.canAccessAdmin('SYSTEM_ADMIN')).toBe(true)
-      expect(PERMISSION_CHECKERS.canApproveRefunds('SYSTEM_ADMIN')).toBe(true)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('SYSTEM_ADMIN')).toBe(false)
       expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('SYSTEM_ADMIN')).toBe('/backoffice/admin')
     })
   })

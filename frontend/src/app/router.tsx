@@ -120,7 +120,7 @@ function NotFoundPage() {
 const ARTICLE_LIST_ROLES: UserRole[] = ['AUTHOR', 'EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
 const ARTICLE_WRITING_ROLES: UserRole[] = ['AUTHOR', 'EDITOR', 'SYSTEM_ADMIN']
 const EDITORIAL_ROLES: UserRole[] = ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN']
-const FINANCE_ROLES: UserRole[] = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN']
+const FINANCE_ROLES: UserRole[] = ['ACCOUNTANT', 'FINANCE_STAFF', 'CHIEF_ACCOUNTANT', 'STAFF']
 const ADMIN_ROLES: UserRole[] = ['SYSTEM_ADMIN']
 
 function BackofficeIndexRedirect() {

@@ -25,7 +25,7 @@ INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, 
 -- (thuộc module identity), nhóm thống nhất SYSTEM_ADMIN giữ vai Kế toán trưởng (FinanceCurrentUser.FINANCE_MANAGER_ROLES).
 -- Không ghi user_id để không trùng id với dữ liệu seed của module khác; mật khẩu "password".
 INSERT INTO users (email, password_hash, full_name, phone, avatar_url, role, status) VALUES
-('ketoantruong@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Kế Toán Trưởng (SV4)', '0903456790', NULL, 'SYSTEM_ADMIN', 'ACTIVE');
+('ketoantruong@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Kế Toán Trưởng (SV4)', '0903456790', NULL, 'CHIEF_ACCOUNTANT', 'ACTIVE');
 
 -- 1.1 USER DEVICES (Khống chế tối đa 2 thiết bị - Độc giả Mai)
 INSERT INTO user_devices (device_id, user_id, device_name, device_type, device_token, ip_address) VALUES

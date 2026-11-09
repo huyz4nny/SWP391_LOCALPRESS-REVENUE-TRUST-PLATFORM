@@ -31,7 +31,7 @@ import org.springframework.security.web.SecurityFilterChain;
  *    - Public: Tin tức Free, chuyên mục, danh mục slot QC, webhook cổng thanh toán IPN.
  *    - Phân hệ Quảng cáo (SV1): Yêu cầu Role ADVERTISER hoặc SYSTEM_ADMIN.
  *    - Phân hệ Biên tập tòa soạn (SV2): Yêu cầu Role EDITOR, STAFF hoặc SYSTEM_ADMIN.
- *    - Phân hệ Tài chính kế toán (SV4): Yêu cầu Role ACCOUNTANT, STAFF hoặc SYSTEM_ADMIN.
+ *    - Phân hệ Tài chính kế toán (SV4): Yêu cầu Role ACCOUNTANT, CHIEF_ACCOUNTANT hoặc STAFF (không có SYSTEM_ADMIN).
  *    - Phân hệ Quản trị (SV5): Yêu cầu Role SYSTEM_ADMIN.
  * 3. Xác thực người dùng (Authentication):
  *    - Hỗ trợ HTTP Basic Auth (phục vụ test tự động và tích hợp ban đầu).
@@ -90,7 +90,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/documents/**").authenticated()
                         // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
                         .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
-                        .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN")
+                        .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "CHIEF_ACCOUNTANT", "STAFF")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)
                         .requestMatchers("/api/v1/admin/**", "/api/v1/administration/**").hasRole("SYSTEM_ADMIN")
