@@ -39,7 +39,7 @@ export function LoginPage() {
       if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
         navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
       } else if (user.role === 'ADVERTISER') {
-        navigate('/advertiser/profile', { replace: true })
+        navigate('/advertiser', { replace: true })
       } else {
         navigate(from === '/login' ? '/' : from, { replace: true })
       }
@@ -77,7 +77,7 @@ export function LoginPage() {
         if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
           navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
         } else if (user.role === 'ADVERTISER') {
-          navigate('/advertiser/profile', { replace: true })
+          navigate('/advertiser', { replace: true })
         } else {
           navigate(from === '/login' ? '/' : from, { replace: true })
         }

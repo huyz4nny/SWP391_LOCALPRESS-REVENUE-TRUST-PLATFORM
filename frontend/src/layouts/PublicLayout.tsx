@@ -19,6 +19,13 @@ import { PERMISSION_CHECKERS } from '@/app/config'
 import { logout } from '@/features/identity/authSession'
 import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
 
+function getBackofficeLabel(role: string): string {
+  if (role === 'SYSTEM_ADMIN') return 'Vào Quản Trị'
+  if (['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF'].includes(role)) return 'Vào Tài Chính'
+  if (['AUTHOR', 'EDITOR', 'REVIEWER'].includes(role)) return 'Vào Tòa Soạn'
+  return 'Vào Backoffice'
+}
+
 export function PublicLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
   const [categories, setCategories] = useState(mockStore.getState().categories)
@@ -108,7 +115,7 @@ export function PublicLayout() {
                       title="Chuyển đến không gian làm việc Tòa soạn / Quản trị"
                     >
                       <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
-                      Vào Tòa Soạn
+                      {getBackofficeLabel(currentUser.role)}
                     </Link>
                     <span className="text-stone-300">|</span>
                   </>
