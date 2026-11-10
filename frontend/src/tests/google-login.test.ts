@@ -90,3 +90,25 @@ it('uses Bearer for private images and uploads without forcing Basic Auth', asyn
     expect(options.headers.has('Content-Type')).toBe(false)
   }
 })
+
+it('logging in again in a tab revokes the session it replaces', async () => {
+  httpClient.setBearerToken('old-jwt')
+  fetchMock.mockResolvedValueOnce(json({ accessToken: 'new-jwt', tokenType: 'Bearer', expiresIn: 3600 }))
+    .mockResolvedValueOnce(json(user))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+  await loginWithGoogle('google-id-token')
+  const revoke = fetchMock.mock.calls[2]
+  expect(revoke[0]).toMatch(/\/auth\/logout$/)
+  expect(revoke[1].headers.Authorization).toBe('Bearer old-jwt')
+  expect(httpClient.currentBearerToken()).toBe('new-jwt')
+})
+
+it('revokes the just-issued session when me fails, so it does not hold a device slot', async () => {
+  fetchMock.mockResolvedValueOnce(json({ accessToken: 'orphan-jwt', tokenType: 'Bearer', expiresIn: 3600 }))
+    .mockResolvedValueOnce(json({ message: 'Locked' }, 403))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+  await expect(loginWithGoogle('google-token')).rejects.toThrow()
+  const revoke = fetchMock.mock.calls[2]
+  expect(revoke[0]).toMatch(/\/auth\/logout$/)
+  expect(revoke[1].headers.Authorization).toBe('Bearer orphan-jwt')
+})

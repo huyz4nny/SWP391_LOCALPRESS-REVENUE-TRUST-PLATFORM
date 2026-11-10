@@ -2,7 +2,6 @@ package com.localpress.reader;
 
 import com.localpress.reader.repository.ReaderDeviceRepository;
 import com.localpress.reader.service.ReaderDeviceSessionService;
-import com.localpress.shared.device.DeviceLimitReachedException;
 import com.localpress.shared.device.RegisteredSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,7 @@ class ReaderDeviceSessionServiceTest {
 
     @Test
     void registerWritesOneSessionWhenUnderLimit() {
-        when(repository.lockUser(9L)).thenReturn(true);
+        when(repository.lockUser(9L)).thenReturn(java.util.Optional.of("READER"));
         when(repository.countActive(9L, NOW)).thenReturn(1);
         when(repository.insert(eq(9L), eq("Máy tính"), eq("DESKTOP"), any(), eq("127.0.0.1"), eq(EXPIRES)))
                 .thenReturn(15L);
@@ -52,14 +51,14 @@ class ReaderDeviceSessionServiceTest {
 
     @Test
     void logoutFreesTheSlotSoThreeLoginsDoNotHitTheLimit() {
-        when(repository.lockUser(9L)).thenReturn(true);
+        when(repository.lockUser(9L)).thenReturn(java.util.Optional.of("READER"));
         java.util.Set<String> active = new java.util.HashSet<>();
         when(repository.countActive(eq(9L), eq(NOW))).thenAnswer(invocation -> active.size());
         when(repository.insert(eq(9L), any(), any(), any(), any(), eq(EXPIRES))).thenAnswer(invocation -> {
             active.add(invocation.getArgument(3));
             return (long) active.size();
         });
-        when(repository.revokeBySessionId(any(), eq(NOW))).thenAnswer(invocation ->
+        when(repository.deleteBySessionId(any())).thenAnswer(invocation ->
                 active.remove(invocation.getArgument(0)) ? 1 : 0);
 
         RegisteredSession first = service.register(9L, "Lần 1", "DESKTOP", null, EXPIRES);
@@ -77,24 +76,42 @@ class ReaderDeviceSessionServiceTest {
     void blankSessionIdRevokeDoesNothing() {
         service.revoke("  ");
 
-        verify(repository, never()).revokeBySessionId(any(), any());
+        verify(repository, never()).deleteBySessionId(any());
     }
 
     @Test
-    void thirdActiveSessionIsRejected() {
-        when(repository.lockUser(9L)).thenReturn(true);
+    void thirdReaderLoginEvictsTheOldestSessionInsteadOfFailing() {
+        when(repository.lockUser(9L)).thenReturn(java.util.Optional.of("READER"));
         when(repository.countActive(9L, NOW)).thenReturn(2);
+        when(repository.insert(eq(9L), any(), any(), any(), any(), eq(EXPIRES))).thenReturn(21L);
 
-        DeviceLimitReachedException error = assertThrows(DeviceLimitReachedException.class,
-                () -> service.register(9L, "Điện thoại", "MOBILE", null, EXPIRES));
+        RegisteredSession session = service.register(9L, "Điện thoại", "MOBILE", null, EXPIRES);
 
-        assertEquals(DeviceLimitReachedException.CODE, error.getCode());
-        verify(repository, never()).insert(any(Long.class), any(), any(), any(), any(), any());
+        assertEquals(21L, session.deviceId());
+        verify(repository).deleteOldestActive(9L, NOW, 1);
+    }
+
+    @Test
+    void staffAccountsHaveNoSessionLimit() {
+        when(repository.lockUser(3L)).thenReturn(java.util.Optional.of("ACCOUNTANT"));
+        when(repository.insert(eq(3L), any(), any(), any(), any(), eq(EXPIRES))).thenReturn(30L);
+
+        service.register(3L, "Máy kế toán", "DESKTOP", null, EXPIRES);
+
+        verify(repository, never()).countActive(any(Long.class), any());
+        verify(repository, never()).deleteOldestActive(any(Long.class), any(), any(Integer.class));
+    }
+
+    @Test
+    void unknownUserIsRejected() {
+        when(repository.lockUser(99L)).thenReturn(java.util.Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> service.register(99L, "Máy", "DESKTOP", null, EXPIRES));
     }
 
     @Test
     void blankNameBecomesDefaultAndMissingExpiryIsRejected() {
-        when(repository.lockUser(9L)).thenReturn(true);
+        when(repository.lockUser(9L)).thenReturn(java.util.Optional.of("READER"));
         when(repository.countActive(9L, NOW)).thenReturn(0);
         when(repository.insert(eq(9L), eq("Trình duyệt"), eq("DESKTOP"), any(), eq(null), eq(EXPIRES)))
                 .thenReturn(4L);

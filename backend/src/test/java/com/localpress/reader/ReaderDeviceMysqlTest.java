@@ -2,7 +2,6 @@ package com.localpress.reader;
 
 import com.localpress.reader.service.ArticlePublishedNotificationService;
 import com.localpress.reader.service.ReaderDeviceSessionService;
-import com.localpress.shared.device.DeviceLimitReachedException;
 import com.localpress.shared.event.ArticlePublishedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,16 +80,16 @@ class ReaderDeviceMysqlTest {
     }
 
     @Test
-    void registerStopsAtTwoAndNotificationIsUnique() {
+    void thirdLoginEvictsOldestAndNotificationIsUnique() {
         Instant expiresAt = Instant.now().plusSeconds(3600);
 
         var first = sessions.register(userId, "Máy tính E2E", "DESKTOP", "127.0.0.1", expiresAt);
         var second = sessions.register(userId, " ", "MOBILE", null, expiresAt);
-        assertThrows(DeviceLimitReachedException.class,
-                () -> sessions.register(userId, "Máy thứ ba", "TABLET", null, expiresAt));
+        var third = sessions.register(userId, "Máy thứ ba", "TABLET", null, expiresAt);
 
-        assertTrue(sessions.isActive(first.sessionId()));
+        assertFalse(sessions.isActive(first.sessionId()));
         assertTrue(sessions.isActive(second.sessionId()));
+        assertTrue(sessions.isActive(third.sessionId()));
         Integer active = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM user_devices
                 WHERE user_id = ? AND revoked_at IS NULL
