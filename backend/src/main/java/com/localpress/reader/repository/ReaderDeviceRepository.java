@@ -109,6 +109,14 @@ public class ReaderDeviceRepository {
                 """, Timestamp.from(now), deviceId, userId);
     }
 
+    public int revokeBySessionId(String sessionId, Instant now) {
+        return jdbcTemplate.update("""
+                UPDATE user_devices
+                SET revoked_at = ?
+                WHERE device_token = ? AND revoked_at IS NULL
+                """, Timestamp.from(now), sessionId);
+    }
+
     private static LocalDateTime toLocal(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
     }

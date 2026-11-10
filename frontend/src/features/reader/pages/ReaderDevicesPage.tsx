@@ -33,7 +33,7 @@ export function ReaderDevicesPage() {
       await devices.revoke(target.deviceId)
       setConfirmId(null)
       if (wasCurrent) {
-        logout()
+        await logout()
         navigate('/login')
       }
     } catch (err) {

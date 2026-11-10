@@ -157,8 +157,8 @@ export function ReaderAccountLayout() {
               })}
               {/* nut Dang xuat o cuoi menu */}
               <button
-                onClick={() => {
-                  logout()
+                onClick={async () => {
+                  await logout()
                   navigate('/')
                 }}
                 className="mt-2 flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 cursor-pointer"

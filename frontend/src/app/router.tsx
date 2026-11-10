@@ -53,6 +53,10 @@ import {
   CreativeReviewPage,
   CommentModerationPage,
   AdvertisingInventoryCalendarPage,
+  CampaignEligibilityPage,
+  CampaignControlPage,
+  AdvertisingContractPage,
+  BusinessOperationDashboardPage,
 } from '@/features/editorial'
 
 // Finance
@@ -271,6 +275,38 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <CommentModerationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/dashboard',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <BusinessOperationDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/eligibility',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <CampaignEligibilityPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/control',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <CampaignControlPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'editorial/contracts',
+        element: (
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+            <AdvertisingContractPage />
           </ProtectedRoute>
         ),
       },

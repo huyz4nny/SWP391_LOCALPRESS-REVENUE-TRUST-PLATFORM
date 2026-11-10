@@ -51,6 +51,36 @@ class ReaderDeviceSessionServiceTest {
     }
 
     @Test
+    void logoutFreesTheSlotSoThreeLoginsDoNotHitTheLimit() {
+        when(repository.lockUser(9L)).thenReturn(true);
+        java.util.Set<String> active = new java.util.HashSet<>();
+        when(repository.countActive(eq(9L), eq(NOW))).thenAnswer(invocation -> active.size());
+        when(repository.insert(eq(9L), any(), any(), any(), any(), eq(EXPIRES))).thenAnswer(invocation -> {
+            active.add(invocation.getArgument(3));
+            return (long) active.size();
+        });
+        when(repository.revokeBySessionId(any(), eq(NOW))).thenAnswer(invocation ->
+                active.remove(invocation.getArgument(0)) ? 1 : 0);
+
+        RegisteredSession first = service.register(9L, "Lần 1", "DESKTOP", null, EXPIRES);
+        service.revoke(first.sessionId());
+        RegisteredSession second = service.register(9L, "Lần 2", "DESKTOP", null, EXPIRES);
+        service.revoke(second.sessionId());
+        RegisteredSession third = service.register(9L, "Lần 3", "DESKTOP", null, EXPIRES);
+
+        assertFalse(third.sessionId().isBlank());
+        assertEquals(1, active.size());
+        assertTrue(active.contains(third.sessionId()));
+    }
+
+    @Test
+    void blankSessionIdRevokeDoesNothing() {
+        service.revoke("  ");
+
+        verify(repository, never()).revokeBySessionId(any(), any());
+    }
+
+    @Test
     void thirdActiveSessionIsRejected() {
         when(repository.lockUser(9L)).thenReturn(true);
         when(repository.countActive(9L, NOW)).thenReturn(2);
