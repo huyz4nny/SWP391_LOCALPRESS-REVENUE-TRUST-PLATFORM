@@ -7,9 +7,11 @@ import com.localpress.finance.service.PaymentProcessingService;
 import com.localpress.finance.service.SepayGatewayService;
 import com.localpress.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,11 +20,14 @@ import java.util.Map;
  * ==============================================================================
  * CONTROLLER: NHẬT KÝ & ĐỒNG BỘ SEPAY (SV4 - UC048, UC049, UC050)
  * ==============================================================================
- * Kế toán: GET  /api/v1/finance/sepay/logs?source=WEBHOOK&limit=100   xem nhật ký tiền SePay báo về
- *          GET  /api/v1/finance/sepay/status                         cấu hình webhook / API token
- *          POST /api/v1/finance/sepay/sync?hours=24                  kéo giao dịch từ API SePay
- * Khách:   POST /api/v1/finance/orders/code/{code}/check-sepay        nút "Tôi đã chuyển khoản, kiểm tra lại"
- * /sepay/** rơi vào quy tắc finance staff của SecurityConfig; kiểm tra lại vai trò ở đây.
+ * Kế toán: GET /api/v1/finance/sepay/logs?source=WEBHOOK&from=2026-11-01&to=2026-11-30&page=0&size=50
+ * xem nhật ký tiền SePay báo về (phân trang, mới nhất trước)
+ * GET /api/v1/finance/sepay/status cấu hình webhook / API token
+ * POST /api/v1/finance/sepay/sync?hours=24 kéo giao dịch từ API SePay
+ * Khách: POST /api/v1/finance/orders/code/{code}/check-sepay nút "Tôi đã chuyển
+ * khoản, kiểm tra lại"
+ * /sepay/** rơi vào quy tắc finance staff của SecurityConfig; kiểm tra lại vai
+ * trò ở đây.
  */
 @RestController
 @RequestMapping("/api/v1/finance")
@@ -34,12 +39,15 @@ public class SepayGatewayController {
     private final FinanceCurrentUser currentUser;
 
     @GetMapping("/sepay/logs")
-    public ResponseEntity<ApiResponse<List<SepayWebhookLog>>> logs(
+    public ResponseEntity<ApiResponse<SepayGatewayService.LogPage>> logs(
             @RequestParam(required = false) SepayWebhookLog.Source source,
-            @RequestParam(defaultValue = "100") int limit
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
         requireFinanceStaff();
-        return ResponseEntity.ok(ApiResponse.ok("Nhật ký SePay", sepayGatewayService.recentLogs(source, limit)));
+        return ResponseEntity.ok(ApiResponse.ok("Nhật ký SePay",
+                sepayGatewayService.searchLogs(source, from, to, page, size)));
     }
 
     @GetMapping("/sepay/status")
@@ -49,20 +57,24 @@ public class SepayGatewayController {
     }
 
     @PostMapping("/sepay/sync")
-    public ResponseEntity<ApiResponse<SepayGatewayService.SyncResult>> sync(@RequestParam(defaultValue = "24") int hours) {
+    public ResponseEntity<ApiResponse<SepayGatewayService.SyncResult>> sync(
+            @RequestParam(defaultValue = "24") int hours) {
         requireFinanceStaff();
         SepayGatewayService.SyncResult result = sepayGatewayService.syncFromSepay(hours, null);
-        return ResponseEntity.ok(ApiResponse.ok("Đã đồng bộ " + result.processed() + " giao dịch mới từ SePay", result));
+        return ResponseEntity
+                .ok(ApiResponse.ok("Đã đồng bộ " + result.processed() + " giao dịch mới từ SePay", result));
     }
 
     /**
-     * Khách bấm "Tôi đã chuyển khoản, kiểm tra lại": hỏi thẳng API SePay cho đúng đơn này rồi trả trạng thái mới.
-     * Quyền chỉ được cấp khi SePay có giao dịch thật khớp mã đơn (Rule 4), không dựa vào trình duyệt.
+     * Khách bấm "Tôi đã chuyển khoản, kiểm tra lại": hỏi thẳng API SePay cho đúng
+     * đơn này rồi trả trạng thái mới.
+     * Quyền chỉ được cấp khi SePay có giao dịch thật khớp mã đơn (Rule 4), không
+     * dựa vào trình duyệt.
      */
     @PostMapping("/orders/code/{orderCode}/check-sepay")
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkOrder(@PathVariable String orderCode) {
         FinanceCurrentUser.Principal principal = currentUser.require();
-        // Kiểm tra chủ đơn (403 nếu không phải) trước khi hỏi SePay
+        // Kiểm tra chủ đơn (403 nếu không phải) trước khi hỏi SePay !!!Quan Trọng
         OrderStatusResponse before = paymentProcessingService.getOrderStatusByCode(principal, orderCode);
         Map<String, Object> check = sepayGatewayService.checkOrderWithSepay(orderCode, before.getCreatedAt());
         OrderStatusResponse status = paymentProcessingService.getOrderStatusByCode(principal, orderCode);

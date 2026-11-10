@@ -138,9 +138,11 @@ d = data((s, b))
 check("check-sepay trả kết quả + trạng thái đơn", s == 200 and isinstance(d, dict) and "order" in d, f"HTTP {s} checked={d.get('checked') if isinstance(d, dict) else d} reason={d.get('reason') if isinstance(d, dict) else ''}")
 
 # 11. Kế toán xem nhật ký; khách không xem được
-s, b = call("GET", "/finance/sepay/logs?limit=20", None, {"Authorization": STAFF})
-logs = data((s, b))
-check("Kế toán xem nhật ký", s == 200 and isinstance(logs, list) and len(logs) >= 8, f"HTTP {s} {len(logs) if isinstance(logs, list) else logs}")
+s, b = call("GET", "/finance/sepay/logs?page=0&size=20", None, {"Authorization": STAFF})
+page = data((s, b))
+logs = page.get("items") if isinstance(page, dict) else None
+check("Kế toán xem nhật ký (phân trang)", s == 200 and isinstance(logs, list) and len(logs) >= 8 and page.get("total", 0) >= len(logs),
+      f"HTTP {s} {len(logs) if isinstance(logs, list) else page}")
 s, b = call("GET", "/finance/sepay/logs", None, {"Authorization": READER})
 check("Khách xem nhật ký -> 403", s == 403, f"HTTP {s}")
 

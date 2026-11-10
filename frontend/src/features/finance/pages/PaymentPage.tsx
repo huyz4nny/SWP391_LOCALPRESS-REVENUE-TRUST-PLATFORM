@@ -23,7 +23,7 @@ import { KeyValue, Notice } from '../components/LedgerUI'
 
 const POLL_INTERVAL_MS = 3000
 
-export const PAYMENT_COMPLAINT_PATH = '/payment-complaints'
+export const PAYMENT_COMPLAINT_PATH = '/payment-complaints' // chuyển thành hằng số để link nào cũng dùng được  
 
 const ORDER_TYPE_LABELS: Record<PaymentOrderView['orderType'], string> = {
   ARTICLE: 'Mua bài viết Premium',
@@ -59,8 +59,8 @@ function useCountdown(expiresAt?: string) {
 }
 
 function complaintLink(order: PaymentOrderView) {
-  return `${PAYMENT_COMPLAINT_PATH}?orderCode=${order.orderCode}&amount=${order.amount}`
-}
+  return `${PAYMENT_COMPLAINT_PATH}?orderCode=${order.orderCode}&amount=${order.amount}` 
+} //ghép thêm tham số mã đơn và tham số tiền
 
 export function PaymentPage() {
   const { orderCode = '' } = useParams<{ orderCode: string }>()
@@ -166,7 +166,7 @@ export function PaymentPage() {
       </div>
     )
   }
-
+//nếu đang đọc bài thì quay lại bài nếu không thì quay về trang mặc định 
   const back = returnUrl ? { to: returnUrl, label: 'Quay lại nội dung' } : DEFAULT_RETURN[order.orderType]
   const isDemo = APP_CONFIG.useMockApi || import.meta.env.DEV
   const detail = order.description && order.description !== ORDER_TYPE_LABELS[order.orderType] ? order.description : null
@@ -183,7 +183,7 @@ export function PaymentPage() {
           <h1 className="mt-2 text-2xl font-semibold leading-8">{ORDER_TYPE_LABELS[order.orderType]}</h1>
           {detail && <p className="mt-1 font-serif text-base text-slate-700">{detail}</p>}
           <div className="mt-4 text-[32px] font-semibold leading-10 tracking-[-0.01em] num">{formatCurrency(order.amount)}</div>
-          <dl className="mt-4">
+          <dl className="mt-4"> // hiện số tiền đã ck
             <KeyValue label="Mã đơn"><span className="font-mono">{order.orderCode}</span></KeyValue>
             <KeyValue label="Phương thức">Chuyển khoản QR SePay</KeyValue>
             <KeyValue label="Thời gian"><span className="num">{formatDateTime(order.paidAt)}</span></KeyValue>
@@ -284,13 +284,13 @@ export function PaymentPage() {
               <div>
                 {order.qrCodeUrl ? (
                   <img
-                    src={order.qrCodeUrl}
-                    alt={`Mã QR thanh toán ${formatCurrency(order.amount)}, nội dung ${order.transferContent}`}
+                    src={order.qrCodeUrl} // Hiển thị thị qr bằng link qrCodeUrl không có link thì hiện Chưa có Mã Qr
+                    alt={`Mã QR thanh toán ${formatCurrency(order.amount)}, nội dung ${order.transferContent}`}//Thuộc tính alt ghi số tiền và nội dung để trình đọc màn hình có thể đọc
                     className="mx-auto h-60 w-60 rounded-md border border-slate-200 bg-white object-contain"
                   />
                 ) : (
                   <div className="mx-auto flex h-60 w-60 items-center justify-center rounded-md border border-dashed border-slate-300 text-[13px] text-slate-500">
-                    Chưa có mã QR
+                    Chưa có mã QR 
                   </div>
                 )}
                 <div className="mt-2 flex items-center justify-center gap-1.5 text-[13px] text-slate-500">

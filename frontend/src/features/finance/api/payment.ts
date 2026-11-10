@@ -7,7 +7,7 @@ import type {
   PaymentComplaint,
   PaymentOrderView,
   PaymentStatusView,
-  SepayLog,
+  SepayLog, SepayLogQuery, SepayLogResult,
   SepayStatus,
 } from '../types'
 
@@ -156,16 +156,34 @@ function toComplaint(raw: any): PaymentComplaint {
  * Nguồn: WEBHOOK (SePay gọi vào), API_SYNC (LocalPress hỏi API SePay), SIMULATION (nút demo).
  */
 export const sepayApi = {
-  logs: async (source?: SepayLog['source']): Promise<SepayLog[]> => {
-    if (APP_CONFIG.useMockApi) return (mock.load().sepayLogs ?? []).filter((l) => !source || l.source === source)
-    return (unwrap<any[]>(await httpClient.get<any>('/finance/sepay/logs', { params: { source, limit: 200 } })) || []).map(toSepayLog)
+  /** Một trang nhật ký, mới nhất trước. from/to dạng yyyy-MM-dd, tính trọn ngày; bỏ trống là không lọc. */
+  logs: async (query: SepayLogQuery = {}): Promise<SepayLogResult> => {
+    const { source, from, to, page = 0, size = 50 } = query
+    if (APP_CONFIG.useMockApi) {
+      const day = (iso: string) => iso.slice(0, 10)
+      const all = (mock.load().sepayLogs ?? [])
+        .filter((l) => !source || l.source === source)
+        .filter((l) => (!from || day(l.receivedAt) >= from) && (!to || day(l.receivedAt) <= to))
+      return { items: all.slice(page * size, (page + 1) * size), total: all.length, page, size, totalPages: Math.ceil(all.length / size) }
+    }
+    const p = unwrap<any>(await httpClient.get<any>('/finance/sepay/logs', { params: { source, from, to, page, size } }))
+    return {
+      items: (p?.items ?? []).map(toSepayLog),
+      total: Number(p?.total ?? 0),
+      page: Number(p?.page ?? page),
+      size: Number(p?.size ?? size),
+      totalPages: Number(p?.totalPages ?? 0),
+    }
   },
 
   status: async (): Promise<SepayStatus> => {
     if (APP_CONFIG.useMockApi) {
-      return { webhookKeyConfigured: false, apiTokenConfigured: false, accountNumber: '****9981', webhookPath: '/api/v1/finance/webhook/sepay', lastWebhookAt: null, mock: true }
+      const real = (mock.load().sepayLogs ?? []).filter((l) => l.source !== 'SIMULATION' && l.authOk)
+      const realTotal = real.filter((l) => l.resultStatus === 'SUCCESS').reduce((a, l) => a + (l.amount ?? 0), 0)
+      return { webhookKeyConfigured: false, apiTokenConfigured: false, accountNumber: '****9981', webhookPath: '/api/v1/finance/webhook/sepay', lastWebhookAt: null, realTotal, realCount: real.length, mock: true }
     }
-    return unwrap(await httpClient.get<any>('/finance/sepay/status'))
+    const s = unwrap<any>(await httpClient.get<any>('/finance/sepay/status'))
+    return { ...s, realTotal: Number(s?.realTotal ?? 0), realCount: Number(s?.realCount ?? 0) }
   },
 
   sync: async (hours = 24): Promise<{ fetched: number; processed: number; skippedDuplicate: number; ignored: number }> => {

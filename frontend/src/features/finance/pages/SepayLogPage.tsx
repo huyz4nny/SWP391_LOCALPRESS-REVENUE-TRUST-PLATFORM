@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { RefreshCw, Download } from 'lucide-react'
+import { RefreshCw, Download, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { Badge, BadgeProps } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
+import { Input, Label } from '@/components/ui/input'
 import { sepayApi } from '../api/payment'
-import type { SepayLog, SepayStatus } from '../types'
+import type { SepayLog, SepayLogResult, SepayStatus } from '../types'
 import { PageHeader, Panel, KpiStrip, KeyValue, Notice, Segmented, tableCls } from '../components/LedgerUI'
 
 /**
@@ -47,9 +48,17 @@ const FILTERS: { value: SourceFilter; label: string }[] = [
   { value: 'SIMULATION', label: 'Giả lập' },
 ]
 
+/** Mỗi lần chỉ tải một trang, không tải cả bảng */
+const PAGE_SIZE = 50
+
+const EMPTY_RESULT: SepayLogResult = { items: [], total: 0, page: 0, size: PAGE_SIZE, totalPages: 0 }
+
 export function SepayLogPage() {
   const [source, setSource] = useState<SourceFilter>(undefined)
-  const [logs, setLogs] = useState<SepayLog[]>([])
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [page, setPage] = useState(0)
+  const [result, setResult] = useState<SepayLogResult>(EMPTY_RESULT)
   const [status, setStatus] = useState<SepayStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -61,8 +70,11 @@ export function SepayLogPage() {
     setLoading(true)
     setError('')
     try {
-      const [l, s] = await Promise.all([sepayApi.logs(source), sepayApi.status()])
-      setLogs(l)
+      const [r, s] = await Promise.all([
+        sepayApi.logs({ source, from: from || undefined, to: to || undefined, page, size: PAGE_SIZE }),
+        sepayApi.status(),
+      ])
+      setResult(r)
       setStatus(s)
     } catch (e: any) {
       setError(e?.message || 'Không tải được nhật ký SePay')
@@ -73,7 +85,12 @@ export function SepayLogPage() {
 
   useEffect(() => {
     load()
-  }, [source])
+  }, [source, from, to, page])
+
+  // Đổi bộ lọc thì quay về trang đầu
+  const changeSource = (v: SourceFilter) => { setSource(v); setPage(0) }
+  const changeFrom = (v: string) => { setFrom(v); setPage(0) }
+  const changeTo = (v: string) => { setTo(v); setPage(0) }
 
   const handleSync = async () => {
     setSyncing(true)
@@ -82,7 +99,9 @@ export function SepayLogPage() {
     try {
       const r = await sepayApi.sync(24)
       setNotice(`Đã hỏi SePay 24 giờ gần nhất: ${r.fetched} giao dịch, xử lý mới ${r.processed}, đã có trước ${r.skippedDuplicate}.`)
-      await load()
+      // Dòng mới nằm ở trang đầu; đang ở trang đầu thì tải lại luôn
+      if (page === 0) await load()
+      else setPage(0)
     } catch (e: any) {
       setError(e?.message || 'Đồng bộ SePay thất bại')
     } finally {
@@ -90,10 +109,13 @@ export function SepayLogPage() {
     }
   }
 
-  const real = logs.filter((l) => l.source !== 'SIMULATION' && l.authOk)
-  const realTotal = real
-    .filter((l) => l.resultStatus === 'SUCCESS')
-    .reduce((a, l) => a + (l.amount ?? 0), 0)
+  // Server tính trên toàn bộ nhật ký (bỏ giả lập, log sai khóa),
+  // không phụ thuộc trang đang xem hay bộ lọc đang chọn
+  const realTotal = status?.realTotal ?? 0
+  const realCount = status?.realCount ?? 0
+  const logs = result.items
+  const firstRow = result.total === 0 ? 0 : result.page * result.size + 1
+  const lastRow = result.page * result.size + logs.length
 
   return (
     <div>
@@ -103,8 +125,8 @@ export function SepayLogPage() {
         actions={
           <>
             <Button variant="outline" size="sm" onClick={load} isLoading={loading}>
-              {!loading && <RefreshCw className="h-3.5 w-3.5" />}
-              Làm mới
+              {!loading && <RefreshCw className="h-3.5 w-3.5" />} 
+              Làm mới 
             </Button>
             <Button
               size="sm"
@@ -127,7 +149,7 @@ export function SepayLogPage() {
               label: 'Tiền thật đã ghi nhận',
               value: formatCurrency(realTotal),
               lead: true,
-              note: `${real.length} lần SePay báo về (webhook + đồng bộ)`,
+              note: `${realCount} lần SePay báo về (webhook + đồng bộ)`,
             },
             {
               label: 'Webhook',
@@ -157,13 +179,30 @@ export function SepayLogPage() {
         {notice && <Notice tone="success">{notice}</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
 
-        <div>
-          <Segmented label="Nguồn" value={source} onChange={setSource} options={FILTERS} />
+        <div className="flex flex-wrap items-end gap-4">
+          <Segmented label="Nguồn" value={source} onChange={changeSource} options={FILTERS} />
+          <div>
+            <Label htmlFor="sepay-from">Từ ngày</Label>
+            <Input id="sepay-from" type="date" value={from} max={to || undefined} onChange={(e) => changeFrom(e.target.value)} className="h-9 w-[160px]" />
+          </div>
+          <div>
+            <Label htmlFor="sepay-to">Đến ngày</Label>
+            <Input id="sepay-to" type="date" value={to} min={from || undefined} onChange={(e) => changeTo(e.target.value)} className="h-9 w-[160px]" />
+          </div>
+          {(from || to) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFrom(''); setTo(''); setPage(0) }}>
+              Bỏ lọc ngày
+            </Button>
+          )}
         </div>
 
-        <Panel title={<span className="num">{logs.length} lần nhận</span>} bodyClassName="px-0 pb-1">
+        <Panel
+          title={<span className="num">{result.total} lần nhận</span>}
+          aside={result.total > 0 ? <span className="num text-[13px] text-slate-500">Dòng {firstRow}-{lastRow}</span> : undefined}
+          bodyClassName="px-0 pb-1"
+        >
           {logs.length === 0 ? (
-            <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Chưa có khoản tiền nào từ nguồn này.</p>
+            <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Không có khoản tiền nào khớp bộ lọc.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className={tableCls.table}>
@@ -213,6 +252,21 @@ export function SepayLogPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {result.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 pt-3 pb-2">
+              <span className="num text-[13px] text-slate-500">
+                Trang {result.page + 1} / {result.totalPages}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={loading || result.page === 0} onClick={() => setPage(result.page - 1)}>
+                  <ChevronLeft className="h-3.5 w-3.5" /> Mới hơn
+                </Button>
+                <Button variant="outline" size="sm" disabled={loading || result.page + 1 >= result.totalPages} onClick={() => setPage(result.page + 1)}>
+                  Cũ hơn <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           )}
         </Panel>

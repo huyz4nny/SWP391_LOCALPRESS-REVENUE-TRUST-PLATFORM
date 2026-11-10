@@ -30,13 +30,19 @@ import java.util.Map;
  * ==============================================================================
  * Phân hệ: com.localpress.finance (SV4 - Huy)
  * Các API cung cấp:
- * 1. POST /api/v1/finance/orders                   : Tạo phiên thanh toán dùng chung cho Reader & Advertiser (UC047)
- * 2. GET  /api/v1/finance/orders/{id}              : Tra cứu trạng thái đơn hàng (UC050)
- *    GET  /api/v1/finance/orders/me               : Đơn của tôi, phân trang, lọc theo loại (UC045 của SV3 dùng)
- * 3. GET  /api/v1/finance/orders/code/{code}/status : Polling trạng thái đơn hàng theo mã đơn (UC050)
- * 4. GET  /api/v1/finance/orders/code/{code}        : Dữ liệu trang thanh toán chung /payment/:orderCode
- * 5. POST /api/v1/finance/webhook/sepay            : Tiếp nhận Webhook IPN từ SePay xử lý tự động (UC048, UC049)
- * Người dùng luôn lấy từ phiên đăng nhập (FinanceCurrentUser), không tin header do client tự gửi (Rule 14).
+ * 1. POST /api/v1/finance/orders : Tạo phiên thanh toán dùng chung cho Reader &
+ * Advertiser (UC047)
+ * 2. GET /api/v1/finance/orders/{id} : Tra cứu trạng thái đơn hàng (UC050)
+ * GET /api/v1/finance/orders/me : Đơn của tôi, phân trang, lọc theo loại (UC045
+ * của SV3 dùng)
+ * 3. GET /api/v1/finance/orders/code/{code}/status : Polling trạng thái đơn
+ * hàng theo mã đơn (UC050)
+ * 4. GET /api/v1/finance/orders/code/{code} : Dữ liệu trang thanh toán chung
+ * /payment/:orderCode
+ * 5. POST /api/v1/finance/webhook/sepay : Tiếp nhận Webhook IPN từ SePay xử lý
+ * tự động (UC048, UC049)
+ * Người dùng luôn lấy từ phiên đăng nhập (FinanceCurrentUser), không tin header
+ * do client tự gửi (Rule 14).
  */
 @Slf4j
 @RestController
@@ -50,22 +56,29 @@ public class PaymentProcessingController {
     private final SepayGatewayService sepayGatewayService;
     private final ObjectMapper objectMapper;
 
-    /** Chỉ bật khi chạy script E2E của SV4 (tạo đơn thử không qua module); mặc định tắt. */
+    /**
+     * Chỉ bật khi chạy script E2E của SV4 (tạo đơn thử không qua module); mặc định
+     * tắt.
+     */
     @Value("${localpress.payment.client-orders-enabled:false}")
     private boolean clientOrdersEnabled;
 
     /**
      * UC047: Tạo đơn hàng thanh toán tập trung.
-     * Module nguồn gọi khi khách bấm "Mua gói", "Mua bài" hoặc "Thanh toán booking",
+     * Module nguồn gọi khi khách bấm "Mua gói", "Mua bài" hoặc "Thanh toán
+     * booking",
      * rồi chuyển khách sang trang thanh toán chung /payment/{orderCode}.
      */
     @PostMapping("/orders")
-    public ResponseEntity<ApiResponse<OrderCreateResponse>> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+    public ResponseEntity<ApiResponse<OrderCreateResponse>> createOrder(
+            @Valid @RequestBody CreateOrderRequest request) {
         FinanceCurrentUser.Principal principal = currentUser.require();
         log.info("API POST /api/v1/finance/orders - User #{}, loại: {}, số tiền: {}",
                 principal.userId(), request.getOrderType(), request.getAmount());
-        // Rule 4 / Rule 14: giá và targetId từ trình duyệt không đáng tin (sửa được bằng F12).
-        // Đơn có đối tượng phải do module sở hữu tạo từ server, giá lấy từ DB (mẫu: AdBookingService).
+        // Rule 4 / Rule 14: giá và targetId từ trình duyệt không đáng tin (sửa được
+        // bằng F12).
+        // Đơn có đối tượng phải do module sở hữu tạo từ server, giá lấy từ DB (mẫu:
+        // AdBookingService).
         if (!clientOrdersEnabled) {
             throw new AppException("Đơn thanh toán phải được tạo từ phân hệ sở hữu (bài viết, gói, quảng cáo), "
                     + "không tạo trực tiếp từ trình duyệt", HttpStatus.FORBIDDEN);
@@ -76,7 +89,8 @@ public class PaymentProcessingController {
     }
 
     /**
-     * Dữ liệu cho trang thanh toán chung: tóm tắt đơn, QR SePay, thông tin chuyển khoản, hạn QR.
+     * Dữ liệu cho trang thanh toán chung: tóm tắt đơn, QR SePay, thông tin chuyển
+     * khoản, hạn QR.
      */
     @GetMapping("/orders/code/{orderCode}")
     public ResponseEntity<ApiResponse<OrderCreateResponse>> getPaymentView(@PathVariable String orderCode) {
@@ -85,16 +99,17 @@ public class PaymentProcessingController {
     }
 
     /**
-     * Đơn của user đang đăng nhập, mới nhất trước. type (tùy chọn): SUBSCRIPTION, ARTICLE, AD, REFUND.
+     * Đơn của user đang đăng nhập, mới nhất trước. type (tùy chọn): SUBSCRIPTION,
+     * ARTICLE, AD, REFUND.
      * Đường dẫn cố định "/orders/me" được Spring ưu tiên hơn "/orders/{id}".
      */
     @GetMapping("/orders/me")
     public ResponseEntity<ApiResponse<Page<OrderStatusResponse>>> getMyOrders(
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        Page<OrderStatusResponse> result = paymentProcessingService.getMyOrders(currentUser.require().userId(), type, page, size);
+            @RequestParam(defaultValue = "20") int size) {
+        Page<OrderStatusResponse> result = paymentProcessingService.getMyOrders(currentUser.require().userId(), type,
+                page, size);
         return ResponseEntity.ok(ApiResponse.ok("Lấy danh sách đơn hàng thành công", result));
     }
 
@@ -108,7 +123,8 @@ public class PaymentProcessingController {
     }
 
     /**
-     * UC050: Polling trạng thái đơn hàng theo mã đơn, trang thanh toán gọi 3 giây/lần.
+     * UC050: Polling trạng thái đơn hàng theo mã đơn, trang thanh toán gọi 3
+     * giây/lần.
      */
     @GetMapping("/orders/code/{orderCode}/status")
     public ResponseEntity<ApiResponse<OrderStatusResponse>> getOrderStatusByCode(@PathVariable String orderCode) {
@@ -117,18 +133,21 @@ public class PaymentProcessingController {
     }
 
     /**
-     * UC048, UC049: Webhook IPN từ SePay. Endpoint công khai (permitAll trong SecurityConfig),
-     * bắt buộc header "Authorization: Apikey <webhook-api-key>". Sai khóa trả 401 và không xử lý gì.
-     * Nhận body thô để ghi nguyên payload vào sepay_webhook_logs (kể cả payload sai định dạng).
-     * Đã xử lý xong thì luôn trả 200 + {"success": true}, nếu không SePay sẽ gửi lại tối đa 7 lần.
+     * UC048, UC049: Webhook IPN từ SePay. Endpoint công khai (permitAll trong
+     * SecurityConfig),
+     * bắt buộc header "Authorization: Apikey <webhook-api-key>". Sai khóa trả 401
+     * và không xử lý gì.
+     * Nhận body thô để ghi nguyên payload vào sepay_webhook_logs (kể cả payload sai
+     * định dạng).
+     * Đã xử lý xong thì luôn trả 200 + {"success": true}, nếu không SePay sẽ gửi
+     * lại tối đa 7 lần.
      */
     @PostMapping("/webhook/sepay")
-    public ResponseEntity<Map<String, Object>> handleSepayWebhook(
+    public ResponseEntity<Map<String, Object>> handleSepayWebhook( // kiểm tra khoá đọc json
             @RequestHeader(value = "X-Secret-Key", required = false) String secretKeyHeader,
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody(required = false) String rawBody,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         String auth = secretKeyHeader != null ? secretKeyHeader : authHeader;
         boolean authOk = sePayService.verifyIpnSecretKey(auth);
         SepayIpnRequest ipn = null;
@@ -141,7 +160,7 @@ public class PaymentProcessingController {
         if (!authOk) {
             log.warn("AUDIT: Webhook SePay bị từ chối do sai khóa xác thực, IP {}", ip);
         }
-        SepayGatewayService.Outcome outcome = sepayGatewayService.receive(
+        SepayGatewayService.Outcome outcome = sepayGatewayService.receive( // GHI LOG CHẶN TRÙNG, CHẶN TIỀN RA
                 SepayWebhookLog.Source.WEBHOOK, ipn, rawBody, authOk && ipn != null, ip);
         return ResponseEntity.status(outcome.httpStatus()).body(outcome.body());
     }
@@ -149,7 +168,8 @@ public class PaymentProcessingController {
     /** Qua tunnel (cloudflared/ngrok) thì IP thật nằm ở X-Forwarded-For. */
     private static String clientIp(HttpServletRequest request) {
         String fwd = request.getHeader("X-Forwarded-For");
-        if (fwd != null && !fwd.isBlank()) return fwd.split(",")[0].trim();
+        if (fwd != null && !fwd.isBlank())
+            return fwd.split(",")[0].trim();
         return request.getRemoteAddr();
     }
 }

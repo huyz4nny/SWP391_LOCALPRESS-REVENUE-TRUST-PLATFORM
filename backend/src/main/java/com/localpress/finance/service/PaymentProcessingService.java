@@ -33,15 +33,19 @@ import java.util.UUID;
  * ==============================================================================
  * DỊCH VỤ XỬ LÝ THANH TOÁN TẬP TRUNG (SV4 - PAYMENT PROCESSING SERVICE)
  * ==============================================================================
- * Mọi luồng thanh toán (mua bài lẻ, gói hội viên, booking quảng cáo) đều tạo đơn ở đây
+ * Mọi luồng thanh toán (mua bài lẻ, gói hội viên, booking quảng cáo) đều tạo
+ * đơn ở đây
  * rồi chuyển khách sang trang thanh toán chung /payment/:orderCode.
  * - UC047: Tạo đơn thanh toán.
  * - UC048: Xác minh kết quả thanh toán, đối chiếu số tiền.
  * - UC049: Xử lý Webhook IPN SePay idempotent.
  * - UC050: Trạng thái đơn cho trang thanh toán polling.
- * Nguyên tắc: LocalPress KHÔNG giữ tiền khách (không ví, không nạp tiền). Khách quét QR có sẵn đúng
- * mã đơn + đúng số tiền; SePay báo về khớp thì đơn PAID. Khoản không khớp (sai số tiền, về sau khi
- * booking hết giữ chỗ, không có mã đơn) chỉ ghi nhật ký; khách gửi khiếu nại (UC051), kế toán ghi nhận
+ * Nguyên tắc: LocalPress KHÔNG giữ tiền khách (không ví, không nạp tiền). Khách
+ * quét QR có sẵn đúng
+ * mã đơn + đúng số tiền; SePay báo về khớp thì đơn PAID. Khoản không khớp (sai
+ * số tiền, về sau khi
+ * booking hết giữ chỗ, không có mã đơn) chỉ ghi nhật ký; khách gửi khiếu nại
+ * (UC051), kế toán ghi nhận
  * vào đơn hoặc chuyển trả lại tài khoản khách.
  */
 @Service
@@ -62,7 +66,8 @@ public class PaymentProcessingService {
     // =========================================================================
 
     /**
-     * UC047: Tạo đơn thanh toán cho đối tượng nghiệp vụ (bài lẻ, gói, chiến dịch quảng cáo).
+     * UC047: Tạo đơn thanh toán cho đối tượng nghiệp vụ (bài lẻ, gói, chiến dịch
+     * quảng cáo).
      */
     @Transactional
     public OrderCreateResponse createOrder(Long userId, CreateOrderRequest request) {
@@ -80,29 +85,37 @@ public class PaymentProcessingService {
 
         Transaction.TransactionBuilder txBuilder = newPendingOrder(userId, type, request.getAmount(), description);
 
-        // Gán đúng Scalar Foreign Key theo từng phân hệ (khớp CHECK chk_transactions_targets)
+        // Gán đúng Scalar Foreign Key theo từng phân hệ (khớp CHECK
+        // chk_transactions_targets)
         switch (type) {
             case SUBSCRIPTION -> txBuilder.subscriptionId(request.getTargetId());
             case ARTICLE -> txBuilder.purchaseId(request.getTargetId());
             case AD -> txBuilder.campaignId(request.getTargetId());
-            default -> { }
+            default -> {
+            }
         }
 
-        // Đơn mới thay đơn cũ cùng đối tượng: đóng đơn cũ, tiền về đơn cũ sau đó thành LATE_PAYMENT (kế toán chuyển trả)
+        // Đơn mới thay đơn cũ cùng đối tượng: đóng đơn cũ, tiền về đơn cũ sau đó thành
+        // LATE_PAYMENT (kế toán chuyển trả)
         closePending(type, request.getTargetId(), "đã có đơn mới thay thế");
 
         Transaction savedTx = transactionRepository.save(txBuilder.build());
-        log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(), savedTx.getGatewayTransactionId());
+        log.info("Đã tạo bản ghi Transaction #{} với mã đơn: {}", savedTx.getTransactionId(),
+                savedTx.getGatewayTransactionId());
 
         return toPaymentView(savedTx);
     }
 
     /**
-     * Module sở hữu đối tượng hủy nó (vd SV1 hủy chiến dịch, SV3 hủy lượt mua) thì gọi hàm này TỪ SERVER, trong
-     * cùng transaction với việc hủy: mọi đơn PENDING của đối tượng bị đóng (FAILED). Tiền khách lỡ chuyển vào
-     * QR cũ sau đó thành LATE_PAYMENT: không ghi vào đơn, không phát hành chứng từ, không cần đề xuất hoàn;
+     * Module sở hữu đối tượng hủy nó (vd SV1 hủy chiến dịch, SV3 hủy lượt mua) thì
+     * gọi hàm này TỪ SERVER, trong
+     * cùng transaction với việc hủy: mọi đơn PENDING của đối tượng bị đóng
+     * (FAILED). Tiền khách lỡ chuyển vào
+     * QR cũ sau đó thành LATE_PAYMENT: không ghi vào đơn, không phát hành chứng từ,
+     * không cần đề xuất hoàn;
      * kế toán chuyển trả qua khiếu nại / đối soát (LocalPress không giữ tiền).
-     * Đơn đã SUCCESS không bị đụng tới: muốn trả lại tiền đã thu thì lập đề xuất hoàn (proposeRefund).
+     * Đơn đã SUCCESS không bị đụng tới: muốn trả lại tiền đã thu thì lập đề xuất
+     * hoàn (proposeRefund).
      *
      * @return số đơn vừa đóng
      */
@@ -110,9 +123,11 @@ public class PaymentProcessingService {
     public int closePendingOrders(String orderType, Long targetId, String reason) {
         TransactionType type = parseOrderType(orderType);
         if (!type.isPurchase() || targetId == null) {
-            throw new AppException("Chỉ đóng được đơn mua có đối tượng (ARTICLE, SUBSCRIPTION, AD)", HttpStatus.BAD_REQUEST);
+            throw new AppException("Chỉ đóng được đơn mua có đối tượng (ARTICLE, SUBSCRIPTION, AD)",
+                    HttpStatus.BAD_REQUEST);
         }
-        return closePending(type, targetId, reason == null || reason.isBlank() ? "module sở hữu đã hủy đối tượng" : reason.trim());
+        return closePending(type, targetId,
+                reason == null || reason.isBlank() ? "module sở hữu đã hủy đối tượng" : reason.trim());
     }
 
     private int closePending(TransactionType type, Long targetId, String reason) {
@@ -144,7 +159,8 @@ public class PaymentProcessingService {
     }
 
     /**
-     * "Đơn của tôi": mọi đơn của user đang đăng nhập (kể cả REFUND), mới nhất trước.
+     * "Đơn của tôi": mọi đơn của user đang đăng nhập (kể cả REFUND), mới nhất
+     * trước.
      * SV3 dùng cho UC045 thay vì đọc thẳng bảng transactions (Rule 17).
      */
     @Transactional(readOnly = true)
@@ -166,13 +182,16 @@ public class PaymentProcessingService {
 
     /**
      * Xử lý IPN đã qua xác thực khóa ở Controller. Các nhánh:
-     * 1. Không có mã đơn / đơn không tồn tại  -> ORDER_NOT_FOUND (chỉ ghi nhật ký, khách khiếu nại UC051).
-     * 2. Đơn đã SUCCESS                       -> ALREADY_PROCESSED (Rule 5).
-     *    Không có số tiền                     -> AMOUNT_MISSING, không đổi gì (Rule 4).
-     * 3. Đơn đã đóng / booking quá hạn giữ chỗ -> LATE_PAYMENT, không cấp quyền (Rule 6).
-     * 4. Số tiền khác số tiền đơn             -> AMOUNT_MISMATCH, đơn giữ nguyên.
-     * 5. Đúng số tiền                         -> SUCCESS + chứng từ (UC057) + PaymentSuccessEvent.
-     * Nhánh 3, 4 không giữ tiền trong hệ thống: kế toán đối chiếu sao kê và chuyển trả lại khách.
+     * 1. Không có mã đơn / đơn không tồn tại -> ORDER_NOT_FOUND (chỉ ghi nhật ký,
+     * khách khiếu nại UC051).
+     * 2. Đơn đã SUCCESS -> ALREADY_PROCESSED (Rule 5).
+     * Không có số tiền -> AMOUNT_MISSING, không đổi gì (Rule 4).
+     * 3. Đơn đã đóng / booking quá hạn giữ chỗ -> LATE_PAYMENT, không cấp quyền
+     * (Rule 6).
+     * 4. Số tiền khác số tiền đơn -> AMOUNT_MISMATCH, đơn giữ nguyên.
+     * 5. Đúng số tiền -> SUCCESS + chứng từ (UC057) + PaymentSuccessEvent.
+     * Nhánh 3, 4 không giữ tiền trong hệ thống: kế toán đối chiếu sao kê và chuyển
+     * trả lại khách.
      */
     @Transactional
     public Map<String, Object> processSepayIpn(SepayIpnRequest ipnRequest) {
@@ -191,18 +210,22 @@ public class PaymentProcessingService {
         }
 
         if (tx.getStatus() == TransactionStatus.SUCCESS) {
-            log.info("Giao dịch #{} ({}) đã SUCCESS trước đó. Bỏ qua (Idempotent Hit).", tx.getTransactionId(), orderCode);
+            log.info("Giao dịch #{} ({}) đã SUCCESS trước đó. Bỏ qua (Idempotent Hit).", tx.getTransactionId(),
+                    orderCode);
             return result(true, "ALREADY_PROCESSED", orderCode, "Giao dịch đã được ghi nhận trước đó");
         }
 
-        // Rule 4: không biết khách chuyển bao nhiêu thì không cấp quyền; log lại để kế toán đối soát (UC054)
+        // Rule 4: không biết khách chuyển bao nhiêu thì không cấp quyền; log lại để kế
+        // toán đối soát (UC054)
         BigDecimal paidAmount = ipnRequest.resolveAmount();
         if (paidAmount == null || paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("Webhook cho đơn {} không có số tiền, không ghi nhận", orderCode);
-            return result(false, "AMOUNT_MISSING", orderCode, "Thông báo tiền về không có số tiền, chờ kế toán đối soát");
+            return result(false, "AMOUNT_MISSING", orderCode,
+                    "Thông báo tiền về không có số tiền, chờ kế toán đối soát");
         }
 
-        // 3. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ: không cấp quyền
+        // 3. Đơn đã đóng (bị từ chối/hoàn) hoặc booking quảng cáo quá hạn giữ chỗ:
+        // không cấp quyền
         if (tx.getStatus() != TransactionStatus.PENDING || tx.isPaymentWindowClosed(LocalDateTime.now())) {
             tx.markExpired();
             transactionRepository.save(tx);
@@ -222,7 +245,8 @@ public class PaymentProcessingService {
         // 5. Đúng số tiền
         tx.markPaidByGateway(sePayService.getBankCode());
         Transaction savedTx = transactionRepository.save(tx);
-        // UC057: cùng giao dịch với việc ghi tiền nên đơn SUCCESS nào cũng có đúng 1 chứng từ
+        // UC057: cùng giao dịch với việc ghi tiền nên đơn SUCCESS nào cũng có đúng 1
+        // chứng từ
         String documentNo = documentService.issueFor(savedTx).getDocumentNo();
         publishPaymentSuccess(savedTx);
 
@@ -236,14 +260,16 @@ public class PaymentProcessingService {
     // HÀM NỘI BỘ
     // =========================================================================
 
-    private Transaction.TransactionBuilder newPendingOrder(Long userId, TransactionType type, BigDecimal amount, String description) {
+    private Transaction.TransactionBuilder newPendingOrder(Long userId, TransactionType type, BigDecimal amount,
+            String description) {
         LocalDateTime now = LocalDateTime.now();
         return Transaction.builder()
                 .userId(userId)
                 .transactionType(type)
                 .amount(amount)
                 .currency("VND")
-                // Mọi khoản tiền vào đều qua QR SePay; không có ví, không có chuyển khoản thủ công do kế toán duyệt
+                // Mọi khoản tiền vào đều qua QR SePay; không có ví, không có chuyển khoản thủ
+                // công do kế toán duyệt
                 .paymentMethod("SEPAY")
                 .bankCode(sePayService.getBankCode())
                 .gatewayTransactionId(generateOrderCode(now))
@@ -254,7 +280,8 @@ public class PaymentProcessingService {
     }
 
     /**
-     * Mã đơn ngắn, chỉ chữ + số để ngân hàng không cắt mất khi nhập nội dung chuyển khoản.
+     * Mã đơn ngắn, chỉ chữ + số để ngân hàng không cắt mất khi nhập nội dung chuyển
+     * khoản.
      */
     private String generateOrderCode(LocalDateTime now) {
         String timestamp = now.format(DateTimeFormatter.ofPattern("yyMMddHHmm"));
@@ -264,8 +291,10 @@ public class PaymentProcessingService {
 
     private TransactionType parseOrderType(String orderType) {
         String rawType = orderType != null ? orderType.toUpperCase().trim() : "";
-        if ("ARTICLE_PURCHASE".equals(rawType)) rawType = "ARTICLE";
-        if ("AD_CAMPAIGN".equals(rawType)) rawType = "AD";
+        if ("ARTICLE_PURCHASE".equals(rawType))
+            rawType = "ARTICLE";
+        if ("AD_CAMPAIGN".equals(rawType))
+            rawType = "AD";
         try {
             return TransactionType.valueOf(rawType);
         } catch (IllegalArgumentException e) {
@@ -319,11 +348,13 @@ public class PaymentProcessingService {
                 .paymentMethod(tx.getPaymentMethod())
                 .description(tx.getDescription())
                 // Chỉ trả QR khi đơn còn chờ thanh toán và chưa hết hạn
-                .qrCodeUrl(tx.getStatus() == TransactionStatus.PENDING && !expired ? sePayService.generateVietQrUrl(tx.getGatewayTransactionId(), tx.getAmount()) : null)
+                .qrCodeUrl(tx.getStatus() == TransactionStatus.PENDING && !expired
+                        ? sePayService.generateVietQrUrl(tx.getGatewayTransactionId(), tx.getAmount())
+                        : null)
                 .bankCode(sePayService.getBankCode())
                 .accountNumber(sePayService.getAccountNumber())
                 .accountName(sePayService.getAccountName())
-                .transferContent(tx.getGatewayTransactionId())
+                .transferContent(tx.getGatewayTransactionId()) // nội dung ck là mã đơn
                 .createdAt(tx.getCreatedAt())
                 .expiresAt(tx.getExpiresAt())
                 .paidAt(tx.getPaidAt())
@@ -354,7 +385,8 @@ public class PaymentProcessingService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", success);
         body.put("status", status);
-        if (orderCode != null) body.put("orderCode", orderCode);
+        if (orderCode != null)
+            body.put("orderCode", orderCode);
         body.put("message", message);
         return body;
     }

@@ -12,12 +12,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.localpress.shared.exception.AppException;
 import com.sun.net.httpserver.HttpServer;
 
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -25,7 +31,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -222,5 +230,25 @@ class SepayGatewayServiceTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    @DisplayName("Nhật ký phân trang: lọc trọn ngày, giới hạn cỡ trang, từ ngày sau đến ngày thì báo lỗi")
+    void searchLogsPagesAndFiltersByDay() {
+        when(logs.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(1, 200), 450));
+
+        SepayGatewayService.LogPage page = gateway.searchLogs(SepayWebhookLog.Source.WEBHOOK,
+                LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 10), 1, 5000);
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(logs).search(eq(SepayWebhookLog.Source.WEBHOOK), eq(LocalDateTime.of(2026, 11, 1, 0, 0)),
+                eq(LocalDateTime.of(2026, 11, 11, 0, 0)), pageable.capture());
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(200);
+        assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(page.total()).isEqualTo(450);
+        assertThat(page.totalPages()).isEqualTo(3);
+
+        assertThatThrownBy(() -> gateway.searchLogs(null, LocalDate.of(2026, 11, 10), LocalDate.of(2026, 11, 1), 0, 50))
+                .isInstanceOf(AppException.class);
     }
 }

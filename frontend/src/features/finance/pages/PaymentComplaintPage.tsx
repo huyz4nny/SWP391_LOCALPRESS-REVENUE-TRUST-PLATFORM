@@ -55,10 +55,10 @@ export function PaymentComplaintPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      orderCode: params.get('orderCode') || '',
+    defaultValues: {//Điền sẵn form từ URL ?orderCode=&amount= (dòng 59-60, từ complaintLink)
+      orderCode: params.get('orderCode') || '',  //chỉ dùng 2 trường: orderCode và amount, ghép vào URL trang khiếu nại.
       amount: Number(params.get('amount')) || undefined,
-      transferredAt: toLocalInput(new Date()),
+      transferredAt: toLocalInput(new Date()),//Thời gian mặc định hiện tại
     },
   })
 

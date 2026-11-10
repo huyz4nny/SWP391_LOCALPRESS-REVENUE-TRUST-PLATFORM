@@ -28,25 +28,35 @@ import java.util.Map;
  * ==============================================================================
  * DỊCH VỤ KHIẾU NẠI THANH TOÁN CHƯA GHI NHẬN (SV4 - UC051)
  * ==============================================================================
- * Thay cho "duyệt chuyển khoản thủ công". Không có luồng nào để kế toán tự tay đánh dấu PAID:
- * khi kế toán Ghi nhận khiếu nại, hệ thống chạy đúng hàm processSepayIpn như webhook thật
- * (dùng mã giao dịch ngân hàng của khách), nên mọi nhánh đủ/thiếu/thừa/muộn và idempotency giữ nguyên.
+ * Thay cho "duyệt chuyển khoản thủ công". Không có luồng nào để kế toán tự tay
+ * đánh dấu PAID:
+ * khi kế toán Ghi nhận khiếu nại, hệ thống chạy đúng hàm processSepayIpn như
+ * webhook thật
+ * (dùng mã giao dịch ngân hàng của khách), nên mọi nhánh đủ/thiếu/thừa/muộn và
+ * idempotency giữ nguyên.
  *
- * LocalPress không giữ tiền khách (không có ví), kế toán chọn 1 trong 2 cách xử lý:
- *  - ORDER   : khoản tiền đúng là của đơn khách khai báo, đúng số tiền, đơn còn chờ -> chạy luồng webhook cho đơn đó.
- *  - RETURNED: không gán được vào đơn (sai số tiền, đơn hết hạn / đã trả, không có mã đơn) -> kế toán chuyển trả
- *              lại tài khoản khách ngoài hệ thống rồi ghi mã GD chuyển trả vào ghi chú.
+ * LocalPress không giữ tiền khách (không có ví), kế toán chọn 1 trong 2 cách xử
+ * lý:
+ * - ORDER : khoản tiền đúng là của đơn khách khai báo, đúng số tiền, đơn còn
+ * chờ -> chạy luồng webhook cho đơn đó.
+ * - RETURNED: không gán được vào đơn (sai số tiền, đơn hết hạn / đã trả, không
+ * có mã đơn) -> kế toán chuyển trả
+ * lại tài khoản khách ngoài hệ thống rồi ghi mã GD chuyển trả vào ghi chú.
  *
  * Chống ghi nhận 2 lần (Rule 5), cả 2 chiều:
- *  - Mã GD ngân hàng đã có trong sepay_webhook_logs với kết quả đã ghi tiền -> 409, không ghi nhận lại.
- *  - Webhook về sau mang mã GD đã ghi nhận qua khiếu nại: SepayGatewayService bỏ qua (RECORDED_BY_COMPLAINT).
+ * - Mã GD ngân hàng đã có trong sepay_webhook_logs với kết quả đã ghi tiền ->
+ * 409, không ghi nhận lại.
+ * - Webhook về sau mang mã GD đã ghi nhận qua khiếu nại: SepayGatewayService bỏ
+ * qua (RECORDED_BY_COMPLAINT).
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PaymentComplaintService {
 
-    public enum Target { ORDER, RETURNED }
+    public enum Target {
+        ORDER, RETURNED
+    }
 
     /** Kết quả lưu trên khiếu nại khi kế toán đã chuyển trả lại khách. */
     public static final String RETURNED_TO_CUSTOMER = "RETURNED_TO_CUSTOMER";
@@ -61,8 +71,9 @@ public class PaymentComplaintService {
     public ComplaintResponse create(Long userId, CreateComplaintRequest request) {
         String reference = request.getBankReference().trim().toUpperCase();
         if (complaintRepository.existsByBankReference(reference)) {
-            throw new AppException("Mã giao dịch " + reference + " đã được gửi khiếu nại trước đó", HttpStatus.CONFLICT);
-        }
+            throw new AppException("Mã giao dịch " + reference + " đã được gửi khiếu nại trước đó",
+                    HttpStatus.CONFLICT);
+        } // check xem đã gửi khiếu nại với mã giao dịch này chưa
 
         String orderCode = request.getOrderCode() == null || request.getOrderCode().isBlank()
                 ? null
@@ -72,10 +83,10 @@ public class PaymentComplaintService {
                     .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng " + orderCode, HttpStatus.NOT_FOUND));
             if (!tx.getUserId().equals(userId)) {
                 throw new AppException("Bạn không có quyền khiếu nại đơn hàng này", HttpStatus.FORBIDDEN);
-            }
+            } // Khách có gửi kèm mã đơn ? Nếu có thì kiểm tra xem đơn có thuộc về user không
         }
 
-        PaymentComplaint saved = complaintRepository.save(PaymentComplaint.builder()
+        PaymentComplaint saved = complaintRepository.save(PaymentComplaint.builder() // lưu kiếu nại vào db
                 .userId(userId)
                 .orderCode(orderCode)
                 .amount(request.getAmount())
@@ -85,7 +96,7 @@ public class PaymentComplaintService {
                 .build());
         log.info("User #{} gửi khiếu nại #{}: đơn {}, {} VND, mã GD {}", userId, saved.getComplaintId(),
                 orderCode, request.getAmount(), reference);
-        return ComplaintResponse.fromEntity(saved);
+        return ComplaintResponse.fromEntity(saved); // trả về frontend
     }
 
     @Transactional(readOnly = true)
@@ -109,7 +120,8 @@ public class PaymentComplaintService {
     public ComplaintResponse resolve(Long complaintId, Long accountantId, Target target, String note) {
         PaymentComplaint c = lockComplaint(complaintId);
         if (c.getStatus() != PaymentComplaint.Status.OPEN) {
-            throw new AppException("Khiếu nại #" + complaintId + " đã được xử lý (" + c.getStatus() + ")", HttpStatus.CONFLICT);
+            throw new AppException("Khiếu nại #" + complaintId + " đã được xử lý (" + c.getStatus() + ")",
+                    HttpStatus.CONFLICT);
         }
         assertNotRecordedByGateway(c);
         Target effective = target != null ? target : (c.getOrderCode() != null ? Target.ORDER : Target.RETURNED);
@@ -135,13 +147,16 @@ public class PaymentComplaintService {
                 throw new AppException(result.get("message") + ". Hãy chuyển trả lại khách.", HttpStatus.CONFLICT);
             }
         } else {
-            // Đơn còn chờ đúng số tiền thì phải ghi vào đơn, tránh vừa trả lại vừa để webhook thật cấp quyền
+            // Đơn còn chờ đúng số tiền thì phải ghi vào đơn, tránh vừa trả lại vừa để
+            // webhook thật cấp quyền
             if (c.getOrderCode() != null) {
                 transactionRepository.findByGatewayTransactionId(c.getOrderCode())
-                        .filter(tx -> tx.getStatus() == TransactionStatus.PENDING && !tx.isPaymentWindowClosed(LocalDateTime.now())
+                        .filter(tx -> tx.getStatus() == TransactionStatus.PENDING
+                                && !tx.isPaymentWindowClosed(LocalDateTime.now())
                                 && tx.getAmount().compareTo(c.getAmount()) == 0)
                         .ifPresent(tx -> {
-                            throw new AppException("Đơn " + c.getOrderCode() + " vẫn đang chờ đúng số tiền này, hãy ghi nhận vào đơn",
+                            throw new AppException(
+                                    "Đơn " + c.getOrderCode() + " vẫn đang chờ đúng số tiền này, hãy ghi nhận vào đơn",
                                     HttpStatus.CONFLICT);
                         });
             }
@@ -168,12 +183,14 @@ public class PaymentComplaintService {
     }
 
     /**
-     * Sao kê chỉ cho biết tiền đã về ngân hàng, không cho biết hệ thống đã ghi chưa. Tra nhật ký SePay theo
-     * mã GD: webhook / đồng bộ API đã ghi tiền (đơn SUCCESS) thì không cho ghi nhận lần 2.
+     * Sao kê chỉ cho biết tiền đã về ngân hàng, không cho biết hệ thống đã ghi
+     * chưa. Tra nhật ký SePay theo
+     * mã GD: webhook / đồng bộ API đã ghi tiền (đơn SUCCESS) thì không cho ghi nhận
+     * lần 2.
      */
     private void assertNotRecordedByGateway(PaymentComplaint c) {
         sepayLogRepository.findFirstByReferenceCodeAndResultStatusInOrderByReceivedAtAsc(
-                        c.getBankReference(), SepayWebhookLog.MONEY_RECORDED_STATUSES)
+                c.getBankReference(), SepayWebhookLog.MONEY_RECORDED_STATUSES)
                 .ifPresent(logEntry -> {
                     throw new AppException("Mã GD " + c.getBankReference() + " đã được SePay ghi nhận tự động ("
                             + logEntry.getResultStatus() + ", mã " + logEntry.getOrderCode()
@@ -189,11 +206,14 @@ public class PaymentComplaintService {
     }
 
     /**
-     * Số tiền trên khiếu nại do khách tự khai. SePay đã báo về mã GD này (vd AMOUNT_MISMATCH) thì lấy số SePay báo làm chuẩn:
-     * khác số khách khai -> 409, không ghi nhận vào đơn (Rule 4). Chưa có log thì kế toán đối chiếu sao kê như cũ.
+     * Số tiền trên khiếu nại do khách tự khai. SePay đã báo về mã GD này (vd
+     * AMOUNT_MISMATCH) thì lấy số SePay báo làm chuẩn:
+     * khác số khách khai -> 409, không ghi nhận vào đơn (Rule 4). Chưa có log thì
+     * kế toán đối chiếu sao kê như cũ.
      */
     private void assertAmountMatchesGateway(PaymentComplaint c) {
-        sepayLogRepository.findFirstByReferenceCodeAndAuthOkTrueAndTransferAmountNotNullOrderByReceivedAtAsc(c.getBankReference())
+        sepayLogRepository
+                .findFirstByReferenceCodeAndAuthOkTrueAndTransferAmountNotNullOrderByReceivedAtAsc(c.getBankReference())
                 .filter(logEntry -> logEntry.getTransferAmount().compareTo(c.getAmount()) != 0)
                 .ifPresent(logEntry -> {
                     throw new AppException("SePay báo mã GD " + c.getBankReference() + " là "
