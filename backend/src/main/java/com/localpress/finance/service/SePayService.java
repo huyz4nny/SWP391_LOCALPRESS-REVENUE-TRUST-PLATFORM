@@ -45,7 +45,7 @@ public class SePayService {
     private String accountName;
 
     /**
-     * Sinh link ảnh VietQR trực tiếp để render lên modal hoặc nhúng vào trang checkout.
+     * Sinh link ảnh VietQR trực tiếp để render lên modal hoặc nhúng vào trang thanh toán.
      */
     public String generateVietQrUrl(String orderCode, BigDecimal amount) {
         // Dùng chuẩn VietQR QuickLink, ngân hàng & số tài khoản lấy từ cấu hình localpress.sepay.*

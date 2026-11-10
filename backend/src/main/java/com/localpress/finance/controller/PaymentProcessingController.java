@@ -55,11 +55,11 @@ public class PaymentProcessingController {
     private boolean clientOrdersEnabled;
 
     /**
-     * UC047: Tạo đơn hàng thanh toán tập trung (hỗ trợ cả alias /checkout từ Paywall/Reader).
+     * UC047: Tạo đơn hàng thanh toán tập trung.
      * Module nguồn gọi khi khách bấm "Mua gói", "Mua bài" hoặc "Thanh toán booking",
      * rồi chuyển khách sang trang thanh toán chung /payment/{orderCode}.
      */
-    @PostMapping({"/orders", "/checkout"})
+    @PostMapping("/orders")
     public ResponseEntity<ApiResponse<OrderCreateResponse>> createOrder(@Valid @RequestBody CreateOrderRequest request) {
         FinanceCurrentUser.Principal principal = currentUser.require();
         log.info("API POST /api/v1/finance/orders - User #{}, loại: {}, số tiền: {}",

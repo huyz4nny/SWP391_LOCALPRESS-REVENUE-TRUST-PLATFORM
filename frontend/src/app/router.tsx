@@ -1,5 +1,5 @@
 import React from 'react'
-import { createBrowserRouter, Navigate, Link, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Link } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
 import { UserRole, PERMISSION_CHECKERS } from '@/app/config'
 import { mockStore } from '@/mocks/store'
@@ -71,16 +71,8 @@ import {
   PaymentComplaintPage,
   ComplaintQueuePage,
   SepayLogPage,
-  DemoStorePage,
   FinanceReportsPage,
 } from '@/features/finance'
-
-/** Link cũ /checkout/:orderId -> trang thanh toán chung của SV4 */
-function LegacyCheckoutRedirect() {
-  const { orderId } = useParams<{ orderId: string }>()
-  const order = mockStore.getState().orders.find((o) => o.id === orderId)
-  return <Navigate to={`/payment/${order?.orderCode ?? orderId}`} replace />
-}
 
 // Admin
 import {
@@ -151,14 +143,9 @@ export const router = createBrowserRouter([
       { path: 'article/:slug', element: <ArticleDetailPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'premium', element: <PremiumPlansPage /> },
-      // Trang thanh toán chung QR SePay (SV4, không ví, không giữ tiền khách). CheckoutPage cũ của SV3 chuyển hướng sang /payment.
-      { path: 'checkout/:orderId', element: <LegacyCheckoutRedirect /> },
+      // Trang thanh toán chung QR SePay (SV4)
       { path: 'payment/:orderCode', element: <PaymentPage /> },
       { path: 'payment-complaints', element: <PaymentComplaintPage /> },
-      // Link cũ của trang hỗ trợ (SV3) trước khi bỏ ví: giữ để không ra 404
-      { path: 'wallet/complaints', element: <Navigate to="/payment-complaints" replace /> },
-      // Cửa hàng thử (SV4, chỉ bản dev): đóng vai SV3 tạo đơn từ server để demo luồng thanh toán
-      ...(import.meta.env.DEV ? [{ path: 'dev/demo-store', element: <DemoStorePage /> }] : []),
       { path: 'payments/:paymentId', element: <PaymentResultPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },

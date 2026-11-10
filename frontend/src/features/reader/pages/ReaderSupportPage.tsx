@@ -1,4 +1,4 @@
-// Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form Huy `/wallet/complaints`.
+// Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form `/payment-complaints`.
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { complaintApi } from '@/features/finance/api/payment'
@@ -16,7 +16,7 @@ function statusLabel(status: PaymentComplaint['status']) {
 }
 
 // UC046 danh sách khiếu nại thanh toán của độc giả ở màn hình II.3.10
-// form gửi khiếu nại nằm ở trang /wallet/complaints của SV4, trang này chỉ liệt kê và dẫn sang đó
+// form gửi khiếu nại nằm ở trang /payment-complaints của SV4, trang này chỉ liệt kê và dẫn sang đó
 export function ReaderSupportPage() {
   const navigate = useNavigate()
   const [items, setItems] = useState<PaymentComplaint[]>([])
@@ -52,7 +52,7 @@ export function ReaderSupportPage() {
 
       {/* nut Gui khieu nai (sang trang Huy) + nut Xem lich su giao dich */}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => navigate('/wallet/complaints')}>
+        <Button size="sm" onClick={() => navigate('/payment-complaints')}>
           Gửi khiếu nại thanh toán
         </Button>
         <Button size="sm" variant="outline" onClick={() => navigate('/account/orders')}>

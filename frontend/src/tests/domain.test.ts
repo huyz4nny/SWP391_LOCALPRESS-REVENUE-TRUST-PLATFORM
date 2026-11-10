@@ -50,14 +50,14 @@ describe('LocalPress Core Business Domain Tests', () => {
       let article = await handleMockRequest('GET', '/articles/khai-thac-tiem-nang-cang-nuoc-sau-lach-huyen')
       expect(article.content).toBeUndefined()
 
-      // Checkout and Pay
+      // Create order
       const order = mockStore.createOrder(
         'user-reader-free',
         'ARTICLE_PURCHASE',
         'art-001',
         'Khai thác tiềm năng Cảng nước sâu Lạch Huyện',
         15000,
-        'VIETQR'
+        'SEPAY'
       )
       expect(order.paymentStatus).toBe('PENDING')
 

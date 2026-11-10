@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 // dto sau khi SV3 tạo quyền PENDING và tạo/tái dùng đơn thanh toán trên server
-// frontend chỉ navigate /payment/:orderCode, không gọi POST /finance/checkout (403 trên main)
+// frontend chỉ navigate /payment/:orderCode
 @Data
 @Builder
 @NoArgsConstructor

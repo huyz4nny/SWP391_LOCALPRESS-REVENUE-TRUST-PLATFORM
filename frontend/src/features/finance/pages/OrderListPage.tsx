@@ -30,11 +30,10 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   REFUND: 'Hoàn tiền',
 }
 
-// Chỉ còn 1 cách trả: quét QR SePay (LocalPress không có ví). BANK_TRANSFER là bút toán chuyển trả khi hoàn tiền.
+// SEPAY: quét QR chuyển khoản. BANK_TRANSFER: bút toán chuyển trả khi hoàn tiền.
 const METHOD_LABELS: Record<string, string> = {
   SEPAY: 'QR SePay',
   BANK_TRANSFER: 'Chuyển trả ngân hàng',
-  WALLET: 'Ví LocalPress (dữ liệu cũ)',
 }
 
 export function OrderListPage() {

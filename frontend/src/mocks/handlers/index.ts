@@ -320,7 +320,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       && o.paymentStatus === 'PENDING'
       && o.amount === article.price)
     const order = pending ?? mockStore.createOrder(
-      currentUser.id, 'ARTICLE_PURCHASE', article.id, article.title, article.price, 'VIETQR')
+      currentUser.id, 'ARTICLE_PURCHASE', article.id, article.title, article.price, 'SEPAY')
     return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title, orderCode: order.orderCode }
   }
 
@@ -337,7 +337,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       && o.paymentStatus === 'PENDING'
       && o.amount === plan.price)
     const order = pending ?? mockStore.createOrder(
-      currentUser.id, 'SUBSCRIPTION', plan.id, plan.name, plan.price, 'VIETQR')
+      currentUser.id, 'SUBSCRIPTION', plan.id, plan.name, plan.price, 'SEPAY')
     return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name, orderCode: order.orderCode }
   }
 
@@ -490,7 +490,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (booking.paymentStatus === 'PAID') throw new Error('Booking đã được thanh toán')
     const pending = mockStore.getState().orders.find((o) => o.targetId === booking.id && o.paymentStatus === 'PENDING')
     return pending ?? mockStore.createOrder(currentUser.id, 'AD_CAMPAIGN', booking.id,
-      `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'VIETQR')
+      `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'SEPAY')
   }
 
   // Iter 3: trạng thái rỗng; hủy/hoàn và thay banner cần backend thật.
@@ -1077,17 +1077,6 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     const order = mockStore.getState().orders.find((o) => o.id === id || o.orderCode === id)
     if (!order) throw new Error('Không tìm thấy đơn hàng')
     return order
-  }
-
-  if (pathname === '/finance/checkout' && method === 'POST') {
-    return mockStore.createOrder(
-      currentUser.id,
-      body.orderType,
-      body.targetId,
-      body.targetTitle,
-      body.amount,
-      body.paymentMethod
-    )
   }
 
   if (pathname.endsWith('/pay') && method === 'POST') {

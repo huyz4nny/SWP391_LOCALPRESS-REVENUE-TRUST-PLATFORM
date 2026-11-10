@@ -180,7 +180,7 @@ export function PaymentResultPage() {
 
             {isFailed && (
               <Button
-                onClick={() => navigate(`/checkout/${order.id}`)}
+                onClick={() => navigate(`/payment/${order.orderCode}`)}
                 className="w-full py-2.5 font-bold"
               >
                 Thử thanh toán lại

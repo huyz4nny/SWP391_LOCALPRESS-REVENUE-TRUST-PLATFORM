@@ -8,6 +8,7 @@ import com.localpress.identity.service.JwtTokenService;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -21,6 +22,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 /**
  * Cấu hình bảo mật tập trung cho toàn bộ hệ thống LocalPress Backend (Spring Boot 3 + Spring Security 6).
@@ -34,7 +36,8 @@ import org.springframework.security.web.SecurityFilterChain;
  *    - Phân hệ Tài chính kế toán (SV4): Yêu cầu Role ACCOUNTANT, CHIEF_ACCOUNTANT hoặc STAFF (không có SYSTEM_ADMIN).
  *    - Phân hệ Quản trị (SV5): Yêu cầu Role SYSTEM_ADMIN.
  * 3. Xác thực người dùng (Authentication):
- *    - Hỗ trợ HTTP Basic Auth (phục vụ test tự động và tích hợp ban đầu).
+ *    - Đăng nhập cấp JWT (Bearer). HTTP Basic chỉ bật khi localpress.security.http-basic=true (profile dev,
+ *      cho test tự động / script E2E); ngoài dev Basic bị tắt để không dò mật khẩu và vượt giới hạn thiết bị.
  *    - UserDetailsService đọc trực tiếp từ bảng 'users' (MySQL), xác thực mật khẩu mã hóa BCrypt.
  */
 @Configuration
@@ -44,7 +47,16 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JdbcTemplate jdbc,
-                                                   ObjectProvider<DeviceSessionService> devices) throws Exception {
+                                                   ObjectProvider<DeviceSessionService> devices,
+                                                   @Value("${localpress.security.http-basic:false}") boolean httpBasic) throws Exception {
+        if (httpBasic) {
+            http.httpBasic(Customizer.withDefaults());
+        } else {
+            // Không có Basic thì Spring mặc định trả 403 cho request chưa đăng nhập; giữ 401 vì frontend dựa vào 401
+            // để biết phiên Bearer đã bị thu hồi.
+            http.httpBasic(AbstractHttpConfigurer::disable)
+                    .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+        }
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -82,14 +94,12 @@ public class SecurityConfig {
 
                         // 8. Phân hệ Kế toán, Thanh toán & Đối soát (SV4 - Huy Leader)
                         // Cho phép độc giả / doanh nghiệp đã đăng nhập tạo đơn và tra cứu trạng thái đơn hàng của mình
-                        .requestMatchers(HttpMethod.POST, "/api/v1/finance/orders", "/api/v1/finance/checkout", "/api/v1/finance/orders/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/finance/orders", "/api/v1/finance/orders/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/orders/**").authenticated()
                         // Khiếu nại thanh toán: khách gửi/xem của mình; xử lý chỉ kế toán (kiểm tra lại trong controller)
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
                         // Chứng từ (UC057): khách xem của mình, chi tiết đơn kiểm chủ đơn / kế toán trong service
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/documents/**").authenticated()
-                        // Cửa hàng thử (chỉ profile dev + localpress.demo-store.enabled, xem finance.demostore); tắt thì 404
-                        .requestMatchers("/api/v1/finance/dev/demo-store", "/api/v1/finance/dev/demo-store/**").authenticated()
                         .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "CHIEF_ACCOUNTANT", "STAFF")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)
@@ -98,7 +108,6 @@ public class SecurityConfig {
                         // Mọi endpoint còn lại bắt buộc phải xác thực
                         .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults())
                 .addFilterBefore(new JwtAuthenticationFilter(tokens, jdbc, devices.getIfAvailable()),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
@@ -125,7 +134,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    public PasswordEncoder passwordEncoder(@Value("${localpress.security.seed-password-alias:false}") boolean seedAlias) {
         return new PasswordEncoder() {
             private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
 
@@ -139,7 +148,11 @@ public class SecurityConfig {
                 if (bcrypt.matches(rawPassword, encodedPassword)) {
                     return true;
                 }
-                // Hỗ trợ linh hoạt cả 2 mật khẩu thông dụng trong môi trường dev: "password" và "password123"
+                // Chỉ dev (localpress.security.seed-password-alias): tài khoản seed dùng được cả "password" và "password123".
+                // Ngoài dev tắt, nếu không mọi tài khoản đặt một trong hai mật khẩu này đăng nhập được bằng mật khẩu kia.
+                if (!seedAlias) {
+                    return false;
+                }
                 if ("password".contentEquals(rawPassword) && bcrypt.matches("password123", encodedPassword)) {
                     return true;
                 }
