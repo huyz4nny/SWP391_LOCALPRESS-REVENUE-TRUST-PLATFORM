@@ -15,9 +15,9 @@ import type {
  * ==============================================================================
  * API TRANG THANH TOÁN CHUNG (SV4 - HUY)
  * ==============================================================================
- * Mọi module muốn thu tiền: tạo đơn qua POST /finance/orders (hoặc /finance/checkout),
+ * Mọi module muốn thu tiền: tạo đơn qua POST /finance/orders,
  * rồi navigate(paymentPath(response)) để sang trang /payment/:orderCode của SV4.
- * LocalPress không giữ tiền khách: không ví, không nạp tiền. Khách quét QR đúng mã đơn + đúng số tiền.
+ * Khách quét QR đúng mã đơn + đúng số tiền.
  *
  * Dual-mode: API thật gọi Spring Boot; mock mode giữ khiếu nại + nhật ký SePay trong localStorage riêng
  * của finance, đơn mua bài/gói/quảng cáo đọc từ mockStore dùng chung (không sửa mockStore).

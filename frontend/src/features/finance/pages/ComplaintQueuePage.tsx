@@ -23,10 +23,6 @@ import { PageHeader, Panel, Segmented, Notice, tableCls } from '../components/Le
 const RESOLUTION_LABELS: Record<string, string> = {
   SUCCESS: 'Đã ghi nhận đơn thành công',
   RETURNED_TO_CUSTOMER: 'Đã chuyển trả lại khách',
-  // Dữ liệu cũ trước khi bỏ ví
-  UNDERPAID_CREDITED_TO_WALLET: 'Chuyển thiếu, tiền vào ví (dữ liệu cũ)',
-  LATE_PAYMENT_CREDITED_TO_WALLET: 'Đơn hết hiệu lực, tiền vào ví (dữ liệu cũ)',
-  CREDITED_WALLET: 'Đã cộng vào ví (dữ liệu cũ)',
 }
 
 export function ComplaintStatusBadge({ status }: { status: PaymentComplaint['status'] }) {
