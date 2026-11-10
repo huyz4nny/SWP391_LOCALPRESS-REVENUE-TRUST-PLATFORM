@@ -335,12 +335,17 @@ public class FinanceReconciliationService {
         return total != null ? total : BigDecimal.ZERO;
     }
 
-    /** Tiền hệ thống đã ghi từ ngân hàng trong kỳ: đơn đã thu, bỏ bút toán hoàn. */
+    /**
+     * Tiền hệ thống đã ghi từ ngân hàng trong kỳ: đơn đã thu, bỏ bút toán hoàn.
+     * Bỏ cả đơn cũ trả bằng ví (V16 giữ payment_method = 'WALLET' làm lịch sử): tiền đó không về ngân hàng
+     * trong kỳ, tính vào sẽ làm lệch đối soát với sao kê.
+     */
     private BigDecimal systemTotal(YearMonth ym) {
         String sql = """
             SELECT COALESCE(SUM(amount), 0) FROM transactions
             WHERE status IN ('SUCCESS', 'REFUNDED')
               AND transaction_type <> 'REFUND'
+              AND (payment_method IS NULL OR payment_method <> 'WALLET')
               AND paid_at >= ? AND paid_at < ?
             """;
         BigDecimal total = jdbcTemplate.queryForObject(sql, BigDecimal.class, monthStart(ym), monthStart(ym.plusMonths(1)));

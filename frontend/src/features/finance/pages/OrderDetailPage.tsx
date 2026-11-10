@@ -9,6 +9,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { RotateCcw, Printer } from 'lucide-react'
 import { PageHeader, Panel, KeyValue, LoadingBlock, Notice } from '../components/LedgerUI'
+import { mockStore } from '@/mocks/store'
+import { PERMISSION_CHECKERS } from '@/app/config'
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   SUBSCRIPTION: 'Gói độc giả',
@@ -27,6 +29,8 @@ const ATTEMPT_STATUS: Record<string, ['success' | 'warning' | 'destructive' | 's
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  // Kế toán trưởng chỉ duyệt hoàn tiền, không lập đề xuất (giữ nguyên tắc 4 mắt)
+  const canProposeRefund = !PERMISSION_CHECKERS.canApproveRefunds(mockStore.getCurrentUser().role)
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -92,12 +96,14 @@ export function OrderDetailPage() {
         actions={
           order.paymentStatus === 'PAID' && (
             <>
-              <Link to={`/backoffice/finance/refunds?orderId=${order.id}`}>
-                <Button variant="outline" size="sm" className="text-negative">
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Lập đề xuất hoàn tiền
-                </Button>
-              </Link>
+              {canProposeRefund && (
+                <Link to={`/backoffice/finance/refunds?orderId=${order.id}`}>
+                  <Button variant="outline" size="sm" className="text-negative">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Lập đề xuất hoàn tiền
+                  </Button>
+                </Link>
+              )}
               {document && (
                 <Button size="sm" onClick={() => setShowInvoiceModal(true)}>
                   <Printer className="h-3.5 w-3.5" />

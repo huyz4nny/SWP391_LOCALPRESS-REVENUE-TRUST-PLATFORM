@@ -149,10 +149,13 @@ export function RefundManagementPage() {
           )
         }
         actions={
-          <Button size="sm" onClick={() => setShowProposeModal(true)} disabled={paidOrders.length === 0}>
-            <PlusCircle className="h-3.5 w-3.5" />
-            Lập đề xuất hoàn tiền
-          </Button>
+          // Kế toán trưởng chỉ duyệt: tự lập thì không còn mắt 2 nào duyệt được phiếu đó
+          !isManager && (
+            <Button size="sm" onClick={() => setShowProposeModal(true)} disabled={paidOrders.length === 0}>
+              <PlusCircle className="h-3.5 w-3.5" />
+              Lập đề xuất hoàn tiền
+            </Button>
+          )
         }
       />
 

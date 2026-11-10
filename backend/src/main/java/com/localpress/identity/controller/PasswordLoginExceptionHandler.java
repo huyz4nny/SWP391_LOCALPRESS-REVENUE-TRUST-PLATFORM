@@ -1,6 +1,5 @@
 package com.localpress.identity.controller;
 
-import com.localpress.shared.device.DeviceLimitReachedException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,12 +12,6 @@ import java.util.Map;
 
 @RestControllerAdvice(assignableTypes = PasswordLoginController.class)
 public class PasswordLoginExceptionHandler {
-
-    @ExceptionHandler(DeviceLimitReachedException.class)
-    public ResponseEntity<Map<String, String>> deviceLimit(DeviceLimitReachedException exception) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", exception.getMessage(), "code", exception.getCode()));
-    }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> status(ResponseStatusException exception) {
