@@ -6,6 +6,7 @@ import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
 import { Button } from '@/components/ui/button'
+import { financeApi } from '@/features/finance/api'
 import {
   DollarSign,
   FileText,
@@ -38,6 +39,8 @@ interface NavItem {
   label: string
   path: string
   icon: LucideIcon
+  /** Số việc đang chờ người dùng này (vd. phiếu hoàn tiền chờ Kế toán trưởng duyệt) */
+  badge?: number
 }
 
 interface NavGroup {
@@ -66,6 +69,20 @@ export function BackofficeLayout() {
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
+
+  // Kế toán trưởng (mắt 2): đếm phiếu hoàn tiền chờ duyệt cho menu, tải lại mỗi lần chuyển trang để khớp sau khi duyệt
+  const isChiefAccountant = PERMISSION_CHECKERS.canApproveRefunds(currentUser.role)
+  const [refundsToReview, setRefundsToReview] = useState(0)
+  useEffect(() => {
+    if (!isChiefAccountant) return
+    let active = true
+    financeApi.getRefunds()
+      .then((rows) => {
+        if (active) setRefundsToReview(rows.filter((r) => r.status === 'UNDER_REVIEW' || (r.status as string) === 'PENDING').length)
+      })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [isChiefAccountant, location.pathname])
 
   const isStaff = PERMISSION_CHECKERS.canAccessBackoffice(currentUser.role)
   const isSystemAdmin = currentUser.role === 'SYSTEM_ADMIN'
@@ -125,7 +142,7 @@ export function BackofficeLayout() {
     { label: 'Đơn thanh toán', path: '/backoffice/finance/orders', icon: DollarSign },
     { label: 'Nhật ký SePay', path: '/backoffice/finance/sepay', icon: Webhook },
     { label: 'Khiếu nại thanh toán', path: '/backoffice/finance/complaints', icon: MessageSquare },
-    { label: 'Hoàn tiền', path: '/backoffice/finance/refunds', icon: RotateCcw },
+    { label: 'Hoàn tiền', path: '/backoffice/finance/refunds', icon: RotateCcw, badge: isChiefAccountant ? refundsToReview : 0 },
     { label: 'Sổ quỹ', path: '/backoffice/finance/ledger', icon: BookMarked },
     { label: 'Đối soát kỳ', path: '/backoffice/finance/reconciliation', icon: Scale },
     { label: 'Cảnh báo và báo cáo', path: '/backoffice/finance/reports', icon: BellRing },
@@ -146,7 +163,9 @@ export function BackofficeLayout() {
     canSeeAdmin && { label: 'Hệ thống', items: adminItems },
   ].filter(Boolean) as NavGroup[]
 
-  const scope = canSeeAdmin ? 'Quản trị hệ thống' : canSeeFinance ? 'Phòng kế toán' : 'Tòa soạn'
+  const scope = canSeeAdmin ? 'Quản trị hệ thống'
+    : isChiefAccountant ? 'Kế toán trưởng'
+    : canSeeFinance ? 'Phòng kế toán' : 'Tòa soạn'
 
   // Mục đang mở: khớp đường dẫn dài nhất để /finance/orders/12 vẫn sáng "Đơn thanh toán"
   const allPaths = groups.flatMap((g) => g.items.map((i) => i.path))
@@ -189,6 +208,14 @@ export function BackofficeLayout() {
                     >
                       <Icon className={`h-4 w-4 flex-none ${isActive ? 'text-slate-900' : 'text-slate-500'}`} strokeWidth={1.75} />
                       <span className="truncate">{item.label}</span>
+                      {item.badge ? (
+                        <span
+                          className="ml-auto flex-none rounded-full bg-negative px-1.5 text-[11px] font-semibold leading-[18px] text-white num"
+                          title={`${item.badge} phiếu chờ bạn duyệt`}
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   </li>
                 )
