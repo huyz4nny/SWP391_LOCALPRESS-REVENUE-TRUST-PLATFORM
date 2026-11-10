@@ -111,6 +111,24 @@ it('auth synchronization keeps a Google user with an active Bearer token', async
   expect(mockStore.getCurrentUser().id).toBe('user-guest')
 })
 
+it('auth synchronization refreshes the cached role and name from /auth/me', async () => {
+  const current = await client()
+  const { APP_CONFIG } = await import('../app/config')
+  const { mockStore } = await import('../mocks/store')
+  const { syncAuthSession } = await import('../features/identity/authSession')
+  APP_CONFIG.useMockApi = false
+  mockStore.setRealUser({ id: '35', name: 'Tên cũ', email: 'chief@example.test', role: 'SYSTEM_ADMIN', isActive: true, createdAt: '2026-11-01T00:00:00.000Z' } as never)
+  current.setBearerToken('local-jwt')
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(
+    { id: '35', name: 'Trần Kế Toán Trưởng', email: 'chief@example.test', role: 'CHIEF_ACCOUNTANT', isActive: true }),
+    { headers: { 'Content-Type': 'application/json' } }))
+  await syncAuthSession()
+  const user = mockStore.getCurrentUser()
+  expect(user.role).toBe('CHIEF_ACCOUNTANT')
+  expect(user.name).toBe('Trần Kế Toán Trưởng')
+  expect(user.createdAt).toBe('2026-11-01T00:00:00.000Z')
+})
+
 it('storage failures allow memory-only authentication without throwing', async () => {
   vi.stubGlobal('window', {
     get sessionStorage() { throw new Error('Storage unavailable') },
