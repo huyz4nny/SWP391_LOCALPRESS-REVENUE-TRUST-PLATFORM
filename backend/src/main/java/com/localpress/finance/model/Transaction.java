@@ -96,7 +96,6 @@ public class Transaction {
 
     /**
      * Phương thức thanh toán: 'SEPAY' (chuyển khoản QR, ghi nhận qua webhook). Bút toán REFUND: 'BANK_TRANSFER'.
-     * Dữ liệu cũ trước V16 có thể còn 'WALLET'.
      */
     @Column(name = "payment_method", nullable = false, length = 50)
     private String paymentMethod;

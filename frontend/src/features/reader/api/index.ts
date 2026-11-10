@@ -503,7 +503,7 @@ export const readerApi = {
     })
   },
 
-  // UC034: server tạo purchase PENDING + đơn SV4, trả orderCode. FE không gọi /finance/checkout.
+  // UC034: server tạo purchase PENDING + đơn SV4, trả orderCode.
   createArticlePurchase: (articleId: string) => {
     return httpClient.post<PendingOrderTarget>('/reader/article-purchases', {
       articleId: APP_CONFIG.useMockApi ? articleId : Number(articleId),

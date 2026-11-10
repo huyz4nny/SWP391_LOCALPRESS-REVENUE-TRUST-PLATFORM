@@ -1,7 +1,7 @@
 spring:
   config:
     # CWD = backend/ (Maven) hoặc thư mục gốc repo (IntelliJ). optional nên thiếu file không làm chết Spring.
-    # application-local.yml (gitignored): cờ chỉ dùng trên máy mình, vd localpress.demo-store.enabled
+    # application-local.yml (gitignored): cờ chỉ dùng trên máy mình, vd localpress.payment.simulation-enabled
     import:
       - optional:file:./config/application-secrets.yml
       - optional:file:./config/application-local.yml
@@ -41,6 +41,12 @@ localpress:
     secret: ${LOCALPRESS_JWT_SECRET:localpress-dev-only-signing-key-change-before-deploy-2026}
   storage:
     image-directory: "${user.home}/localpress-data/uploads"
+  # Chỉ bật ở dev (mặc định tắt, xem SecurityConfig):
+  # http-basic: cho test / script E2E gọi API bằng Basic, bỏ qua JWT và giới hạn thiết bị.
+  # seed-password-alias: tài khoản seed đăng nhập được bằng cả "password" và "password123".
+  security:
+    http-basic: true
+    seed-password-alias: true
   # SePay: khóa nằm ở application-secrets.yml (gitignore) hoặc biến SEPAY_*.
   # File import qua spring.config.import được ưu tiên hơn file đang import nó.
   # Thiếu khóa thường do chạy Spring từ thư mục gốc nên không thấy ./config/application-secrets.yml.

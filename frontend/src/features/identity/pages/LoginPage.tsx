@@ -10,11 +10,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Sparkles, ArrowRight } from 'lucide-react'
 import { APP_CONFIG } from '@/app/config'
 import { authApi } from '@/features/identity'
-import { httpClient } from '@/lib/http/client'
 import { AppApiError } from '@/lib/http/errors'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import { loginWithGoogle } from '../googleAuthSession'
-import { cancelLogin } from '../authSession'
+import { signIn } from '../authSession'
 import { currentBrowserDevice } from '../browserDevice'
 
 export function LoginPage() {
@@ -60,17 +59,12 @@ export function LoginPage() {
       try {
         const normalizedEmail = email.trim().toLowerCase()
         const device = currentBrowserDevice()
-        httpClient.beginLogin()
-        const session = await authApi.login({
+        const user = await signIn(() => authApi.login({
           email: normalizedEmail,
           password,
           deviceName: device.deviceName,
           deviceType: device.deviceType,
-        })
-        httpClient.setBearerToken(session.accessToken)
-        const user = await authApi.getMe()
-        mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
-        httpClient.shareLoginWithOtherTabs()
+        }))
         setPassword('')
 
         // 2. Điều hướng chính xác theo vai trò người dùng (không phân biệt Doanh nghiệp hay Nội bộ)
@@ -82,8 +76,6 @@ export function LoginPage() {
           navigate(from === '/login' ? '/' : from, { replace: true })
         }
       } catch (error: unknown) {
-        cancelLogin()
-
         if (error instanceof AppApiError) {
           if (error.status === 401) {
             setLoginError(

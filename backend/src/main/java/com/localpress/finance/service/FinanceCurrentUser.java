@@ -23,15 +23,13 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class FinanceCurrentUser {
 
-    private static final Set<String> FINANCE_ROLES = Set.of("ACCOUNTANT", "STAFF", "SYSTEM_ADMIN");
+    /** Nhân sự tài chính. SYSTEM_ADMIN không nằm trong đây: quản trị hệ thống không đụng vào tiền. */
+    private static final Set<String> FINANCE_ROLES = Set.of("ACCOUNTANT", "CHIEF_ACCOUNTANT", "STAFF");
 
     private final JdbcTemplate jdbcTemplate;
 
-    /**
-     * Kế toán trưởng (mắt 2 duyệt hoàn tiền, chốt kỳ đối soát). Bảng users thuộc module identity nên SV4
-     * không tự thêm giá trị role mới: tài khoản quản trị (SYSTEM_ADMIN) giữ vai trò Kế toán trưởng.
-     */
-    private static final Set<String> FINANCE_MANAGER_ROLES = Set.of("SYSTEM_ADMIN");
+    /** Kế toán trưởng (mắt 2 duyệt hoàn tiền, chốt kỳ đối soát): role riêng từ V202611091000, tách khỏi SYSTEM_ADMIN. */
+    private static final Set<String> FINANCE_MANAGER_ROLES = Set.of("CHIEF_ACCOUNTANT");
 
     public record Principal(Long userId, String role) {
         public boolean isFinanceStaff() {

@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * ==============================================================================
  * DTO: TRA CỨU TRẠNG THÁI ĐƠN HÀNG (SV4 - UC050)
  * ==============================================================================
- * Dùng cho màn hình thanh toán Checkout phía Frontend để polling trạng thái đơn hàng.
+ * Dùng cho trang thanh toán /payment/:orderCode phía Frontend để polling trạng thái đơn hàng.
  */
 @Data
 @Builder

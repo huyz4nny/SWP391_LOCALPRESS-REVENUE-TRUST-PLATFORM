@@ -3,7 +3,6 @@ package com.localpress.reader.service;
 import com.localpress.reader.dto.ReaderDeviceResponse;
 import com.localpress.reader.repository.ReaderDeviceRepository;
 import com.localpress.reader.repository.ReaderDeviceRepository.DeviceRow;
-import com.localpress.shared.device.DeviceLimitReachedException;
 import com.localpress.shared.device.DeviceSessionService;
 import com.localpress.shared.device.RegisteredSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +24,7 @@ import java.util.Set;
 public class ReaderDeviceSessionService implements DeviceSessionService {
 
     static final int ACTIVE_LIMIT = 2;
+    static final String LIMITED_ROLE = "READER";
     static final String DEFAULT_NAME = "Trình duyệt";
     static final Set<String> DEVICE_TYPES = Set.of("DESKTOP", "MOBILE", "TABLET");
 
@@ -54,12 +54,17 @@ public class ReaderDeviceSessionService implements DeviceSessionService {
         String name = normalizeName(deviceName);
         String type = normalizeType(deviceType);
         String ip = normalizeIp(ipAddress);
-        if (!repository.lockUser(userId)) {
-            throw new IllegalArgumentException("Không tìm thấy tài khoản");
-        }
+        String role = repository.lockUser(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản"));
         Instant now = clock.instant();
-        if (repository.countActive(userId, now) >= ACTIVE_LIMIT) {
-            throw new DeviceLimitReachedException();
+        // UC043: độc giả tối đa 2 phiên. Đã đủ thì đẩy phiên cũ nhất ra thay vì chặn đăng nhập,
+        // vì tab bị đóng mà không bấm Đăng xuất vẫn giữ phiên đến khi hết hạn.
+        // Tài khoản nội bộ và nhà quảng cáo không giới hạn số phiên.
+        if (LIMITED_ROLE.equals(role)) {
+            int overflow = repository.countActive(userId, now) - ACTIVE_LIMIT + 1;
+            if (overflow > 0) {
+                repository.deleteOldestActive(userId, now, overflow);
+            }
         }
         String sessionId = newSessionId();
         long deviceId = repository.insert(userId, name, type, sessionId, ip, expiresAt);
@@ -80,7 +85,7 @@ public class ReaderDeviceSessionService implements DeviceSessionService {
         if (sessionId == null || sessionId.isBlank()) {
             return;
         }
-        repository.revokeBySessionId(sessionId.trim(), clock.instant());
+        repository.deleteBySessionId(sessionId.trim());
     }
 
     @Transactional(readOnly = true)

@@ -63,7 +63,7 @@ export function ReaderDevicesPage() {
         <div>
           <h2 className="font-serif text-2xl font-bold text-slate-900">Thiết bị đăng nhập</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Mỗi tài khoản tối đa 2 phiên còn hiệu lực. Đăng nhập thiết bị thứ ba bị từ chối cho đến khi bạn thu hồi một phiên.
+            Mỗi tài khoản tối đa 2 phiên còn hiệu lực. Đăng nhập trên thiết bị thứ ba sẽ tự đăng xuất phiên cũ nhất.
           </p>
         </div>
         <p className="text-sm font-medium text-slate-700 num">{devices.items.length} / 2 phiên</p>

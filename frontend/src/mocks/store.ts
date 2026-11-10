@@ -593,7 +593,7 @@ class MockStore {
     const newAttempt: PaymentAttempt = {
       id: `ATT-${Date.now()}`,
       orderId,
-      method: method || 'VIETQR',
+      method: method || 'SEPAY',
       transactionCode: `TX-${Date.now()}`,
       amount: order.finalAmount,
       status: isManualBank ? 'PROCESSING' : 'SUCCESS',

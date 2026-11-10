@@ -7,7 +7,7 @@ import { Receipt } from 'lucide-react'
 import { advertisingApi } from '../api'
 import { AdPaymentOrder } from '../types'
 
-const METHOD_LABEL: Record<string, string> = { WALLET: 'Ví LocalPress', SEPAY: 'Chuyển khoản QR' }
+const METHOD_LABEL: Record<string, string> = { SEPAY: 'Chuyển khoản QR' }
 
 export function AdvertiserBillingPage() {
   const [orders, setOrders] = useState<AdPaymentOrder[]>([])

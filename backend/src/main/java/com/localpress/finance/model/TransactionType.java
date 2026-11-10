@@ -5,7 +5,7 @@ package com.localpress.finance.model;
  * ENUM: PHÂN LOẠI GIAO DỊCH TÀI CHÍNH (TRANSACTION TYPE)
  * ==============================================================================
  * Khớp 100% với ràng buộc ENUM('SUBSCRIPTION', 'ARTICLE', 'AD', 'REFUND')
- * trong bảng CSDL transactions (V16__remove_wallet.sql bỏ loại TOPUP của ví).
+ * trong bảng CSDL transactions.
  */
 public enum TransactionType {
     /**

@@ -11,6 +11,7 @@ import { Input, Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
 import {
+  Crown,
   FileText,
   PlusCircle,
   Edit,
@@ -201,8 +202,9 @@ export function ArticleListPage() {
                   <td className="px-4 py-3 font-medium text-slate-700">{art.categoryName}</td>
                   <td className="px-4 py-3">
                     {art.isPremium ? (
-                      <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
-                        👑 Premium
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] leading-4 font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
+                        <Crown className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        Premium
                       </span>
                     ) : (
                       <span className="text-[10px] font-medium text-slate-500">Miễn phí</span>

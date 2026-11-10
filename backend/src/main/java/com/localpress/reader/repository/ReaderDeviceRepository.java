@@ -33,13 +33,31 @@ public class ReaderDeviceRepository {
     ) {
     }
 
-    // khóa dòng user để hai lần đăng nhập cùng lúc không cùng đếm thấy dưới 2 phiên
-    public boolean lockUser(long userId) {
-        List<Long> ids = jdbcTemplate.query(
-                "SELECT user_id FROM users WHERE user_id = ? FOR UPDATE",
-                (rs, row) -> rs.getLong(1),
+    // khóa dòng user để hai lần đăng nhập cùng lúc không cùng đếm thấy dưới 2 phiên; trả role, rỗng nếu không có user
+    public Optional<String> lockUser(long userId) {
+        List<String> roles = jdbcTemplate.query(
+                "SELECT role FROM users WHERE user_id = ? FOR UPDATE",
+                (rs, row) -> rs.getString(1),
                 userId);
-        return !ids.isEmpty();
+        return roles.stream().findFirst();
+    }
+
+    /** Xóa {count} phiên còn hiệu lực cũ nhất của user, kèm các phiên đã thu hồi hoặc hết hạn. */
+    public int deleteOldestActive(long userId, Instant now, int count) {
+        Timestamp at = Timestamp.from(now);
+        int removed = jdbcTemplate.update("""
+                DELETE FROM user_devices
+                WHERE user_id = ? AND (revoked_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at <= ?))
+                """, userId, at);
+        if (count <= 0) {
+            return removed;
+        }
+        return removed + jdbcTemplate.update("""
+                DELETE FROM user_devices
+                WHERE user_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
+                ORDER BY created_at ASC, device_id ASC
+                LIMIT ?
+                """, userId, at, count);
     }
 
     public int countActive(long userId, Instant now) {
@@ -109,12 +127,9 @@ public class ReaderDeviceRepository {
                 """, Timestamp.from(now), deviceId, userId);
     }
 
-    public int revokeBySessionId(String sessionId, Instant now) {
-        return jdbcTemplate.update("""
-                UPDATE user_devices
-                SET revoked_at = ?
-                WHERE device_token = ? AND revoked_at IS NULL
-                """, Timestamp.from(now), sessionId);
+    /** Đăng xuất: xóa hẳn dòng phiên, không giữ lại bản ghi đã thu hồi. */
+    public int deleteBySessionId(String sessionId) {
+        return jdbcTemplate.update("DELETE FROM user_devices WHERE device_token = ?", sessionId);
     }
 
     private static LocalDateTime toLocal(Timestamp timestamp) {

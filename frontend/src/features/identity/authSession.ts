@@ -2,6 +2,7 @@
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
 import { mockStore } from '@/mocks/store'
+import { authApi, type AuthMeResponse } from './api'
 
 export function logout(): Promise<void> {
     const finish = () => {
@@ -20,6 +21,38 @@ export function logout(): Promise<void> {
 /** Failed login: this tab goes back to the login it had before; other tabs are not logged out. */
 export function cancelLogin(): void {
     if (!httpClient.cancelLogin()) mockStore.setCurrentUser('user-guest')
+}
+
+/** Xóa phiên của 1 token cụ thể trên server. Lỗi thì bỏ qua: phiên vẫn tự hết hạn. */
+function revokeSession(token: string): void {
+    httpClient
+        .post<void>('/auth/logout', {}, { skipAuth: true, headers: { Authorization: `Bearer ${token}` } })
+        .catch(() => undefined)
+}
+
+/**
+ * Luồng chung cho đăng nhập mật khẩu và Google (API thật).
+ * Mỗi lần đăng nhập server tạo 1 phiên trong user_devices (tối đa 2), nên:
+ * - đăng nhập lại khi tab đã có phiên: xóa phiên cũ sau khi phiên mới được nhận;
+ * - đã có token mới nhưng bước sau lỗi: xóa luôn phiên mới, không để phiên mồ côi giữ chỗ.
+ */
+export async function signIn(requestSession: () => Promise<{ accessToken: string }>): Promise<AuthMeResponse> {
+    const previousBearer = httpClient.currentBearerToken()
+    httpClient.beginLogin()
+    let issued = ''
+    try {
+        issued = (await requestSession()).accessToken
+        httpClient.setBearerToken(issued)
+        const user = await authApi.getMe()
+        mockStore.setRealUser({ ...user, createdAt: new Date().toISOString() })
+        httpClient.shareLoginWithOtherTabs()
+        if (previousBearer && previousBearer !== issued) revokeSession(previousBearer)
+        return user
+    } catch (error) {
+        if (issued) revokeSession(issued)
+        cancelLogin()
+        throw error
+    }
 }
 
 /**
