@@ -42,6 +42,13 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 }
 
 /**
+ * Đường dẫn các cổng thông tin và phân hệ dùng chung
+ */
+export const APP_ROUTES = {
+  advertiser: '/advertiser',
+} as const
+
+/**
  * Phân quyền module chức năng (RBAC Granular Permission Checkers)
  */
 export const PERMISSION_CHECKERS = {
@@ -67,6 +74,21 @@ export const PERMISSION_CHECKERS = {
 
   canPublishArticles: (role: UserRole): boolean =>
     ['EDITOR', 'REVIEWER', 'SYSTEM_ADMIN'].includes(role),
+
+  getAdvertiserRoute: (): string => APP_ROUTES.advertiser,
+
+  getBackofficeLabel: (role: UserRole | string): string => {
+    if (PERMISSION_CHECKERS.canAccessAdmin(role as UserRole)) {
+      return 'Vào Quản Trị'
+    }
+    if (PERMISSION_CHECKERS.canAccessFinance(role as UserRole)) {
+      return 'Vào Tài Chính'
+    }
+    if (PERMISSION_CHECKERS.canAccessEditorial(role as UserRole) || role === 'AUTHOR') {
+      return 'Vào Tòa Soạn'
+    }
+    return 'Vào Backoffice'
+  },
 
   getDefaultBackofficeRoute: (role: UserRole): string => {
     if (role === 'AUTHOR') {

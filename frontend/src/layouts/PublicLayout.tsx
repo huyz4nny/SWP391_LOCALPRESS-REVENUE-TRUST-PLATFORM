@@ -13,7 +13,9 @@ import {
   X,
   ChevronRight,
   Building2,
+  LayoutDashboard,
 } from 'lucide-react'
+import { PERMISSION_CHECKERS, APP_ROUTES } from '@/app/config'
 import { logout } from '@/features/identity/authSession'
 import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
 
@@ -72,7 +74,7 @@ export function PublicLayout() {
           <div className="flex items-center space-x-3.5">
             <ThemeToggle className="h-7 px-1.5 text-stone-600 hover:bg-stone-100" />
             <Link
-              to="/advertiser"
+              to={APP_ROUTES.advertiser}
               className="text-stone-500 hover:text-stone-900 font-medium transition-colors"
             >
               Đặt quảng cáo
@@ -98,6 +100,32 @@ export function PublicLayout() {
               </div>
             ) : (
               <div className="flex items-center space-x-2.5">
+                {PERMISSION_CHECKERS.canAccessBackoffice(currentUser.role) && (
+                  <>
+                    <Link
+                      to={PERMISSION_CHECKERS.getDefaultBackofficeRoute(currentUser.role)}
+                      className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-900 text-white hover:bg-primary-800 text-xs font-semibold shadow-xs transition-colors"
+                      title="Chuyển đến không gian làm việc Tòa soạn / Quản trị"
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
+                      {PERMISSION_CHECKERS.getBackofficeLabel(currentUser.role)}
+                    </Link>
+                    <span className="text-stone-300">|</span>
+                  </>
+                )}
+                {currentUser.role === 'ADVERTISER' && (
+                  <>
+                    <Link
+                      to={APP_ROUTES.advertiser}
+                      className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-900 text-white hover:bg-primary-800 text-xs font-semibold shadow-xs transition-colors"
+                      title="Chuyển đến Cổng Doanh nghiệp"
+                    >
+                      <Building2 className="w-3.5 h-3.5 mr-1.5" />
+                      Cổng Doanh Nghiệp
+                    </Link>
+                    <span className="text-stone-300">|</span>
+                  </>
+                )}
                 <Link
                   to="/account"
                   className="flex items-center space-x-1.5 font-medium text-stone-700 hover:text-stone-950"

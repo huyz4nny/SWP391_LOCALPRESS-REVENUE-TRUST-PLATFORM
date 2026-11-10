@@ -147,10 +147,12 @@ INSERT INTO article_purchases (purchase_id, user_id, article_id, purchase_price,
 
 -- 13. AD CAMPAIGNS, CREATIVES & STATS (Quảng cáo B2B)
 INSERT INTO ad_campaigns (campaign_id, advertiser_id, slot_id, reviewed_by, campaign_name, start_date, end_date, quoted_amount, quotation_status, contract_reference, contract_file_url, payment_status, status) VALUES
-(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE');
+(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE'),
+(2, 1, 2, NULL, 'Chiến dịch Khai trương Trung tâm Logistics Cát Hải', '2026-11-20', '2026-12-20', 25000000.00, 'PENDING', NULL, NULL, 'UNPAID', 'PENDING');
 
 INSERT INTO ad_creatives (creative_id, campaign_id, reviewed_by, version_number, media_url, target_url, resolved_url, review_status, scan_status, approved_at) VALUES
-(1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00');
+(1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00'),
+(2, 2, NULL, 1, 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1140', 'https://cathailogistics.com.vn', 'https://cathailogistics.com.vn', 'PENDING', 'SAFE', NULL);
 
 INSERT INTO ad_stats (stat_id, campaign_id, creative_id, stat_date, impressions, clicks, ctr) VALUES
 (1, 1, 1, '2026-09-28', 15200, 684, 4.5000);

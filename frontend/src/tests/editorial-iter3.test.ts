@@ -1,8 +1,25 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
 import { editorialApi } from '@/features/editorial/api'
 import { mockStore } from '@/mocks/store'
+import { APP_CONFIG } from '@/app/config'
+import { httpClient } from '@/lib/http/client'
 
 describe('SV2 Editorial Iteration 3 Comprehensive Test Suite (Screens II.2.7 - II.2.10)', () => {
+  const originalMock = APP_CONFIG.useMockApi
+
+  beforeAll(() => {
+    APP_CONFIG.useMockApi = true
+    httpClient.setUseMock(true)
+    mockStore.resetToDefaults()
+    mockStore.setCurrentUser('user-editor')
+  })
+
+  afterAll(() => {
+    APP_CONFIG.useMockApi = originalMock
+    httpClient.setUseMock(originalMock)
+    mockStore.resetToDefaults()
+  })
+
   beforeEach(() => {
     mockStore.setCurrentUser('user-editor')
   })

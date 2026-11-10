@@ -2,13 +2,12 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'
-import { ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
+import { ROLE_LABELS, PERMISSION_CHECKERS, APP_CONFIG, APP_ROUTES } from '@/app/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Sparkles, ArrowRight } from 'lucide-react'
-import { APP_CONFIG } from '@/app/config'
 import { authApi } from '@/features/identity'
 import { AppApiError } from '@/lib/http/errors'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
@@ -38,7 +37,7 @@ export function LoginPage() {
       if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
         navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
       } else if (user.role === 'ADVERTISER') {
-        navigate('/advertiser/profile', { replace: true })
+        navigate(APP_ROUTES.advertiser, { replace: true })
       } else {
         navigate(from === '/login' ? '/' : from, { replace: true })
       }
@@ -71,7 +70,7 @@ export function LoginPage() {
         if (PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
           navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
         } else if (user.role === 'ADVERTISER') {
-          navigate('/advertiser/profile', { replace: true })
+          navigate(APP_ROUTES.advertiser, { replace: true })
         } else {
           navigate(from === '/login' ? '/' : from, { replace: true })
         }
@@ -101,11 +100,18 @@ export function LoginPage() {
       const matched = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
       if (matched) {
         mockStore.setCurrentUser(matched.id)
+        if (PERMISSION_CHECKERS.canAccessBackoffice(matched.role)) {
+          navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(matched.role), { replace: true })
+        } else if (matched.role === 'ADVERTISER') {
+          navigate(APP_ROUTES.advertiser, { replace: true })
+        } else {
+          navigate(from === '/login' ? '/' : from, { replace: true })
+        }
       } else {
         mockStore.setCurrentUser('user-reader-free')
+        navigate(from === '/login' ? '/' : from, { replace: true })
       }
       setIsLoading(false)
-      navigate(from, { replace: true })
     }, 400)
   }
 
@@ -113,7 +119,7 @@ export function LoginPage() {
     mockStore.setCurrentUser(userId)
     const user = users.find((u) => u.id === userId)
     if (user?.role === 'ADVERTISER') {
-      navigate('/advertiser', { replace: true })
+      navigate(APP_ROUTES.advertiser, { replace: true })
     } else if (user && PERMISSION_CHECKERS.canAccessBackoffice(user.role)) {
       navigate(PERMISSION_CHECKERS.getDefaultBackofficeRoute(user.role), { replace: true })
     } else {
