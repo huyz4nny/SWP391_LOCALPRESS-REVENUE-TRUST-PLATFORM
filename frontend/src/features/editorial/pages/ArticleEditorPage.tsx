@@ -48,6 +48,7 @@ export function ArticleEditorPage() {
   const coverPreview = filePreview ?? (coverImage.startsWith('/api/v1/content/images/') ? serverCoverUrl : (coverImage || null))
   const [coverError, setCoverError] = useState('')
   const coverFileInput = useRef<HTMLInputElement>(null)
+  const serverCoverUrlRef = useRef<string | null>(null)
   const [categoryId, setCategoryId] = useState('cat-thoi-su')
   const [tags, setTags] = useState('Hải Phòng, Thời sự')
   const [isPremium, setIsPremium] = useState(false)
@@ -165,25 +166,44 @@ export function ArticleEditorPage() {
     }
   }, [filePreview])
 
+  // Thu hồi ảnh bìa từ server khi rời màn hình để tránh rò rỉ bộ nhớ
+  useEffect(() => {
+    return () => {
+      if (serverCoverUrlRef.current) {
+        URL.revokeObjectURL(serverCoverUrlRef.current)
+        serverCoverUrlRef.current = null
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (!coverImage.startsWith('/api/v1/content/images/')) {
+      if (serverCoverUrlRef.current) {
+        URL.revokeObjectURL(serverCoverUrlRef.current)
+        serverCoverUrlRef.current = null
+        setServerCoverUrl(null)
+      }
       return
     }
 
     let active = true
-    let objectUrl: string | null = null
 
     void contentApi.getCoverImage(coverImage).then((blob) => {
       if (!active) return
-      objectUrl = URL.createObjectURL(blob)
-      setServerCoverUrl(objectUrl)
+      const nextUrl = URL.createObjectURL(blob)
+      const prevUrl = serverCoverUrlRef.current
+      serverCoverUrlRef.current = nextUrl
+      setServerCoverUrl(nextUrl)
+      // Chỉ thu hồi URL ảnh cũ sau khi ảnh mới tải xong để không bị chớp ảnh hỏng
+      if (prevUrl) {
+        URL.revokeObjectURL(prevUrl)
+      }
     }).catch((error: unknown) => {
       if (active) setCoverError(error instanceof Error ? error.message : 'Không tải được ảnh bìa')
     })
 
     return () => {
       active = false
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [coverImage])
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { PERMISSION_CHECKERS } from '@/app/config'
+import { PERMISSION_CHECKERS, APP_ROUTES } from '@/app/config'
 
-describe('AUTHOR permissions', () => {
+describe('AUTHOR permissions and RBAC route helpers', () => {
   it('can open backoffice and is directed to the existing composer', () => {
     expect(PERMISSION_CHECKERS.canAccessBackoffice('AUTHOR')).toBe(true)
     expect(PERMISSION_CHECKERS.canComposeArticles('AUTHOR')).toBe(true)
@@ -21,5 +21,22 @@ describe('AUTHOR permissions', () => {
     expect(PERMISSION_CHECKERS.canComposeArticles('SYSTEM_ADMIN')).toBe(true)
     expect(PERMISSION_CHECKERS.canComposeArticles('READER')).toBe(false)
     expect(PERMISSION_CHECKERS.canComposeArticles('REVIEWER')).toBe(false)
+  })
+
+  it('returns accurate backoffice label per role without missing CHIEF_ACCOUNTANT', () => {
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('SYSTEM_ADMIN')).toBe('Vào Quản Trị')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('CHIEF_ACCOUNTANT')).toBe('Vào Tài Chính')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('ACCOUNTANT')).toBe('Vào Tài Chính')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('STAFF')).toBe('Vào Tài Chính')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('FINANCE_STAFF')).toBe('Vào Tài Chính')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('EDITOR')).toBe('Vào Tòa Soạn')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('REVIEWER')).toBe('Vào Tòa Soạn')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('AUTHOR')).toBe('Vào Tòa Soạn')
+    expect(PERMISSION_CHECKERS.getBackofficeLabel('READER')).toBe('Vào Backoffice')
+  })
+
+  it('provides centralized advertiser route constant and helper', () => {
+    expect(APP_ROUTES.advertiser).toBe('/advertiser')
+    expect(PERMISSION_CHECKERS.getAdvertiserRoute()).toBe('/advertiser')
   })
 })

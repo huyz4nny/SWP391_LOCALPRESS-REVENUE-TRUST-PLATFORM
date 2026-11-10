@@ -15,16 +15,9 @@ import {
   Building2,
   LayoutDashboard,
 } from 'lucide-react'
-import { PERMISSION_CHECKERS } from '@/app/config'
+import { PERMISSION_CHECKERS, APP_ROUTES } from '@/app/config'
 import { logout } from '@/features/identity/authSession'
 import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
-
-function getBackofficeLabel(role: string): string {
-  if (role === 'SYSTEM_ADMIN') return 'Vào Quản Trị'
-  if (['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF'].includes(role)) return 'Vào Tài Chính'
-  if (['AUTHOR', 'EDITOR', 'REVIEWER'].includes(role)) return 'Vào Tòa Soạn'
-  return 'Vào Backoffice'
-}
 
 export function PublicLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
@@ -81,7 +74,7 @@ export function PublicLayout() {
           <div className="flex items-center space-x-3.5">
             <ThemeToggle className="h-7 px-1.5 text-stone-600 hover:bg-stone-100" />
             <Link
-              to="/advertiser"
+              to={APP_ROUTES.advertiser}
               className="text-stone-500 hover:text-stone-900 font-medium transition-colors"
             >
               Đặt quảng cáo
@@ -115,7 +108,7 @@ export function PublicLayout() {
                       title="Chuyển đến không gian làm việc Tòa soạn / Quản trị"
                     >
                       <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
-                      {getBackofficeLabel(currentUser.role)}
+                      {PERMISSION_CHECKERS.getBackofficeLabel(currentUser.role)}
                     </Link>
                     <span className="text-stone-300">|</span>
                   </>
@@ -123,7 +116,7 @@ export function PublicLayout() {
                 {currentUser.role === 'ADVERTISER' && (
                   <>
                     <Link
-                      to="/advertiser"
+                      to={APP_ROUTES.advertiser}
                       className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary-900 text-white hover:bg-primary-800 text-xs font-semibold shadow-xs transition-colors"
                       title="Chuyển đến Cổng Doanh nghiệp"
                     >
