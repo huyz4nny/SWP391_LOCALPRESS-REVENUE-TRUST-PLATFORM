@@ -4,7 +4,6 @@ import com.localpress.identity.dto.LoginRequest;
 import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.repository.UserRepository;
-import com.localpress.shared.device.DeviceLimitReachedException;
 import com.localpress.shared.device.DeviceSessionService;
 import com.localpress.shared.device.RegisteredSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +22,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -83,14 +81,5 @@ class PasswordLoginServiceTest {
         assertEquals(403, assertThrows(ResponseStatusException.class,
                 () -> service.login(new LoginRequest("reader.an@gmail.com", "password", null, null), null)).getStatusCode().value());
         verifyNoInteractions(devices);
-    }
-
-    @Test
-    void deviceLimitPropagates() {
-        when(devices.register(anyLong(), nullable(String.class), nullable(String.class), nullable(String.class), any()))
-                .thenThrow(new DeviceLimitReachedException());
-        assertThrows(DeviceLimitReachedException.class,
-                () -> service.login(new LoginRequest("reader.an@gmail.com", "password", null, null), "127.0.0.1"));
-        verify(tokens, never()).issue(any(), any(), any());
     }
 }

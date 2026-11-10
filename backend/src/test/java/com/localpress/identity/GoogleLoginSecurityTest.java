@@ -6,7 +6,6 @@ import com.localpress.identity.controller.GoogleLoginExceptionHandler;
 import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.service.*;
-import com.localpress.shared.device.DeviceLimitReachedException;
 import com.localpress.shared.device.DeviceSessionService;
 import com.localpress.shared.security.SecurityConfig;
 import io.jsonwebtoken.Jwts;
@@ -106,14 +105,6 @@ class GoogleLoginSecurityTest {
     }
     @Test void meRequiresAuthentication() throws Exception {
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
-    }
-    @Test void deviceLimitOnGoogleLoginIsConflict() throws Exception {
-        when(login.login(anyString(), any(), nullable(String.class), nullable(String.class), anyString()))
-                .thenThrow(new DeviceLimitReachedException());
-        mvc.perform(post("/api/v1/auth/google").cookie(new Cookie(GoogleLoginNonceService.COOKIE, "nonce"))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"google-id-token\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("DEVICE_LIMIT_REACHED"));
     }
     @Test void revokedDeviceSessionIsRejected() throws Exception {
         when(devices.isActive("sid-revoked")).thenReturn(false);

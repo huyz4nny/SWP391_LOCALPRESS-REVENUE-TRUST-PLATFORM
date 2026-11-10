@@ -1,6 +1,5 @@
 package com.localpress.identity.controller;
 
-import com.localpress.shared.device.DeviceLimitReachedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,12 +9,6 @@ import java.util.Map;
 
 @RestControllerAdvice(assignableTypes = GoogleLoginController.class)
 public class GoogleLoginExceptionHandler {
-    @ExceptionHandler(DeviceLimitReachedException.class)
-    public ResponseEntity<Map<String, String>> deviceLimit(DeviceLimitReachedException exception) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", exception.getMessage(), "code", exception.getCode()));
-    }
-
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> status(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode()).cacheControl(CacheControl.noStore())
