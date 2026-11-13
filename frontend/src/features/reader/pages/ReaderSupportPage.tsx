@@ -6,14 +6,9 @@ import type { PaymentComplaint } from '@/features/finance/types'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { HelpCircle } from 'lucide-react'
-
-function statusLabel(status: PaymentComplaint['status']) {
-  if (status === 'OPEN') return <Badge variant="warning">Chờ đối soát</Badge>
-  if (status === 'RESOLVED') return <Badge variant="success">Đã ghi nhận</Badge>
-  return <Badge variant="destructive">Từ chối</Badge>
-}
+// dùng chung badge trạng thái khiếu nại với trang của SV4 để chữ và màu giống nhau ở mọi màn hình
+import { ComplaintStatusBadge } from '@/features/finance/pages/ComplaintQueuePage'
 
 // UC046 danh sách khiếu nại thanh toán của độc giả ở màn hình II.3.10
 // form gửi khiếu nại nằm ở trang /wallet/complaints của SV4, trang này chỉ liệt kê và dẫn sang đó
@@ -85,7 +80,7 @@ export function ReaderSupportPage() {
             <li key={c.complaintId} className="px-4 py-3 space-y-1">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold num">{formatCurrency(c.amount)}</span>
-                {statusLabel(c.status)}
+                <ComplaintStatusBadge status={c.status} />
               </div>
               <div className="text-xs text-slate-500">
                 <span className="font-mono">{c.bankReference}</span>
