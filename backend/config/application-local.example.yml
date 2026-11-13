@@ -1,10 +1,6 @@
 # Mẫu cấu hình chỉ trên máy mình: copy thành application-local.yml (gitignored), chỉ được nạp ở profile dev.
 # Không đặt khóa bí mật ở đây (khóa SePay ở application-secrets.yml).
 localpress:
-  # Cửa hàng thử /dev/demo-store (SV4, package finance.demostore): đóng vai SV3 tạo đơn mua bài / gói từ server
-  # để demo trọn luồng thanh toán khi phân hệ độc giả chưa xong. Tắt (mặc định) thì endpoint trả 404.
-  demo-store:
-    enabled: false
   # Nút "Giả lập đã chuyển khoản" trên trang thanh toán (POST /finance/orders/code/{code}/simulate-ipn).
   # Chủ đơn tự đánh dấu đã trả nên chỉ bật trên máy demo; tắt (mặc định) thì endpoint trả 404 (audit PAY-07).
   payment:

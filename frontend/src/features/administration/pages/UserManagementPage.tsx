@@ -234,7 +234,7 @@ export function UserManagementPage() {
                 onChange={(e) => setSelectedRole(e.target.value as UserRole)}
                 className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-xs font-semibold focus:ring-2 focus:ring-primary-900"
               >
-                {Object.entries(ROLE_LABELS).filter(([role]) => APP_CONFIG.useMockApi || ['READER', 'AUTHOR', 'EDITOR', 'STAFF', 'ACCOUNTANT', 'ADVERTISER', 'SYSTEM_ADMIN'].includes(role)).map(([rKey, rLabel]) => (
+                {Object.entries(ROLE_LABELS).filter(([role]) => APP_CONFIG.useMockApi || ['READER', 'AUTHOR', 'EDITOR', 'STAFF', 'ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'ADVERTISER', 'SYSTEM_ADMIN'].includes(role)).map(([rKey, rLabel]) => (
                   <option key={rKey} value={rKey}>
                     {rLabel} ({rKey})
                   </option>

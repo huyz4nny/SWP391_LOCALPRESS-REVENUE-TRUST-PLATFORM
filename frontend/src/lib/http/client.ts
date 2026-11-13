@@ -206,6 +206,11 @@ class HttpClient {
         return Boolean(this.basicAuth || this.bearerToken)
     }
 
+    /** Bearer this tab is using now (empty if none); lets a new login revoke the session it replaces. */
+    public currentBearerToken() {
+        return this.bearerToken
+    }
+
     public hasBasicAuth() {
         return Boolean(this.basicAuth)
     }

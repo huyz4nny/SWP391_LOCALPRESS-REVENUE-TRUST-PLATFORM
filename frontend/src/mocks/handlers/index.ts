@@ -369,7 +369,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       && o.paymentStatus === 'PENDING'
       && o.amount === article.price)
     const order = pending ?? mockStore.createOrder(
-      currentUser.id, 'ARTICLE_PURCHASE', article.id, article.title, article.price, 'VIETQR')
+      currentUser.id, 'ARTICLE_PURCHASE', article.id, article.title, article.price, 'SEPAY')
     return { orderType: 'ARTICLE', targetId: article.id, amount: article.price, title: article.title, orderCode: order.orderCode }
   }
 
@@ -386,7 +386,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
       && o.paymentStatus === 'PENDING'
       && o.amount === plan.price)
     const order = pending ?? mockStore.createOrder(
-      currentUser.id, 'SUBSCRIPTION', plan.id, plan.name, plan.price, 'VIETQR')
+      currentUser.id, 'SUBSCRIPTION', plan.id, plan.name, plan.price, 'SEPAY')
     return { orderType: 'SUBSCRIPTION', targetId: plan.id, amount: plan.price, title: plan.name, orderCode: order.orderCode }
   }
 
@@ -539,7 +539,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (booking.paymentStatus === 'PAID') throw new Error('Booking đã được thanh toán')
     const pending = mockStore.getState().orders.find((o) => o.targetId === booking.id && o.paymentStatus === 'PENDING')
     return pending ?? mockStore.createOrder(currentUser.id, 'AD_CAMPAIGN', booking.id,
-      `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'VIETQR')
+      `Quảng cáo: ${booking.campaignName || booking.slotName}`, booking.finalPrice, 'SEPAY')
   }
 
   // Iter 3: trạng thái rỗng; hủy/hoàn và thay banner cần backend thật.
@@ -670,6 +670,367 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     }
   }
 
+  // =========================================================================
+  // SV2 ITERATION 3 MOCK HANDLERS (Screen II.2.7 - II.2.10)
+  // =========================================================================
+
+  // Màn II.2.7: Campaign Eligibility Check (UC022, UC023)
+  if (pathname === '/editorial/eligibility' && method === 'GET') {
+    const state = mockStore.getState()
+    return state.campaigns.map((camp, idx) => {
+      const booking = state.bookings.find((b) => b.campaignId === camp.id || b.id === camp.bookingId)
+      const latestCreative = camp.creatives[camp.creatives.length - 1]
+      const paymentPassed = booking?.paymentStatus === 'PAID' || camp.status === 'ACTIVE'
+      const quotationPassed = booking?.bookingStatus === 'CONFIRMED' || booking?.bookingStatus === 'QUOTED' || booking?.termsAccepted === true || camp.status === 'ACTIVE'
+      const contractReference = `HD-2026-DV-00${idx + 1}`
+      const contractPassed = Boolean(contractReference)
+      const creativePassed = Boolean(latestCreative && latestCreative.status === 'APPROVED')
+      const slotPassed = true
+      const overallEligible = paymentPassed && quotationPassed && contractPassed && creativePassed && slotPassed
+
+      return {
+        campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
+        advertiserId: 1,
+        companyName: camp.companyName || booking?.companyName || 'Công ty CP Logistics Cảng Hải Phòng',
+        campaignName: camp.name,
+        slotCode: camp.slotId?.toUpperCase() || 'SLOT-TOP-LEADERBOARD',
+        slotName: camp.slotName || 'Leaderboard Đầu Trang',
+        startDate: camp.startDate,
+        endDate: camp.endDate,
+        quotedAmount: camp.totalBudget,
+        status: camp.status,
+        paymentPassed,
+        paymentStatus: paymentPassed ? 'PAID' : (booking?.paymentStatus || 'UNPAID'),
+        paymentMessage: paymentPassed ? 'Đã xác nhận thanh toán đủ (PAID)' : 'Chưa thanh toán (UNPAID)',
+        quotationPassed,
+        quotationStatus: quotationPassed ? 'ACCEPTED' : 'PENDING',
+        quotationMessage: quotationPassed ? 'Doanh nghiệp đã chấp nhận báo giá' : 'Chưa chấp thuận báo giá',
+        contractPassed,
+        contractReference,
+        contractFileUrl: `https://example.com/contracts/${contractReference}.pdf`,
+        contractMessage: contractPassed ? `Hợp đồng số: ${contractReference}` : 'Chưa ký hợp đồng',
+        creativePassed,
+        creativeVersion: latestCreative?.versionNumber || 1,
+        creativeReviewStatus: latestCreative?.status || 'PENDING',
+        creativeScanStatus: 'SAFE',
+        creativeMediaUrl: latestCreative?.imageUrl || null,
+        creativeTargetUrl: latestCreative?.targetUrl || null,
+        creativeMessage: creativePassed ? `Banner v${latestCreative?.versionNumber} đã duyệt & an toàn` : 'Banner chưa được duyệt',
+        slotPassed,
+        slotStatus: 'ACTIVE',
+        slotMessage: 'Vị trí quảng cáo đang mở',
+        dateRangeValid: true,
+        overallEligible,
+        canActivate: overallEligible && camp.status !== 'ACTIVE',
+      }
+    })
+  }
+
+  if (pathname.startsWith('/editorial/eligibility/') && pathname.endsWith('/activate') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const camp = mockStore.getState().campaigns.find((c) => c.id === id || c.id === `CAMP-${id.padStart(3, '0')}`)
+    if (camp) {
+      camp.status = 'ACTIVE'
+    }
+    return {
+      campaignId: Number(id) || 1,
+      status: 'ACTIVE',
+      overallEligible: true,
+      canActivate: false,
+    }
+  }
+
+  // Màn II.2.8: Campaign Control (UC023, UC024)
+  if (pathname === '/editorial/campaign-control' && method === 'GET') {
+    const state = mockStore.getState()
+    return state.campaigns.map((camp, idx) => ({
+      campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
+      advertiserId: 1,
+      companyName: camp.companyName || 'Công ty CP Logistics Cảng Hải Phòng',
+      campaignName: camp.name,
+      slotCode: camp.slotId?.toUpperCase() || 'SLOT-TOP-LEADERBOARD',
+      slotName: camp.slotName || 'Leaderboard Đầu Trang',
+      startDate: camp.startDate,
+      endDate: camp.endDate,
+      amount: camp.totalBudget,
+      status: camp.status,
+      suspensionReason: camp.status === 'SUSPENDED' ? 'Tạm ngưng khẩn cấp để kiểm tra an toàn link đích' : null,
+      totalPlannedDays: 20,
+      elapsedDays: 10,
+      makeGoodDaysAdded: 0,
+      lastControlledAt: camp.updatedAt,
+    }))
+  }
+
+  if (pathname.startsWith('/editorial/campaign-control/') && pathname.endsWith('/suspend') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const camp = mockStore.getState().campaigns.find((c) => c.id === id || c.id === `CAMP-${id.padStart(3, '0')}`)
+    if (camp) {
+      camp.status = 'SUSPENDED'
+    }
+    return {
+      campaignId: Number(id) || 1,
+      status: 'SUSPENDED',
+      suspensionReason: body.reason,
+    }
+  }
+
+  if (pathname.startsWith('/editorial/campaign-control/') && pathname.endsWith('/resume') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    const camp = mockStore.getState().campaigns.find((c) => c.id === id || c.id === `CAMP-${id.padStart(3, '0')}`)
+    if (camp) {
+      camp.status = 'ACTIVE'
+    }
+    return {
+      campaignId: Number(id) || 1,
+      status: 'ACTIVE',
+    }
+  }
+
+  if (pathname.startsWith('/editorial/campaign-control/') && pathname.endsWith('/make-good') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    return {
+      campaignId: Number(id) || 1,
+      makeGoodDaysAdded: body.extraDays,
+      status: 'ACTIVE',
+    }
+  }
+
+  // Màn II.2.9: Advertising Contracts & VIP Tiering (UC019, UC025)
+  if (pathname === '/editorial/contracts' && method === 'GET') {
+    const state = mockStore.getState()
+    return state.campaigns.map((camp, idx) => ({
+      contractId: idx + 1,
+      campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
+      advertiserId: 1,
+      companyName: camp.companyName || 'Công ty CP Logistics Cảng Hải Phòng',
+      taxCode: '0201988888',
+      contactPerson: 'Đặng Quang Huy',
+      contactEmail: 'huy.dang@logisticshaiphong.vn',
+      contactPhone: '0934567890',
+      campaignName: camp.name,
+      slotCode: camp.slotId?.toUpperCase() || 'SLOT-TOP-LEADERBOARD',
+      slotName: camp.slotName || 'Leaderboard Đầu Trang',
+      contractReference: `HD-2026-DV-00${idx + 1}`,
+      contractNumber: `HD-2026-DV-00${idx + 1}`,
+      signingDate: '2026-08-25',
+      contractFileUrl: `https://example.com/contracts/HD-2026-DV-00${idx + 1}.pdf`,
+      contractValue: camp.totalBudget,
+      startDate: camp.startDate,
+      endDate: camp.endDate,
+      quotationStatus: 'ACCEPTED',
+      paymentStatus: 'PAID',
+      status: camp.status,
+      contractStatus: 'SIGNED',
+      addendums: [
+        {
+          addendumId: 1,
+          campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
+          addendumNumber: `PL-01/HD-2026-DV-00${idx + 1}`,
+          effectiveDate: '2026-09-20',
+          adjustmentType: 'Điều chỉnh lịch phát sóng',
+          notes: 'Dịch ngày phát sóng do lịch tàu biển cập cảng',
+          createdAt: '2026-09-18T10:00:00Z',
+        }
+      ],
+    }))
+  }
+
+  // Tạo mới hợp đồng (UC019)
+  if (pathname === '/editorial/contracts' && method === 'POST') {
+    return {
+      contractId: Date.now(),
+      campaignId: Number(body.campaignId) || 1,
+      contractNumber: body.contractNumber,
+      contractReference: body.contractNumber,
+      signingDate: body.signingDate,
+      contractValue: Number(body.contractValue),
+      contractFileUrl: body.contractFileUrl,
+      status: 'SIGNED',
+      contractStatus: 'SIGNED',
+      addendums: [],
+    }
+  }
+
+  // API cho Doanh nghiệp xem hợp đồng của mình (SV1 - UC012)
+  if (pathname === '/advertiser/contracts' && method === 'GET') {
+    const state = mockStore.getState()
+    return state.campaigns.map((camp, idx) => ({
+      contractId: idx + 1,
+      campaignId: Number(camp.id.replace(/\D/g, '')) || idx + 1,
+      campaignName: camp.name,
+      contractNumber: `HD-2026-DV-00${idx + 1}`,
+      signingDate: '2026-08-25',
+      contractValue: camp.totalBudget,
+      contractFileUrl: `https://example.com/contracts/HD-2026-DV-00${idx + 1}.pdf`,
+      status: 'SIGNED',
+      slotName: camp.slotName || 'Leaderboard Đầu Trang',
+      startDate: camp.startDate,
+      endDate: camp.endDate,
+    }))
+  }
+
+  if (pathname.startsWith('/editorial/contracts/') && pathname.endsWith('/addendum') && method === 'POST') {
+    const id = pathname.split('/')[3]
+    return {
+      campaignId: Number(id) || 1,
+      contractReference: `HD-2026-DV-00${id}`,
+      addendums: [
+        {
+          addendumNumber: body.addendumNumber,
+          effectiveDate: body.effectiveDate,
+          adjustmentType: body.adjustmentType,
+          notes: body.notes,
+        }
+      ],
+    }
+  }
+
+  if (pathname.startsWith('/editorial/contracts/') && method === 'PUT') {
+    const id = pathname.split('/')[3]
+    return {
+      campaignId: Number(id) || 1,
+      contractReference: body.contractReference,
+      contractFileUrl: body.contractFileUrl,
+      signingDate: body.signingDate || '2026-08-25',
+      contractValue: body.contractValue,
+    }
+  }
+
+  if (pathname === '/editorial/advertisers/vip' && method === 'GET') {
+    return [
+      {
+        advertiserId: 1,
+        companyName: 'Công ty CP Logistics & Cảng Quốc tế Đình Vũ',
+        taxCode: '0201988888',
+        contactPerson: 'Đặng Quang Huy',
+        email: 'adv.canghaiphong@gmail.com',
+        phone: '0934567890',
+        totalSpent: 45000000,
+        campaignCount: 3,
+        vipTier: 'GOLD',
+        vipDiscountPercent: 10,
+      },
+      {
+        advertiserId: 2,
+        companyName: 'Bất động sản Đất Cảng Hải Phòng',
+        taxCode: '0201654321',
+        contactPerson: 'Lê Hồng Phong',
+        email: 'phong.le@datcanghaiphong.vn',
+        phone: '0977665544',
+        totalSpent: 24000000,
+        campaignCount: 2,
+        vipTier: 'SILVER',
+        vipDiscountPercent: 5,
+      },
+    ]
+  }
+
+  if (pathname.startsWith('/editorial/advertisers/') && pathname.endsWith('/vip-tier') && method === 'PUT') {
+    const id = pathname.split('/')[3]
+    return {
+      advertiserId: Number(id) || 1,
+      vipTier: body.vipTier,
+      vipDiscountPercent: body.vipDiscountPercent,
+    }
+  }
+
+  // Màn II.2.10: Operations Dashboard (UC015, UC028)
+  if (pathname === '/editorial/dashboard/overview' && method === 'GET') {
+    const state = mockStore.getState()
+    const pendingArticles = state.articles.filter((a) => a.status === 'IN_REVIEW')
+    const pendingBookings = state.bookings.filter((b) => b.bookingStatus === 'SUBMITTED' || b.bookingStatus === 'QUOTED')
+    const pendingComments = state.comments.filter((c) => c.status === 'PENDING')
+    const b2bPaid = state.bookings.filter((b) => b.paymentStatus === 'PAID').reduce((sum, b) => sum + (b.finalPrice || 0), 0)
+    const b2bTotal = state.bookings.reduce((sum, b) => sum + (b.finalPrice || 0), 0)
+
+    return {
+      b2bTotalSigned: b2bTotal || 69000000,
+      b2bActualPaid: b2bPaid || 54000000,
+      b2bReceivables: (b2bTotal - b2bPaid) || 15000000,
+      b2cSubscriptions: 24000000,
+      b2cSingleArticles: 4500000,
+      totalPlatformRevenue: (b2bPaid || 54000000) + 24000000 + 4500000,
+      slotOccupancies: [
+        {
+          slotCode: 'SLOT-TOP-LEADERBOARD',
+          slotName: 'Leaderboard Đầu Trang Chủ',
+          dimensions: '1140x120',
+          capacity: 1,
+          basePrice: 30000000,
+          pricingType: 'CPD',
+          activeCampaignsCount: 1,
+          occupancyPercentage: 100,
+          status: 'FULL',
+        },
+        {
+          slotCode: 'SLOT-ARTICLE-INLINE',
+          slotName: 'Inline Banner Trong Thân Bài',
+          dimensions: '728x90',
+          capacity: 3,
+          basePrice: 12000000,
+          pricingType: 'CPD',
+          activeCampaignsCount: 2,
+          occupancyPercentage: 66.7,
+          status: 'NORMAL',
+        },
+        {
+          slotCode: 'SLOT-SIDEBAR-STICKY',
+          slotName: 'Sticky Sidebar Cột Phải',
+          dimensions: '300x600',
+          capacity: 2,
+          basePrice: 20000000,
+          pricingType: 'CPD',
+          activeCampaignsCount: 2,
+          occupancyPercentage: 100,
+          status: 'FULL',
+        },
+      ],
+      pendingArticlesCount: pendingArticles.length || 3,
+      pendingBookingsCount: pendingBookings.length || 2,
+      pendingCreativesCount: 1,
+      pendingCommentsCount: pendingComments.length || 4,
+      urgentItems: [
+        {
+          id: 'art-001',
+          type: 'ARTICLE',
+          title: 'Bài viết: Khai thác tiềm năng Cảng nước sâu Lạch Huyện',
+          description: 'Bài viết chờ thẩm định nội dung để xuất bản',
+          priority: 'HIGH',
+          link: '/backoffice/editorial/articles',
+          createdAt: '2026-10-31T09:00:00Z',
+        },
+        {
+          id: 'bk-003',
+          type: 'BOOKING',
+          title: 'Booking: Đặt banner Inline Thân bài viết 10 ngày',
+          description: 'Công ty CP Logistics Cảng Hải Phòng chờ phản hồi báo giá',
+          priority: 'URGENT',
+          link: '/backoffice/editorial/bookings',
+          createdAt: '2026-10-30T14:30:00Z',
+        },
+        {
+          id: 'cr-002-v2',
+          type: 'CREATIVE',
+          title: 'Banner v2: Bất động sản Đất Cảng thay mới ảnh',
+          description: 'Cần thẩm định kích thước và kiểm tra liên kết an toàn',
+          priority: 'HIGH',
+          link: '/backoffice/editorial/creatives',
+          createdAt: '2026-10-31T10:15:00Z',
+        },
+        {
+          id: 'cmt-105',
+          type: 'COMMENT',
+          title: 'Bình luận: Bàn về quy hoạch giao thông kết nối liên vùng',
+          description: 'Bình luận mới của độc giả cần kiểm duyệt quy chuẩn',
+          priority: 'NORMAL',
+          link: '/backoffice/editorial/comments',
+          createdAt: '2026-10-31T11:45:00Z',
+        },
+      ],
+    }
+  }
+
   // ---------------- FINANCE BACKOFFICE ----------------
   if (pathname === '/finance/dashboard' && method === 'GET') {
     const state = mockStore.getState()
@@ -753,7 +1114,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (!row) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Đơn chưa có chứng từ (chưa thu tiền)', path: pathname })
     }
-    const isFinance = ['ACCOUNTANT', 'FINANCE_STAFF', 'FINANCE_MANAGER', 'STAFF', 'SYSTEM_ADMIN'].includes(currentUser.role)
+    const isFinance = ['ACCOUNTANT', 'FINANCE_STAFF', 'CHIEF_ACCOUNTANT', 'STAFF'].includes(currentUser.role)
     if (!isFinance && row.owner !== currentUser.id) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 403, error: 'Forbidden', message: 'Bạn không có quyền xem chứng từ này', path: pathname })
     }
@@ -765,17 +1126,6 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     const order = mockStore.getState().orders.find((o) => o.id === id || o.orderCode === id)
     if (!order) throw new Error('Không tìm thấy đơn hàng')
     return order
-  }
-
-  if (pathname === '/finance/checkout' && method === 'POST') {
-    return mockStore.createOrder(
-      currentUser.id,
-      body.orderType,
-      body.targetId,
-      body.targetTitle,
-      body.amount,
-      body.paymentMethod
-    )
   }
 
   if (pathname.endsWith('/pay') && method === 'POST') {
@@ -830,7 +1180,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
   }
 
   if (pathname === '/finance/reconciliation/close' && method === 'POST') {
-    if (currentUser.role !== 'FINANCE_MANAGER' && currentUser.role !== 'SYSTEM_ADMIN') {
+    if (currentUser.role !== 'CHIEF_ACCOUNTANT') {
       throw mockError(403, 'Chỉ Kế toán trưởng được chốt kỳ đối soát')
     }
     const rec = withReconciliationCounts(mockStore.getState().reconciliation)

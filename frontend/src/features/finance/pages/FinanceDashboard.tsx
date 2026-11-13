@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { RefreshCw, ChevronRight } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { PageHeader, Panel, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
+import { mockStore } from '@/mocks/store'
+import { PERMISSION_CHECKERS } from '@/app/config'
 
 /**
  * Tổng quan tài chính (SV4). Câu hỏi của màn hình: "Hôm nay có khoản nào phòng kế toán cần xử lý?"
@@ -96,13 +98,16 @@ export function FinanceDashboard() {
     )
   }
 
+  // Kế toán trưởng (mắt 2) thấy việc của mình: duyệt hoàn tiền và chốt kỳ; kế toán (mắt 1) chỉ theo dõi
+  const isChief = PERMISSION_CHECKERS.canApproveRefunds(mockStore.getCurrentUser().role)
+
   const todo = [
     {
-      label: 'Đề xuất hoàn tiền chờ duyệt',
+      label: isChief ? 'Hoàn tiền chờ bạn duyệt' : 'Đề xuất hoàn tiền chờ duyệt',
       value: `${stats.refundReviewCount}`,
-      note: 'Kế toán trưởng duyệt, người lập không tự duyệt',
+      note: isChief ? 'Kế toán lập đề xuất, bạn duyệt rồi chuyển trả khách' : 'Chờ kế toán trưởng duyệt, người lập không tự duyệt',
       to: '/backoffice/finance/refunds',
-      action: 'Duyệt',
+      action: isChief ? 'Duyệt' : 'Xem',
       urgent: stats.refundReviewCount > 0,
     },
     {
@@ -118,7 +123,7 @@ export function FinanceDashboard() {
       value: formatCurrency(stats.reconciliationDiscrepancy),
       note: stats.reconciliationDiscrepancy === 0 ? 'Sổ hệ thống khớp sao kê' : 'Hệ thống lệch với sao kê ngân hàng',
       to: '/backoffice/finance/reconciliation',
-      action: 'Đối soát',
+      action: isChief ? 'Đối soát và chốt kỳ' : 'Đối soát',
       urgent: stats.reconciliationDiscrepancy !== 0,
     },
     {
@@ -132,7 +137,9 @@ export function FinanceDashboard() {
   ]
 
   const finding = [
-    stats.refundReviewCount > 0 && `${stats.refundReviewCount} đề xuất hoàn tiền đang chờ duyệt`,
+    stats.refundReviewCount > 0 && (isChief
+      ? `${stats.refundReviewCount} đề xuất hoàn tiền chờ bạn duyệt`
+      : `${stats.refundReviewCount} đề xuất hoàn tiền đang chờ duyệt`),
     stats.reconciliationDiscrepancy !== 0 && `đối soát lệch ${formatCurrency(stats.reconciliationDiscrepancy)}`,
   ].filter(Boolean) as string[]
 

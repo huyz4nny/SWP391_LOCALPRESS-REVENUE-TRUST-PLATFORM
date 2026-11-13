@@ -2,7 +2,7 @@
 -- LocalPress Database Seed Data - V2__insert_seed_data.sql
 -- Bối cảnh: Báo điện tử địa phương TP. Hải Phòng
 -- Tương thích 100% với V1__create_tables.sql & Frontend React
--- Password chung cho mọi tài khoản: password (hoặc password123)
+-- Password chung cho mọi tài khoản: password
 -- ====================================================================
 
 USE localpress_db;
@@ -20,6 +20,12 @@ INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, 
 (6, 'reader.an@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Nguyễn Văn An (Độc giả Free SV3)', '0912345678', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120', 'READER', 'ACTIVE'),
 (7, 'reader.mai@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Thị Mai (Độc giả VIP SV3)', '0988776655', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120', 'READER', 'ACTIVE'),
 (8, 'kiemduyet@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Phạm Kiểm Duyệt Bình Luận', '0907778899', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120', 'STAFF', 'ACTIVE');
+
+-- 1.0.1 Kế toán trưởng (SV4, mắt 2 duyệt hoàn tiền / chốt kỳ đối soát). Bảng users không có role FINANCE_MANAGER
+-- (thuộc module identity), nhóm thống nhất SYSTEM_ADMIN giữ vai Kế toán trưởng (FinanceCurrentUser.FINANCE_MANAGER_ROLES).
+-- Không ghi user_id để không trùng id với dữ liệu seed của module khác; mật khẩu "password".
+INSERT INTO users (email, password_hash, full_name, phone, avatar_url, role, status) VALUES
+('ketoantruong@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Kế Toán Trưởng (SV4)', '0903456790', NULL, 'CHIEF_ACCOUNTANT', 'ACTIVE');
 
 -- 1.1 USER DEVICES (Khống chế tối đa 2 thiết bị - Độc giả Mai)
 INSERT INTO user_devices (device_id, user_id, device_name, device_type, device_token, ip_address) VALUES
@@ -141,13 +147,20 @@ INSERT INTO article_purchases (purchase_id, user_id, article_id, purchase_price,
 
 -- 13. AD CAMPAIGNS, CREATIVES & STATS (Quảng cáo B2B)
 INSERT INTO ad_campaigns (campaign_id, advertiser_id, slot_id, reviewed_by, campaign_name, start_date, end_date, quoted_amount, quotation_status, contract_reference, contract_file_url, payment_status, status) VALUES
-(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE');
+(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE'),
+(2, 1, 2, NULL, 'Chiến dịch Khai trương Trung tâm Logistics Cát Hải', '2026-11-20', '2026-12-20', 25000000.00, 'PENDING', NULL, NULL, 'UNPAID', 'PENDING');
 
 INSERT INTO ad_creatives (creative_id, campaign_id, reviewed_by, version_number, media_url, target_url, resolved_url, review_status, scan_status, approved_at) VALUES
-(1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00');
+(1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00'),
+(2, 2, NULL, 1, 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1140', 'https://cathailogistics.com.vn', 'https://cathailogistics.com.vn', 'PENDING', 'SAFE', NULL);
 
 INSERT INTO ad_stats (stat_id, campaign_id, creative_id, stat_date, impressions, clicks, ctr) VALUES
 (1, 1, 1, '2026-09-28', 15200, 684, 4.5000);
+
+-- 13.1 AD CONTRACTS (Hợp đồng B2B SV2 - Trọng Phan)
+INSERT INTO ad_contracts (contract_id, campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, notes) VALUES
+(1, 1, 1, 'HD-2026-DV-001', '2026-08-25', 45000000.00, 'https://example.com/contracts/HD-2026-DV-001.pdf', 'SIGNED', 'Hợp đồng quảng cáo B2B Cảng Logistics Đình Vũ 2026')
+ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number);
 
 -- 14. TRANSACTIONS (Sổ cái thu tiền)
 -- Giao dịch 1: Độc giả Mai mua gói năm 480k
@@ -165,5 +178,56 @@ INSERT INTO transactions (transaction_id, user_id, campaign_id, transaction_type
 -- 15. REFUND REQUESTS (Dữ liệu mẫu cho SV4 demo luồng Hoàn tiền 4 mắt)
 INSERT INTO refund_requests (refund_id, transaction_id, user_id, refund_amount, reason, evidence_url, status, proposed_by, reviewed_by, review_notes) VALUES
 (1, 2, 6, 25000.00, 'Độc giả chuyển khoản trùng 2 lần khi mua bài lẻ', 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600', 'PENDING', 2, NULL, 'Kế toán viên Lê Kế Toán đã kiểm tra số dư và lập phiếu');
+
+-- 16. CHỨNG TỪ TÀI CHÍNH (SV4 - UC057): seed nạp sau Flyway nên phát hành bù cho các đơn đã thu ở trên
+-- Phát hành bù chứng từ cho đơn đã thu trước UC057 (đơn SUCCESS / REFUNDED chưa có chứng từ), VAT 8%.
+-- Đánh số tiếp theo dãy hiện có của từng loại / năm, theo thời điểm thu tiền. Đơn đã hoàn toàn phần -> VOIDED.
+INSERT INTO financial_documents (document_no, document_type, transaction_id, user_id, buyer_name, buyer_tax_code,
+                                 buyer_address, vat_rate, amount_before_vat, vat_amount, total_amount, status,
+                                 issued_at, voided_at)
+SELECT CONCAT(IF(x.doc_type = 'INVOICE', 'HD', 'BN'), '-', x.doc_year, '-',
+              LPAD(COALESCE(s.last_no, 0) + x.rn, 6, '0')),
+       x.doc_type, x.transaction_id, x.user_id, x.buyer_name, x.buyer_tax_code, x.buyer_address,
+       8.00, x.before_vat, x.amount - x.before_vat, x.amount,
+       IF(x.status = 'REFUNDED', 'VOIDED', 'ISSUED'), x.issued_at,
+       IF(x.status = 'REFUNDED', COALESCE(x.refunded_at, x.issued_at), NULL)
+FROM (
+    SELECT t.transaction_id, t.user_id, t.amount, t.status,
+           IF(t.transaction_type = 'AD', 'INVOICE', 'RECEIPT') AS doc_type,
+           YEAR(COALESCE(t.paid_at, t.created_at)) AS doc_year,
+           COALESCE(t.paid_at, t.created_at) AS issued_at,
+           ROUND(t.amount * 100 / 108, 0) AS before_vat,
+           ROW_NUMBER() OVER (PARTITION BY IF(t.transaction_type = 'AD', 'INVOICE', 'RECEIPT'),
+                                           YEAR(COALESCE(t.paid_at, t.created_at))
+                              ORDER BY COALESCE(t.paid_at, t.created_at), t.transaction_id) AS rn,
+           COALESCE(NULLIF(a.invoice_name, ''), a.company_name, u.full_name) AS buyer_name,
+           COALESCE(NULLIF(a.invoice_tax_code, ''), a.tax_code) AS buyer_tax_code,
+           COALESCE(NULLIF(a.invoice_address, ''), a.address) AS buyer_address,
+           (SELECT MAX(r.paid_at) FROM transactions r
+            WHERE r.transaction_type = 'REFUND' AND r.original_transaction_id = t.transaction_id) AS refunded_at
+    FROM transactions t
+    JOIN users u ON u.user_id = t.user_id
+    LEFT JOIN advertisers a ON a.user_id = t.user_id AND t.transaction_type = 'AD'
+    WHERE t.transaction_type IN ('AD', 'ARTICLE', 'SUBSCRIPTION')
+      AND t.status IN ('SUCCESS', 'REFUNDED')
+      AND NOT EXISTS (SELECT 1 FROM financial_documents d WHERE d.transaction_id = t.transaction_id)
+) x
+LEFT JOIN financial_document_sequences s ON s.document_type = x.doc_type AND s.document_year = x.doc_year;
+
+-- Dãy số tiếp tục từ số lớn nhất đã phát hành; tạo sẵn dòng năm nay và năm sau (last_no = 0) để lần phát hành
+-- đầu năm chỉ UPDATE 1 dòng có sẵn, không chèn dòng mới cùng lúc.
+INSERT INTO financial_document_sequences (document_type, document_year, last_no)
+SELECT d.document_type, d.doc_year, MAX(d.doc_seq)
+FROM (SELECT document_type,
+             CAST(SUBSTRING(document_no, 4, 4) AS UNSIGNED) AS doc_year,
+             CAST(SUBSTRING(document_no, 9) AS UNSIGNED) AS doc_seq
+      FROM financial_documents) d
+GROUP BY d.document_type, d.doc_year
+ON DUPLICATE KEY UPDATE last_no = GREATEST(last_no, VALUES(last_no));
+
+INSERT IGNORE INTO financial_document_sequences (document_type, document_year, last_no)
+SELECT k.document_type, YEAR(CURDATE()) + y.n, 0
+FROM (SELECT 'INVOICE' AS document_type UNION ALL SELECT 'RECEIPT') k
+CROSS JOIN (SELECT 0 AS n UNION ALL SELECT 1) y;
 
 SET FOREIGN_KEY_CHECKS = 1;

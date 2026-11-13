@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { RefundRequest, Order } from '../types'
 import { financeApi } from '../api'
 import { mockStore } from '@/mocks/store'
+import { PERMISSION_CHECKERS } from '@/app/config'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -20,8 +21,8 @@ export function RefundManagementPage() {
   // Mở từ nút "Lập đề xuất hoàn tiền" ở chi tiết đơn: /backoffice/finance/refunds?orderId=...
   const [searchParams] = useSearchParams()
   const presetOrderId = searchParams.get('orderId')
-  // Mắt 2 là Kế toán trưởng (API thật: SYSTEM_ADMIN); backend trả 403 cho vai trò khác
-  const isManager = currentUser.role === 'FINANCE_MANAGER' || currentUser.role === 'SYSTEM_ADMIN'
+  // Mắt 2 là Kế toán trưởng (CHIEF_ACCOUNTANT); backend trả 403 cho vai trò khác
+  const isManager = PERMISSION_CHECKERS.canApproveRefunds(currentUser.role)
 
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
   const [paidOrders, setPaidOrders] = useState<Order[]>([])
@@ -110,7 +111,7 @@ export function RefundManagementPage() {
 
     // Tách bạch nhiệm vụ: người lập không được tự duyệt
     if (selectedRefund.proposedBy === currentUser.id) {
-      alert('Nguyên tắc kiểm soát tài chính: Người lập đề xuất không được tự phê duyệt yêu cầu của chính mình! Vui lòng đổi sang vai trò Kế toán trưởng (Phạm Trưởng Phòng).')
+      alert('Nguyên tắc kiểm soát tài chính: Người lập đề xuất không được tự phê duyệt yêu cầu của chính mình! Vui lòng đổi sang vai trò Kế toán trưởng (Trần Kế Toán Trưởng).')
       return
     }
 
@@ -148,10 +149,13 @@ export function RefundManagementPage() {
           )
         }
         actions={
-          <Button size="sm" onClick={() => setShowProposeModal(true)} disabled={paidOrders.length === 0}>
-            <PlusCircle className="h-3.5 w-3.5" />
-            Lập đề xuất hoàn tiền
-          </Button>
+          // Kế toán trưởng chỉ duyệt: tự lập thì không còn mắt 2 nào duyệt được phiếu đó
+          !isManager && (
+            <Button size="sm" onClick={() => setShowProposeModal(true)} disabled={paidOrders.length === 0}>
+              <PlusCircle className="h-3.5 w-3.5" />
+              Lập đề xuất hoàn tiền
+            </Button>
+          )
         }
       />
 

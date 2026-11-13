@@ -1,4 +1,4 @@
-// Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form Huy `/payment-complaints`.
+// Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form `/payment-complaints`.
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { mockStore } from '@/mocks/store'

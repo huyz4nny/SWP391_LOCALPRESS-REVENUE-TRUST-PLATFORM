@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * POST /api/v1/finance/orders (alias /checkout): trình duyệt không được tự đặt giá / targetId (Rule 4, Rule 14).
+ * POST /api/v1/finance/orders: trình duyệt không được tự đặt giá / targetId (Rule 4, Rule 14).
  * Đơn có đối tượng do module sở hữu tạo từ server (mẫu AdBookingService), endpoint chỉ mở khi chạy E2E.
  */
 @ExtendWith(MockitoExtension.class)
@@ -55,10 +55,8 @@ class CreateOrderEndpointTest {
     @Test
     @DisplayName("Mặc định: trình duyệt tự tạo đơn (giá tự gửi) bị chặn 403, không tạo đơn")
     void clientOrderBlockedByDefault() throws Exception {
-        for (String path : new String[]{"/api/v1/finance/orders", "/api/v1/finance/checkout"}) {
-            mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(BODY))
-                    .andExpect(status().isForbidden());
-        }
+        mockMvc.perform(post("/api/v1/finance/orders").contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isForbidden());
         verify(paymentProcessingService, never()).createOrder(any(), any());
     }
 

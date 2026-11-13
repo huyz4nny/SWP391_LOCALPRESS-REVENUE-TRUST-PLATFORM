@@ -64,7 +64,7 @@ export const purchaseApi = {
     return (data ?? []).map(mapPublicPlan)
   },
 
-  // UC034: server tạo purchase PENDING + đơn SV4, trả orderCode. FE không gọi /finance/checkout.
+  // UC034: server tạo purchase PENDING + đơn SV4, trả orderCode.
   createArticlePurchase: (articleId: string) => {
     return httpClient.post<PendingOrderTarget>('/reader/article-purchases', {
       articleId: bodyId(articleId),

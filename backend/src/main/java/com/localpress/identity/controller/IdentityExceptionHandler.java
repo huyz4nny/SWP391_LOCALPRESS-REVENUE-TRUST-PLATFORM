@@ -1,6 +1,5 @@
 package com.localpress.identity.controller;
 
-import com.localpress.shared.device.DeviceLimitReachedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -19,7 +18,7 @@ import java.util.Map;
 // xử lý lỗi chung cho các API xác thực của UC033 (thay cho 4 handler riêng trước đây)
 // frontend đang đọc hai kiểu JSON lỗi khác nhau nên giữ nguyên cả hai:
 //   - hồ sơ (/auth/me) và đăng ký (/auth/register): {timestamp, status, error, message, fieldErrors}
-//   - đăng nhập mật khẩu (/auth/login) và Google (/auth/google): {message} hoặc {message, code},
+//   - đăng nhập mật khẩu (/auth/login) và Google (/auth/google): {message},
 //     kèm Cache-Control: no-store để trình duyệt không lưu lại phản hồi đăng nhập
 // IdentityErrorFormatTest chốt đúng từng định dạng này
 @RestControllerAdvice(assignableTypes = {
@@ -67,17 +66,6 @@ public class IdentityExceptionHandler {
                 ? "Vui lòng kiểm tra thông tin đăng ký"
                 : "Dữ liệu gửi lên không hợp lệ";
         return fullError(HttpStatus.BAD_REQUEST.value(), message, fieldErrors);
-    }
-
-    // đã đủ 2 phiên đăng nhập, chỉ hai API đăng nhập ném lỗi này
-    @ExceptionHandler(DeviceLimitReachedException.class)
-    public ResponseEntity<Map<String, String>> handleDeviceLimit(DeviceLimitReachedException exception,
-                                                                 HandlerMethod handler) {
-        if (!isPasswordLogin(handler) && !isGoogleLogin(handler)) {
-            throw exception;
-        }
-        return ResponseEntity.status(HttpStatus.CONFLICT).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", exception.getMessage(), "code", exception.getCode()));
     }
 
     // hai lần đăng nhập Google đầu tiên chạy cùng lúc: không lộ lỗi DB và không tạo hai tài khoản

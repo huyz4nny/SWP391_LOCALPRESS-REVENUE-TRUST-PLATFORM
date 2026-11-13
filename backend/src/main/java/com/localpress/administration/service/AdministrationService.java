@@ -75,7 +75,7 @@ public class AdministrationService {
         if(target.contains("PAYWALL")) return "PAYWALL";
         if(target.contains("ARTICLE")||target.contains("COMMENT")) return "EDITORIAL";
         if(target.contains("AD")||target.contains("CAMPAIGN")) return "ADVERTISING";
-        if(target.contains("ORDER")||target.contains("TRANSACTION")||target.contains("REFUND")||target.contains("WALLET")) return "FINANCE";
+        if(target.contains("ORDER")||target.contains("TRANSACTION")||target.contains("REFUND")) return "FINANCE";
         return "SECURITY";
     }
 

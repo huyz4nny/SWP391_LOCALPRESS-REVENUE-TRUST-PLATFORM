@@ -1,6 +1,7 @@
 package com.localpress.editorial.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.localpress.advertising.BookingOccupancy;
 import com.localpress.editorial.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -526,6 +527,933 @@ public class EditorialAdvertisingService {
                 .build();
     }
 
+    // =========================================================================
+    // UC022 & UC023: CAMPAIGN ELIGIBILITY CHECK (AD SERVING GATEKEEPER - MÀN II.2.7)
+    // =========================================================================
+
+    /**
+     * Lấy danh sách kiểm tra 5 điều kiện tiên quyết phát sóng (Gatekeeper Checklist).
+     */
+    public List<CampaignEligibilityDto> getEligibilityChecklist() {
+        String sql = "SELECT c.campaign_id, c.advertiser_id, a.company_name, c.campaign_name, " +
+                "s.slot_code, s.name AS slot_name, s.status AS slot_status, " +
+                "c.start_date, c.end_date, COALESCE(c.accepted_amount, c.quoted_amount) AS amount, " +
+                "c.payment_status, c.quotation_status, c.contract_reference, c.contract_file_url, c.status " +
+                "FROM ad_campaigns c " +
+                "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
+                "JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                "ORDER BY c.campaign_id DESC";
+
+        return jdbc.query(sql, (rs, rowNum) -> {
+            Long campaignId = rs.getLong("campaign_id");
+            Long advertiserId = rs.getLong("advertiser_id");
+            String companyName = rs.getString("company_name");
+            String campaignName = rs.getString("campaign_name");
+            String slotCode = rs.getString("slot_code");
+            String slotName = rs.getString("slot_name");
+            String slotStatus = rs.getString("slot_status");
+            LocalDate startDate = toLocalDate(rs.getDate("start_date"));
+            LocalDate endDate = toLocalDate(rs.getDate("end_date"));
+            BigDecimal amount = rs.getBigDecimal("amount");
+            String paymentStatus = rs.getString("payment_status");
+            String quotationStatus = rs.getString("quotation_status");
+            String contractReference = rs.getString("contract_reference");
+            String contractFileUrl = rs.getString("contract_file_url");
+            String status = rs.getString("status");
+
+            // 1. Điều kiện thanh toán (PAID)
+            boolean paymentPassed = "PAID".equalsIgnoreCase(paymentStatus);
+            String paymentMessage = paymentPassed
+                    ? "Đã xác nhận thanh toán đầy đủ (" + paymentStatus + ")"
+                    : "Chưa thanh toán hợp lệ (Hiện tại: " + paymentStatus + ")";
+
+            // 2. Điều kiện báo giá (ACCEPTED)
+            boolean quotationPassed = "ACCEPTED".equalsIgnoreCase(quotationStatus);
+            String quotationMessage = quotationPassed
+                    ? "Doanh nghiệp đã chấp thuận báo giá chính thức"
+                    : "Chưa hoàn tất thỏa thuận báo giá (Hiện tại: " + quotationStatus + ")";
+
+            // 3. Điều kiện hợp đồng (contract_reference non-empty)
+            boolean contractPassed = contractReference != null && !contractReference.trim().isEmpty();
+            String contractMessage = contractPassed
+                    ? "Hợp đồng pháp lý đã ký: " + contractReference
+                    : "Thiếu số hiệu hợp đồng pháp lý quảng cáo";
+
+            // 4. Điều kiện Creative: Bản mới nhất đã APPROVED và an toàn
+            List<Map<String, Object>> creativeRows = jdbc.queryForList(
+                    "SELECT version_number, review_status, scan_status, media_url, target_url " +
+                    "FROM ad_creatives WHERE campaign_id = ? ORDER BY version_number DESC LIMIT 1",
+                    campaignId
+            );
+
+            boolean creativePassed = false;
+            Integer creativeVer = null;
+            String revStatus = null;
+            String scStatus = null;
+            String mediaUrl = null;
+            String targetUrl = null;
+            String creativeMsg;
+
+            if (creativeRows.isEmpty()) {
+                creativeMsg = "Doanh nghiệp chưa tải lên bản thiết kế (creative)";
+            } else {
+                Map<String, Object> cr = creativeRows.get(0);
+                creativeVer = ((Number) cr.get("version_number")).intValue();
+                revStatus = (String) cr.get("review_status");
+                scStatus = (String) cr.get("scan_status");
+                mediaUrl = (String) cr.get("media_url");
+                targetUrl = (String) cr.get("target_url");
+
+                boolean isApproved = "APPROVED".equalsIgnoreCase(revStatus);
+                boolean isSafe = scStatus == null || "SAFE".equalsIgnoreCase(scStatus);
+                creativePassed = isApproved && isSafe;
+
+                if (creativePassed) {
+                    creativeMsg = "Banner phiên bản v" + creativeVer + " đã duyệt & an toàn";
+                } else if (!isApproved) {
+                    creativeMsg = "Banner v" + creativeVer + " chưa được duyệt (Trạng thái: " + revStatus + ")";
+                } else {
+                    creativeMsg = "Cảnh báo bảo mật banner v" + creativeVer + " (Quét URL: " + scStatus + ")";
+                }
+            }
+
+            // 5. Điều kiện Vị trí hiển thị (Slot is ACTIVE)
+            boolean slotPassed = "ACTIVE".equalsIgnoreCase(slotStatus);
+            String slotMessage = slotPassed
+                    ? "Vị trí quảng cáo [" + slotCode + "] đang mở"
+                    : "Vị trí quảng cáo [" + slotCode + "] đang khóa / bảo trì (" + slotStatus + ")";
+
+            LocalDate today = LocalDate.now();
+            boolean dateValid = startDate != null && endDate != null && !today.isBefore(startDate) && !today.isAfter(endDate);
+            boolean statusEligible = "PENDING".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status);
+            boolean overallEligible = paymentPassed && quotationPassed && contractPassed && creativePassed && slotPassed && statusEligible && dateValid;
+            boolean canActivate = overallEligible;
+
+            return CampaignEligibilityDto.builder()
+                    .campaignId(campaignId)
+                    .advertiserId(advertiserId)
+                    .companyName(companyName)
+                    .campaignName(campaignName)
+                    .slotCode(slotCode)
+                    .slotName(slotName)
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .quotedAmount(amount)
+                    .status(status)
+                    .paymentPassed(paymentPassed)
+                    .paymentStatus(paymentStatus)
+                    .paymentMessage(paymentMessage)
+                    .quotationPassed(quotationPassed)
+                    .quotationStatus(quotationStatus)
+                    .quotationMessage(quotationMessage)
+                    .contractPassed(contractPassed)
+                    .contractReference(contractReference)
+                    .contractFileUrl(contractFileUrl)
+                    .contractMessage(contractMessage)
+                    .creativePassed(creativePassed)
+                    .creativeVersion(creativeVer)
+                    .creativeReviewStatus(revStatus)
+                    .creativeScanStatus(scStatus)
+                    .creativeMediaUrl(mediaUrl)
+                    .creativeTargetUrl(targetUrl)
+                    .creativeMessage(creativeMsg)
+                    .slotPassed(slotPassed)
+                    .slotStatus(slotStatus)
+                    .slotMessage(slotMessage)
+                    .dateRangeValid(dateValid)
+                    .overallEligible(overallEligible)
+                    .canActivate(canActivate)
+                    .build();
+        });
+    }
+
+    /**
+     * Kích hoạt phát sóng chiến dịch (LIVE) khi thỏa mãn toàn bộ 5 điều kiện (Rule 9).
+     */
+    @Transactional
+    public CampaignEligibilityDto activateCampaign(Long campaignId, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT campaign_id, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String currentStatus = (String) rows.get(0).get("status");
+        if (!"PENDING".equalsIgnoreCase(currentStatus) && !"APPROVED".equalsIgnoreCase(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể kích hoạt chiến dịch đang ở trạng thái [" + currentStatus + "]. Chỉ chiến dịch PENDING hoặc APPROVED mới được kích hoạt phát sóng.");
+        }
+
+        List<CampaignEligibilityDto> list = getEligibilityChecklist();
+        CampaignEligibilityDto item = list.stream()
+                .filter(e -> e.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId));
+
+        if (!item.isOverallEligible()) {
+            StringBuilder sb = new StringBuilder("Không đủ điều kiện kích hoạt phát sóng: ");
+            if (!item.isPaymentPassed()) sb.append("[Chưa thanh toán đủ] ");
+            if (!item.isQuotationPassed()) sb.append("[Chưa chốt báo giá] ");
+            if (!item.isContractPassed()) sb.append("[Chưa có hợp đồng] ");
+            if (!item.isCreativePassed()) sb.append("[Banner chưa duyệt/URL có rủi ro] ");
+            if (!item.isSlotPassed()) sb.append("[Vị trí quảng cáo không mở] ");
+            if (!item.isDateRangeValid()) sb.append("[Thời gian phát sóng không hợp lệ hoặc đã quá hạn] ");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, sb.toString().trim());
+        }
+
+        jdbc.update("UPDATE ad_campaigns SET status = 'ACTIVE' WHERE campaign_id = ?", campaignId);
+        logAudit(userId, "CAMPAIGN_ACTIVATED", "AD_CAMPAIGN", campaignId, Map.of(
+                "campaignId", campaignId,
+                "status", "ACTIVE",
+                "activatedBy", editorEmail
+        ));
+
+        item.setStatus("ACTIVE");
+        item.setCanActivate(false);
+        return item;
+    }
+
+    // =========================================================================
+    // UC023 & UC024: CAMPAIGN CONTROL (KILL-SWITCH & MAKE-GOOD - MÀN II.2.8)
+    // =========================================================================
+
+    /**
+     * Lấy danh sách điều khiển vận hành chiến dịch.
+     */
+    public List<CampaignControlDto> getCampaignControlList() {
+        String sql = "SELECT c.campaign_id, c.advertiser_id, a.company_name, c.campaign_name, " +
+                "s.slot_code, s.name AS slot_name, c.start_date, c.end_date, " +
+                "COALESCE(c.accepted_amount, c.quoted_amount) AS amount, " +
+                "c.status, c.rejection_reason, c.updated_at " +
+                "FROM ad_campaigns c " +
+                "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
+                "JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                "ORDER BY c.campaign_id DESC";
+
+        LocalDate today = LocalDate.now();
+        return jdbc.query(sql, (rs, rowNum) -> {
+            Long campId = rs.getLong("campaign_id");
+            LocalDate startDate = toLocalDate(rs.getDate("start_date"));
+            LocalDate endDate = toLocalDate(rs.getDate("end_date"));
+            long totalDays = (startDate != null && endDate != null && !endDate.isBefore(startDate))
+                    ? ChronoUnit.DAYS.between(startDate, endDate) + 1 : 0;
+            long elapsedDays = 0;
+            if (startDate != null) {
+                if (today.isBefore(startDate)) {
+                    elapsedDays = 0;
+                } else if (endDate != null && today.isAfter(endDate)) {
+                    elapsedDays = totalDays;
+                } else {
+                    elapsedDays = ChronoUnit.DAYS.between(startDate, today) + 1;
+                }
+            }
+
+            List<String> auditLogs = jdbc.queryForList(
+                    "SELECT new_value FROM audit_logs WHERE target_type = 'AD_CAMPAIGN' AND target_id = ? AND action = 'CAMPAIGN_MAKE_GOOD'",
+                    String.class,
+                    campId
+            );
+            int makeGoodDays = 0;
+            for (String val : auditLogs) {
+                if (val != null && !val.isBlank()) {
+                    try {
+                        var node = json.readTree(val);
+                        if (node.has("extraDays")) {
+                            makeGoodDays += node.get("extraDays").asInt(0);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Lỗi đọc audit log bù ngày cho chiến dịch #{}: {}", campId, e.getMessage());
+                    }
+                }
+            }
+
+            return CampaignControlDto.builder()
+                    .campaignId(campId)
+                    .advertiserId(rs.getLong("advertiser_id"))
+                    .companyName(rs.getString("company_name"))
+                    .campaignName(rs.getString("campaign_name"))
+                    .slotCode(rs.getString("slot_code"))
+                    .slotName(rs.getString("slot_name"))
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .amount(rs.getBigDecimal("amount"))
+                    .status(rs.getString("status"))
+                    .suspensionReason(rs.getString("rejection_reason"))
+                    .totalPlannedDays(totalDays)
+                    .elapsedDays(elapsedDays)
+                    .makeGoodDaysAdded(makeGoodDays)
+                    .lastControlledAt(toLocalDateTime(rs.getTimestamp("updated_at")))
+                    .build();
+        });
+    }
+
+    /**
+     * Dừng khẩn cấp chiến dịch quảng cáo (Emergency Kill-Switch - UC024).
+     */
+    @Transactional
+    public CampaignControlDto suspendCampaign(Long campaignId, SuspendCampaignRequest request, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT campaign_id, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+        String currentStatus = (String) rows.get(0).get("status");
+        if (!"ACTIVE".equalsIgnoreCase(currentStatus) && !"APPROVED".equalsIgnoreCase(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ có thể dừng khẩn cấp chiến dịch đang hoạt động (ACTIVE) hoặc đã duyệt (APPROVED)");
+        }
+
+        jdbc.update(
+                "UPDATE ad_campaigns SET status = 'SUSPENDED', rejection_reason = ? WHERE campaign_id = ?",
+                request.getReason(), campaignId
+        );
+        logAudit(userId, "CAMPAIGN_SUSPENDED", "AD_CAMPAIGN", campaignId, Map.of(
+                "campaignId", campaignId,
+                "oldStatus", currentStatus,
+                "newStatus", "SUSPENDED",
+                "reason", request.getReason(),
+                "suspendedBy", editorEmail
+        ));
+
+        return getCampaignControlList().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId));
+    }
+
+    /**
+     * Mở lại chiến dịch sau khi khắc phục sự cố (UC024).
+     */
+    @Transactional
+    public CampaignControlDto resumeCampaign(Long campaignId, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT campaign_id, status, payment_status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+        String currentStatus = (String) rows.get(0).get("status");
+        if (!"SUSPENDED".equalsIgnoreCase(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chỉ có thể mở lại chiến dịch đang bị tạm ngưng (SUSPENDED)");
+        }
+        String paymentStatus = (String) rows.get(0).get("payment_status");
+        if (!"PAID".equalsIgnoreCase(paymentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể mở lại chiến dịch chưa thanh toán đủ hoặc đã hoàn tiền (Trạng thái thanh toán: " + paymentStatus + "). Yêu cầu thanh toán: PAID (Rule 9)");
+        }
+
+        jdbc.update("UPDATE ad_campaigns SET status = 'ACTIVE' WHERE campaign_id = ?", campaignId);
+        logAudit(userId, "CAMPAIGN_RESUMED", "AD_CAMPAIGN", campaignId, Map.of(
+                "campaignId", campaignId,
+                "oldStatus", "SUSPENDED",
+                "newStatus", "ACTIVE",
+                "resumedBy", editorEmail
+        ));
+
+        return getCampaignControlList().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId));
+    }
+
+    /**
+     * Bù ngày phát sóng cho chiến dịch do sự cố tạm ngưng (Make-Good - UC024).
+     */
+    @Transactional
+    public CampaignControlDto makeGoodCampaign(Long campaignId, MakeGoodRequest request, String editorEmail) {
+        if (request.getExtraDays() == null || request.getExtraDays() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số ngày bù phát sóng phải lớn hơn 0");
+        }
+        Long userId = resolveUserId(editorEmail);
+
+        // Khóa theo thứ tự: ad_slots trước, ad_campaigns sau (Rule 18 để chống deadlock)
+        Long slotId = jdbc.query("SELECT slot_id FROM ad_campaigns WHERE campaign_id = ?",
+                (rs, r) -> rs.getLong(1), campaignId).stream().findFirst().orElse(null);
+        if (slotId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        List<Map<String, Object>> slotRows = jdbc.queryForList(
+                "SELECT slot_id, capacity, status, name, slot_code FROM ad_slots WHERE slot_id = ? FOR UPDATE",
+                slotId
+        );
+        if (slotRows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy vị trí quảng cáo #" + slotId);
+        }
+        int capacity = ((Number) slotRows.get(0).get("capacity")).intValue();
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT campaign_id, slot_id, start_date, end_date, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+        String campStatus = (String) rows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể bù ngày phát sóng cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
+        }
+        LocalDate oldEndDate = toLocalDate(rows.get(0).get("end_date"));
+        LocalDate newEndDate = oldEndDate != null ? oldEndDate.plusDays(request.getExtraDays()) : LocalDate.now().plusDays(request.getExtraDays());
+
+        // Kiểm tra sức chứa slot (Rule 7 & AdBookingService) cho các ngày bù thêm
+        LocalDate checkStart = (oldEndDate != null) ? oldEndDate.plusDays(1) : LocalDate.now();
+        if (!checkStart.isAfter(newEndDate)) {
+            List<SlotReservationRange> ranges = jdbc.query(
+                    "SELECT start_date, end_date FROM ad_campaigns WHERE slot_id = ? " +
+                    "AND campaign_id <> ? AND start_date <= ? AND end_date >= ? AND " + BookingOccupancy.SQL + " FOR SHARE",
+                    (rs, row) -> new SlotReservationRange(rs.getDate("start_date").toLocalDate(), rs.getDate("end_date").toLocalDate()),
+                    slotId, campaignId, newEndDate, checkStart
+            );
+
+            List<LocalDate> fullDates = new ArrayList<>();
+            for (LocalDate day = checkStart; !day.isAfter(newEndDate); day = day.plusDays(1)) {
+                LocalDate d = day;
+                long used = ranges.stream().filter(r -> !d.isBefore(r.start()) && !d.isAfter(r.end())).count();
+                if (used >= capacity) {
+                    fullDates.add(day);
+                }
+            }
+
+            if (!fullDates.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Không thể bù ngày vì vị trí quảng cáo đã đạt tối đa sức chứa (" + capacity + " banner) trong các ngày: " + fullDates);
+            }
+        }
+
+        jdbc.update("UPDATE ad_campaigns SET end_date = ? WHERE campaign_id = ?", newEndDate, campaignId);
+        logAudit(userId, "CAMPAIGN_MAKE_GOOD", "AD_CAMPAIGN", campaignId, Map.of(
+                "campaignId", campaignId,
+                "oldEndDate", oldEndDate != null ? oldEndDate.toString() : "",
+                "newEndDate", newEndDate.toString(),
+                "extraDays", request.getExtraDays(),
+                "reason", request.getReason(),
+                "compensatedBy", editorEmail
+        ));
+
+        return getCampaignControlList().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId));
+    }
+
+    // =========================================================================
+    // UC019 & UC025: CONTRACT MANAGEMENT & VIP TIERING (MÀN II.2.9)
+    // =========================================================================
+
+    /**
+     * Lấy danh sách hồ sơ hợp đồng quảng cáo B2B (UC019, UC025).
+     * Truy vấn từ bảng ad_contracts (hoặc ad_campaigns), kết hợp quan hệ với đối tác và vị trí slot.
+     */
+    public List<EditorialContractDto> getContracts() {
+        String sql = "SELECT c.campaign_id, c.advertiser_id, a.company_name, a.tax_code, " +
+                "c.contact_person, c.contact_email, c.contact_phone, " +
+                "c.campaign_name, s.slot_code, s.name AS slot_name, " +
+                "ct.contract_id, ct.contract_number, ct.signing_date, ct.contract_value AS ct_val, " +
+                "ct.contract_file_url AS ct_file_url, ct.status AS ct_status, " +
+                "c.contract_reference, c.contract_file_url, " +
+                "COALESCE(ct.contract_value, c.accepted_amount, c.quoted_amount) AS amount, " +
+                "c.start_date, c.end_date, c.quotation_status, c.payment_status, c.status " +
+                "FROM ad_campaigns c " +
+                "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
+                "JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                "LEFT JOIN ad_contracts ct ON ct.campaign_id = c.campaign_id " +
+                "ORDER BY c.campaign_id DESC";
+
+        return jdbc.query(sql, (rs, rowNum) -> {
+            Long campId = rs.getLong("campaign_id");
+            List<ContractAddendumDto> addendums = getAddendumsForCampaign(campId);
+
+            String contractNum = rs.getString("contract_number");
+            if (contractNum == null || contractNum.isBlank()) {
+                contractNum = rs.getString("contract_reference");
+            }
+
+            String fileUrl = rs.getString("ct_file_url");
+            if (fileUrl == null || fileUrl.isBlank()) {
+                fileUrl = rs.getString("contract_file_url");
+            }
+
+            LocalDate signDate = toLocalDate(rs.getDate("signing_date"));
+            if (signDate == null) {
+                signDate = toLocalDate(rs.getDate("start_date"));
+            }
+
+            Long contractId = rs.getObject("contract_id") != null ? rs.getLong("contract_id") : null;
+            String contractStatus = rs.getString("ct_status");
+            if (contractStatus == null || contractStatus.isBlank()) {
+                contractStatus = (contractNum != null && !contractNum.isBlank()) ? "SIGNED" : "DRAFT";
+            }
+
+            return EditorialContractDto.builder()
+                    .contractId(contractId)
+                    .campaignId(campId)
+                    .advertiserId(rs.getLong("advertiser_id"))
+                    .companyName(rs.getString("company_name"))
+                    .taxCode(rs.getString("tax_code"))
+                    .contactPerson(rs.getString("contact_person"))
+                    .contactEmail(rs.getString("contact_email"))
+                    .contactPhone(rs.getString("contact_phone"))
+                    .campaignName(rs.getString("campaign_name"))
+                    .slotCode(rs.getString("slot_code"))
+                    .slotName(rs.getString("slot_name"))
+                    .contractReference(contractNum)
+                    .contractNumber(contractNum)
+                    .signingDate(signDate)
+                    .contractFileUrl(fileUrl)
+                    .contractValue(rs.getBigDecimal("amount"))
+                    .startDate(toLocalDate(rs.getDate("start_date")))
+                    .endDate(toLocalDate(rs.getDate("end_date")))
+                    .quotationStatus(rs.getString("quotation_status"))
+                    .paymentStatus(rs.getString("payment_status"))
+                    .status(rs.getString("status"))
+                    .contractStatus(contractStatus)
+                    .addendums(addendums)
+                    .build();
+        });
+    }
+
+    /**
+     * Tạo mới hồ sơ hợp đồng quảng cáo (UC019) với đầy đủ: số hợp đồng, ngày ký, giá trị, file đính kèm.
+     */
+    @Transactional
+    public EditorialContractDto createContract(CreateContractRequest request, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        Long campaignId = request.getCampaignId();
+
+        List<Map<String, Object>> campRows = jdbc.queryForList(
+                "SELECT campaign_id, advertiser_id, contract_reference, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (campRows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String campStatus = (String) campRows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể tạo hợp đồng cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
+        }
+
+        Long advertiserId = ((Number) campRows.get(0).get("advertiser_id")).longValue();
+
+        // Kiểm tra trùng lặp số hợp đồng
+        List<Long> duplicate = jdbc.query(
+                "SELECT campaign_id FROM ad_campaigns WHERE contract_reference = ? AND campaign_id <> ?",
+                (rs, r) -> rs.getLong(1),
+                request.getContractNumber().trim(), campaignId
+        );
+        if (!duplicate.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Mã số hợp đồng [" + request.getContractNumber().trim() + "] đã tồn tại trên chiến dịch khác");
+        }
+
+        try {
+            jdbc.update(
+                    "INSERT INTO ad_contracts (campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, notes, created_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, 'SIGNED', ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number), signing_date = VALUES(signing_date), " +
+                    "contract_value = VALUES(contract_value), contract_file_url = VALUES(contract_file_url), notes = VALUES(notes)",
+                    campaignId, advertiserId, request.getContractNumber().trim(), request.getSigningDate(),
+                    request.getContractValue(), request.getContractFileUrl(), request.getNotes(), userId
+            );
+        } catch (Exception e) {
+            log.warn("Table ad_contracts insert fallback: {}", e.getMessage());
+        }
+
+        // Đồng bộ ngược lại ad_campaigns
+        jdbc.update(
+                "UPDATE ad_campaigns SET contract_reference = ?, contract_file_url = ? WHERE campaign_id = ?",
+                request.getContractNumber().trim(), request.getContractFileUrl(), campaignId
+        );
+
+        logAudit(userId, "CONTRACT_CREATED", "AD_CONTRACT", campaignId, Map.of(
+                "campaignId", campaignId,
+                "contractNumber", request.getContractNumber().trim(),
+                "signingDate", request.getSigningDate().toString(),
+                "contractValue", request.getContractValue().toString(),
+                "contractFileUrl", request.getContractFileUrl() != null ? request.getContractFileUrl() : "",
+                "createdBy", editorEmail
+        ));
+
+        return getContracts().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR));
+    }
+
+    private List<ContractAddendumDto> getAddendumsForCampaign(Long campaignId) {
+        try {
+            String sql = "SELECT addendum_id, campaign_id, addendum_number, effective_date, adjustment_type, notes, created_at " +
+                    "FROM ad_contract_addendums WHERE campaign_id = ? ORDER BY addendum_id ASC";
+            return jdbc.query(sql, (rs, rowNum) -> ContractAddendumDto.builder()
+                    .addendumId(rs.getLong("addendum_id"))
+                    .campaignId(rs.getLong("campaign_id"))
+                    .addendumNumber(rs.getString("addendum_number"))
+                    .effectiveDate(toLocalDate(rs.getDate("effective_date")))
+                    .adjustmentType(rs.getString("adjustment_type"))
+                    .notes(rs.getString("notes"))
+                    .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                    .build(), campaignId);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Cập nhật thông tin hợp đồng quảng cáo (Mã số hợp đồng, Ngày ký, Giá trị, URL file PDF).
+     */
+    @Transactional
+    public EditorialContractDto updateContract(Long campaignId, UpdateContractRequest request, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT campaign_id, advertiser_id, contract_reference, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE",
+                campaignId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String campStatus = (String) rows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể cập nhật hợp đồng cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
+        }
+
+        List<Long> duplicate = jdbc.query(
+                "SELECT campaign_id FROM ad_campaigns WHERE contract_reference = ? AND campaign_id <> ?",
+                (rs, r) -> rs.getLong(1),
+                request.getContractReference(), campaignId
+        );
+        if (!duplicate.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Mã số hợp đồng [" + request.getContractReference() + "] đã tồn tại trên một chiến dịch khác");
+        }
+
+        Object advObj = rows.get(0).get("advertiser_id");
+        Long advertiserId = advObj instanceof Number ? ((Number) advObj).longValue() : 0L;
+
+        try {
+            LocalDate signDate = request.getSigningDate() != null ? request.getSigningDate() : LocalDate.now();
+            BigDecimal val = request.getContractValue() != null ? request.getContractValue() : BigDecimal.ZERO;
+            jdbc.update(
+                    "INSERT INTO ad_contracts (campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, created_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, 'SIGNED', ?) " +
+                    "ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number), contract_file_url = VALUES(contract_file_url), " +
+                    (request.getSigningDate() != null ? "signing_date = VALUES(signing_date), " : "") +
+                    (request.getContractValue() != null ? "contract_value = VALUES(contract_value), " : "") +
+                    "updated_at = NOW()",
+                    campaignId, advertiserId, request.getContractReference(), signDate, val, request.getContractFileUrl(), userId
+            );
+        } catch (Exception e) {
+            log.warn("Table ad_contracts update fallback: {}", e.getMessage());
+        }
+
+        jdbc.update(
+                "UPDATE ad_campaigns SET contract_reference = ?, contract_file_url = ? WHERE campaign_id = ?",
+                request.getContractReference(), request.getContractFileUrl(), campaignId
+        );
+        logAudit(userId, "CONTRACT_UPDATED", "AD_CAMPAIGN", campaignId, Map.of(
+                "campaignId", campaignId,
+                "contractReference", request.getContractReference(),
+                "contractFileUrl", request.getContractFileUrl() != null ? request.getContractFileUrl() : "",
+                "updatedBy", editorEmail
+        ));
+
+        return getContracts().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy hợp đồng"));
+    }
+
+    /**
+     * Tạo phụ lục hợp đồng quảng cáo (UC019).
+     */
+    @Transactional
+    public EditorialContractDto createAddendum(Long campaignId, CreateContractAddendumRequest request, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT campaign_id, status FROM ad_campaigns WHERE campaign_id = ?",
+                campaignId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chiến dịch #" + campaignId);
+        }
+
+        String campStatus = (String) rows.get(0).get("status");
+        if ("CANCELLED".equalsIgnoreCase(campStatus) || "REJECTED".equalsIgnoreCase(campStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể tạo phụ lục cho chiến dịch đã bị hủy hoặc từ chối (" + campStatus + ")");
+        }
+
+        try {
+            jdbc.update(
+                    "INSERT INTO ad_contract_addendums (campaign_id, addendum_number, effective_date, adjustment_type, notes, created_by, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, NOW())",
+                    campaignId, request.getAddendumNumber(), request.getEffectiveDate(), request.getAdjustmentType(), request.getNotes(), userId
+            );
+        } catch (Exception e) {
+            log.warn("Không thể ghi ad_contract_addendums (sẽ ghi vào audit_logs): {}", e.getMessage());
+        }
+
+        logAudit(userId, "CONTRACT_ADDENDUM_CREATED", "AD_CAMPAIGN", campaignId, Map.of(
+                "campaignId", campaignId,
+                "addendumNumber", request.getAddendumNumber(),
+                "effectiveDate", request.getEffectiveDate().toString(),
+                "adjustmentType", request.getAdjustmentType(),
+                "notes", request.getNotes() != null ? request.getNotes() : "",
+                "createdBy", editorEmail
+        ));
+
+        return getContracts().stream()
+                .filter(c -> c.getCampaignId().equals(campaignId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy hợp đồng"));
+    }
+
+    /**
+     * Lấy danh sách đối tác doanh nghiệp B2B và phân hạng VIP.
+     */
+    public List<AdvertiserVipDto> getVipAdvertisers() {
+        String sql = "SELECT a.advertiser_id, a.company_name, a.tax_code, a.contact_person, a.email, a.phone, " +
+                "COALESCE(a.vip_tier, 'STANDARD') AS vip_tier, " +
+                "COALESCE(a.vip_discount_percent, 0.00) AS vip_discount_percent, " +
+                "COALESCE(SUM(c.accepted_amount), 0) AS total_spent, " +
+                "COUNT(c.campaign_id) AS campaign_count " +
+                "FROM advertisers a " +
+                "LEFT JOIN ad_campaigns c ON c.advertiser_id = a.advertiser_id AND c.quotation_status = 'ACCEPTED' " +
+                "GROUP BY a.advertiser_id, a.company_name, a.tax_code, a.contact_person, a.email, a.phone, a.vip_tier, a.vip_discount_percent " +
+                "ORDER BY total_spent DESC";
+        try {
+            return jdbc.query(sql, (rs, rowNum) -> AdvertiserVipDto.builder()
+                    .advertiserId(rs.getLong("advertiser_id"))
+                    .companyName(rs.getString("company_name"))
+                    .taxCode(rs.getString("tax_code"))
+                    .contactPerson(rs.getString("contact_person"))
+                    .email(rs.getString("email"))
+                    .phone(rs.getString("phone"))
+                    .vipTier(rs.getString("vip_tier"))
+                    .vipDiscountPercent(rs.getBigDecimal("vip_discount_percent"))
+                    .totalSpent(rs.getBigDecimal("total_spent"))
+                    .campaignCount(rs.getLong("campaign_count"))
+                    .build());
+        } catch (Exception e) {
+            String fallbackSql = "SELECT a.advertiser_id, a.company_name, a.tax_code, a.contact_person, a.email, a.phone, " +
+                    "COALESCE(SUM(c.accepted_amount), 0) AS total_spent, " +
+                    "COUNT(c.campaign_id) AS campaign_count " +
+                    "FROM advertisers a " +
+                    "LEFT JOIN ad_campaigns c ON c.advertiser_id = a.advertiser_id AND c.quotation_status = 'ACCEPTED' " +
+                    "GROUP BY a.advertiser_id, a.company_name, a.tax_code, a.contact_person, a.email, a.phone " +
+                    "ORDER BY total_spent DESC";
+            return jdbc.query(fallbackSql, (rs, rowNum) -> AdvertiserVipDto.builder()
+                    .advertiserId(rs.getLong("advertiser_id"))
+                    .companyName(rs.getString("company_name"))
+                    .taxCode(rs.getString("tax_code"))
+                    .contactPerson(rs.getString("contact_person"))
+                    .email(rs.getString("email"))
+                    .phone(rs.getString("phone"))
+                    .vipTier("STANDARD")
+                    .vipDiscountPercent(BigDecimal.ZERO)
+                    .totalSpent(rs.getBigDecimal("total_spent"))
+                    .campaignCount(rs.getLong("campaign_count"))
+                    .build());
+        }
+    }
+
+    /**
+     * Cập nhật phân hạng VIP và mức chiết khấu cho đối tác doanh nghiệp B2B (UC019, UC025).
+     *
+     * QUY TẮC NGHIỆP VỤ & TÀI CHÍNH (Lưu ý quan trọng):
+     * - `vip_discount_percent` lưu trên bảng `advertisers` đại diện cho mức ưu đãi theo hạng đối tác B2B (STANDARD/SILVER/GOLD/DIAMOND).
+     * - Khi Tòa soạn gửi báo giá (UC018 sendQuotation), mức giá chốt `quoted_amount` (và sau này là `accepted_amount`)
+     *   bắt buộc phải là GIÁ CUỐI CÙNG ĐÃ ĐƯỢC GIẢM TRỪ CHIẾT KHẤU trước khi Doanh nghiệp tạo đơn thanh toán (Payment Order).
+     * - Lý do: Phía Module Finance (SV4) chỉ thu đúng số tiền ghi nhận trên đơn thanh toán; hệ thống không lưu công nợ
+     *   và không hỗ trợ trừ tiền sau khi đơn hàng đã chốt thanh toán.
+     */
+    @Transactional
+    public AdvertiserVipDto updateVipTier(Long advertiserId, UpdateVipTierRequest request, String editorEmail) {
+        Long userId = resolveUserId(editorEmail);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT advertiser_id FROM advertisers WHERE advertiser_id = ?",
+                advertiserId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy nhà quảng cáo #" + advertiserId);
+        }
+
+        try {
+            jdbc.update(
+                    "UPDATE advertisers SET vip_tier = ?, vip_discount_percent = ? WHERE advertiser_id = ?",
+                    request.getVipTier(), request.getVipDiscountPercent(), advertiserId
+            );
+        } catch (Exception e) {
+            log.warn("Không thể cập nhật cột vip_tier trên advertisers: {}", e.getMessage());
+        }
+
+        logAudit(userId, "ADVERTISER_VIP_UPDATED", "ADVERTISER", advertiserId, Map.of(
+                "advertiserId", advertiserId,
+                "vipTier", request.getVipTier(),
+                "vipDiscountPercent", request.getVipDiscountPercent(),
+                "notes", request.getNotes() != null ? request.getNotes() : "",
+                "updatedBy", editorEmail
+        ));
+
+        return getVipAdvertisers().stream()
+                .filter(a -> a.getAdvertiserId().equals(advertiserId))
+                .findFirst()
+                .orElse(AdvertiserVipDto.builder()
+                        .advertiserId(advertiserId)
+                        .vipTier(request.getVipTier())
+                        .vipDiscountPercent(request.getVipDiscountPercent())
+                        .build());
+    }
+
+    // =========================================================================
+    // UC015 & UC028: BUSINESS OPERATIONS DASHBOARD (MÀN II.2.10)
+    // =========================================================================
+
+    /**
+     * Lấy tổng quan hoạt động kinh doanh: Lấp đầy kho slot, Hàng việc khẩn tòa soạn.
+     * Lưu ý Rule 17 (Module boundary):
+     * Các chỉ số doanh thu (B2B thực thu, B2C gói đọc, B2C bài lẻ đã trừ hoàn tiền REFUND)
+     * được ủy quyền cung cấp qua API tổng hợp từ Module Finance (SV4), không query trực tiếp bảng transactions.
+     * Hệ thống đã xóa bỏ công nợ quảng cáo (b2bReceivables = 0).
+     */
+    public EditorialDashboardDto getDashboardOverview() {
+        BigDecimal b2bTotalSigned = BigDecimal.ZERO;
+        BigDecimal b2bActualPaid = BigDecimal.ZERO;
+        BigDecimal b2bReceivables = BigDecimal.ZERO;
+        BigDecimal b2cSubscriptions = BigDecimal.ZERO;
+        BigDecimal b2cSingleArticles = BigDecimal.ZERO;
+        BigDecimal totalPlatformRevenue = BigDecimal.ZERO;
+
+        String slotSql = "SELECT slot_code, name, dimensions, capacity, base_price, pricing_type FROM ad_slots ORDER BY slot_id";
+        List<SlotOccupancyDto> slotOccupancies = jdbc.query(slotSql, (rs, rowNum) -> {
+            String slotCode = rs.getString("slot_code");
+            int capacity = rs.getInt("capacity");
+            Integer activeCount = Optional.ofNullable(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ad_campaigns c JOIN ad_slots s ON s.slot_id = c.slot_id " +
+                    "WHERE s.slot_code = ? AND c.status = 'ACTIVE' AND c.start_date <= CURRENT_DATE AND c.end_date >= CURRENT_DATE",
+                    Integer.class, slotCode
+            )).orElse(0);
+
+            double occupancy = capacity > 0 ? Math.min(100.0, (activeCount * 100.0) / capacity) : 0.0;
+            String status = occupancy >= 100.0 ? "FULL" : (occupancy >= 70.0 ? "NEAR_FULL" : "NORMAL");
+
+            return SlotOccupancyDto.builder()
+                    .slotCode(slotCode)
+                    .slotName(rs.getString("name"))
+                    .dimensions(rs.getString("dimensions"))
+                    .capacity(capacity)
+                    .basePrice(rs.getBigDecimal("base_price"))
+                    .pricingType(rs.getString("pricing_type"))
+                    .activeCampaignsCount(activeCount)
+                    .occupancyPercentage(Math.round(occupancy * 10.0) / 10.0)
+                    .status(status)
+                    .build();
+        });
+
+        long pendingArticlesCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM articles WHERE status = 'IN_REVIEW'", Long.class)).orElse(0L);
+        long pendingBookingsCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ad_campaigns WHERE quotation_status = 'PENDING'", Long.class)).orElse(0L);
+        long pendingCreativesCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ad_creatives WHERE review_status = 'PENDING'", Long.class)).orElse(0L);
+        long pendingCommentsCount = Optional.ofNullable(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE status = 'PENDING'", Long.class)).orElse(0L);
+        List<UrgentItemDto> urgentItems = new ArrayList<>();
+
+        // 1. Bài viết chờ duyệt
+        jdbc.query("SELECT a.article_id, v.title, a.created_at FROM articles a " +
+                   "JOIN article_versions v ON v.article_id = a.article_id AND v.version_number = a.latest_version " +
+                   "WHERE a.status = 'IN_REVIEW' ORDER BY a.article_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("art-" + rs.getLong("article_id"))
+                            .type("ARTICLE")
+                            .title("Bài viết: " + rs.getString("title"))
+                            .description("Đang chờ tòa soạn thẩm định và phê duyệt xuất bản")
+                            .priority("HIGH")
+                            .link("/backoffice/editorial/articles")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                            .build());
+                    return null;
+                });
+
+        // 2. Booking chờ báo giá
+        jdbc.query("SELECT c.campaign_id, c.campaign_name, a.company_name, c.created_at FROM ad_campaigns c " +
+                   "JOIN advertisers a ON a.advertiser_id = c.advertiser_id " +
+                   "WHERE c.quotation_status = 'PENDING' ORDER BY c.campaign_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("bk-" + rs.getLong("campaign_id"))
+                            .type("BOOKING")
+                            .title("Booking: " + rs.getString("campaign_name"))
+                            .description("Doanh nghiệp " + rs.getString("company_name") + " đang chờ báo giá")
+                            .priority("URGENT")
+                            .link("/backoffice/editorial/bookings")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                            .build());
+                    return null;
+                });
+
+        // 3. Creative chờ duyệt
+        jdbc.query("SELECT cr.creative_id, c.campaign_name, cr.uploaded_at FROM ad_creatives cr " +
+                   "JOIN ad_campaigns c ON c.campaign_id = cr.campaign_id " +
+                   "WHERE cr.review_status = 'PENDING' ORDER BY cr.creative_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("cr-" + rs.getLong("creative_id"))
+                            .type("CREATIVE")
+                            .title("Creative: Banner mới cho " + rs.getString("campaign_name"))
+                            .description("Cần kiểm tra quy cách kích thước và quét mã độc URL")
+                            .priority("HIGH")
+                            .link("/backoffice/editorial/creatives")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("uploaded_at")))
+                            .build());
+                    return null;
+                });
+
+        // 4. Bình luận chờ duyệt
+        jdbc.query("SELECT comment_id, content, created_at FROM comments " +
+                   "WHERE status = 'PENDING' ORDER BY comment_id DESC LIMIT 3",
+                (rs, rowNum) -> {
+                    String content = rs.getString("content");
+                    String shortContent = (content != null && content.length() > 50) ? content.substring(0, 50) + "..." : content;
+                    urgentItems.add(UrgentItemDto.builder()
+                            .id("cmt-" + rs.getLong("comment_id"))
+                            .type("COMMENT")
+                            .title("Bình luận: " + shortContent)
+                            .description("Bình luận mới của độc giả cần kiểm duyệt quy chuẩn")
+                            .priority("NORMAL")
+                            .link("/backoffice/editorial/comments")
+                            .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                            .build());
+                    return null;
+                });
+
+        return EditorialDashboardDto.builder()
+                .b2bTotalSigned(b2bTotalSigned)
+                .b2bActualPaid(b2bActualPaid)
+                .b2bReceivables(b2bReceivables)
+                .b2cSubscriptions(b2cSubscriptions)
+                .b2cSingleArticles(b2cSingleArticles)
+                .totalPlatformRevenue(totalPlatformRevenue)
+                .slotOccupancies(slotOccupancies)
+                .pendingArticlesCount(pendingArticlesCount)
+                .pendingBookingsCount(pendingBookingsCount)
+                .pendingCreativesCount(pendingCreativesCount)
+                .pendingCommentsCount(pendingCommentsCount)
+                .urgentItems(urgentItems)
+                .build();
+    }
+
     private Long resolveUserId(String email) {
         if (email == null || email.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Chưa xác thực danh tính biên tập viên");
@@ -560,6 +1488,8 @@ public class EditorialAdvertisingService {
         if (obj instanceof java.util.Date d) return new Timestamp(d.getTime()).toLocalDateTime();
         return null;
     }
+
+    public record SlotReservationRange(LocalDate start, LocalDate end) {}
 
     private static LocalDate toLocalDate(Object obj) {
         if (obj == null) return null;

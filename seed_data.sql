@@ -25,7 +25,7 @@ INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, 
 -- (thuộc module identity), nhóm thống nhất SYSTEM_ADMIN giữ vai Kế toán trưởng (FinanceCurrentUser.FINANCE_MANAGER_ROLES).
 -- Không ghi user_id để không trùng id với dữ liệu seed của module khác; mật khẩu "password".
 INSERT INTO users (email, password_hash, full_name, phone, avatar_url, role, status) VALUES
-('ketoantruong@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Kế Toán Trưởng (SV4)', '0903456790', NULL, 'SYSTEM_ADMIN', 'ACTIVE');
+('ketoantruong@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Kế Toán Trưởng (SV4)', '0903456790', NULL, 'CHIEF_ACCOUNTANT', 'ACTIVE');
 
 -- 1.1 USER DEVICES (Khống chế tối đa 2 thiết bị - Độc giả Mai)
 INSERT INTO user_devices (device_id, user_id, device_name, device_type, device_token, ip_address) VALUES
@@ -147,13 +147,20 @@ INSERT INTO article_purchases (purchase_id, user_id, article_id, purchase_price,
 
 -- 13. AD CAMPAIGNS, CREATIVES & STATS (Quảng cáo B2B)
 INSERT INTO ad_campaigns (campaign_id, advertiser_id, slot_id, reviewed_by, campaign_name, start_date, end_date, quoted_amount, quotation_status, contract_reference, contract_file_url, payment_status, status) VALUES
-(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE');
+(1, 1, 1, 3, 'Chiến dịch Quảng bá Logistics Cảng Đình Vũ 2026', '2026-09-01', '2026-09-30', 45000000.00, 'ACCEPTED', 'HD-2026-DV-001', 'https://example.com/contracts/HD-2026-DV-001.pdf', 'PAID', 'ACTIVE'),
+(2, 1, 2, NULL, 'Chiến dịch Khai trương Trung tâm Logistics Cát Hải', '2026-11-20', '2026-12-20', 25000000.00, 'PENDING', NULL, NULL, 'UNPAID', 'PENDING');
 
 INSERT INTO ad_creatives (creative_id, campaign_id, reviewed_by, version_number, media_url, target_url, resolved_url, review_status, scan_status, approved_at) VALUES
-(1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00');
+(1, 1, 3, 1, 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1140', 'https://dinhvuport.com.vn', 'https://dinhvuport.com.vn', 'APPROVED', 'SAFE', '2026-08-31 16:00:00'),
+(2, 2, NULL, 1, 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1140', 'https://cathailogistics.com.vn', 'https://cathailogistics.com.vn', 'PENDING', 'SAFE', NULL);
 
 INSERT INTO ad_stats (stat_id, campaign_id, creative_id, stat_date, impressions, clicks, ctr) VALUES
 (1, 1, 1, '2026-09-28', 15200, 684, 4.5000);
+
+-- 13.1 AD CONTRACTS (Hợp đồng B2B SV2 - Trọng Phan)
+INSERT INTO ad_contracts (contract_id, campaign_id, advertiser_id, contract_number, signing_date, contract_value, contract_file_url, status, notes) VALUES
+(1, 1, 1, 'HD-2026-DV-001', '2026-08-25', 45000000.00, 'https://example.com/contracts/HD-2026-DV-001.pdf', 'SIGNED', 'Hợp đồng quảng cáo B2B Cảng Logistics Đình Vũ 2026')
+ON DUPLICATE KEY UPDATE contract_number = VALUES(contract_number);
 
 -- 14. TRANSACTIONS (Sổ cái thu tiền)
 -- Giao dịch 1: Độc giả Mai mua gói năm 480k

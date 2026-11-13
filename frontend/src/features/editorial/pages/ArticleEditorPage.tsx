@@ -22,9 +22,6 @@ import {
   Save,
   ArrowLeft,
   Crown,
-  Eye,
-  CheckCircle2,
-  Clock,
   RotateCcw,
 } from 'lucide-react'
 import { ArticleVersionDraftEditor } from '@/features/content/components/ArticleVersionDraftEditor'
@@ -46,9 +43,12 @@ export function ArticleEditorPage() {
   const [coverCaption, setCoverCaption] = useState('')
   const [coverAltText, setCoverAltText] = useState('')
   const [coverSource, setCoverSource] = useState('')
-  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+  const [serverCoverUrl, setServerCoverUrl] = useState<string | null>(null)
+  const coverPreview = filePreview ?? (coverImage.startsWith('/api/v1/content/images/') ? serverCoverUrl : (coverImage || null))
   const [coverError, setCoverError] = useState('')
   const coverFileInput = useRef<HTMLInputElement>(null)
+  const serverCoverUrlRef = useRef<string | null>(null)
   const [categoryId, setCategoryId] = useState('cat-thoi-su')
   const [tags, setTags] = useState('Hải Phòng, Thời sự')
   const [isPremium, setIsPremium] = useState(false)
@@ -83,6 +83,7 @@ export function ArticleEditorPage() {
       setContent('')
       setCoverImage('')
       setCoverFile(null)
+      setFilePreview(null)
       setCoverCaption('')
       setCoverAltText('')
       setCoverSource('')
@@ -160,30 +161,51 @@ export function ArticleEditorPage() {
   }, [id, isEditing, isAuthor, clearErrors, location.search])
 
   useEffect(() => {
-    let active = true
-    let objectUrl: string | null = null
-    setCoverPreview(null)
-
-    if (coverFile) {
-      objectUrl = URL.createObjectURL(coverFile)
-      setCoverPreview(objectUrl)
-    } else if (coverImage.startsWith('/api/v1/content/images/')) {
-      void contentApi.getCoverImage(coverImage).then((blob) => {
-        if (!active) return
-        objectUrl = URL.createObjectURL(blob)
-        setCoverPreview(objectUrl)
-      }).catch((error: unknown) => {
-        if (active) setCoverError(error instanceof Error ? error.message : 'Không tải được ảnh bìa')
-      })
-    } else {
-      setCoverPreview(coverImage || null)
+    return () => {
+      if (filePreview) URL.revokeObjectURL(filePreview)
     }
+  }, [filePreview])
+
+  // Thu hồi ảnh bìa từ server khi rời màn hình để tránh rò rỉ bộ nhớ
+  useEffect(() => {
+    return () => {
+      if (serverCoverUrlRef.current) {
+        URL.revokeObjectURL(serverCoverUrlRef.current)
+        serverCoverUrlRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!coverImage.startsWith('/api/v1/content/images/')) {
+      if (serverCoverUrlRef.current) {
+        URL.revokeObjectURL(serverCoverUrlRef.current)
+        serverCoverUrlRef.current = null
+        setServerCoverUrl(null)
+      }
+      return
+    }
+
+    let active = true
+
+    void contentApi.getCoverImage(coverImage).then((blob) => {
+      if (!active) return
+      const nextUrl = URL.createObjectURL(blob)
+      const prevUrl = serverCoverUrlRef.current
+      serverCoverUrlRef.current = nextUrl
+      setServerCoverUrl(nextUrl)
+      // Chỉ thu hồi URL ảnh cũ sau khi ảnh mới tải xong để không bị chớp ảnh hỏng
+      if (prevUrl) {
+        URL.revokeObjectURL(prevUrl)
+      }
+    }).catch((error: unknown) => {
+      if (active) setCoverError(error instanceof Error ? error.message : 'Không tải được ảnh bìa')
+    })
 
     return () => {
       active = false
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [coverFile, coverImage])
+  }, [coverImage])
 
   const handleChooseCover = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
@@ -192,10 +214,12 @@ export function ArticleEditorPage() {
     if (file && ((file.type && !['image/jpeg', 'image/png'].includes(file.type)) || file.size > 5 * 1024 * 1024)) {
       event.target.value = ''
       setCoverFile(null)
+      setFilePreview(null)
       setCoverError('Vui lòng chọn JPEG hoặc PNG, tối đa 5 MB')
       return
     }
     setCoverFile(file)
+    setFilePreview(file ? URL.createObjectURL(file) : null)
   }
 
   const handleSave = async (submitForReview: boolean = false) => {
@@ -545,6 +569,7 @@ export function ArticleEditorPage() {
                     <p className="break-all">Đã chọn: {coverFile.name}</p>
                     <Button type="button" size="sm" variant="outline" disabled={isSaving} onClick={() => {
                       setCoverFile(null)
+                      setFilePreview(null)
                       setCoverError('')
                       if (coverFileInput.current) coverFileInput.current.value = ''
                     }}>Bỏ chọn ảnh</Button>

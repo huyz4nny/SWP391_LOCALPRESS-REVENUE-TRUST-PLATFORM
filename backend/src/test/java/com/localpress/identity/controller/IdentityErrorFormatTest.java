@@ -5,7 +5,6 @@ import com.localpress.identity.service.GoogleLoginService;
 import com.localpress.identity.service.PasswordLoginService;
 import com.localpress.identity.service.ProfileService;
 import com.localpress.identity.service.ReaderRegistrationService;
-import com.localpress.shared.device.DeviceLimitReachedException;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // chốt định dạng JSON lỗi mà frontend đang đọc ở các API của identity (UC033)
 // hai kiểu lỗi:
 //   - hồ sơ và đăng ký: {timestamp, status, error, message, fieldErrors}
-//   - đăng nhập mật khẩu và Google: {message} hoặc {message, code}, kèm Cache-Control: no-store
+//   - đăng nhập mật khẩu và Google: {message}, kèm Cache-Control: no-store
 class IdentityErrorFormatTest {
 
     ProfileService profiles = mock(ProfileService.class);
@@ -133,16 +132,6 @@ class IdentityErrorFormatTest {
     }
 
     @Test
-    void passwordLoginDeviceLimitReturnsCode() throws Exception {
-        when(passwordLogin.login(any(), any())).thenThrow(new DeviceLimitReachedException());
-        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(validLogin()))
-                .andExpect(status().isConflict())
-                .andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.code").value(DeviceLimitReachedException.CODE))
-                .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
     void passwordLoginErrorWithoutReasonUsesDefaultMessage() throws Exception {
         when(passwordLogin.login(any(), any())).thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(validLogin()))
@@ -175,15 +164,6 @@ class IdentityErrorFormatTest {
         mvc.perform(post("/api/v1/auth/google").contentType(MediaType.APPLICATION_JSON).content(validGoogle()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Không thể đăng nhập Google"));
-    }
-
-    @Test
-    void googleLoginDeviceLimitReturnsCode() throws Exception {
-        when(googleLogin.login(any(), any(), any(), any(), any())).thenThrow(new DeviceLimitReachedException());
-        mvc.perform(post("/api/v1/auth/google").contentType(MediaType.APPLICATION_JSON).content(validGoogle()))
-                .andExpect(status().isConflict())
-                .andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.code").value(DeviceLimitReachedException.CODE));
     }
 
     @Test

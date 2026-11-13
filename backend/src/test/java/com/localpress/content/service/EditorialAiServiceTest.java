@@ -137,17 +137,34 @@ class EditorialAiServiceTest {
         server.verify();
     }
 
-    @Test void interruptionStopsRetryAndPreservesInterruptFlag() {
-        server.expect(anything()).andRespond(withStatus(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
-        Thread.currentThread().interrupt();
+    @Test void deadlineCancelsSlowProviderWithoutWaitingForItsResponse() {
+        var cancelled = new java.util.concurrent.CountDownLatch(1);
+        server.expect(anything()).andRespond(request -> {
+            try { Thread.sleep(5000); }
+            catch (InterruptedException interrupted) {
+                cancelled.countDown();
+                Thread.currentThread().interrupt();
+            }
+            return withSuccess("{}", MediaType.APPLICATION_JSON).createResponse(request);
+        });
+        var service = new EditorialAiService("gemini", "model", "test-key", builder.build());
         try {
-            var error = assertThrows(EditorialAiService.AiException.class,
-                    () -> new EditorialAiService("gemini", "model", "test-key", builder.build()).suggest("Topic"));
-            assertEquals("AI_REQUEST_INTERRUPTED", error.getCode());
-            assertTrue(Thread.currentThread().isInterrupted());
-        } finally {
-            Thread.interrupted();
-        }
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+                var error = assertThrows(EditorialAiService.AiException.class,
+                    () -> service.suggestWithin("Topic", java.time.Duration.ofMillis(200)));
+                assertEquals("AI_TIMEOUT", error.getCode());
+                assertTrue(cancelled.await(1, java.util.concurrent.TimeUnit.SECONDS));
+            });
+        } finally { service.close(); }
+    }
+
+    @Test void flashLiteUsesMinimalThinkingAndShortOutput() throws Exception {
+        String text = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(json);
+        server.expect(anything())
+            .andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("minimal"))
+            .andExpect(jsonPath("$.generationConfig.maxOutputTokens").value(1024))
+            .andRespond(withSuccess("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":" + text + "}]}}]}", MediaType.APPLICATION_JSON));
+        assertEquals("Sapo", new EditorialAiService("gemini", "gemini-3.1-flash-lite", "test-key", builder.build()).suggest("Topic").suggestedSapo());
         server.verify();
     }
 
@@ -209,7 +226,7 @@ class EditorialAiServiceTest {
                 () -> new EditorialAiService("gemini", "model", "test-key", seconds));
     }
 
-    @Test void readTimeoutConfigurationDefaultsTo60AndAcceptsOverride() {
+    @Test void readTimeoutConfigurationDefaultsTo10AndAcceptsOverride() {
         new org.springframework.boot.test.context.runner.ApplicationContextRunner()
                 .withBean(EditorialAiService.class)
                 .run(context -> {

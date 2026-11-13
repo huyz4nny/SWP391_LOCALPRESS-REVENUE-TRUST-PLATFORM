@@ -5,11 +5,19 @@ import { mockStore } from '@/mocks/store'
 
 import { APP_CONFIG } from '@/app/config'
 import { httpClient } from '@/lib/http/client'
-const originalMock = APP_CONFIG.useMockApi
-beforeAll(() => { APP_CONFIG.useMockApi = true; httpClient.setUseMock(true); mockStore.resetToDefaults(); mockStore.setCurrentUser('user-editor') })
-afterAll(() => { APP_CONFIG.useMockApi = originalMock; httpClient.setUseMock(originalMock); mockStore.resetToDefaults() })
-
 describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () => {
+  const originalMock = APP_CONFIG.useMockApi
+  beforeAll(() => {
+    APP_CONFIG.useMockApi = true
+    httpClient.setUseMock(true)
+    mockStore.resetToDefaults()
+    mockStore.setCurrentUser('user-editor')
+  })
+  afterAll(() => {
+    APP_CONFIG.useMockApi = originalMock
+    httpClient.setUseMock(originalMock)
+    mockStore.resetToDefaults()
+  })
   // ==========================================
   // Màn II.2.3: Pending Booking Queue (UC016)
   // ==========================================
@@ -36,8 +44,8 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
         requestKey: 'req-test-reject-01',
         campaignName: 'Chiến dịch Test Từ Chối',
         slotId: 'slot-top-leaderboard',
-        startDate: '2026-11-01',
-        endDate: '2026-11-05',
+        startDate: '2026-12-01',
+        endDate: '2026-12-05',
         contactPerson: 'Nguyễn Văn A',
         contactPhone: '0988776655',
         contactEmail: 'test-reject@company.com',
@@ -69,8 +77,8 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
       requestKey: 'req-test-quote-001',
       campaignName: 'Chiến dịch Logistics Mùa Đông 2026',
       slotId: 'slot-sidebar-sticky',
-      startDate: '2026-11-10',
-      endDate: '2026-11-20',
+      startDate: '2026-12-10',
+      endDate: '2026-12-20',
       contactPerson: 'Trần Thị B',
       contactPhone: '0912345678',
       contactEmail: 'logistics-hp@company.com',
