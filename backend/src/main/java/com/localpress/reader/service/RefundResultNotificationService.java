@@ -111,7 +111,15 @@ public class RefundResultNotificationService {
         if (originalTransactionId == null) {
             return "đơn của bạn";
         }
-        RefundContext context = repository.findRefundContext(originalTransactionId).orElse(null);
+        RefundContext context;
+        try {
+            context = repository.findRefundContext(originalTransactionId).orElse(null);
+        } catch (RuntimeException exception) {
+            // tra mã đơn / tên bài lỗi thì vẫn phải báo cho độc giả, chỉ ghi "#id"
+            log.warn("Không tra được thông tin đơn #{} cho thông báo hoàn tiền: {}",
+                    originalTransactionId, exception.getMessage());
+            context = null;
+        }
         String code = context != null && hasText(context.orderCode()) ? context.orderCode() : "#" + originalTransactionId;
         String item = context != null && hasText(context.itemName()) ? " (" + context.itemName().trim() + ")" : "";
         return "đơn " + code + item;

@@ -71,10 +71,13 @@ public class ReaderNotificationRepository {
     public Optional<RefundContext> findRefundContext(long originalTransactionId) {
         return jdbcTemplate.query("""
                 SELECT t.gateway_transaction_id AS order_code,
-                       COALESCE(a.title, sp.name) AS item_name
+                       COALESCE(v.title, sp.name) AS item_name
                 FROM transactions t
                 LEFT JOIN article_purchases ap ON ap.purchase_id = t.purchase_id
                 LEFT JOIN articles a ON a.article_id = ap.article_id
+                -- tiêu đề nằm ở bảng phiên bản: lấy bản đang xuất bản, chưa xuất bản thì lấy bản mới nhất
+                LEFT JOIN article_versions v ON v.article_id = a.article_id
+                      AND v.version_number = COALESCE(a.published_version, a.latest_version)
                 LEFT JOIN subscriptions s ON s.subscription_id = t.subscription_id
                 LEFT JOIN subscription_plans sp ON sp.plan_id = s.plan_id
                 WHERE t.transaction_id = ?

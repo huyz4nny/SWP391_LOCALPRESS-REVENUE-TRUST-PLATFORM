@@ -116,6 +116,19 @@ class RefundResultNotificationServiceTest {
     }
 
     @Test
+    void orderLookupFailureStillNotifiesWithTransactionId() {
+        when(repository.findRefundContext(30L)).thenThrow(new org.springframework.jdbc.BadSqlGrammarException(
+                "lookup", "SELECT", new java.sql.SQLException("Unknown column")));
+
+        service.recordCompleted(completed("ARTICLE", false, null));
+
+        ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
+        verify(repository).insertInApp(eq(7L), eq(ReaderNotificationRepository.TYPE_REFUND_COMPLETED),
+                anyString(), content.capture(), anyString(), eq("REFUND_COMPLETED:5"));
+        assertTrue(content.getValue().contains("đơn #30"));
+    }
+
+    @Test
     void moneyUsesVietnameseGrouping() {
         assertEquals("1.250.000 ₫", invokeMoney(new BigDecimal("1250000")));
     }
