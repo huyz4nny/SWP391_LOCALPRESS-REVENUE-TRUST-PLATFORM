@@ -41,8 +41,8 @@ class ArticlePublishedNotificationServiceTest {
         service.record(event);
         service.record(event);
 
-        verify(repository, times(2)).insertInApp(9L, "Cảng mới", "Có bài mới trong chuyên mục bạn theo dõi.", "ARTICLE_PUBLISHED:8:9");
-        verify(repository, times(2)).insertInApp(10L, "Cảng mới", "Có bài mới trong chuyên mục bạn theo dõi.", "ARTICLE_PUBLISHED:8:10");
+        verify(repository, times(2)).insertInApp(9L, ReaderNotificationRepository.TYPE_ARTICLE_PUBLISHED, "Cảng mới", "Có bài mới trong chuyên mục bạn theo dõi.", "/articles/bai-moi", "ARTICLE_PUBLISHED:8:9");
+        verify(repository, times(2)).insertInApp(10L, ReaderNotificationRepository.TYPE_ARTICLE_PUBLISHED, "Cảng mới", "Có bài mới trong chuyên mục bạn theo dõi.", "/articles/bai-moi", "ARTICLE_PUBLISHED:8:10");
     }
 
     @Test
@@ -50,10 +50,10 @@ class ArticlePublishedNotificationServiceTest {
         when(repository.findFollowerIds(2L)).thenReturn(List.of(9L));
 
         service.record(event(true, 8L, 2L, " "));
-        verify(repository).insertInApp(9L, "Bài mới", "Có bài mới trong chuyên mục bạn theo dõi.", "ARTICLE_PUBLISHED:8:9");
+        verify(repository).insertInApp(9L, ReaderNotificationRepository.TYPE_ARTICLE_PUBLISHED, "Bài mới", "Có bài mới trong chuyên mục bạn theo dõi.", "/articles/bai-moi", "ARTICLE_PUBLISHED:8:9");
 
         service.record(event(true, 8L, 2L, "A".repeat(300)));
-        verify(repository).insertInApp(9L, "A".repeat(255), "Có bài mới trong chuyên mục bạn theo dõi.", "ARTICLE_PUBLISHED:8:9");
+        verify(repository).insertInApp(9L, ReaderNotificationRepository.TYPE_ARTICLE_PUBLISHED, "A".repeat(255), "Có bài mới trong chuyên mục bạn theo dõi.", "/articles/bai-moi", "ARTICLE_PUBLISHED:8:9");
     }
 
     private static ArticlePublishedEvent event(boolean first, Long articleId, Long categoryId, String title) {

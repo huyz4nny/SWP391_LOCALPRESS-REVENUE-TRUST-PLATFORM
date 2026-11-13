@@ -42,6 +42,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+		<!-- Gửi email thông báo (SV3: kết quả hoàn tiền). Chưa cấu hình spring.mail.host thì không gửi. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
 
 
 		<dependency>
