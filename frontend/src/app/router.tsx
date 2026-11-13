@@ -20,7 +20,6 @@ import {
   ArticleDetailPage,
   SearchPage,
   PremiumPlansPage,
-  PaymentResultPage,
   ReaderAccountPage,
   ReaderLibraryPage,
   ReaderBookmarksPage,
@@ -155,7 +154,6 @@ export const router = createBrowserRouter([
       { path: 'wallet/complaints', element: <Navigate to="/payment-complaints" replace /> },
       // Cửa hàng thử (SV4, chỉ bản dev): đóng vai SV3 tạo đơn từ server để demo luồng thanh toán
       ...(import.meta.env.DEV ? [{ path: 'dev/demo-store', element: <DemoStorePage /> }] : []),
-      { path: 'payments/:paymentId', element: <PaymentResultPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
