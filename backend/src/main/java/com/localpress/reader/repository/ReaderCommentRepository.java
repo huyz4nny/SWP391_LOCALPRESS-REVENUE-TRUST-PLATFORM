@@ -103,6 +103,14 @@ public class ReaderCommentRepository {
         return rows.stream().findFirst();
     }
 
+    // UC031 bình luận công khai cuối bài: chỉ APPROVED (rule 12), cũ nằm trên
+    public List<ReaderCommentResponse> findApprovedByArticle(Long articleId) {
+        return jdbcTemplate.query(
+                COMMENT_SELECT + " WHERE c.article_id = ? AND c.status = 'APPROVED' ORDER BY c.created_at ASC",
+                (rs, row) -> mapComment(rs),
+                articleId);
+    }
+
     public List<ReaderCommentResponse> findMine(Long userId, Long articleId) {
         return jdbcTemplate.query(
                 COMMENT_SELECT + " WHERE c.user_id = ? AND c.article_id = ? ORDER BY c.created_at ASC",
