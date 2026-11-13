@@ -28,6 +28,7 @@ import {
   ReaderSubscriptionPage,
   ReaderOrdersPage,
   ReaderDevicesPage,
+  ReaderNotificationsPage,
   ReaderSupportPage,
 } from '@/features/reader'
 
@@ -175,6 +176,7 @@ export const router = createBrowserRouter([
       { path: 'orders', element: <ReaderOrdersPage /> },
       { path: 'devices', element: <ReaderDevicesPage /> },
       { path: 'support', element: <ReaderSupportPage /> },
+      { path: 'notifications', element: <ReaderNotificationsPage /> },
     ],
   },
 

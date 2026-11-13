@@ -45,7 +45,6 @@ function mapPublicPlan(dto: Partial<SubscriptionPlan> & {
   const line = scopeLine(dto)
   const features = [line]
   if (dto.hasAdFree) features.push('Không hiện quảng cáo')
-  if (dto.hasAudio) features.push('Nghe audio')
   features.push(`Thời hạn ${Number(dto.durationDays ?? 0)} ngày`)
   return {
     id: String(dto.id ?? ''),

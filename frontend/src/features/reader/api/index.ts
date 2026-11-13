@@ -7,18 +7,21 @@
 //   comments.ts      UC041-UC042 bình luận và báo cáo
 //   devices.ts       UC043 thiết bị và phiên đăng nhập
 //   subscription.ts  UC044 gói đang dùng, tắt gia hạn
+//   notifications.ts UC040 + UC046 thông báo trong app (bài mới, kết quả hoàn tiền)
 import { articlesApi } from './articles'
 import { commentsApi } from './comments'
 import { devicesApi } from './devices'
 import { libraryApi } from './library'
 import { purchaseApi } from './purchase'
 import { subscriptionApi } from './subscription'
+import { notificationsApi } from './notifications'
 
 export type { ArticlePage } from './shared'
 export type { PendingOrderTarget } from './purchase'
 export type { ReaderSubscription } from './subscription'
 export type { FollowedCategory, ReadingHistoryItem } from './library'
 export type { ReaderDevice } from './devices'
+export type { ReaderNotification, ReaderNotificationType } from './notifications'
 
 // các page và hook chỉ cần import readerApi như trước
 export const readerApi = {
@@ -28,4 +31,5 @@ export const readerApi = {
   ...libraryApi,
   ...commentsApi,
   ...devicesApi,
+  ...notificationsApi,
 }

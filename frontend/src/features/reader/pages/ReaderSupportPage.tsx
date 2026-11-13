@@ -1,6 +1,7 @@
 // Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form Huy `/payment-complaints`.
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { mockStore } from '@/mocks/store'
 import { complaintApi } from '@/features/finance/api/payment'
 import type { PaymentComplaint } from '@/features/finance/types'
 import { formatCurrency, formatDateTime } from '@/lib/format'
@@ -14,6 +15,8 @@ import { ComplaintStatusBadge } from '@/features/finance/pages/ComplaintQueuePag
 // form gửi khiếu nại nằm ở trang /payment-complaints của SV4, trang này chỉ liệt kê và dẫn sang đó
 export function ReaderSupportPage() {
   const navigate = useNavigate()
+  // email của tài khoản đang đăng nhập (giống trang Hồ sơ: lấy từ phiên)
+  const email = mockStore.getCurrentUser().email
   const [items, setItems] = useState<PaymentComplaint[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -54,6 +57,13 @@ export function ReaderSupportPage() {
           Xem lịch sử giao dịch
         </Button>
       </div>
+
+      {/* kết quả hoàn tiền: luôn có trong mục Thông báo, email chỉ là kênh phụ */}
+      <p className="text-xs text-stone-600">
+        Khi kế toán xử lý xong, kết quả hoàn tiền sẽ hiện trong mục{' '}
+        <Link to="/account/notifications" className="font-medium text-primary-900 hover:underline">Thông báo</Link>
+        {email ? <> và được báo qua email <span className="font-medium text-stone-900">{email}</span></> : null}.
+      </p>
 
       {loadError ? (
         <EmptyState
