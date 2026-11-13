@@ -5,6 +5,7 @@ import com.localpress.identity.dto.RegisterReaderRequest;
 import com.localpress.identity.dto.RegisterReaderResponse;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.repository.UserRepository;
+import com.localpress.identity.util.VnPhone;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package com.localpress.identity.service;
+package com.localpress.identity.util;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;

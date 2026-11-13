@@ -1,21 +1,29 @@
 package com.localpress.identity.service;
 
+import com.localpress.identity.dto.CurrentUserResponse;
+import com.localpress.identity.repository.UserProfileRepository;
+import com.localpress.identity.util.VnPhone;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.sql.SQLException;
 
-// sửa họ tên và số điện thoại của đúng tài khoản đang đăng nhập
+// đọc và sửa họ tên, số điện thoại của đúng tài khoản đang đăng nhập
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
 
-    private final JdbcTemplate jdbc;
+    private final UserProfileRepository profiles;
+
+    @Transactional(readOnly = true)
+    public CurrentUserResponse getCurrent(String email) {
+        return profiles.findActiveByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin tài khoản"));
+    }
 
     @Transactional
     public void update(String email, String fullName, String phone) {
@@ -27,26 +35,15 @@ public class ProfileService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Họ tên tối đa 150 ký tự");
         }
         String normalizedPhone = VnPhone.normalizeOrNull(phone);
-        if (normalizedPhone != null) {
-            Integer taken = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM users WHERE phone = ? AND email <> ?",
-                    Integer.class,
-                    normalizedPhone,
-                    email);
-            if (taken != null && taken > 0) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Số điện thoại đã được sử dụng");
-            }
+        if (normalizedPhone != null && profiles.isPhoneUsedByAnother(normalizedPhone, email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Số điện thoại đã được sử dụng");
         }
         try {
-            int updated = jdbc.update(
-                    "UPDATE users SET full_name = ?, phone = ? WHERE email = ? AND status = 'ACTIVE'",
-                    name,
-                    normalizedPhone,
-                    email);
-            if (updated == 0) {
+            if (profiles.updateNameAndPhone(email, name, normalizedPhone) == 0) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin tài khoản");
             }
         } catch (DataIntegrityViolationException exception) {
+            // hai người lưu cùng một số điện thoại cùng lúc: mã lỗi MySQL 1062 là trùng khóa unique
             Throwable cause = exception.getMostSpecificCause();
             if (cause instanceof SQLException sql && sql.getErrorCode() == 1062) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Số điện thoại đã được sử dụng");
