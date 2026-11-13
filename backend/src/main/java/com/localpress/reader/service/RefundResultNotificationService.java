@@ -64,7 +64,7 @@ public class RefundResultNotificationService {
             content.append(" Quyền đọc của đơn này đã kết thúc.");
         }
         if (hasText(event.getReason())) {
-            content.append(" Lý do: ").append(event.getReason().trim());
+            content.append(" Lý do: ").append(sentence(event.getReason()));
         }
         notifyReader(event.getUserId(), ReaderNotificationRepository.TYPE_REFUND_COMPLETED,
                 "Đã hoàn tiền " + money(event.getRefundAmount()), content.toString(),
@@ -79,7 +79,7 @@ public class RefundResultNotificationService {
         StringBuilder content = new StringBuilder("Yêu cầu hoàn ")
                 .append(money(event.getRefundAmount())).append(" cho ").append(order).append(" không được duyệt.");
         if (hasText(event.getReviewNotes())) {
-            content.append(" Ghi chú của kế toán: ").append(event.getReviewNotes().trim());
+            content.append(" Ghi chú của kế toán: ").append(sentence(event.getReviewNotes()));
         }
         content.append(" Nếu cần, bạn có thể gửi khiếu nại mới ở trang Hỗ trợ.");
         notifyReader(event.getUserId(), ReaderNotificationRepository.TYPE_REFUND_REJECTED,
@@ -128,6 +128,12 @@ public class RefundResultNotificationService {
     static String money(BigDecimal amount) {
         NumberFormat format = NumberFormat.getIntegerInstance(Locale.forLanguageTag("vi-VN"));
         return format.format(amount == null ? BigDecimal.ZERO : amount) + " ₫";
+    }
+
+    // thêm dấu chấm cuối câu nếu kế toán chưa gõ, để câu sau không dính vào
+    static String sentence(String text) {
+        String value = text.trim();
+        return value.matches(".*[.!?…]$") ? value : value + ".";
     }
 
     private static boolean hasText(String value) {

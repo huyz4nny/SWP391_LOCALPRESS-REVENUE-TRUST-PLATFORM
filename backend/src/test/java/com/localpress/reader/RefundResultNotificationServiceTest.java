@@ -75,7 +75,8 @@ class RefundResultNotificationServiceTest {
         verify(repository).insertInApp(eq(7L), eq(ReaderNotificationRepository.TYPE_REFUND_REJECTED),
                 eq("Yêu cầu hoàn tiền không được duyệt"), content.capture(), anyString(), eq("REFUND_REJECTED:6"));
         assertTrue(content.getValue().contains("99.000 ₫"));
-        assertTrue(content.getValue().contains("Đã đọc quá 50% kỳ"));
+        // ghi chú không có dấu chấm thì được thêm vào, câu sau không bị dính
+        assertTrue(content.getValue().contains("Đã đọc quá 50% kỳ. Nếu cần"));
     }
 
     @Test
