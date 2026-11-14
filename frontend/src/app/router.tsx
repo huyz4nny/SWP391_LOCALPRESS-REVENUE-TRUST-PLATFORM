@@ -20,7 +20,6 @@ import {
   ArticleDetailPage,
   SearchPage,
   PremiumPlansPage,
-  PaymentResultPage,
   ReaderAccountPage,
   ReaderLibraryPage,
   ReaderBookmarksPage,
@@ -29,6 +28,7 @@ import {
   ReaderSubscriptionPage,
   ReaderOrdersPage,
   ReaderDevicesPage,
+  ReaderNotificationsPage,
   ReaderSupportPage,
 } from '@/features/reader'
 
@@ -146,7 +146,6 @@ export const router = createBrowserRouter([
       // Trang thanh toán chung QR SePay (SV4)
       { path: 'payment/:orderCode', element: <PaymentPage /> },
       { path: 'payment-complaints', element: <PaymentComplaintPage /> },
-      { path: 'payments/:paymentId', element: <PaymentResultPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
@@ -168,6 +167,7 @@ export const router = createBrowserRouter([
       { path: 'orders', element: <ReaderOrdersPage /> },
       { path: 'devices', element: <ReaderDevicesPage /> },
       { path: 'support', element: <ReaderSupportPage /> },
+      { path: 'notifications', element: <ReaderNotificationsPage /> },
     ],
   },
 

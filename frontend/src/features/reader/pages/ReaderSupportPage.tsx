@@ -1,24 +1,22 @@
 // Tác dụng: trang `/account/support` (UC046) — list khiếu nại của tôi, nút sang form `/payment-complaints`.
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { mockStore } from '@/mocks/store'
 import { complaintApi } from '@/features/finance/api/payment'
 import type { PaymentComplaint } from '@/features/finance/types'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { HelpCircle } from 'lucide-react'
-
-function statusLabel(status: PaymentComplaint['status']) {
-  if (status === 'OPEN') return <Badge variant="warning">Chờ đối soát</Badge>
-  if (status === 'RESOLVED') return <Badge variant="success">Đã ghi nhận</Badge>
-  return <Badge variant="destructive">Từ chối</Badge>
-}
+// dùng chung badge trạng thái khiếu nại với trang của SV4 để chữ và màu giống nhau ở mọi màn hình
+import { ComplaintStatusBadge } from '@/features/finance/pages/ComplaintQueuePage'
 
 // UC046 danh sách khiếu nại thanh toán của độc giả ở màn hình II.3.10
 // form gửi khiếu nại nằm ở trang /payment-complaints của SV4, trang này chỉ liệt kê và dẫn sang đó
 export function ReaderSupportPage() {
   const navigate = useNavigate()
+  // email của tài khoản đang đăng nhập (giống trang Hồ sơ: lấy từ phiên)
+  const email = mockStore.getCurrentUser().email
   const [items, setItems] = useState<PaymentComplaint[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -46,7 +44,7 @@ export function ReaderSupportPage() {
       <div>
         <h2 className="font-serif text-2xl font-bold text-stone-900">Hỗ trợ thanh toán</h2>
         <p className="text-xs text-stone-500 mt-1">
-          Khi đã chuyển tiền mà đơn hoặc ví chưa được ghi nhận, gửi khiếu nại để kế toán đối chiếu sao kê. Không chuyển tiền lại.
+          Khi đã chuyển tiền mà đơn chưa được ghi nhận, gửi khiếu nại để kế toán đối chiếu sao kê. Không chuyển tiền lại.
         </p>
       </div>
 
@@ -59,6 +57,13 @@ export function ReaderSupportPage() {
           Xem lịch sử giao dịch
         </Button>
       </div>
+
+      {/* kết quả hoàn tiền: luôn có trong mục Thông báo, email chỉ là kênh phụ */}
+      <p className="text-xs text-stone-600">
+        Khi kế toán xử lý xong, kết quả hoàn tiền sẽ hiện trong mục{' '}
+        <Link to="/account/notifications" className="font-medium text-primary-900 hover:underline">Thông báo</Link>
+        {email ? <> và được báo qua email <span className="font-medium text-stone-900">{email}</span></> : null}.
+      </p>
 
       {loadError ? (
         <EmptyState
@@ -85,7 +90,7 @@ export function ReaderSupportPage() {
             <li key={c.complaintId} className="px-4 py-3 space-y-1">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold num">{formatCurrency(c.amount)}</span>
-                {statusLabel(c.status)}
+                <ComplaintStatusBadge status={c.status} />
               </div>
               <div className="text-xs text-slate-500">
                 <span className="font-mono">{c.bankReference}</span>

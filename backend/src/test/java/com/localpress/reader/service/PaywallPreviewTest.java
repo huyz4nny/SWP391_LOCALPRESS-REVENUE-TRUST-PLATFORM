@@ -1,7 +1,7 @@
-package com.localpress.delivery.service;
+package com.localpress.reader.service;
 
 import com.localpress.administration.service.PaywallPolicyService;
-import com.localpress.delivery.repository.ContentAccessRepository;
+import com.localpress.reader.repository.ContentAccessRepository;
 import com.localpress.identity.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

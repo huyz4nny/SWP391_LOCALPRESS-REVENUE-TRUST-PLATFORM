@@ -40,7 +40,6 @@ export function PremiumPlansPage() {
       navigate(paymentPath({ orderCode: target.orderCode }), { state: { returnUrl: '/account/subscription' } })
     } catch (err) {
       // hiện lý do lỗi cho khách thay vì chỉ ghi console
-      console.error(err)
       setError(err instanceof Error ? err.message : 'Không thể tạo đơn đăng ký gói, vui lòng thử lại')
     } finally {
       setLoadingPlanId(null)
@@ -116,7 +115,7 @@ export function PremiumPlansPage() {
                     </span>
                   </div>
                   <div className={`text-[11px] mt-1 ${isPopular ? 'text-amber-300' : 'text-stone-400'}`}>
-                    ~ {Math.round(plan.price / plan.durationDays).toLocaleString()} ₫ mỗi ngày
+                    ~ {formatCurrency(Math.round(plan.price / plan.durationDays))} mỗi ngày
                   </div>
                 </div>
 

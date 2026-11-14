@@ -18,10 +18,11 @@ import java.util.Map;
         ReaderPurchaseController.class,
         ReaderLibraryController.class,
         ReaderFollowController.class,
-        ReaderCommentWriteController.class,
+        ReaderCommentController.class,
         ReaderSubscriptionController.class,
         ReaderArticleReportController.class,
-        ReaderDeviceController.class
+        ReaderDeviceController.class,
+        ReaderNotificationController.class
 })
 public class ReaderPurchaseExceptionHandler {
 

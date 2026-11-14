@@ -2,7 +2,8 @@ package com.localpress.identity;
 
 import com.localpress.identity.controller.AuthController;
 import com.localpress.identity.controller.GoogleLoginController;
-import com.localpress.identity.controller.GoogleLoginExceptionHandler;
+import com.localpress.identity.controller.IdentityExceptionHandler;
+import com.localpress.identity.repository.UserProfileRepository;
 import com.localpress.identity.dto.LoginResponse;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.service.*;
@@ -42,14 +43,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "localpress.google.client-id=test-client",
         "localpress.jwt.secret=test-signing-key-at-least-32-bytes-long"
 })
-@Import({SecurityConfig.class, GoogleLoginNonceService.class, GoogleLoginExceptionHandler.class,
+@Import({SecurityConfig.class, GoogleLoginNonceService.class, IdentityExceptionHandler.class,
+        ProfileService.class, UserProfileRepository.class,
         GoogleLoginSecurityTest.WebhookProbeController.class})
 class GoogleLoginSecurityTest {
     @Autowired MockMvc mvc;
     @Autowired JwtTokenService tokens;
     @Autowired PasswordEncoder passwords;
     @MockBean GoogleLoginService login;
-    @MockBean ProfileService profileService;
     @MockBean JdbcTemplate jdbc;
     @MockBean DeviceSessionService devices;
     ResultSet account;

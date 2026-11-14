@@ -1,5 +1,5 @@
-// package domain của reader chứa entity ánh xạ bảng trong database
-package com.localpress.reader.domain;
+// package entity của reader chứa entity ánh xạ bảng trong database (chỉ đọc)
+package com.localpress.reader.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

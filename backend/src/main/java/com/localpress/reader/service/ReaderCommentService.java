@@ -16,11 +16,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// UC041 gửi và sửa bình luận, UC042 báo cáo bình luận đang hiển thị
+// UC031 xem bình luận đã duyệt, UC041 gửi và sửa bình luận, UC042 báo cáo bình luận đang hiển thị
 // status luôn về PENDING, moderated_by để nguyên cho tòa soạn
 @Service
 @RequiredArgsConstructor
-public class ReaderCommentWriteService {
+public class ReaderCommentService {
 
     static final int MAX_CONTENT = 1000;
     static final int MAX_REASON = 500;
@@ -55,6 +55,12 @@ public class ReaderCommentWriteService {
         }
         return repository.findResponse(commentId)
                 .orElseThrow(() -> new IllegalStateException("Không đọc lại được bình luận vừa sửa"));
+    }
+
+    // danh sách công khai cho khách và độc giả, không cần đăng nhập
+    @Transactional(readOnly = true)
+    public List<ReaderCommentResponse> listApproved(Long articleId) {
+        return repository.findApprovedByArticle(articleId);
     }
 
     @Transactional(readOnly = true)

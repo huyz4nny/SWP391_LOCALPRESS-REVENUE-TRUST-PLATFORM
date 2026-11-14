@@ -1,58 +1,64 @@
-// package controller của reader nhận request http từ frontend
 package com.localpress.reader.controller;
 
+import com.localpress.reader.dto.CommentContentRequest;
 import com.localpress.reader.dto.ReaderCommentResponse;
+import com.localpress.reader.dto.ReportCommentRequest;
+import com.localpress.reader.dto.ReportCommentResponse;
+import com.localpress.reader.dto.UpdateCommentRequest;
+import com.localpress.reader.service.ReaderCommentService;
+import com.localpress.reader.service.ReaderCurrentUser;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-// class này là api xem bình luận công khai của bài viết phục vụ UC031 ở màn hình II.3.2 phần cuối bài
-// chỉ trả bình luận đã duyệt (rule 12) và route /api/v1/comments đã mở permitAll cho khách
-// luồng đi là frontend CommentSection gọi vào đây -> JdbcTemplate query thẳng bảng comments và users -> trả list về frontend
+// API bình luận của độc giả (màn hình II.3.2 và II.3.7)
+//   - UC031: GET /api/v1/comments/article/{id} công khai cho khách (permitAll), chỉ trả bình luận APPROVED
+//   - UC041: gửi, sửa bình luận của mình (sửa xong quay về PENDING, rule 12)
+//   - UC042: báo cáo bình luận vi phạm
+// các API ghi nằm dưới /api/v1/reader/** nên bắt buộc đăng nhập
+// luồng đi: frontend CommentSection -> controller này -> ReaderCommentService -> ReaderCommentRepository
 @RestController
-@RequestMapping("/api/v1/comments")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class ReaderCommentController {
 
-    // dùng JdbcTemplate viết sql trực tiếp cho gọn vì chỉ cần đọc danh sách
-    private final JdbcTemplate jdbc;
+    private final ReaderCommentService commentService;
+    private final ReaderCurrentUser readerCurrentUser;
 
-    // block lấy danh sách bình luận đã duyệt theo id bài viết
-    // join users để lấy tên và avatar người bình luận
-    // lọc status APPROVED nên bình luận PENDING REJECTED HIDDEN không bao giờ lọt ra ngoài
-    // sắp xếp created_at tăng dần để bình luận cũ nằm trên
-    @GetMapping("/article/{articleId}")
+    @GetMapping("/comments/article/{articleId}")
     public List<ReaderCommentResponse> listApprovedByArticle(@PathVariable Long articleId) {
-        return jdbc.query(
-                """
-                SELECT c.comment_id, c.article_id, c.user_id, u.full_name, u.avatar_url,
-                       c.content, c.status, c.created_at
-                FROM comments c
-                JOIN users u ON u.user_id = c.user_id
-                WHERE c.article_id = ? AND c.status = 'APPROVED'
-                ORDER BY c.created_at ASC
-                """,
-                // mỗi dòng kết quả được đổi thành một ReaderCommentResponse để trả ra json
-                (rs, row) -> ReaderCommentResponse.builder()
-                        .id(rs.getLong("comment_id"))
-                        .articleId(rs.getLong("article_id"))
-                        .userId(rs.getLong("user_id"))
-                        .userName(rs.getString("full_name"))
-                        .userAvatar(rs.getString("avatar_url"))
-                        .content(rs.getString("content"))
-                        .status(rs.getString("status"))
-                        // nếu created_at null thì để null còn không thì đổi sang chuỗi để frontend hiển thị
-                        .createdAt(rs.getTimestamp("created_at") != null
-                                ? rs.getTimestamp("created_at").toLocalDateTime().toString()
-                                : null)
-                        .build(),
-                // tham số này gắn vào dấu ? đầu tiên trong câu sql
-                articleId
-        );
+        return commentService.listApproved(articleId);
+    }
+
+    @PostMapping("/reader/comments")
+    public ReaderCommentResponse post(@RequestBody CommentContentRequest request) {
+        Long userId = readerCurrentUser.requireUserId();
+        return commentService.post(userId, request.getArticleId(), request.getContent());
+    }
+
+    @PutMapping("/reader/comments/{commentId:\\d+}")
+    public ReaderCommentResponse edit(@PathVariable Long commentId, @RequestBody UpdateCommentRequest request) {
+        Long userId = readerCurrentUser.requireUserId();
+        return commentService.edit(userId, commentId, request.getContent());
+    }
+
+    @GetMapping("/reader/comments/mine")
+    public List<ReaderCommentResponse> mine(@RequestParam(required = false) Long articleId) {
+        Long userId = readerCurrentUser.requireUserId();
+        return commentService.mine(userId, articleId);
+    }
+
+    @PostMapping("/reader/comments/{commentId:\\d+}/report")
+    public ReportCommentResponse report(@PathVariable Long commentId, @RequestBody ReportCommentRequest request) {
+        Long userId = readerCurrentUser.requireUserId();
+        return commentService.report(userId, commentId, request.getReason());
     }
 }

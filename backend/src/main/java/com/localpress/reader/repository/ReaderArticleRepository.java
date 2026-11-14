@@ -1,7 +1,7 @@
 // package repository của reader là lớp cuối cùng nói chuyện trực tiếp với database
 package com.localpress.reader.repository;
 
-import com.localpress.reader.domain.ArticleEntity;
+import com.localpress.reader.entity.ArticleEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
