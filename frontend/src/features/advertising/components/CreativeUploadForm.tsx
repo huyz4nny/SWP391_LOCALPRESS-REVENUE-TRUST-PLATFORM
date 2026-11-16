@@ -157,6 +157,7 @@ export function CreativeUploadForm({ campaign, onUploaded, replacement = false }
 
         {requestError && <p role="alert" className="text-xs text-red-700">{requestError}</p>}
         {message && <p role="status" className="text-xs font-semibold text-emerald-700">{message}</p>}
+        {/* [SV2_FLOW_QC_1] [BÊN ADV] Bấm nộp ma-két banner Creative (Upload Form) */}
         <div className="flex justify-end">
           <Button type="submit" size="sm" isLoading={isSubmitting} disabled={sizeMismatch || (replacement && campaign.creatives.some((c) => c.status === 'IN_REVIEW'))}>
             Gửi banner để tòa soạn duyệt

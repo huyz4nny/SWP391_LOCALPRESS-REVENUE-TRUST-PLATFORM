@@ -166,75 +166,109 @@
   <header class="header">
     <span class="badge">UML Activity Diagram • Phân hệ SV2</span>
     <h1>SƠ ĐỒ QUY TRÌNH (WORKFLOW) TÒA SOẠN</h1>
-    <p>Quy trình Vận hành Chiến dịch Quảng cáo & Kiểm duyệt Banner Creative theo đúng biểu mẫu Swimlane chuẩn (Advertiser &bull; Editor/Reviewer &bull; System/Platform).</p>
+    <p>Tổng hợp các Sơ đồ Phân làn (Swimlane Activity Diagrams) cốt lõi của SV2: Duyệt bài báo 4 mắt, Vận hành Chiến dịch Quảng cáo & Kiểm duyệt Banner Creative.</p>
   </header>
 
   <div class="container">
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('tab1')">1. Workflow Kiểm Duyệt Banner Creative (Khớp Form Mẫu 100%)</button>
-      <button class="tab-btn" onclick="switchTab('tab2')">2. Workflow Toàn Cảnh Chiến Dịch Quảng Cáo &amp; Gatekeeper 5 Cửa</button>
+      <button class="tab-btn active" onclick="switchTab('tab0')">⭐ Flow 2.1 — Duyệt Bài Báo &amp; 4 Mắt (Four-Eyes)</button>
+      <button class="tab-btn" onclick="switchTab('tab1')">⭐ Flow 2.2 — Vận Hành Chiến Dịch &amp; Gatekeeper 5 Cửa (Bảng 2)</button>
+      <button class="tab-btn" onclick="switchTab('tab2')">Flow 2.3 — Kiểm Duyệt Banner Creative (Rule 8)</button>
+      <button class="tab-btn" onclick="switchTab('tab3')">👑 Use Case Diagram (SV2 Editor Full)</button>
     </div>
 
-    <!-- TAB 1: WORKFLOW BANNER CREATIVE -->
-    <div id="tab1" class="tab-content active">
+    <!-- TAB 0: FLOW 2.1 ARTICLE EDITORIAL & FOUR-EYES -->
+    <div id="tab0" class="tab-content active">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <div>
-          <h2 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;">Quy trình Kiểm duyệt Banner &amp; Quản trị Phiên bản Creative (Rule 8)</h2>
-          <p style="font-size: 0.85rem; color: #64748b;">Được thiết kế chính xác theo cấu trúc Activity Diagram phân làn mẫu của bạn (bắt đầu bằng chấm tròn đen, rẽ nhánh duyệt/từ chối, nộp bản mới v+1, kết thúc bằng bullseye).</p>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;">FLOW 2.1 — CONTENT MANAGEMENT, EDITORIAL REVIEW &amp; FOUR-EYES PUBLICATION</h2>
+          <p style="font-size: 0.85rem; color: #64748b;">Quy trình Xuất bản Bài viết Báo chí, Kiểm soát Phiên bản và Thực thi Nguyên tắc 4 Mắt (Maker-Checker Four-Eyes Principle).</p>
         </div>
         <div class="action-bar">
-          <a href="/workflow_banner_creative.svg" target="_blank" download="workflow_banner_creative.svg" class="btn btn-primary">⬇ Tải file SVG Vector (Để dán vào Word/Slide)</a>
+          <a href="/workflow_article_editorial.svg" target="_blank" download="FLOW_2.1_ARTICLE_EDITORIAL_FOUR_EYES.svg" class="btn btn-primary">⬇ Tải file SVG Vector (Để dán vào Word/Slide)</a>
           <button onclick="window.print()" class="btn btn-outline">🖨 In sơ đồ</button>
         </div>
       </div>
 
       <div class="svg-wrapper">
-        <img src="/workflow_banner_creative.svg" alt="UML Activity Diagram - Banner Creative Workflow" />
+        <img src="/workflow_article_editorial.svg" alt="UML Activity Diagram - Flow 2.1 Article Editorial Review & Four-Eyes Publication" style="max-width: 100%; height: auto;" />
       </div>
 
       <div class="explanation-card">
-        <h3>Thuyết minh các bước trong quy trình Kiểm duyệt Banner Creative:</h3>
+        <h3>Thuyết minh các bước trong Flow 2.1 (Bài viết &amp; Nguyên tắc 4 Mắt):</h3>
         <ol>
-          <li><strong>Bắt đầu (Start Node - Advertiser Lane):</strong> Doanh nghiệp tạo mẫu quảng cáo banner (`Create Banner Creative`), chuẩn bị file ảnh (JPEG/PNG đúng kích thước vị trí như 970x250px hoặc 300x600px) và link đích (`landingPageUrl`).</li>
-          <li><strong>Nộp phiên bản Creative (`Submit Creative Version`):</strong> Bản thiết kế đầu tiên được gắn mã phiên bản `v1.0`, trạng thái chuyển từ `DRAFT` sang `SUBMITTED`, tự động xếp vào hàng đợi kiểm duyệt của Tòa soạn.</li>
-          <li><strong>Tòa soạn tiếp nhận &amp; Thẩm định kỹ thuật (`Review Creative Asset - Reviewer Lane`):</strong> Ban biên tập kiểm tra 3 yếu tố: Kích thước pixel thực tế $\leftrightarrow$ Tiêu chuẩn vị trí slot; Nội dung hình ảnh &amp; thông điệp quảng cáo có vi phạm pháp luật/thuần phong mỹ tục; Tính an toàn của Landing page URL (không chứa mã độc/lừa đảo).</li>
-          <li><strong>Nút rẽ nhánh quyết định (`Approved?`):</strong>
+          <li><strong>Làn AUTHOR (Phóng viên / Tác giả soạn bài - SV5):</strong>
             <ul>
-              <li><strong>Nhánh `No` (Từ chối):</strong> Tòa soạn bấm nút <em>"Từ chối"</em>, nhập rõ phản hồi kỹ thuật (`Provide Rejection Feedback`). Quy trình quay ngược lên làn Advertiser: Khách hàng tiến hành chỉnh sửa thiết kế (`Revise Creative Version`), hệ thống tự động sinh phiên bản mới `v+1` (ví dụ `v2.0`) và nộp lại vào hàng đợi duyệt.</li>
-              <li><strong>Nhánh `Yes` (Phê duyệt):</strong> Tòa soạn bấm nút <em>"Chấp thuận &amp; Cấp phép phát sóng"</em> (`Approve Creative Version`), trạng thái creative chuyển sang `APPROVED`.</li>
+              <li><strong>Khởi tạo:</strong> Bắt đầu bằng <em>Start Node</em> (chấm tròn đen) &rarr; Soạn thảo bản thảo bài viết (`Create / edit draft`), phân chuyên mục, tạo đường dẫn tĩnh (`slug`), quản lý ảnh bìa.</li>
+              <li><strong>Đề xuất gói truy cập:</strong> Chọn loại bài (Miễn phí `FREE` hoặc Trả phí `PREMIUM`) kèm giá đọc lẻ (`singlePrice`).</li>
+              <li><strong>Nộp thẩm định:</strong> Xem trước và bấm "Nộp duyệt về Tòa soạn" (`Preview and submit version v1`). Bản thảo được chuyển trạng thái sang `SUBMITTED`. <em>(Phóng viên chỉ dừng lại ở bước nộp bài, tuyệt đối không có quyền tự ý xuất bản).</em></li>
+              <li><strong>Vòng lặp sửa bài:</strong> Nếu bị Tòa soạn trả về yêu cầu sửa, tác giả đọc nhận xét góp ý (`Read feedback notes`), tiến hành cập nhật bản thảo phiên bản mới `v+1` và nộp lại vào hàng đợi duyệt.</li>
             </ul>
           </li>
-          <li><strong>Cơ chế Chuyển đổi phát sóng trực tiếp <span class="rule-badge">Rule 8 Serving Switch</span>:</strong> Nếu chiến dịch đã có một bản banner cũ đang chạy trên báo, hệ thống tự động gán cờ `isActiveServing = true` cho bản mới này, đồng thời thu hồi cờ của bản cũ đưa vào kho lưu trữ (`ARCHIVED`). Điều này đảm bảo banner mới được thay thế tức thì, 0 giây downtime, không bao giờ bị lỗi ảnh hỏng trên trang báo.</li>
-          <li><strong>Hệ thống phân phối &amp; Giám sát (`System / Platform Lane`):</strong> Nền tảng phát sóng nhận lệnh, đưa banner lên đúng vị trí hiển thị trên trang báo công khai, đồng thời kích hoạt động cơ đo lường lượt hiển thị (`Impression`), lượt click và tỷ lệ chiếm dụng SOV.</li>
-          <li><strong>Kết thúc (End Node - Bullseye):</strong> Hoàn tất 1 chu trình kiểm duyệt banner.</li>
+          <li><strong>Làn EDITOR (Biên tập viên Tòa soạn - SV2 Trọng Phan):</strong>
+            <ul>
+              <li><strong>Tiếp nhận thẩm định:</strong> Mở hàng đợi danh sách bài chờ duyệt (`ArticleListPage.tsx`), xem chi tiết nội dung và lịch sử thay đổi qua các phiên bản.</li>
+              <li><strong>Cửa ngõ Nguyên tắc 4 mắt (Gatekeeper Self Article?):</strong> Hệ thống kiểm tra ID tác giả với ID biên tập viên hiện tại (`isSelfArticle = article.authorId === editorUserId`):
+                <ul>
+                  <li><strong>Nhánh "Yes" (Bài do chính BTV viết - Maker):</strong> Khóa hoàn toàn nút "Duyệt" và "Yêu cầu sửa", hiển thị nhãn màu vàng <span class="rule-badge">🕒 Chờ BTV khác duyệt</span>. Ném lỗi `403 FORBIDDEN` nếu cố tình tự duyệt; bài bắt buộc phải chờ BTV độc lập khác vào duyệt.</li>
+                  <li><strong>Nhánh "No" (BTV thẩm định độc lập / Checker):</strong> Tiến hành thẩm định chuyên môn về tính chính xác, đạo đức báo chí, bản quyền và chính sách giá.</li>
+                </ul>
+              </li>
+              <li><strong>Rẽ nhánh Quyết định (Approved?):</strong>
+                <ul>
+                  <li><strong>Nhánh "No" (Yêu cầu sửa):</strong> Nhập ghi chú hướng dẫn sửa (`reviewNotes`), chuyển trạng thái sang `CHANGES_REQUESTED`, gửi trả lại làn Author.</li>
+                  <li><strong>Nhánh "Yes" (Phê duyệt):</strong> Xác nhận phiên bản đạt chuẩn (`APPROVED`).</li>
+                </ul>
+              </li>
+              <li><strong>Đặc quyền Xuất bản báo điện tử:</strong> Chỉ duy nhất Biên tập viên tòa soạn mới có quyền bấm nút màu xanh <span class="rule-badge" style="background:#059669;">Xuất bản ngay</span> (`PUBLISHED`) để đưa bài báo chính thức lên trang tin công khai!</li>
+            </ul>
+          </li>
+          <li><strong>Làn SYSTEM PLATFORM (Nền tảng hệ thống LocalPress):</strong>
+            <ul>
+              <li>Xác thực tính toàn vẹn dữ liệu, kiểm tra tính duy nhất của `slug`, nạp bài viết vào hàng đợi duyệt với trạng thái `SUBMITTED`.</li>
+              <li>Tự động tăng số phiên bản `version_number` trong bảng `article_versions`.</li>
+              <li>Ghi nhận biên tập viên duyệt (`reviewed_by`), thời gian duyệt (`reviewed_at`), gán trạng thái chính thức là <strong>`PUBLISHED`</strong> và kích hoạt phát hành lên trang báo điện tử.</li>
+              <li><strong>Kết thúc chu trình (Bullseye):</strong> Chấm tròn mắt bò xác nhận bài viết đã lên báo thành công, kết thúc toàn bộ luồng thẩm định &amp; xuất bản của Tòa soạn.</li>
+            </ul>
+          </li>
         </ol>
       </div>
     </div>
 
-    <!-- TAB 2: WORKFLOW CHIẾN DỊCH QUẢNG CÁO TOÀN CẢNH -->
-    <div id="tab2" class="tab-content">
+    <!-- TAB 1: FLOW 2.2 ADVERTISING CAMPAIGN & GATEKEEPER (BẢNG 2) -->
+    <div id="tab1" class="tab-content">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <div>
-          <h2 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;">Quy trình Toàn cảnh Chiến dịch Quảng cáo &amp; Thẩm định Gatekeeper 5 Cửa (Rule 9)</h2>
-          <p style="font-size: 0.85rem; color: #64748b;">Mô tả vòng đời khép kín từ khâu Đặt chỗ (Booking) &bull; Lịch tồn kho Rule 7 &bull; Báo giá &bull; Ký hợp đồng &bull; Thẩm định Gatekeeper 5 Cửa &bull; Kích hoạt LIVE &bull; Điều khiển khẩn cấp Kill-Switch.</p>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;">FLOW 2.2 — ADVERTISING CAMPAIGN OPERATIONS &amp; GATEKEEPER AUDIT (BẢNG 2)</h2>
+          <p style="font-size: 0.85rem; color: #64748b;">Quy trình Vận hành Chiến dịch Quảng cáo B2B: Đặt chỗ (Booking) &bull; Lịch tồn kho Rule 7 &bull; Thẩm định Gatekeeper 5 Cửa Rule 9 &bull; Kích hoạt phát sóng LIVE.</p>
         </div>
         <div class="action-bar">
-          <a href="/workflow_advertising_campaign.svg" target="_blank" download="workflow_advertising_campaign.svg" class="btn btn-primary">⬇ Tải file SVG Vector (Để dán vào Word/Slide)</a>
+          <a href="/workflow_advertising_campaign.svg" target="_blank" download="FLOW_2.2_ADVERTISING_CAMPAIGN_GATEKEEPER.svg" class="btn btn-primary">⬇ Tải file SVG Vector (Để dán vào Word/Slide)</a>
           <button onclick="window.print()" class="btn btn-outline">🖨 In sơ đồ</button>
         </div>
       </div>
 
       <div class="svg-wrapper">
-        <img src="/workflow_advertising_campaign.svg" alt="UML Activity Diagram - Advertising Campaign Master Workflow" />
+        <img src="/workflow_advertising_campaign.svg" alt="UML Activity Diagram - Flow 2.2 Advertising Campaign Master Workflow" style="max-width: 100%; height: auto;" />
       </div>
 
       <div class="explanation-card">
-        <h3>Thuyết minh các bước trong quy trình Toàn cảnh Chiến dịch:</h3>
+        <h3>Thuyết minh các bước trong Flow 2.2 (Chiến dịch Quảng cáo &amp; Gatekeeper 5 Cửa):</h3>
         <ol>
           <li><strong>Booking quảng cáo (`Advertiser`):</strong> Doanh nghiệp chọn vị trí slot, khoảng ngày phát sóng, nhập thông tin liên hệ và bấm gửi booking (`SUBMITTED`).</li>
-          <li><strong>Kiểm soát Tồn kho &amp; Xung đột <span class="rule-badge">Rule 7 Inventory Check</span> (`Reviewer`):</strong> Tòa soạn tra cứu lịch slot trên Màn II.2.4. Nếu slot độc quyền (`EXCLUSIVE`) bị trùng ngày $\rightarrow$ <em>Từ chối (REJECTED)</em>. Nếu slot còn trống $\rightarrow$ <em>Gửi báo giá chính thức</em> kèm chiết khấu VIP (`QUOTED`).</li>
+          <li><strong>Kiểm soát Tồn kho &amp; Xung đột <span class="rule-badge">Rule 7 Inventory Check</span> (`Editor`):</strong> Tòa soạn tra cứu lịch slot trên Màn II.2.4:
+            <ul>
+              <li><strong>Nhánh `No` (Trùng lịch / Quá tải):</strong> Tòa soạn bấm nút <em>"Từ chối" (`Reject booking`)</em>, nhập rõ lý do xung đột (ví dụ: slot Top Leaderboard độc quyền đã có người bao trọn). Lúc này quy trình rẽ làm 2 nhánh hoàn chỉnh:
+                <ul>
+                  <li><em>Nhánh 1 (Đổi ngày/slot):</em> Mũi tên quay ngược lên làn Advertiser để khách hàng chọn lại ngày khác hoặc chuyển sang vị trí slot còn trống (`Revise dates / slot`).</li>
+                  <li><em>Nhánh 2 (Hủy booking):</em> Mũi tên bắn xuống System Platform để chuyển trạng thái sang `REJECTED`, gửi thông báo và kết thúc phiên đặt chỗ này (`Booking terminated` &bull; Bullseye ◎).</li>
+                </ul>
+              </li>
+              <li><strong>Nhánh `Yes` (Còn trống):</strong> Tòa soạn tiến hành gửi <em>Báo giá chính thức</em> kèm chiết khấu VIP (`Send official quote`).</li>
+            </ul>
+          </li>
           <li><strong>Ký hợp đồng &amp; Nộp Banner (`Advertiser`):</strong> Doanh nghiệp chấp nhận báo giá, hai bên ký kết hợp đồng kinh tế và doanh nghiệp nộp file banner lên hệ thống.</li>
-          <li><strong>Thẩm định 5 Cửa Tiên quyết <span class="rule-badge">Gatekeeper Rule 9</span> (`Reviewer`):</strong> Trước khi phát sóng, hệ thống chạy thuật toán Gatekeeper kiểm tra đủ 5 điều kiện cốt lõi:
+          <li><strong>Thẩm định 5 Cửa Tiên quyết <span class="rule-badge">Gatekeeper Rule 9</span> (`Editor`):</strong> Trước khi phát sóng, hệ thống chạy thuật toán Gatekeeper kiểm tra đủ 5 điều kiện cốt lõi:
             <ul>
               <li>1. 💳 <strong>Payment:</strong> Đã thu tiền / cọc hợp lệ.</li>
               <li>2. 📝 <strong>Quote:</strong> Đã chốt báo giá chính thức.</li>
@@ -243,10 +277,98 @@
               <li>5. 📅 <strong>Slot:</strong> Lịch tồn kho không bị quá tải hay xung đột.</li>
             </ul>
           </li>
-          <li><strong>Kích hoạt LIVE &amp; Phát sóng (`Reviewer &rarr; System`):</strong> Khi 5/5 điều kiện đạt (`overallEligible = true`), Tòa soạn bấm nút <strong>"Kích hoạt phát sóng (LIVE)"</strong>. Hệ thống chuyển trạng thái chiến dịch sang `ACTIVE`, tự động đưa banner lên trang chủ báo điện tử.</li>
+          <li><strong>Kích hoạt LIVE &amp; Phát sóng (`Editor &rarr; System`):</strong> Khi 5/5 điều kiện đạt (`overallEligible = true`), Tòa soạn bấm nút <strong>"Kích hoạt phát sóng (LIVE)"</strong>. Hệ thống chuyển trạng thái chiến dịch sang `ACTIVE`, tự động đưa banner lên trang chủ báo điện tử.</li>
           <li><strong>Công tắc dừng khẩn cấp &amp; Bù ngày <span class="rule-badge">Rule 10 Kill-Switch &amp; Make-Good</span> (`System`):</strong> Trong thời gian phát sóng, nếu phát hiện sự cố pháp lý hoặc vi phạm nội dung, Tòa soạn kích hoạt <em>Kill-Switch (SUSPEND)</em> để hạ banner trong 1 giây. Khi sự cố khắc phục xong, chiến dịch được mở lại (RESUME) và cấp ngày bù phát sóng miễn phí (Make-Good).</li>
-          <li><strong>Kết thúc (End Node):</strong> Chiến dịch hoàn thành toàn bộ thời lượng, tự động xuất báo cáo KPI và kết thúc luồng.</li>
+          <li><strong>Kết thúc (End Node - Bullseye):</strong> Chiến dịch hoàn thành toàn bộ thời lượng, tự động xuất báo cáo KPI và kết thúc luồng.</li>
         </ol>
+      </div>
+    </div>
+
+    <!-- TAB 2: WORKFLOW BANNER CREATIVE (FLOW 2.3) -->
+    <div id="tab2" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;">FLOW 2.3 — BANNER CREATIVE MODERATION &amp; SERVING SWITCH (RULE 8)</h2>
+          <p style="font-size: 0.85rem; color: #64748b;">Quy trình Kiểm duyệt Ma-két Banner Quảng cáo &amp; Cơ chế Hoán đổi Phát sóng Tức thì (Rule 8 Zero-Downtime Serving Switch).</p>
+        </div>
+        <div class="action-bar">
+          <a href="/workflow_banner_creative.svg" target="_blank" download="workflow_banner_creative.svg" class="btn btn-primary">⬇ Tải file SVG Vector (Để dán vào Word/Slide)</a>
+          <button onclick="window.print()" class="btn btn-outline">🖨 In sơ đồ</button>
+        </div>
+      </div>
+
+      <div class="svg-wrapper">
+        <img src="/workflow_banner_creative.svg" alt="UML Activity Diagram - Banner Creative Workflow" style="max-width: 100%; height: auto;" />
+      </div>
+
+      <div class="explanation-card">
+        <h3>Thuyết minh các bước trong Flow 2.3 (Kiểm duyệt Banner Creative):</h3>
+        <ol>
+          <li><strong>Bắt đầu (Start Node - Advertiser Lane):</strong> Doanh nghiệp tạo mẫu quảng cáo banner (`Create Banner Creative`), chuẩn bị file ảnh và link đích (`landingPageUrl`).</li>
+          <li><strong>Nộp phiên bản Creative (`Submit Creative Version`):</strong> Bản thiết kế đầu tiên được gắn mã phiên bản `v1.0`, chuyển sang `SUBMITTED`, tự động xếp vào hàng đợi kiểm duyệt của Tòa soạn.</li>
+          <li><strong>Tòa soạn thẩm định kỹ thuật (`Review Creative Asset - Editor Lane`):</strong> Ban biên tập kiểm tra 3 yếu tố: Kích thước pixel $\leftrightarrow$ Slot tiêu chuẩn; Nội dung hình ảnh văn hóa &amp; đạo đức; Tính an toàn của Landing page URL.</li>
+          <li><strong>Rẽ nhánh quyết định (`Approved?`):</strong>
+            <ul>
+              <li><strong>Nhánh `No` (Từ chối):</strong> Nhập phản hồi kỹ thuật (`Provide Rejection Feedback`). Khách hàng chỉnh sửa (`Revise`), hệ thống tự sinh bản mới `v+1` và nộp lại.</li>
+              <li><strong>Nhánh `Yes` (Phê duyệt):</strong> Bấm nút <em>"Chấp thuận &amp; Cấp phép phát sóng"</em> (`APPROVED`).</li>
+            </ul>
+          </li>
+          <li><strong>Cơ chế Chuyển đổi phát sóng trực tiếp <span class="rule-badge">Rule 8 Serving Switch</span>:</strong> Tự động gán cờ `isActiveServing = true` cho bản mới này, đồng thời thu hồi bản cũ vào lưu trữ (`ARCHIVED`). Thay thế tức thì, 0 giây downtime.</li>
+          <li><strong>Kết thúc (End Node - Bullseye):</strong> Hoàn tất 1 chu trình kiểm duyệt banner.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- TAB 3: SV2 USE CASE DIAGRAM (FULL WORKFLOW) -->
+    <div id="tab3" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;">UML USE CASE DIAGRAM — TOÀN BỘ PHÂN HỆ BIÊN TẬP &amp; VẬN HÀNH (SV2)</h2>
+          <p style="font-size: 0.85rem; color: #64748b;">Mô hình hóa toàn bộ 14 Use Case (UC015 – UC028) của Actor Biên tập viên (EDITOR), liên kết chuẩn UML với 2 sơ đồ phân làn Swimlane.</p>
+        </div>
+        <div class="action-bar">
+          <a href="/use_case_diagram_sv2_editor.svg" target="_blank" download="USE_CASE_DIAGRAM_SV2_EDITOR.svg" class="btn btn-primary">⬇ Tải file SVG Vector (Để dán vào Word/Slide)</a>
+          <button onclick="window.print()" class="btn btn-outline">🖨 In sơ đồ</button>
+        </div>
+      </div>
+
+      <div class="svg-wrapper">
+        <img src="/use_case_diagram_sv2_editor.svg" alt="UML Use Case Diagram - SV2 Editorial & Operations Subsystem" style="max-width: 100%; height: auto;" />
+      </div>
+
+      <div class="explanation-card">
+        <h3>Thuyết minh Cấu trúc Use Case Diagram SV2 (Chuẩn Phạm Vi Độc Lập — Chỉ EDITOR &amp; SYSTEM):</h3>
+        <p style="font-size: 0.92rem; color: #475569; margin-bottom: 1rem;">
+          Sơ đồ tuân thủ chặt chẽ nguyên tắc bảo vệ đồ án chuyên sâu: <strong>chỉ xuất hiện Actor chính của SV2 là EDITOR</strong> và <strong>Actor kỹ thuật là SYSTEM</strong> (hoàn toàn không đưa các vai trò của SV khác vào để bảo đảm ranh giới trách nhiệm rõ ràng 100%).
+        </p>
+        
+        <h4 style="font-size: 1rem; color: #1e3a8a; margin-top: 1rem; margin-bottom: 0.5rem;">A. Mảng Quản Trị Nội Dung Báo Chí (Flow 2.1 — Content &amp; Editorial):</h4>
+        <ol>
+          <li><strong>UC015 (View Editorial &amp; Operations Dashboard):</strong> Xem bảng điều khiển trung tâm tòa soạn, theo dõi số lượng bài nộp, tỷ lệ xuất bản và hiệu suất duyệt bài.</li>
+          <li><strong>UC025 (Review &amp; Publish Articles - Four-Eyes Principle):</strong> Thẩm định chất lượng bài báo. Thực thi nguyên tắc 4 mắt (Maker-Checker): khóa tự duyệt bài của chính mình, chỉ cho phép BTV độc lập xuất bản. Phối hợp với SYSTEM để ghi nhận lịch sử duyệt và đẩy bài lên báo.</li>
+          <li><strong>UC026 (Moderate Reader Comments):</strong> Phê duyệt, ẩn hoặc gắn cờ bình luận độc giả vi phạm tiêu chuẩn cộng đồng.</li>
+          <li><strong>UC027 (Manage Article Policy - Free / Premium &amp; Price):</strong> Cấu hình chính sách bài viết (Miễn phí đọc hay Bài VIP trả phí) và định giá token lẻ.</li>
+          <li><strong>UC028 (Manage Subscription Membership Plans):</strong> Quản lý các gói thẻ hội viên (Tiêu chuẩn, Premium, VIP) theo chu kỳ tuần/tháng/năm.</li>
+        </ol>
+
+        <h4 style="font-size: 1rem; color: #1e3a8a; margin-top: 1.25rem; margin-bottom: 0.5rem;">B. Mảng Vận Hành Chiến Dịch &amp; Quảng Cáo B2B (Flow 2.2 — Ad Operations &amp; Gatekeeper):</h4>
+        <ol start="6">
+          <li><strong>UC016 (Process &amp; Reject Advertising Booking):</strong> Tiếp nhận yêu cầu đặt chỗ quảng cáo, đối soát thông tin khách hàng và từ chối kèm lý do xung đột nếu slot bị quá tải. Có quan hệ <code>&laquo;include&raquo;</code> với UC017.</li>
+          <li><strong>UC017 (Monitor Slot Inventory Calendar - Rule 7):</strong> Tra cứu ma trận lịch slot hiển thị theo ngày, kiểm soát xung đột Share of Voice và ngăn chặn overbooking (phối hợp với SYSTEM tính toán tồn kho).</li>
+          <li><strong>UC018 (Create &amp; Manage Quotation - VIP Discount):</strong> Tính toán bảng giá niêm yết, áp dụng mức chiết khấu đối tác VIP và phát hành báo giá chính thức.</li>
+          <li><strong>UC019 (Manage Contracts &amp; VIP Partner Tiering):</strong> Thẩm định hợp đồng pháp lý quảng cáo, đính kèm file scan hợp đồng và thiết lập hạng mức ưu đãi VIP.</li>
+          <li><strong>UC020 (Review Creative Asset - Specs &amp; Safety):</strong> Thẩm định kích thước pixel ma-két banner, kiểm tra nội dung và quét tính an toàn của Landing Page.</li>
+          <li><strong>UC021 (Approve or Reject Banner Creative):</strong> Phê duyệt hoặc từ chối cấp phép phát sóng banner. Có quan hệ <code>&laquo;include&raquo;</code> với UC020 (bắt buộc phải qua bước thẩm định kỹ thuật).</li>
+          <li><strong>UC022 (Review Creative Replacement &amp; Serving Switch - Rule 8):</strong> Tiếp nhận yêu cầu đổi banner đột xuất, duyệt ma-két mới và kích hoạt hoán đổi phát sóng 0-giây downtime.</li>
+          <li><strong>UC023 (Campaign Eligibility &amp; Gatekeeper 5-Door Audit - Rule 9):</strong> Thẩm định đủ 5 điều kiện tiên quyết (Payment + Quote + Contract + Creative + Slot) trước khi bấm Kích hoạt LIVE (phối hợp cùng SYSTEM tự động quét điều kiện).</li>
+          <li><strong>UC024 (Control Campaign Operations &amp; Kill-Switch - Rule 10):</strong> Quản trị chiến dịch đang phát sóng: kích hoạt công tắc khẩn cấp (Kill-Switch) khi có sự cố và phối hợp SYSTEM tự động cấp bù ngày phát sóng (Make-Good).</li>
+        </ol>
+
+        <h4 style="font-size: 1rem; color: #1e3a8a; margin-top: 1.25rem; margin-bottom: 0.5rem;">C. Vai Trò 2 Actor Trong Sơ Đồ:</h4>
+        <ul style="margin-left: 1.5rem; font-size: 0.92rem; color: #334155;">
+          <li><strong>EDITOR (Actor chính bên trái - Con người):</strong> Nắm toàn bộ quyền chủ động thực thi, duyệt, cấu hình và vận hành cả 14 Use Cases của Tòa soạn.</li>
+          <li><strong>SYSTEM (Actor phụ bên phải - Nền tảng tự động):</strong> Hỗ trợ tự động hóa trong các khâu: Kiểm soát nguyên tắc 4 mắt &amp; xuất bản (UC025), Tính toán ma trận slot tồn kho (UC017), Thuật toán Gatekeeper 5 cửa kiểm tra điều kiện phát sóng (UC023) và Watchdog giám sát dừng khẩn cấp / bù phát sóng (UC024).</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -255,12 +377,14 @@
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      if (tabId === 'tab1') {
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
-        document.getElementById('tab1').classList.add('active');
-      } else {
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
-        document.getElementById('tab2').classList.add('active');
+      const targetContent = document.getElementById(tabId);
+      if (targetContent) {
+        targetContent.classList.add('active');
+      }
+      const tabs = ['tab0', 'tab1', 'tab2', 'tab3'];
+      const idx = tabs.indexOf(tabId);
+      if (idx !== -1) {
+        document.querySelectorAll('.tab-btn')[idx].classList.add('active');
       }
     }
   </script>

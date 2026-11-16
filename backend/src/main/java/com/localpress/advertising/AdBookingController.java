@@ -91,6 +91,7 @@ public class AdBookingController {
         return bookings.createPayment(auth.getName(), id);
     }
 
+    // [SV2_FLOW_QC_3] [BACKEND] Tiếp nhận file banner, tạo bản ghi Creative version v1.0 (trạng thái SUBMITTED)
     @PostMapping(value = "/advertiser/campaigns/{id}/creatives", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AdCreativeService.Creative uploadCreative(Authentication auth, @PathVariable long id,
                                                      @RequestPart(value="file",required=false) MultipartFile file,

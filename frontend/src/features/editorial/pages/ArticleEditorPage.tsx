@@ -422,7 +422,8 @@ export function ArticleEditorPage() {
             </Button>
           )}
 
-          {/* Save Draft */}
+          {/* [SV2_FLOW_SOAN_BAI_2A] NHÁNH 1 - LƯU BẢN NHÁP: Gọi handleSave(false) -> Lưu bài với status = DRAFT
+              ==> MỐC 3: Mở file frontend/src/features/content/api/index.ts (Tìm [SV2_FLOW_SOAN_BAI_3]) */}
           <Button
             type="button"
             variant="outline"
@@ -435,7 +436,8 @@ export function ArticleEditorPage() {
             Lưu bản nháp
           </Button>
 
-          {/* Submit for Review */}
+          {/* [SV2_FLOW_SOAN_BAI_2B] NHÁNH 2 - LƯU VÀ TIẾP TỤC GỬI DUYỆT: Gọi handleSave(true) -> Lưu nháp rồi chuyển tiếp sang nộp duyệt
+              ==> MỐC 3: Mở file frontend/src/features/content/api/index.ts (Tìm [SV2_FLOW_SOAN_BAI_3]) */}
           <Button
             type="button"
             size="sm"

@@ -162,6 +162,9 @@ export function ArticleVersionDraftEditor({
         setConfirmSubmit(true)
     }
 
+    // [SV2_FLOW_SOAN_BAI_6] MỐC 6: Bấm "Gửi duyệt" -> Gọi contentApi.submitVersionForReview(articleId, versionNumber)
+    // -> Bắn POST /api/v1/articles/{articleId}/versions/{versionNumber}/submit
+    // ==> MỐC 7: Mở file ArticleVersionController.java (Tìm [SV2_FLOW_SOAN_BAI_7])
     async function submitForReview() {
         if (inFlight.current || isDirty || conflict || submitted || submissionUncertain) return
         inFlight.current = true

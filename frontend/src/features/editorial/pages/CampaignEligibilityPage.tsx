@@ -53,6 +53,7 @@ export const CampaignEligibilityPage: React.FC = () => {
     loadData()
   }, [])
 
+  // [SV2_FLOW_QC_6] [BÊN SV2 TÒA SOẠN] Thẩm định 5 cửa Gatekeeper & Bấm nút "Kích hoạt ngay (LIVE)" (UC023)
   const handleActivate = async (campaignId: number) => {
     try {
       setActivatingId(campaignId)

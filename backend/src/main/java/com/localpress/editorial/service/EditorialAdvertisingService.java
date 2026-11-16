@@ -368,6 +368,7 @@ public class EditorialAdvertisingService {
      * Chặn duyệt nếu campaign cha đã REJECTED hoặc COMPLETED.
      * Bắt buộc có lý do (notes) khi từ chối.
      */
+    // [SV2_FLOW_QC_5] [BACKEND SERVICE] Xử lý duyệt banner Creative (APPROVED / REJECTED)
     @Transactional
     public EditorialCreativeDto reviewCreative(Long creativeId, ReviewCreativeRequest request, String editorEmail) {
         if (!request.isApproved() && (request.getNotes() == null || request.getNotes().isBlank())) {
@@ -668,6 +669,7 @@ public class EditorialAdvertisingService {
     }
 
     /**
+     * [SV2_FLOW_QC_7] [BACKEND SERVICE] Thuật toán Gatekeeper 5 Cửa kiểm tra điều kiện & Chuyển chiến dịch sang ACTIVE
      * Kích hoạt phát sóng chiến dịch (LIVE) khi thỏa mãn toàn bộ 5 điều kiện (Rule 9).
      */
     @Transactional

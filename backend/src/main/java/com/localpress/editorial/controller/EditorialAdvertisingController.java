@@ -103,6 +103,7 @@ public class EditorialAdvertisingController {
     }
 
     /**
+     * [SV2_FLOW_QC_5] [BACKEND] Cập nhật trạng thái Banner Creative sang APPROVED
      * POST /api/v1/editorial/creatives/{id}/review-creative
      * Kiểm duyệt banner creative: Duyệt (APPROVED) hoặc Từ chối (REJECTED).
      */
@@ -135,6 +136,7 @@ public class EditorialAdvertisingController {
     }
 
     /**
+     * [SV2_FLOW_QC_7] [BACKEND] Thuật toán Gatekeeper 5 Cửa kiểm tra điều kiện & Kích hoạt chiến dịch sang ACTIVE
      * POST /api/v1/editorial/eligibility/{id}/activate
      * Kích hoạt phát sóng chiến dịch (LIVE).
      */
@@ -163,6 +165,7 @@ public class EditorialAdvertisingController {
     }
 
     /**
+     * [SV2_FLOW_QC_8] [BACKEND] Chuyển trạng thái chiến dịch sang SUSPENDED (Ngắt phát sóng banner)
      * POST /api/v1/editorial/campaign-control/{id}/suspend
      * Dừng khẩn cấp quảng cáo (Emergency Kill-Switch - UC024).
      */

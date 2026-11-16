@@ -117,6 +117,7 @@ public class EditorialArticleController {
     }
 
     /**
+     * [SV2_FLOW_DUYET_BAI_4] [BACKEND CONTROLLER] Endpoint tiếp nhận lệnh Duyệt (APPROVED), Yêu cầu sửa (CHANGES_REQUESTED), Xuất bản (PUBLISHED)
      * POST /api/v1/editorial/articles/{id}/status
      * Tổng biên tập / Biên tập viên (SV2) thực hiện:
      * - Duyệt bài (APPROVED)
@@ -126,6 +127,11 @@ public class EditorialArticleController {
      *
      * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
      */
+    // [SV2_FLOW_HA_BAI_3] KHI BẤM NÚT HẠ BÀI - MỐC 3 (BƯỚC 3): Backend Controller tiếp nhận request gỡ bài.
+    // -> Kiểm tra bảo mật: @PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN')") - chỉ cho phép BTV, chặn Phóng viên (AUTHOR).
+    // -> Trích xuất email BTV từ Authentication auth để phục vụ audit log.
+    // -> Chuyển giao tiếp cho ArticleReviewService xử lý nghiệp vụ.
+    // ==> MỐC 4: Mở file ArticleReviewService.java (Tìm [SV2_FLOW_HA_BAI_4] hoặc MỐC 4)
     @PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN')")
     @PostMapping("/{id}/status")
     public ResponseEntity<EditorialArticleDto> updateArticleStatus(

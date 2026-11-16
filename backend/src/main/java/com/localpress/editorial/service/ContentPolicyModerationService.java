@@ -67,6 +67,8 @@ public class ContentPolicyModerationService {
     // =========================================================================
 
     /**
+     * [SV2_FLOW_BL_7] [BACKEND SERVICE] Xử lý LỌC danh sách bình luận từ Database theo status
+     * Khi bấm PENDING -> lọc PENDING; bấm APPROVED -> lọc APPROVED; bấm REJECTED -> lọc REJECTED.
      * Lấy danh sách bình luận (hỗ trợ lọc theo trạng thái: ALL, PENDING, APPROVED, REJECTED).
      */
     @Transactional(readOnly = true)
@@ -89,6 +91,9 @@ public class ContentPolicyModerationService {
     }
 
     /**
+     * [SV2_FLOW_BL_8] [BACKEND SERVICE] Xử lý CẬP NHẬT DB (approve / reject) & Ghi lịch sử kiểm toán Audit Log
+     * - switch("APPROVED"): gọi comment.approve() -> chuyển sang APPROVED
+     * - switch("REJECTED"): gọi comment.reject() -> chuyển sang REJECTED
      * Duyệt / Từ chối / Ẩn bình luận độc giả (UC026).
      */
     @Transactional
@@ -184,10 +189,11 @@ public class ContentPolicyModerationService {
     // =========================================================================
 
     /**
-     * Cập nhật chính sách truy cập bài viết FREE / PREMIUM và giá bán lẻ (UC027).
+     * [SV2_FLOW_CHINH_SACH_5] [BACKEND SERVICE] Cập nhật chính sách truy cập bài viết FREE / PREMIUM và giá bán lẻ (UC027)
      * Tuân thủ ràng buộc MySQL chk_articles_price:
      * - FREE: single_price = 0
      * - PREMIUM: single_price >= 0
+     * Đồng thời ghi nhật ký audit_logs (ARTICLE_POLICY_UPDATE).
      */
     @Transactional
     public EditorialArticleDto updateArticlePolicy(Long articleId, UpdateArticlePolicyRequest request, String email) {
@@ -252,7 +258,7 @@ public class ContentPolicyModerationService {
     }
 
     /**
-     * Tạo mới một gói cước hội viên (UC028).
+     * [SV2_FLOW_GOI_CUOC_5] [BACKEND SERVICE] Tạo mới một gói cước hội viên (UC028).
      */
     @Transactional
     public SubscriptionPlanDto createPlan(SaveSubscriptionPlanRequest request, String email) {
@@ -364,7 +370,8 @@ public class ContentPolicyModerationService {
     }
 
     /**
-     * Bật/Tắt trạng thái kích hoạt gói cước (ACTIVE <-> INACTIVE).
+     * [SV2_FLOW_GOI_CUOC_5] [BACKEND SERVICE] Bật/Tắt trạng thái kích hoạt gói cước (ACTIVE <-> INACTIVE) - UC028
+     * Ghi nhận vết kiểm toán PLAN_TOGGLE vào audit_logs.
      */
     @Transactional
     public SubscriptionPlanDto togglePlanStatus(Long planId, String email) {

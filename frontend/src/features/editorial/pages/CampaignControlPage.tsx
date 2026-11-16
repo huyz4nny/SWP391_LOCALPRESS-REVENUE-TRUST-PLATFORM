@@ -59,6 +59,7 @@ export const CampaignControlPage: React.FC = () => {
     loadData()
   }, [])
 
+  // [SV2_FLOW_QC_8] [BÊN SV2 TÒA SOẠN] Công tắc dừng khẩn cấp Kill-Switch (UC024) hạ banner trong 1 giây
   // Emergency Kill-Switch action
   const handleSuspend = async () => {
     if (!suspendTarget || !suspendReason.trim()) return
