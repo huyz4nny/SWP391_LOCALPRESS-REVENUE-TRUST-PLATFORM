@@ -1,5 +1,7 @@
 import React from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 /**
  * Primitive giao diện dùng chung cho các màn hình kế toán SV4 (style "achromatic-ledger" của taste-skill):
@@ -170,6 +172,33 @@ export function LoadingBlock({ rows = 4 }: { rows?: number }) {
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} className="h-5 rounded bg-slate-100" />
         ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Thanh chuyển trang dùng chung (Đơn thanh toán, Nhật ký SePay), đặt cả trên và dưới bảng. Trang 1 là dòng mới nhất:
+ * "Trang trước" về phía dòng mới hơn, "Trang sau" sang dòng cũ hơn.
+ */
+export function Pager({ page, totalPages, loading, onChange, className = '' }: {
+  page: number
+  totalPages: number
+  loading: boolean
+  onChange: (p: number) => void
+  className?: string
+}) {
+  if (totalPages <= 1) return null
+  return (
+    <div className={`flex items-center justify-between px-5 ${className}`}>
+      <span className="num text-[13px] text-slate-500">Trang {page + 1} / {totalPages}</span>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" disabled={loading || page === 0} onClick={() => onChange(page - 1)}>
+          <ChevronLeft className="h-3.5 w-3.5" /> Trang trước
+        </Button>
+        <Button variant="outline" size="sm" disabled={loading || page + 1 >= totalPages} onClick={() => onChange(page + 1)}>
+          Trang sau <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </div>
   )
