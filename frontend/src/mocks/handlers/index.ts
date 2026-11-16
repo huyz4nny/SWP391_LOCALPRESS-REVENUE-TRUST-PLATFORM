@@ -6,6 +6,33 @@ import type { ReconciliationPeriod } from '@/features/finance/types'
 // Helper for delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// thông báo trong app của độc giả ở chế độ mock (UC040, UC046), không lưu localStorage
+type MockReaderNotification = {
+  id: string
+  type: string
+  title: string
+  content: string
+  linkUrl: string | null
+  read: boolean
+  createdAt: string
+}
+const mockNotifications = new Map<string, MockReaderNotification[]>()
+
+function mockNotificationsOf(userId: string): MockReaderNotification[] {
+  let items = mockNotifications.get(userId)
+  if (!items) {
+    items = []
+    mockNotifications.set(userId, items)
+  }
+  return items
+}
+
+// dùng trong test và khi muốn thử giao diện: thêm một thông báo cho user ở chế độ mock
+export function pushMockReaderNotification(userId: string, item: Omit<MockReaderNotification, 'id' | 'read' | 'createdAt'>) {
+  const items = mockNotificationsOf(userId)
+  items.unshift({ ...item, id: `ntf-${items.length + 1}`, read: false, createdAt: new Date().toISOString() })
+}
+
 export async function handleMockRequest(method: string, url: string, body?: any): Promise<any> {
   await delay(250) // Realistic network latency
 
@@ -137,6 +164,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     || pathname.startsWith('/reader/followed-categories')
     || pathname.startsWith('/reader/reading-history')
     || pathname === '/reader/feed'
+    || pathname.startsWith('/reader/notifications')
   if (isLibraryPath && currentUser.role === 'GUEST') {
     throw new AppApiError({ timestamp: new Date().toISOString(), status: 401, error: 'Unauthorized', message: 'Bạn cần đăng nhập để dùng chức năng này', path: pathname })
   }
@@ -179,6 +207,27 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     }
     ent.subscriptionAutoRenew = false
     return { ...item, autoRenew: false }
+  }
+
+  // UC040 + UC046 thông báo trong app (mock giữ trong bộ nhớ theo từng user, mặc định rỗng)
+  if (pathname === '/reader/notifications' && method === 'GET') {
+    return mockNotificationsOf(currentUser.id)
+  }
+  if (pathname === '/reader/notifications/unread-count' && method === 'GET') {
+    return { count: mockNotificationsOf(currentUser.id).filter((item) => !item.read).length }
+  }
+  if (pathname === '/reader/notifications/read-all' && method === 'PUT') {
+    mockNotificationsOf(currentUser.id).forEach((item) => { item.read = true })
+    return undefined
+  }
+  const readNotification = pathname.match(/^\/reader\/notifications\/([^/]+)\/read$/)
+  if (readNotification && method === 'PUT') {
+    const item = mockNotificationsOf(currentUser.id).find((entry) => String(entry.id) === decodeURIComponent(readNotification[1]))
+    if (!item) {
+      throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Không tìm thấy thông báo', path: pathname })
+    }
+    item.read = true
+    return undefined
   }
 
   if (pathname === '/reader/devices' && method === 'GET') {

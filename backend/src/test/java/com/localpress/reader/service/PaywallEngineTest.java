@@ -1,8 +1,8 @@
-package com.localpress.delivery.service;
+package com.localpress.reader.service;
 
-import com.localpress.delivery.repository.ContentAccessRepository;
-import com.localpress.delivery.repository.ContentAccessRepository.PublishedArticle;
-import com.localpress.delivery.repository.ContentAccessRepository.SubscriptionGrant;
+import com.localpress.reader.repository.ContentAccessRepository;
+import com.localpress.reader.repository.ContentAccessRepository.PublishedArticle;
+import com.localpress.reader.repository.ContentAccessRepository.SubscriptionGrant;
 import com.localpress.identity.entity.User;
 import com.localpress.identity.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;

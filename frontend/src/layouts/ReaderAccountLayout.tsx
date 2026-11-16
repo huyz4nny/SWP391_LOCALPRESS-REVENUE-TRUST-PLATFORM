@@ -16,6 +16,7 @@ import {
   Receipt,
   Smartphone,
   HelpCircle,
+  Bell,
   ArrowLeft,
   LogOut,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ import { logout } from '@/features/identity/authSession'
 import { useReaderLibrary } from '@/features/reader/hooks/useReaderLibrary'
 import { useReaderSubscription } from '@/features/reader/hooks/useReaderSubscription'
 import { useReaderDevices } from '@/features/reader/hooks/useReaderDevices'
+import { useReaderNotifications } from '@/features/reader/hooks/useReaderNotifications'
 
 export function ReaderAccountLayout() {
   const [currentUser, setCurrentUser] = useState(mockStore.getCurrentUser())
@@ -31,6 +33,7 @@ export function ReaderAccountLayout() {
   const library = useReaderLibrary()
   const subscription = useReaderSubscription()
   const devices = useReaderDevices()
+  const notifications = useReaderNotifications()
 
   useEffect(() => {
     const unsub = mockStore.subscribe(() => {
@@ -70,6 +73,7 @@ export function ReaderAccountLayout() {
   // list muc sidebar: ho so, tu sach, bookmark, follow, ls doc, goi, don, thiet bi, ho tro
   const navItems = [
     { label: 'Hồ sơ tài khoản', path: '/account', icon: UserIcon },
+    { label: 'Thông báo', path: '/account/notifications', icon: Bell, badge: notifications.unreadCount || undefined },
     { label: 'Tủ sách & bài đã mua', path: '/account/library', icon: BookOpen, badge: library.purchasedCount },
     { label: 'Bài viết đã lưu', path: '/account/bookmarks', icon: Bookmark, badge: library.savedIds.length },
     { label: 'Chuyên mục theo dõi', path: '/account/following', icon: Rss, badge: library.followedCategoryIds.length },

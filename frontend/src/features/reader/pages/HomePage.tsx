@@ -11,13 +11,11 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import {
   Crown,
   TrendingUp,
-  Flame,
   ArrowRight,
   Clock,
   Sparkles,
   Mail,
   CheckCircle2,
-  Newspaper,
   Compass,
 } from 'lucide-react'
 
@@ -372,7 +370,7 @@ export function HomePage() {
                       </h4>
                     </Link>
                     <div className="flex items-center space-x-2 text-[10px] text-stone-400 mt-1">
-                      <span>{art.views.toLocaleString()} lượt đọc</span>
+                      <span>{art.views.toLocaleString('vi-VN')} lượt đọc</span>
                     </div>
                   </div>
                 </div>

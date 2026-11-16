@@ -27,9 +27,11 @@ public class ArticlePublishedNotificationService {
         }
         String title = titleOf(event.getTitle());
         String content = "Có bài mới trong chuyên mục bạn theo dõi.";
+        // đường dẫn để độc giả bấm vào thông báo mở thẳng bài viết
+        String link = event.getSlug() == null || event.getSlug().isBlank() ? null : "/articles/" + event.getSlug().trim();
         for (Long userId : repository.findFollowerIds(event.getCategoryId())) {
             String dedupKey = "ARTICLE_PUBLISHED:" + event.getArticleId() + ":" + userId;
-            repository.insertInApp(userId, title, content, dedupKey);
+            repository.insertInApp(userId, ReaderNotificationRepository.TYPE_ARTICLE_PUBLISHED, title, content, link, dedupKey);
         }
     }
 

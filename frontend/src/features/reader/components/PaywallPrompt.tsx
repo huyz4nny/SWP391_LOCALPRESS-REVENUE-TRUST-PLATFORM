@@ -34,7 +34,6 @@ export function PaywallPrompt({ article }: PaywallPromptProps) {
       navigate(paymentPath({ orderCode: target.orderCode }), { state: { returnUrl: `/articles/${article.slug}` } })
     } catch (err) {
       // các lỗi như đã mua rồi hoặc đã có gói bao trùm được hiện cho khách thay vì chỉ ghi console
-      console.error(err)
       setError(err instanceof Error ? err.message : 'Không thể tạo đơn mua bài, vui lòng thử lại')
     } finally {
       setIsLoading(false)

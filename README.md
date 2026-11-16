@@ -139,12 +139,12 @@ LocalPress/
 │       │   ├── java/com/localpress/
 │       │   │   ├── LocalPressApplication.java
 │       │   │   ├── identity/              # Quản lý tài khoản users, phân quyền RBAC, AuthController
-│       │   │   ├── reader/                # Nghiệp vụ tài khoản độc giả, tủ sách, giỏ hàng
+│       │   │   ├── reader/                # Nghiệp vụ độc giả, tủ sách, mua bài/gói, Paywall Engine máy chủ (cắt preview 30%)
 │       │   │   ├── content/               # CMS soạn bài, bài viết, phiên bản, ảnh bìa, danh mục
 │       │   │   ├── editorial/             # Quy trình biên tập, duyệt bài, duyệt ad, duyệt comment
 │       │   │   ├── advertising/           # AdvertisingController, hồ sơ B2B, catalog slot quảng cáo
 │       │   │   ├── finance/               # Sổ quỹ kép, xác nhận ủy nhiệm chi, đối soát, hoàn tiền 4 mắt
-│       │   │   ├── delivery/              # Paywall Engine máy chủ, Ad Serving Engine & lọc click gian lận
+│       │   │   ├── delivery/              # Ad Serving Engine & lọc click gian lận
 │       │   │   ├── administration/        # Quản trị hệ thống, cấu hình slot & audit log
 │       │   │   └── shared/
 │       │   │       ├── security/          # Master SecurityConfig.java (Spring Security 6, stateless)

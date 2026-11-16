@@ -1,4 +1,4 @@
-package com.localpress.delivery.repository;
+package com.localpress.reader.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;

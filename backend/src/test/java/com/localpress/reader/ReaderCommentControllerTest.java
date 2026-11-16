@@ -1,13 +1,13 @@
 package com.localpress.reader;
 
-import com.localpress.reader.controller.ReaderCommentWriteController;
+import com.localpress.reader.controller.ReaderCommentController;
 import com.localpress.reader.controller.ReaderPlanController;
 import com.localpress.reader.controller.ReaderPurchaseExceptionHandler;
 import com.localpress.reader.dto.PublicSubscriptionPlanResponse;
 import com.localpress.reader.dto.ReaderCommentResponse;
 import com.localpress.reader.dto.ReportCommentResponse;
 import com.localpress.reader.repository.ReaderPlanRepository;
-import com.localpress.reader.service.ReaderCommentWriteService;
+import com.localpress.reader.service.ReaderCommentService;
 import com.localpress.reader.service.ReaderCurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,24 +29,35 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-class ReaderCommentWriteControllerTest {
+class ReaderCommentControllerTest {
 
-    private ReaderCommentWriteService commentService;
+    private ReaderCommentService commentService;
     private ReaderCurrentUser currentUser;
     private ReaderPlanRepository planRepository;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        commentService = mock(ReaderCommentWriteService.class);
+        commentService = mock(ReaderCommentService.class);
         currentUser = mock(ReaderCurrentUser.class);
         planRepository = mock(ReaderPlanRepository.class);
         mvc = MockMvcBuilders
                 .standaloneSetup(
-                        new ReaderCommentWriteController(commentService, currentUser),
+                        new ReaderCommentController(commentService, currentUser),
                         new ReaderPlanController(planRepository))
                 .setControllerAdvice(new ReaderPurchaseExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void publicListReturnsApprovedCommentsWithoutLogin() throws Exception {
+        when(commentService.listApproved(5L)).thenReturn(List.of(ReaderCommentResponse.builder()
+                .id(1L).articleId(5L).userName("An").content("Hay").status("APPROVED").build()));
+
+        mvc.perform(get("/api/v1/comments/article/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].status").value("APPROVED"));
     }
 
     @Test

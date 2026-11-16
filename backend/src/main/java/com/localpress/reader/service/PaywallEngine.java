@@ -1,7 +1,7 @@
-package com.localpress.delivery.service;
+package com.localpress.reader.service;
 
-import com.localpress.delivery.repository.ContentAccessRepository;
-import com.localpress.delivery.repository.ContentAccessRepository.PublishedArticle;
+import com.localpress.reader.repository.ContentAccessRepository;
+import com.localpress.reader.repository.ContentAccessRepository.PublishedArticle;
 import com.localpress.identity.entity.User;
 import com.localpress.administration.service.PaywallPolicyService;
 import com.localpress.identity.repository.UserRepository;

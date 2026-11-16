@@ -20,7 +20,6 @@ import {
   Lock,
   ChevronRight,
   Eye,
-  Volume2,
 } from 'lucide-react'
 
 // trang /articles/:slug: tieu de, sapo, body hoac paywall, comment, sidebar
@@ -31,7 +30,6 @@ export function ArticleDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [bookmarkError, setBookmarkError] = useState<string | null>(null)
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false)
 
   const currentUser = mockStore.getCurrentUser()
   const library = useReaderLibrary()
@@ -146,7 +144,7 @@ export function ArticleDetailPage() {
                 </span>
               </div>
 
-              {/* hang nut: Luu bai + Nghe bao (AI, chua co TTS) */}
+              {/* hang nut: Luu bai */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleToggleBookmark}
@@ -161,19 +159,6 @@ export function ArticleDetailPage() {
                   <span>{isBookmarked ? 'Đã lưu' : 'Lưu bài'}</span>
                 </button>
                 {bookmarkError && <span className="text-xs text-red-700">{bookmarkError}</span>}
-
-                <button
-                  onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-                  className={`flex items-center space-x-1 px-2.5 py-1 rounded border text-xs cursor-pointer transition-colors ${
-                    isPlayingAudio
-                      ? 'bg-amber-100 text-amber-900 border-amber-300'
-                      : 'border-stone-300 text-stone-600 hover:bg-stone-50'
-                  }`}
-                  title="Nghe đọc bài báo"
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>{isPlayingAudio ? 'Đang đọc...' : 'Nghe báo (AI)'}</span>
-                </button>
               </div>
             </div>
           </div>

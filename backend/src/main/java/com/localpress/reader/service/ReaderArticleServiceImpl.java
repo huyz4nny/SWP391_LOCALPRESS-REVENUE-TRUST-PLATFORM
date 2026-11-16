@@ -5,7 +5,6 @@ import com.localpress.reader.dto.ArticleReaderResponse;
 import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.repository.ArticleProjection;
 import com.localpress.reader.repository.ReaderArticleRepository;
-import com.localpress.delivery.service.PaywallEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -67,7 +66,7 @@ public class ReaderArticleServiceImpl implements ReaderArticleService {
                         "Không tìm thấy bài viết hoặc bài chưa được xuất bản"));
         // tăng lượt xem thêm 1 trong database
         readerArticleRepository.incrementViewCount(slug);
-        // hỏi PaywallEngine của SV5 xem người đọc hiện tại có quyền đọc toàn văn không
+        // hỏi PaywallEngine (cùng module reader) xem người đọc hiện tại có quyền đọc toàn văn không
         // engine tự xét bài free người đã mua lẻ hoặc người có gói còn hạn nên ở đây chỉ nhận kết quả đúng hay sai
         boolean allowed = paywallEngine.checkCurrentAccess(projection.getId()).allowed();
         // đẩy sang applyPaywall để quyết định trả toàn văn hay chỉ preview

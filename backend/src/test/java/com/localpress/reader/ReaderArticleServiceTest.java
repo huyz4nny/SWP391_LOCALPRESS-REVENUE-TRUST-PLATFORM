@@ -5,7 +5,7 @@ import com.localpress.reader.dto.ArticleSummaryResponse;
 import com.localpress.reader.repository.ArticleProjection;
 import com.localpress.reader.repository.ReaderArticleRepository;
 import com.localpress.reader.service.ReaderArticleServiceImpl;
-import com.localpress.delivery.service.PaywallEngine;
+import com.localpress.reader.service.PaywallEngine;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

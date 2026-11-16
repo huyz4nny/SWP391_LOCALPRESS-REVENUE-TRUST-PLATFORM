@@ -5,7 +5,7 @@ import com.localpress.reader.dto.ReaderCommentResponse;
 import com.localpress.reader.dto.ReportCommentResponse;
 import com.localpress.reader.repository.ReaderCommentRepository;
 import com.localpress.reader.repository.ReaderCommentRepository.CommentHead;
-import com.localpress.reader.service.ReaderCommentWriteService;
+import com.localpress.reader.service.ReaderCommentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -23,15 +23,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class ReaderCommentWriteServiceTest {
+class ReaderCommentServiceTest {
 
     private ReaderCommentRepository repository;
-    private ReaderCommentWriteService service;
+    private ReaderCommentService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(ReaderCommentRepository.class);
-        service = new ReaderCommentWriteService(repository, new ObjectMapper());
+        service = new ReaderCommentService(repository, new ObjectMapper());
     }
 
     @Test

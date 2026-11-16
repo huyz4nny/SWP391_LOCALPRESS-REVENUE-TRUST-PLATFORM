@@ -1,6 +1,6 @@
 package com.localpress.identity;
 
-import com.localpress.identity.service.VnPhone;
+import com.localpress.identity.util.VnPhone;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
