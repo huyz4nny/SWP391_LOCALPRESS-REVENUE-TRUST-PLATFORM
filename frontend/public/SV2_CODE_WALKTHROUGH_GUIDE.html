@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cẩm Nang Chi Tiết Vị Trí Nút Bấm & Luồng Code Demo SV2 - Nguyễn Trọng Phan | LocalPress</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-hover: #1e40af;
+      --primary-light: #eff6ff;
+      --crimson: #991b1b;
+      --crimson-light: #fef2f2;
+      --gold: #d97706;
+      --gold-light: #fffbeb;
+      --emerald: #059669;
+      --emerald-light: #ecfdf5;
+      --purple: #7c3aed;
+      --purple-light: #f5f3ff;
+      --slate-dark: #0f172a;
+      --slate-gray: #334155;
+      --bg-light: #f8fafc;
+      --card-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --code-bg: #0f172a;
+      --code-text: #f8fafc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-light);
+      color: var(--slate-dark);
+      line-height: 1.6;
+    }
+
+    /* Header */
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #172554 100%);
+      color: white;
+      padding: 2.2rem 2rem;
+      border-bottom: 4px solid var(--gold);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .header-content {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .header-title h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.4rem;
+    }
+    .header-title p {
+      color: #cbd5e1;
+      font-size: 1rem;
+    }
+    .header-badges {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .badge-navy { background: #1e3a8a; color: #fff; border: 1px solid #60a5fa; }
+    .badge-gold { background: #b45309; color: #fff; border: 1px solid #fbbf24; }
+    .badge-emerald { background: #065f46; color: #fff; border: 1px solid #34d399; }
+    .badge-red { background: #991b1b; color: #fff; border: 1px solid #f87171; }
+
+    /* Layout */
+    .app-container {
+      max-width: 1440px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .app-container { grid-template-columns: 1fr; }
+    }
+
+    /* Sidebar */
+    .sidebar-nav {
+      position: sticky;
+      top: 1.5rem;
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 1.25rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+    }
+    .sidebar-search input {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.88rem;
+      background: #f8fafc;
+      outline: none;
+      margin-bottom: 1rem;
+    }
+    .sidebar-search input:focus {
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(30,58,138,0.15);
+    }
+    .sidebar-menu { list-style: none; }
+    .sidebar-group-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 800;
+      color: #64748b;
+      letter-spacing: 0.06em;
+      margin: 1.1rem 0 0.4rem 0.5rem;
+    }
+    .sidebar-item a {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 0.75rem;
+      color: var(--slate-gray);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .sidebar-item a:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+      transform: translateX(3px);
+    }
+    .sidebar-item a.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Main Content */
+    .main-content { min-width: 0; }
+    .guide-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 2rem;
+      margin-bottom: 2.2rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      scroll-margin-top: 1.5rem;
+    }
+    .guide-card-header {
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .guide-card-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--slate-dark);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .guide-card-subtitle {
+      color: #64748b;
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    /* UI Visual Wireframe Mockup */
+    .ui-mockup-container {
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 1.25rem;
+      color: #f8fafc;
+      margin: 1.25rem 0 1.75rem 0;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .mockup-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .mockup-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .mockup-button {
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid transparent;
+    }
+    .mock-btn-blue { background: #0284c7; color: white; border-color: #38bdf8; }
+    .mock-btn-green { background: #059669; color: white; border-color: #34d399; }
+    .mock-btn-amber { background: #d97706; color: white; border-color: #fbbf24; }
+    .mock-btn-red { background: #dc2626; color: white; border-color: #f87171; }
+    .mock-btn-gray { background: #334155; color: #e2e8f0; border-color: #475569; }
+
+    .mockup-filter-bar {
+      background: #1e293b;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      border: 1px solid #334155;
+    }
+    .mockup-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .mock-tab {
+      background: #334155;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+    }
+    .mock-tab.active { background: #f8fafc; color: #0f172a; font-weight: 800; }
+    .mockup-search {
+      background: #0f172a;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      width: 220px;
+    }
+
+    .mockup-table-preview {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .mockup-table-preview th {
+      background: #1e293b;
+      color: #94a3b8;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+    .mockup-table-preview td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: middle;
+    }
+    .mockup-table-preview tr:hover { background: #1e293b55; }
+
+    /* Tables */
+    .custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.25rem 0;
+      font-size: 0.88rem;
+    }
+    .custom-table th, .custom-table td {
+      border: 1px solid var(--border-color);
+      padding: 0.75rem 0.9rem;
+      text-align: left;
+    }
+    .custom-table th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: var(--slate-dark);
+    }
+    .custom-table tr:hover { background: #f8fafc; }
+
+    /* Flow Step Callouts */
+    .step-box {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .step-box-header {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--primary);
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Code Snippet */
+    .code-container {
+      background: var(--code-bg);
+      color: var(--code-text);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 1rem 0;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+    }
+    .code-header {
+      background: #1e293b;
+      padding: 0.4rem 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .code-content {
+      padding: 0.85rem;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .code-keyword { color: #f472b6; font-weight: 700; }
+    .code-fn { color: #60a5fa; }
+    .code-string { color: #4ade80; }
+    .code-type { color: #38bdf8; }
+    .code-comment { color: #94a3b8; font-style: italic; }
+
+    .tag-location {
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Banner -->
+  <header class="header-banner">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>🚀 BẢN ĐỒ VỊ TRÍ NÚT BẤM & TRUY VẾT CODE DEMO - SV2</h1>
+        <p>Sinh viên: <strong>Nguyễn Trọng Phan (HE160300)</strong> | Chuyên trách: <strong>Tòa soạn, Vận hành & Phê duyệt nội dung (Editorial)</strong></p>
+      </div>
+      <div class="header-badges">
+        <span class="badge-pill badge-navy">URL: /backoffice/editorial/*</span>
+        <span class="badge-pill badge-gold">Đầy đủ 10 Màn hình SV2</span>
+        <span class="badge-pill badge-emerald">Real Spring Boot & MySQL</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-container">
+
+    <!-- Sticky Sidebar -->
+    <nav class="sidebar-nav">
+      <div class="sidebar-search">
+        <input type="text" id="searchInput" placeholder="🔍 Tìm nhanh nút, hàm, URL..." onkeyup="filterScreens()">
+      </div>
+      <ul class="sidebar-menu">
+        <li class="sidebar-group-title">MÀN HÌNH CHÍNH & DEMO TRỌNG TÂM</li>
+        <li class="sidebar-item"><a href="#screen-articles" class="menu-link active">📄 1. Quản lý Bài viết & Tòa soạn</a></li>
+        <li class="sidebar-item"><a href="#screen-editor" class="menu-link">✍️ 2. Soạn bài mới & Gợi ý AI</a></li>
+        <li class="sidebar-item"><a href="#screen-comments" class="menu-link">💬 3. Kiểm duyệt bình luận độc giả</a></li>
+        <li class="sidebar-item"><a href="#screen-bookings" class="menu-link">📋 4. Hàng đợi Booking Quảng cáo</a></li>
+        <li class="sidebar-item"><a href="#screen-calendar" class="menu-link">📅 5. Lịch tồn kho slot (UC017)</a></li>
+        <li class="sidebar-item"><a href="#screen-creatives" class="menu-link">🖼️ 6. Duyệt Banner Creative</a></li>
+        <li class="sidebar-item"><a href="#screen-eligibility" class="menu-link">🛡️ 7. Thẩm định 5 cổng (Rule 9)</a></li>
+        <li class="sidebar-item"><a href="#screen-control" class="menu-link">🛑 8. Dừng khẩn cấp Kill-Switch</a></li>
+        <li class="sidebar-item"><a href="#screen-contracts" class="menu-link">📜 9. Hợp đồng B2B & Phân hạng VIP</a></li>
+        <li class="sidebar-item"><a href="#screen-dashboard" class="menu-link">📊 10. Dashboard vận hành kép</a></li>
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- ========================================================================= -->
+      <!-- MÀN 1: QUẢN LÝ BÀI VIẾT & TÒA SOẠN (CHÍNH TRONG ẢNH CHỤP CỦA BẠN) -->
+      <!-- ========================================================================= -->
+      <section id="screen-articles" class="guide-card">
+        <div class="guide-card-header">
+          <div>
+            <h2 class="guide-card-title">📄 1. Màn hình Quản lý Bài viết & Tòa soạn (ArticleListPage.tsx)</h2>
+            <p class="guide-card-subtitle"><strong>URL:</strong> <code>http://localhost:5173/backoffice/editorial/articles</code> | <strong>Use Case:</strong> UC025</p>
+          </div>
+          <span class="badge-pill badge-emerald">Chính là màn hình trong ảnh chụp của bạn!</span>
+        </div>
+
+        <!-- Wireframe trực quan -->
+        <div class="ui-mockup-container">
+          <div class="mockup-header-bar">
+            <div>
+              <div class="mockup-title">Quản lý Bài viết & Tòa soạn</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Quy trình xuất bản: Bản nháp → Chờ duyệt → Cần sửa / Đã duyệt → Xuất bản lên báo</div>
+            </div>
+            <div>
+              <span class="tag-location">VỊ TRÍ 1: GÓC TRÊN CÙNG BÊN PHẢI</span>
+              <span class="mockup-button mock-btn-blue">+ Viết bài mới</span>
+            </div>
+          </div>
+
+          <div class="mockup-filter-bar">
+            <div>
+              <span class="tag-location" style="margin-right: 0.5rem;">VỊ TRÍ 2: THANH NẰM NGANG PHÍA TRÊN BẢNG</span>
+              <span style="font-size: 0.75rem; color: #94a3b8; margin-right: 0.4rem;">Trạng thái bài viết:</span>
+              <span class="mockup-tabs">
+                <span class="mock-tab active">[Tất cả]</span>
+                <span class="mock-tab">[Bản nháp]</span>
+                <span class="mock-tab">[Chờ duyệt]</span>
+                <span class="mock-tab">[Cần sửa]</span>
+                <span class="mock-tab">[Đã duyệt]</span>
+                <span class="mock-tab">[Đang xuất bản]</span>
+                <span class="mock-tab">[Đã gỡ bài]</span>
+              </span>
+            </div>
+            <div>
+              <span class="tag-location">VỊ TRÍ 3: Ô TÌM KIẾM</span>
+              <input class="mockup-search" value="Tìm theo tiêu đề hoặc tác giả..." readonly>
+            </div>
+          </div>
+
+          <!-- Bảng Preview -->
+          <table class="mockup-table-preview">
+            <thead>
+              <tr>
+                <th>BÀI VIẾT</th>
+                <th>CHUYÊN MỤC</th>
+                <th>LOẠI</th>
+                <th>TÁC GIẢ</th>
+                <th>PHIÊN BẢN</th>
+                <th>TRẠNG THÁI</th>
+                <th style="text-align: right;"><span class="tag-location">VỊ TRÍ 4: CỘT HÀNH ĐỘNG</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Khai thác tiềm năng Cảng nước sâu Lạch Huyện...</strong><br><span style="color:#64748b; font-size:0.7rem;">Cập nhật: 14:40 02/11/2026 • Góp ý: Đạt chuẩn...</span></td>
+                <td>Kinh tế & Đầu tư</td>
+                <td><span style="color: #fbbf24; font-weight: bold;">👑 Premium</span></td>
+                <td>Hoàng Minh Phóng Viên</td>
+                <td>V1</td>
+                <td><span class="mockup-button mock-btn-green" style="padding: 0.15rem 0.4rem; font-size:0.7rem;">Đã xuất bản</span></td>
+                <td style="text-align: right;">
+                  <span class="mockup-button mock-btn-gray" style="font-size:0.7rem;">Lịch sử</span>
+                  <span class="mockup-button mock-btn-gray" style="font-size:0.7rem;">Sửa</span>
+                  <span class="mockup-button mock-btn-red" style="font-size:0.7rem;">Hạ bài</span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Hải Phòng thu hút hơn 2,8 tỷ USD vốn FDI...</strong></td>
+                <td>Thời sự</td>
+                <td>Miễn phí</td>
+                <td>Nguyễn Văn Biên Tập</td>
+                <td>V1</td>
+                <td><span class="mockup-button mock-btn-amber" style="padding: 0.15rem 0.4rem; font-size:0.7rem;">Chờ duyệt</span></td>
+                <td style="text-align: right;">
+                  <span class="mockup-button mock-btn-green" style="font-size:0.7rem;">Duyệt bài</span>
+                  <span class="mockup-button mock-btn-amber" style="font-size:0.7rem;">Yêu cầu sửa</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 1. Danh sách hiển thị lên như thế nào -->
+        <div class="step-box">
+          <div class="step-box-header">🔄 1. Danh sách bài viết được hiển thị lên màn hình như thế nào? (Data Lifecycle)</div>
+          <ol style="margin-left: 1.5rem; font-size: 0.88rem; line-height: 1.7;">
+            <li><strong>Khi người dùng vào trang:</strong> React tự động kích hoạt hook <code>useEffect()</code> tại <strong>dòng 47 - 49</strong> file <code>ArticleListPage.tsx</code>.</li>
+            <li>Hàm <code>loadArticles()</code> được gọi tại <strong>dòng 51 - 63</strong>:
+              <br>➔ Dòng 55: Gọi API <code>editorialApi.getArticles()</code>.
+              <br>➔ Hàm này gửi request HTTP: <code>GET http://localhost:8080/api/v1/editorial/articles</code> kèm Bearer token.
+            </li>
+            <li><strong>Phía Backend Spring Boot:</strong>
+              <br>➔ Controller <code>EditorialArticleController.java</code> tại <strong>dòng 39</strong> nhận request <code>@GetMapping</code>.
+              <br>➔ Gọi Service truy vấn cơ sở dữ liệu MySQL: <code>SELECT a.*, c.name AS category_name, u.full_name AS author_name FROM articles a JOIN categories c ...</code>.
+              <br>➔ Backend trả về mảng JSON danh sách 5 bài viết với mã <code>200 OK</code>.
+            </li>
+            <li><strong>Render dữ liệu lên giao diện (JSX):</strong>
+              <br>➔ Dòng 56: React lưu mảng bài viết vào state <code>setArticles(data)</code>.
+              <br>➔ Dòng 179: React duyệt qua mảng bằng hàm <code>filteredArticles.map((art) =&gt; (&lt;tr key={art.id}&gt; ... &lt;/tr&gt;))</code> để sinh ra từng dòng của bảng (Tiêu đề, Chuyên mục, Badge Premium, Tác giả, Trạng thái).
+            </li>
+          </ol>
+        </div>
+
+        <!-- 2. Bảng chi tiết từng nút bấm -->
+        <h3 style="margin: 1.5rem 0 0.5rem 0; font-size: 1.1rem; color: var(--slate-dark);">⚡ 2. Bấm vào nút nào thì dòng code nào được gọi? (Click-to-Code Trace)</h3>
+        
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 18%;">Tên nút & Vị trí</th>
+              <th style="width: 28%;">Sự kiện Frontend (onClick / onChange)</th>
+              <th style="width: 27%;">API Client gọi</th>
+              <th style="width: 27%;">Backend xử lý & MySQL tác động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Nút "+ Viết bài mới"</strong><br>
+                <span class="tag-location">Góc trên cùng bên phải</span><br>
+                <span style="color: #0284c7; font-size: 0.75rem;">Màu xanh dương, icon Plus</span>
+              </td>
+              <td>
+                Bọc trong thẻ <code>&lt;Link to="/backoffice/editorial/articles/new"&gt;</code><br>
+                <strong>Dòng 111 - 116</strong>: Khi click, React Router lập tức chuyển hướng trang sang URL soạn bài mới mà không tải lại trang.
+              </td>
+              <td>Không gọi API, chỉ chuyển route.</td>
+              <td>Chuyển giao diện sang component <code>ArticleEditorPage.tsx</code>.</td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Các nút Tab lọc trạng thái</strong><br>
+                <span class="tag-location">Thanh ngang trên bảng</span><br>
+                <em>[Tất cả], [Bản nháp], [Chờ duyệt], [Đang xuất bản]...</em>
+              </td>
+              <td>
+                <strong>Dòng 128:</strong><br>
+                <code>onClick={() =&gt; setStatusFilter(st)}</code><br>
+                ➔ Cập nhật state <code>statusFilter</code>.<br>
+                <strong>Dòng 93 - 97:</strong> Kích hoạt thuật toán filter trong RAM:<br>
+                <code>filteredArticles = articles.filter(a =&gt; a.status === statusFilter)</code>
+              </td>
+              <td>Không gọi lại API (lọc tức thì trên State đã nạp).</td>
+              <td>Bảng tự động ẩn các bài viết không khớp và chỉ hiện các bài có trạng thái được chọn.</td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Ô tìm kiếm</strong><br>
+                <span class="tag-location">Góc trên bên phải bảng</span>
+              </td>
+              <td>
+                <strong>Dòng 149 - 150:</strong><br>
+                <code>onChange={(e) =&gt; setSearch(e.target.value)}</code><br>
+                ➔ Lọc theo tiêu đề hoặc tên tác giả: <code>a.title.includes(search) || a.authorName.includes(search)</code>.
+              </td>
+              <td>Không gọi API.</td>
+              <td>Bảng lọc real-time ngay khi gõ từng phím.</td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Hạ bài" (Màu đỏ)</strong><br>
+                <span class="tag-location">Cuối mỗi dòng có bài "Đã xuất bản"</span>
+              </td>
+              <td>
+                <strong>Dòng 265:</strong><br>
+                <code>onClick={() =&gt; handleOpenReview(art, 'UNPUBLISH')}</code><br>
+                ➔ Mở Modal Hộp thoại xác nhận gỡ bài.<br>
+                <strong>Dòng 72 - 91:</strong> Trong modal bấm "Xác nhận gỡ bài" gọi <code>handleExecuteReview()</code>.
+              </td>
+              <td>
+                <strong>Dòng 83:</strong><br>
+                <code>editorialApi.updateArticleStatus(reviewArticle.id, 'UNPUBLISHED', reviewNotes)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/articles/{id}/status</code><br>
+                ➔ <code>EditorialArticleController.java</code> (dòng 130)<br>
+                ➔ Chạy SQL: <code>UPDATE articles SET status = 'UNPUBLISHED' WHERE article_id = ?</code><br>
+                ➔ Dòng 85 gọi lại <code>loadArticles()</code>, badge đổi sang màu đỏ <strong>Đã gỡ bài</strong>.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Duyệt bài" (Màu xanh lá)</strong><br>
+                <span class="tag-location">Cuối mỗi dòng có bài "Chờ duyệt"</span>
+              </td>
+              <td>
+                <strong>Dòng 237:</strong><br>
+                <code>onClick={() =&gt; handleOpenReview(art, 'APPROVE')}</code><br>
+                ➔ Mở Modal phê duyệt.<br>
+                Bấm xác nhận gọi <code>handleExecuteReview()</code> với <code>targetStatus = 'APPROVED'</code>.
+              </td>
+              <td>
+                <strong>Dòng 83:</strong><br>
+                <code>editorialApi.updateArticleStatus(id, 'APPROVED')</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/articles/{id}/status</code><br>
+                ➔ Cập nhật <code>articles.status = 'APPROVED'</code><br>
+                ➔ Bài viết đủ điều kiện xuất bản lên báo.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Yêu cầu sửa" (Màu vàng)</strong><br>
+                <span class="tag-location">Cuối mỗi dòng có bài "Chờ duyệt"</span>
+              </td>
+              <td>
+                <strong>Dòng 244:</strong><br>
+                <code>onClick={() =&gt; handleOpenReview(art, 'REJECT')}</code><br>
+                ➔ Mở Modal nhập góp ý <code>reviewNotes</code>.
+              </td>
+              <td>
+                <strong>Dòng 83:</strong><br>
+                <code>editorialApi.updateArticleStatus(id, 'CHANGES_REQUESTED', reviewNotes)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/articles/{id}/status</code><br>
+                ➔ Cập nhật <code>status = 'CHANGES_REQUESTED'</code> và lưu lời dặn vào cột <code>review_notes</code> để phóng viên đọc.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Sửa"</strong><br>
+                <span class="tag-location">Cuối dòng bài viết</span>
+              </td>
+              <td>
+                <strong>Dòng 224 - 230:</strong><br>
+                <code>&lt;Link to={'/backoffice/editorial/articles/' + art.id + '/edit'}&gt;</code>
+              </td>
+              <td>Không gọi API.</td>
+              <td>Chuyển trang sang trình soạn thảo với ID bài viết để sửa nội dung.</td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Lịch sử"</strong><br>
+                <span class="tag-location">Cuối dòng bài viết</span>
+              </td>
+              <td>
+                <strong>Dòng 222:</strong> Component <code>&lt;ArticleVersionActions article={art} /&gt;</code><br>
+                ➔ Click mở modal danh sách các phiên bản (V1, V2, V3...).
+              </td>
+              <td>Gọi API lấy lịch sử phiên bản từ <code>article_versions</code>.</td>
+              <td>Mở drawer cho phép xem lại các bản nháp trước đó và khôi phục (Restore).</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- MÀN 4: HÀNG ĐỢI BOOKING QUẢNG CÁO B2B -->
+      <!-- ========================================================================= -->
+      <section id="screen-bookings" class="guide-card">
+        <div class="guide-card-header">
+          <div>
+            <h2 class="guide-card-title">📋 4. Hàng Đợi Duyệt Booking Quảng Cáo (BookingManagementPage.tsx)</h2>
+            <p class="guide-card-subtitle"><strong>URL:</strong> <code>http://localhost:5173/backoffice/editorial/bookings</code> | <strong>Use Case:</strong> UC016, UC018</p>
+          </div>
+        </div>
+
+        <div class="ui-mockup-container">
+          <div class="mockup-header-bar">
+            <div>
+              <div class="mockup-title">Duyệt Yêu Cầu Đặt Quảng Cáo (B2B Booking)</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Tiếp nhận booking từ doanh nghiệp, thẩm định vị trí, chiết khấu và gửi báo giá chính thức</div>
+            </div>
+            <div>
+              <span class="mockup-button mock-btn-blue">Xem Lịch Tồn Kho Slot</span>
+              <span class="mockup-button mock-btn-gray">Làm mới</span>
+            </div>
+          </div>
+
+          <div class="mockup-filter-bar">
+            <span class="mock-tab active">[Tất cả (2)]</span>
+            <span class="mock-tab">[Chờ báo giá (1)]</span>
+            <span class="mock-tab">[Đã báo giá (0)]</span>
+            <span class="mock-tab">[Đã xác nhận (1)]</span>
+            <span class="mock-tab">[Từ chối (0)]</span>
+          </div>
+
+          <table class="mockup-table-preview">
+            <thead>
+              <tr>
+                <th>MÃ BOOKING / KHÁCH HÀNG</th>
+                <th>VỊ TRÍ SLOT</th>
+                <th>THỜI GIAN PHÁT SÓNG</th>
+                <th>GIÁ DỰ KIẾN</th>
+                <th>TRẠNG THÁI</th>
+                <th style="text-align: right;">HÀNH ĐỘNG</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>#BK-002</strong> - Cty Cát Hải Logistics</td>
+                <td>Inline Banner (Thân bài viết)</td>
+                <td>20/11/2026 → 20/12/2026</td>
+                <td>25.000.000 đ</td>
+                <td><span class="mockup-button mock-btn-amber" style="padding:0.15rem 0.4rem; font-size:0.7rem;">Chờ báo giá</span></td>
+                <td style="text-align: right;">
+                  <span class="mockup-button mock-btn-gray" style="font-size:0.7rem;">Chi tiết</span>
+                  <span class="mockup-button mock-btn-blue" style="font-size:0.7rem;">Gửi báo giá</span>
+                  <span class="mockup-button mock-btn-red" style="font-size:0.7rem;">Từ chối</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="step-box">
+          <div class="step-box-header">🔄 1. Dữ liệu Booking được nạp và hiển thị ra sao?</div>
+          <ol style="margin-left: 1.5rem; font-size: 0.88rem; line-height: 1.7;">
+            <li>Khi vào trang, <code>loadBookings()</code> kích hoạt gọi <code>editorialApi.getBookings()</code> tại <strong>dòng 58</strong>.</li>
+            <li>Gửi request <code>GET /api/v1/editorial/bookings</code> tới <code>EditorialAdvertisingController.java</code> (dòng 45).</li>
+            <li>Backend truy vấn bảng <code>ad_campaigns</code> lấy các chiến dịch B2B kèm tên nhà quảng cáo từ bảng <code>advertisers</code>.</li>
+            <li>Dòng 350 - 450: Dùng <code>filteredBookings.map((b) =&gt; (&lt;tr key={b.id}&gt;...&lt;/tr&gt;))</code> để sinh ra các dòng bảng.</li>
+          </ol>
+        </div>
+
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 20%;">Nút bấm & Vị trí</th>
+              <th style="width: 30%;">Sự kiện Frontend (onClick / onSubmit)</th>
+              <th style="width: 25%;">API Client gọi</th>
+              <th style="width: 25%;">Backend xử lý & MySQL tác động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Nút "Gửi báo giá"</strong><br>
+                <span class="tag-location">Cột Hành động (Dòng booking Chờ báo giá)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 396:</strong> <code>onClick={() =&gt; handleOpenQuotation(b)}</code> ➔ Mở Modal nhập % chiết khấu.<br>
+                2. Trong modal nhập chiết khấu 10%, giá giảm còn 22.500.000 đ.<br>
+                3. Bấm xác nhận kích hoạt <code>handleSendQuotation()</code> tại <strong>dòng 78</strong>.
+              </td>
+              <td>
+                <strong>Dòng 84:</strong><br>
+                <code>editorialApi.sendQuotation(bookingId, finalPrice, discountPercent, notes)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/bookings/{id}/quote</code><br>
+                ➔ <code>EditorialAdvertisingService.java</code> (dòng 83)<br>
+                ➔ Chạy SQL: <code>UPDATE ad_campaigns SET quoted_amount = ?, quotation_status = 'ACCEPTED' WHERE campaign_id = ?</code><br>
+                ➔ Khách hàng nhận được báo giá chính thức.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Từ chối"</strong><br>
+                <span class="tag-location">Cột Hành động (Dòng booking)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 405:</strong> <code>onClick={() =&gt; handleOpenReject(b)}</code> ➔ Mở Modal chọn lý do.<br>
+                2. Bấm xác nhận kích hoạt <code>handleConfirmReject()</code> tại <strong>dòng 105</strong>.
+              </td>
+              <td>
+                <strong>Dòng 111:</strong><br>
+                <code>editorialApi.rejectBooking(id, reason)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/bookings/{id}/reject</code><br>
+                ➔ Cập nhật <code>ad_campaigns.status = 'REJECTED'</code><br>
+                ➔ Giải phóng vị trí slot quảng cáo.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- MÀN 8: ĐIỀU KHIỂN CHIẾN DỊCH, KILL-SWITCH & MAKE-GOOD -->
+      <!-- ========================================================================= -->
+      <section id="screen-control" class="guide-card">
+        <div class="guide-card-header">
+          <div>
+            <h2 class="guide-card-title">🛑 8. Màn hình Điều Khiển Chiến Dịch & Kill-Switch (CampaignControlPage.tsx)</h2>
+            <p class="guide-card-subtitle"><strong>URL:</strong> <code>http://localhost:5173/backoffice/editorial/control</code> | <strong>Use Case:</strong> UC023, UC024</p>
+          </div>
+        </div>
+
+        <div class="ui-mockup-container">
+          <div class="mockup-header-bar">
+            <div>
+              <div class="mockup-title">Điều Khiển & Dừng Khẩn Cấp Chiến Dịch (Emergency Kill-Switch)</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Xử lý sự cố truyền thông nhãn hàng: ngắt hiển thị banner tức thì và cấp bù ngày phát sóng (Make-Good)</div>
+            </div>
+            <div>
+              <span class="mockup-button mock-btn-gray">Làm mới dữ liệu</span>
+            </div>
+          </div>
+
+          <table class="mockup-table-preview">
+            <thead>
+              <tr>
+                <th>CHIẾN DỊCH / DOANH NGHIỆP</th>
+                <th>SLOT</th>
+                <th>THỜI HẠN HIỆN TẠI</th>
+                <th>TRẠNG THÁI</th>
+                <th style="text-align: right;">NÚT ĐIỀU KHIỂN</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Chiến dịch Quảng bá Logistics Cảng Đình Vũ</strong></td>
+                <td>Top Leaderboard</td>
+                <td>01/09/2026 → 03/10/2026</td>
+                <td><span class="mockup-button mock-btn-green" style="padding:0.15rem 0.4rem; font-size:0.7rem;">ACTIVE</span></td>
+                <td style="text-align: right;">
+                  <span class="mockup-button mock-btn-red" style="font-size:0.7rem;">Dừng khẩn cấp</span>
+                  <span class="mockup-button mock-btn-blue" style="font-size:0.7rem;">Bù ngày (Make-good)</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 22%;">Nút bấm & Vị trí</th>
+              <th style="width: 28%;">Sự kiện Frontend</th>
+              <th style="width: 25%;">API Client gọi</th>
+              <th style="width: 25%;">Backend xử lý & MySQL tác động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Nút "Dừng khẩn cấp" (Kill-Switch)</strong><br>
+                <span class="tag-location">Cột điều khiển (Màu đỏ nổi bật)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 404:</strong> <code>onClick={() =&gt; setSuspendTarget(item)}</code> ➔ Mở Modal cảnh báo dừng khẩn cấp.<br>
+                2. Nhập lý do: <em>"Khủng hoảng truyền thông"</em>.<br>
+                3. Bấm xác nhận gọi hàm <code>handleSuspend()</code> tại <strong>dòng 63</strong>.
+              </td>
+              <td>
+                <strong>Dòng 68:</strong><br>
+                <code>editorialApi.suspendCampaign(id, reason)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/campaign-control/{id}/suspend</code><br>
+                ➔ <code>EditorialAdvertisingService.java</code> (dòng 860)<br>
+                ➔ SQL: <code>UPDATE ad_campaigns SET status = 'SUSPENDED' WHERE campaign_id = ?</code><br>
+                ➔ Banner lập tức bị gỡ khỏi trang chủ để dập tắt rủi ro pháp lý.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Mở lại chiến dịch" (Resume)</strong><br>
+                <span class="tag-location">Hiện khi trạng thái là SUSPENDED</span>
+              </td>
+              <td>
+                <strong>Dòng 419:</strong> <code>onClick={() =&gt; setResumeTarget(item)}</code><br>
+                ➔ Xác nhận gọi hàm <code>handleResume()</code> tại <strong>dòng 82</strong>.
+              </td>
+              <td>
+                <strong>Dòng 87:</strong><br>
+                <code>editorialApi.resumeCampaign(id)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/campaign-control/{id}/resume</code><br>
+                ➔ Chuyển lại <code>status = 'ACTIVE'</code>, banner tiếp tục phát sóng.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Bù ngày" (Make-Good)</strong><br>
+                <span class="tag-location">Cột điều khiển (Màu tím/xanh)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 430:</strong> <code>onClick={() =&gt; setMakeGoodTarget(item)}</code> ➔ Mở Modal cấp bù ngày.<br>
+                2. Nhập số ngày bù: <em>3 ngày</em>, lý do: <em>Bù ngày do sự cố mạng</em>.<br>
+                3. Bấm xác nhận gọi <code>handleMakeGood()</code> tại <strong>dòng 100</strong>.
+              </td>
+              <td>
+                <strong>Dòng 105:</strong><br>
+                <code>editorialApi.makeGoodCampaign(id, extraDays, reason)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/campaign-control/{id}/make-good</code><br>
+                ➔ SQL: <code>UPDATE ad_campaigns SET end_date = DATE_ADD(end_date, INTERVAL ? DAY) WHERE campaign_id = ?</code><br>
+                ➔ Ngày kết thúc tự động gia hạn thêm 3 ngày.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- MÀN 9: HỢP ĐỒNG QUẢNG CÁO B2B & PHÂN HẠNG VIP -->
+      <!-- ========================================================================= -->
+      <section id="screen-contracts" class="guide-card">
+        <div class="guide-card-header">
+          <div>
+            <h2 class="guide-card-title">📜 9. Màn hình Hợp Đồng B2B & Phân Hạng VIP (AdvertisingContractPage.tsx)</h2>
+            <p class="guide-card-subtitle"><strong>URL:</strong> <code>http://localhost:5173/backoffice/editorial/contracts</code> | <strong>Use Case:</strong> UC019, UC025</p>
+          </div>
+        </div>
+
+        <div class="ui-mockup-container">
+          <div class="mockup-header-bar">
+            <div>
+              <div class="mockup-title">Quản Lý Hồ Sơ Hợp Đồng & Phân Hạng Khách Hàng VIP</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Lưu trữ 4 thông tin hợp đồng pháp lý, lập phụ lục điều chỉnh và thiết lập ưu đãi VIP doanh nghiệp</div>
+            </div>
+            <div>
+              <span class="mockup-button mock-btn-blue">+ Tạo hồ sơ HĐ mới</span>
+              <span class="mockup-button mock-btn-gray">Làm mới</span>
+            </div>
+          </div>
+
+          <div class="mockup-filter-bar">
+            <span class="mock-tab active">[Hồ sơ Hợp đồng B2B (UC019)]</span>
+            <span class="mock-tab">[Phân hạng VIP Doanh nghiệp (UC025)]</span>
+          </div>
+
+          <table class="mockup-table-preview">
+            <thead>
+              <tr>
+                <th>SỐ HỢP ĐỒNG / FILE PDF</th>
+                <th>DOANH NGHIỆP</th>
+                <th>NGÀY KÝ</th>
+                <th>GIÁ TRỊ HỢP ĐỒNG</th>
+                <th style="text-align: right;">HÀNH ĐỘNG</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>HD-2026-DV-001</strong><br><span style="color:#38bdf8; font-size:0.7rem;">📄 HD-2026-DV-001.pdf</span></td>
+                <td>Công ty CP Cảng Đình Vũ</td>
+                <td>25/08/2026</td>
+                <td>45.000.000 đ</td>
+                <td style="text-align: right;">
+                  <span class="mockup-button mock-btn-gray" style="font-size:0.7rem;">Phụ lục (0)</span>
+                  <span class="mockup-button mock-btn-gray" style="font-size:0.7rem;">Sửa HĐ</span>
+                  <span class="mockup-button mock-btn-blue" style="font-size:0.7rem;">+ Phụ lục</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 22%;">Nút bấm & Vị trí</th>
+              <th style="width: 28%;">Sự kiện Frontend</th>
+              <th style="width: 25%;">API Client gọi</th>
+              <th style="width: 25%;">Backend xử lý & MySQL tác động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Nút "Sửa HĐ"</strong><br>
+                <span class="tag-location">Cột Hành động (Tab Hợp đồng)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 492:</strong> <code>onClick={() =&gt; setEditContractTarget(c)}</code> ➔ Mở Modal cập nhật HĐ.<br>
+                2. Nhập số HĐ, file URL, ngày ký.<br>
+                3. Bấm "Lưu hồ sơ hợp đồng" gọi <code>handleUpdateContract()</code> tại <strong>dòng 100</strong>.
+              </td>
+              <td>
+                <strong>Dòng 105:</strong><br>
+                <code>editorialApi.updateContract(campaignId, ref, fileUrl, date, value)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>PUT /api/v1/editorial/contracts/{campaignId}</code><br>
+                ➔ Cập nhật bảng <code>ad_contracts</code> và <code>ad_campaigns.contract_reference</code>.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "+ Phụ lục"</strong><br>
+                <span class="tag-location">Cột Hành động (Tab Hợp đồng)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 507:</strong> <code>onClick={() =&gt; setAddendumTarget(c)}</code> ➔ Mở Modal tạo phụ lục.<br>
+                2. Nhập số phụ lục: <em>PL-01-2026</em>, loại điều chỉnh: <em>Gia hạn thời gian</em>.<br>
+                3. Bấm xác nhận gọi <code>handleCreateAddendum()</code> tại <strong>dòng 157</strong>.
+              </td>
+              <td>
+                <strong>Dòng 162:</strong><br>
+                <code>editorialApi.createContractAddendum(campaignId, payload)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/contracts/{id}/addendum</code><br>
+                ➔ Thêm bản ghi mới vào bảng <code>ad_contract_addendums</code>.
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <strong>Nút "Chỉnh hạng VIP"</strong><br>
+                <span class="tag-location">Cột Hành động (Tab VIP)</span>
+              </td>
+              <td>
+                1. <strong>Dòng 601:</strong> <code>onClick={() =&gt; setVipTarget(v)}</code> ➔ Mở Modal phân hạng VIP.<br>
+                2. Chọn hạng: <strong>GOLD</strong>, chiết khấu: <strong>15%</strong>.<br>
+                3. Bấm xác nhận gọi <code>handleUpdateVip()</code> tại <strong>dòng 182</strong>.
+              </td>
+              <td>
+                <strong>Dòng 187:</strong><br>
+                <code>editorialApi.updateVipTier(advertiserId, { vipTier, vipDiscountPercent })</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>PUT /api/v1/editorial/advertisers/{id}/vip-tier</code><br>
+                ➔ Chạy SQL: <code>UPDATE advertisers SET vip_tier = 'GOLD', vip_discount_percent = 15 WHERE advertiser_id = ?</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- MÀN 7: 5 CỔNG ĐIỀU KIỆN PHÁT SÓNG (RULE 9) -->
+      <!-- ========================================================================= -->
+      <section id="screen-eligibility" class="guide-card">
+        <div class="guide-card-header">
+          <div>
+            <h2 class="guide-card-title">🛡️ 7. Màn hình Thẩm Định 5 Cổng Điều Kiện Phát Sóng (CampaignEligibilityPage.tsx)</h2>
+            <p class="guide-card-subtitle"><strong>URL:</strong> <code>http://localhost:5173/backoffice/editorial/eligibility</code> | <strong>Use Case:</strong> UC022 (Luật cốt lõi Rule 9)</p>
+          </div>
+        </div>
+
+        <div class="step-box">
+          <div class="step-box-header">5 Cổng kiểm tra bắt buộc trước khi phát sóng banner:</div>
+          <p style="font-size: 0.88rem;">1. Cổng Thanh toán (Đã thu 100%) ➔ 2. Cổng Báo giá (Khách đã chốt) ➔ 3. Cổng Hợp đồng (Đã có mã HĐ) ➔ 4. Cổng Creative (Banner đã duyệt & URL SAFE) ➔ 5. Cổng Slot (Vị trí còn trống và hợp lệ).</p>
+        </div>
+
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 22%;">Nút bấm & Vị trí</th>
+              <th style="width: 28%;">Sự kiện Frontend</th>
+              <th style="width: 25%;">API Client gọi</th>
+              <th style="width: 25%;">Backend xử lý & MySQL tác động</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Nút "Kích hoạt phát sóng" (LIVE)</strong><br>
+                <span class="tag-location">Cuối mỗi dòng chiến dịch</span><br>
+                <em>Bị mờ (Disabled) nếu chưa đủ 5 cổng</em>
+              </td>
+              <td>
+                <strong>Dòng 58:</strong><br>
+                <code>onClick={() =&gt; handleActivate(item.campaignId)}</code><br>
+                ➔ Kích hoạt hàm <code>handleActivate()</code>.
+              </td>
+              <td>
+                <strong>Dòng 60:</strong><br>
+                <code>editorialApi.activateCampaign(campaignId)</code>
+              </td>
+              <td>
+                <strong>Endpoint:</strong> <code>POST /api/v1/editorial/eligibility/{id}/activate</code><br>
+                ➔ <code>EditorialAdvertisingService.java</code> (dòng 674)<br>
+                ➔ Kiểm tra lại toàn bộ 5 điều kiện ở Backend. Nếu hợp lệ, cập nhật <code>UPDATE ad_campaigns SET status = 'ACTIVE'</code> ➔ Banner chính thức lên sóng trang báo!
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- MÀN 10: DASHBOARD VẬN HÀNH KÉP -->
+      <!-- ========================================================================= -->
+      <section id="screen-dashboard" class="guide-card">
+        <div class="guide-card-header">
+          <div>
+            <h2 class="guide-card-title">📊 10. Dashboard Vận Hành Kép (BusinessOperationDashboardPage.tsx)</h2>
+            <p class="guide-card-subtitle"><strong>URL:</strong> <code>http://localhost:5173/backoffice/editorial/dashboard</code> | <strong>Use Case:</strong> UC015, UC028</p>
+          </div>
+        </div>
+
+        <div class="step-box">
+          <div class="step-box-header">🔄 1. Các khối trên Dashboard được nạp dữ liệu ra sao?</div>
+          <ol style="margin-left: 1.5rem; font-size: 0.88rem; line-height: 1.7;">
+            <li>Khi mở trang, <code>useEffect</code> gọi <code>loadDashboard()</code> tại <strong>dòng 30</strong>.</li>
+            <li>Dòng 35 gọi <code>editorialApi.getDashboardOverview()</code> ➔ HTTP <code>GET /api/v1/editorial/dashboard/overview</code>.</li>
+            <li>Backend tính toán đồng thời:
+              <br>• Tổng doanh thu B2B đã ký & Thực thu.
+              <br>• Doanh thu B2C từ gói đăng ký đọc báo (Subscriptions) & Mua bài viết lẻ.
+              <br>• Tỷ lệ % lấp đầy kho slot của 3 vị trí (Top Leaderboard, Inline, Sidebar).
+              <br>• Danh sách các việc gấp cần xử lý ngay (Urgent Action Items).
+            </li>
+          </ol>
+        </div>
+
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 25%;">Thành phần / Nút bấm</th>
+              <th style="width: 35%;">Vị trí & Thao tác trên giao diện</th>
+              <th style="width: 40%;">Hành vi khi Click</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Nút "Xử lý ngay" trên thẻ Việc cần làm gấp</strong></td>
+              <td>Nằm tại từng thẻ trong khối <strong>"Hàng đợi việc khẩn cấp"</strong> ở góc dưới Dashboard.</td>
+              <td>
+                Bọc trong thẻ <code>&lt;Link to={item.link}&gt;</code> (ví dụ: <code>/backoffice/editorial/bookings</code> hoặc <code>/creatives</code>).<br>
+                ➔ Biên tập viên click 1 chạm là nhảy ngay đến đúng hồ sơ cần phê duyệt mà không mất công tìm kiếm!
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+  </div>
+
+  <footer style="text-align: center; padding: 2rem; color: #64748b; font-size: 0.88rem; border-top: 1px solid #e2e8f0; background: #fff; margin-top: 3rem;">
+    LocalPress Platform © 2026 - Cẩm nang chi tiết Demo & Phản biện dành riêng cho SV2 Nguyễn Trọng Phan (HE160300).
+  </footer>
+
+  <script>
+    function filterScreens() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const sections = document.querySelectorAll('.guide-card');
+      sections.forEach(sec => {
+        const text = sec.innerText.toLowerCase();
+        if (text.includes(q)) {
+          sec.style.display = 'block';
+        } else {
+          sec.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

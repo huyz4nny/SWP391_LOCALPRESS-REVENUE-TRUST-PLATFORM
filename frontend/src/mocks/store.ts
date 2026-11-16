@@ -878,6 +878,18 @@ class MockStore {
     const article = this.state.articles.find((a) => a.id === id)
     if (!article) throw new Error('Không tìm thấy bài viết')
 
+    const currentUser = this.getCurrentUser()
+    const isSelfArticle = Boolean(article.authorId && String(article.authorId) === String(currentUser.id))
+
+    // Four-Eyes Principle: Tác giả không được tự duyệt hoặc từ chối bài của chính mình
+    if (isSelfArticle && (newStatus === 'APPROVED' || newStatus === 'CHANGES_REQUESTED')) {
+      throw new Error('Nguyên tắc 4 mắt (Four-Eyes Principle): Biên tập viên không được tự duyệt bài viết của chính mình. Cần biên tập viên khác duyệt!')
+    }
+
+    if (isSelfArticle && newStatus === 'PUBLISHED' && article.status !== 'APPROVED') {
+      throw new Error('Bài viết của bạn chưa được biên tập viên khác phê duyệt. Không thể tự xuất bản khi chưa có phê duyệt!')
+    }
+
     // Rule: Cannot publish an article that has not been approved!
     if (newStatus === 'PUBLISHED' && article.status !== 'APPROVED') {
       throw new Error('Quy chuẩn tòa soạn: Chỉ được xuất bản các bài viết đã qua bước duyệt (APPROVED)!')

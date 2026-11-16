@@ -38,8 +38,8 @@ public class EditorialArticleController {
      */
     @GetMapping
     public ResponseEntity<List<EditorialArticleDto>> getAllArticles() {
-        return ResponseEntity.ok(articleReviewService.getAllArticles());
-    }
+        return ResponseEntity.ok(articleReviewService.getAllArticles());//dong goi danh sach thanh 1 chuoi JSON va gui tai cong /editorial/articles
+    } // -> ArticleListPage.tsx 48-50
 
     /**
      * GET /api/v1/editorial/articles/{id}

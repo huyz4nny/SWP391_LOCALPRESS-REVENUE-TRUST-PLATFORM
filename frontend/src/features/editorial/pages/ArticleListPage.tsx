@@ -45,7 +45,7 @@ export function ArticleListPage() {
   const [reviewNotes, setReviewNotes] = useState('')
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
-  useEffect(() => {
+  useEffect(() => {//active useEffect -> 56
     loadArticles()
   }, [currentUser.id, currentUser.role])
 
@@ -53,8 +53,8 @@ export function ArticleListPage() {
     try {
       setLoading(true)
       setLoadError('')
-      const data = isAuthor ? await editorialApi.getMyArticles() : await editorialApi.getArticles()
-      setArticles(isAuthor ? data.filter((article) => article.authorId === currentUser.id) : data)
+      const data = isAuthor ? await editorialApi.getMyArticles() : await editorialApi.getArticles() //hung du lieu tu backend
+      setArticles(isAuthor ? data.filter((article) => article.authorId === currentUser.id) : data) //nap toan bo danh sach bai viet vao state articles -> 189 hien thi danh sach
     } catch (error: unknown) {
       setArticles([])
       setLoadError(error instanceof Error ? error.message : 'Không tải được danh sách bài viết')
@@ -65,6 +65,11 @@ export function ArticleListPage() {
 
   const handleOpenReview = (art: ArticleListItem, action: 'APPROVE' | 'REJECT' | 'PUBLISH' | 'UNPUBLISH') => {
     if (!canReview) return
+    const isSelfArticle = Boolean(art.authorId && String(art.authorId) === String(currentUser.id))
+    if (isSelfArticle && (action === 'APPROVE' || action === 'REJECT')) {
+      alert('Nguyên tắc 4 mắt (Four-Eyes Principle): Biên tập viên không được tự duyệt bài viết của chính mình. Vui lòng để biên tập viên khác đăng nhập vào duyệt.')
+      return
+    }
     setReviewArticle(art)
     setReviewAction(action)
     setReviewNotes('')
@@ -75,6 +80,10 @@ export function ArticleListPage() {
     setIsSubmittingReview(true)
 
     try {
+      const isSelfArticle = Boolean(reviewArticle.authorId && String(reviewArticle.authorId) === String(currentUser.id))
+      if (isSelfArticle && (reviewAction === 'APPROVE' || reviewAction === 'REJECT')) {
+        throw new Error('Nguyên tắc 4 mắt (Four-Eyes Principle): Biên tập viên không được tự duyệt bài viết của chính mình. Vui lòng để biên tập viên khác đăng nhập vào duyệt.')
+      }
       let targetStatus: ArticleStatus = 'APPROVED'
       if (reviewAction === 'APPROVE') targetStatus = 'APPROVED'
       if (reviewAction === 'REJECT') targetStatus = 'CHANGES_REQUESTED'
@@ -177,7 +186,7 @@ export function ArticleListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredArticles.map((art) => (
+              {filteredArticles.map((art) => ( //là vòng lặp. Nó chạy qua từng bài viết art trong danh sách.
                 <tr key={art.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-4 py-3 max-w-sm">
                     {isAuthor && art.status !== 'DRAFT' ? (
@@ -232,25 +241,36 @@ export function ArticleListPage() {
                     )}
 
                     {/* Reviewer / Admin Workflow Actions */}
-{canReview &&
-  (art.status === 'IN_REVIEW' || art.status === 'CHANGES_REQUESTED') && (
-                      <>
-                        <button
-                          onClick={() => handleOpenReview(art, 'APPROVE')}
-                          className="px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer"
-                        >
-                          Duyệt
-                        </button>
-                        {art.status === 'IN_REVIEW' && (
-                          <button
-                            onClick={() => handleOpenReview(art, 'REJECT')}
-                            className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
-                          >
-                            Yêu cầu sửa
-                          </button>
-                        )}
-                      </>
-                    )}
+                    {canReview &&
+                      (art.status === 'IN_REVIEW' || art.status === 'CHANGES_REQUESTED') && (
+                        <>
+                          {Boolean(art.authorId && String(art.authorId) === String(currentUser.id)) ? (
+                            <span
+                              className="inline-flex items-center px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium"
+                              title="Nguyên tắc 4 mắt (Four-Eyes Principle): Biên tập viên không được tự duyệt bài viết của chính mình. Cần biên tập viên khác đăng nhập vào duyệt."
+                            >
+                              <Clock className="w-3 h-3 mr-1 inline" /> Chờ BTV khác duyệt
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleOpenReview(art, 'APPROVE')}
+                                className="px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer"
+                              >
+                                Duyệt
+                              </button>
+                              {art.status === 'IN_REVIEW' && (
+                                <button
+                                  onClick={() => handleOpenReview(art, 'REJECT')}
+                                  className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
+                                >
+                                  Yêu cầu sửa
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
 
 {canReview &&
   (art.status === 'APPROVED' || art.status === 'UNPUBLISHED') && (

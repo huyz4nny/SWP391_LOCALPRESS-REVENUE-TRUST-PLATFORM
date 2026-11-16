@@ -248,4 +248,49 @@ class ArticleReviewServiceTest {
         assertTrue(captured.isFirstPublication());
         assertNotNull(captured.getPublishedAt());
     }
+
+    @Test
+    @DisplayName("Four-Eyes Principle: Biên tập viên không được tự duyệt bài do chính mình soạn thảo")
+    void updateArticleStatus_whenAuthorAttemptsToSelfApprove_throws403Forbidden() {
+        // author1 (id = 10L) là tác giả của draftArticle (authorId = 10L)
+        // Set author1 role thành EDITOR
+        ReflectionTestUtils.setField(authorUser, "role", User.Role.EDITOR);
+
+        when(userRepository.findByEmail("author1@localpress.vn")).thenReturn(Optional.of(authorUser));
+        when(articleRepository.findById(100L)).thenReturn(Optional.of(draftArticle));
+        when(versionRepository.findByArticleIdAndVersionNumber(100L, 1)).thenReturn(Optional.of(draftVersion));
+
+        UpdateArticleStatusRequest req = new UpdateArticleStatusRequest();
+        req.setStatus("APPROVED");
+        req.setReviewNotes("Tự duyệt bài của mình");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                articleReviewService.updateArticleStatus(100L, req, "author1@localpress.vn")
+        );
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("không được tự duyệt bài viết của chính mình"));
+    }
+
+    @Test
+    @DisplayName("Four-Eyes Principle: Tác giả được phép xuất bản bài khi phiên bản ĐÃ ĐƯỢC BTV khác APPROVED")
+    void updateArticleStatus_whenAuthorPublishesAlreadyApprovedArticle_success() {
+        // draftArticle (authorId = 10L)
+        // draftVersion đã được người khác duyệt APPROVED
+        draftVersion.approve(30L, "BTV khác đã duyệt");
+
+        ReflectionTestUtils.setField(authorUser, "role", User.Role.EDITOR);
+        when(userRepository.findByEmail("author1@localpress.vn")).thenReturn(Optional.of(authorUser));
+        when(articleRepository.findById(100L)).thenReturn(Optional.of(draftArticle));
+        when(versionRepository.findByArticleIdAndVersionNumber(100L, 1)).thenReturn(Optional.of(draftVersion));
+        when(articleRepository.save(any(Article.class))).thenReturn(draftArticle);
+
+        UpdateArticleStatusRequest req = new UpdateArticleStatusRequest();
+        req.setStatus("PUBLISHED");
+        req.setAccessType("FREE");
+        req.setSinglePrice(BigDecimal.ZERO);
+
+        EditorialArticleDto result = articleReviewService.updateArticleStatus(100L, req, "author1@localpress.vn");
+        assertNotNull(result);
+        assertEquals(Article.Status.PUBLISHED, draftArticle.getStatus());
+    }
 }
