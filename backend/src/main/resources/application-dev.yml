@@ -59,3 +59,8 @@ localpress:
     webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
   payment:
     order-ttl-minutes: 15
+    # Job đóng đơn quảng cáo quá hạn giữ chỗ (PENDING -> FAILED), Rule 6
+    expiry-job:
+      enabled: true
+      delay-ms: 60000
+      initial-delay-ms: 30000
