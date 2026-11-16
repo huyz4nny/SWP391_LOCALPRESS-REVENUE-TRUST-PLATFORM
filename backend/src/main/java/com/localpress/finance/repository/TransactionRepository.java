@@ -42,6 +42,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     boolean existsByGatewayTransactionId(String gatewayTransactionId);
 
+    /** Lấy nhiều đơn theo mã một lần (hàng chờ khiếu nại hiện số tiền đơn). */
+    List<Transaction> findByGatewayTransactionIdIn(Collection<String> gatewayTransactionIds);
+
     /** Khóa dòng đơn gốc khi lập / duyệt hoàn tiền, để 2 phiếu cùng lúc không cùng vượt hạn mức (Rule 11). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT t FROM Transaction t WHERE t.transactionId = :id")

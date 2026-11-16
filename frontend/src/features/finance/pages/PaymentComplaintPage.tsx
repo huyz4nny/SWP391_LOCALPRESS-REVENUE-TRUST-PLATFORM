@@ -55,10 +55,10 @@ export function PaymentComplaintPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      orderCode: params.get('orderCode') || '',
+    defaultValues: {//Điền sẵn form từ URL ?orderCode=&amount= (dòng 59-60, từ complaintLink)
+      orderCode: params.get('orderCode') || '',  //chỉ dùng 2 trường: orderCode và amount, ghép vào URL trang khiếu nại.
       amount: Number(params.get('amount')) || undefined,
-      transferredAt: toLocalInput(new Date()),
+      transferredAt: toLocalInput(new Date()),//Thời gian mặc định hiện tại
     },
   })
 
@@ -159,6 +159,11 @@ export function PaymentComplaintPage() {
                     {c.orderCode ? <> · đơn <span className="font-mono">{c.orderCode}</span></> : null}
                   </div>
                   <div className="text-[13px] text-slate-500 num">Chuyển lúc {formatDateTime(c.transferredAt)}</div>
+                  {c.returnedAmount != null && (
+                    <div className="mt-1 text-[13px] text-slate-700 num">
+                      {c.resolution === 'EXCESS_RETURNED' ? 'Đơn đã ghi nhận, phần thừa đã trả lại' : 'Đã trả lại'}: {formatCurrency(c.returnedAmount)}
+                    </div>
+                  )}
                   {c.resolutionNote && (
                     <div className={`mt-1 text-[13px] ${c.status === 'REJECTED' ? 'text-[#831c1e]' : 'text-slate-700'}`}>
                       Kế toán: {c.resolutionNote}

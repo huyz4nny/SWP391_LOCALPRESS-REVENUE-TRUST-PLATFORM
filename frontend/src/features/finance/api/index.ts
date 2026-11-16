@@ -29,6 +29,56 @@ const TITLE_BY_TYPE: Record<string, string> = {
 const titleOf = (tx: any): string =>
   tx.description || `${TITLE_BY_TYPE[tx.transactionType] || tx.transactionType} #${tx.targetId || tx.transactionId || tx.id}`
 
+/** Số đơn mỗi trang của màn Đơn thanh toán; backend cắt tối đa 100 */
+export const PAGE_SIZE = 100
+
+/** Bộ lọc đơn ở phía hiển thị -> giá trị backend (transaction_type và status) */
+const TX_TYPE_OF: Record<string, string> = { SUBSCRIPTION: 'SUBSCRIPTION', ARTICLE_PURCHASE: 'ARTICLE', AD_CAMPAIGN: 'AD' }
+const TX_STATUS_OF: Record<string, string> = { PAID: 'SUCCESS', PENDING: 'PENDING', FAILED: 'FAILED', REFUNDED: 'REFUNDED' }
+
+/** Một giao dịch từ /finance/ledger -> đơn hiển thị */
+const txToOrder = (tx: any): Order => ({
+  id: String(tx.transactionId || tx.id),
+  orderCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
+  userId: String(tx.userId),
+  userName: tx.userName || `Khách hàng #${tx.userId}`,
+  userEmail: tx.userEmail || '',
+  orderType: mapOrderType(tx.transactionType),
+  targetId: String(tx.targetId || ''),
+  targetTitle: titleOf(tx),
+  amount: Number(tx.amount || 0),
+  discount: 0,
+  finalAmount: Number(tx.amount || 0),
+  paymentStatus: tx.status === 'SUCCESS' ? 'PAID' : tx.status,
+  paymentMethod: tx.paymentMethod,
+  paymentAttempts: [{
+    id: `att-${tx.transactionId || tx.id}`,
+    orderId: String(tx.transactionId || tx.id),
+    method: tx.paymentMethod || 'SEPAY',
+    transactionCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
+    amount: Number(tx.amount || 0),
+    status: tx.status === 'SUCCESS' ? 'SUCCESS' : tx.status,
+    createdAt: tx.createdAt || new Date().toISOString(),
+    verifiedAt: tx.paidAt,
+  }],
+  createdAt: tx.createdAt,
+  updatedAt: tx.paidAt || tx.createdAt,
+})
+
+export interface OrderPageQuery {
+  page: number
+  orderType?: string
+  paymentStatus?: string
+  keyword?: string
+}
+
+export interface OrderPage {
+  items: Order[]
+  page: number
+  totalPages: number
+  totalElements: number
+}
+
 /**
  * ==============================================================================
  * API CLIENT CHO PHÂN HỆ TÀI CHÍNH & KẾ TOÁN (SV4 - HUY)
@@ -81,33 +131,44 @@ export const financeApi = {
     if (APP_CONFIG.useMockApi) return httpClient.get<Order[]>('/finance/orders')
     const res = await httpClient.get<any>('/finance/ledger', { params: { size: 100 } })
     const list = res?.data?.content || (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []))
-    return list.map((tx: any) => ({
-      id: String(tx.transactionId || tx.id),
-      orderCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
-      userId: String(tx.userId),
-      userName: tx.userName || `Khách hàng #${tx.userId}`,
-      userEmail: tx.userEmail || '',
-      orderType: mapOrderType(tx.transactionType),
-      targetId: String(tx.targetId || ''),
-      targetTitle: titleOf(tx),
-      amount: Number(tx.amount || 0),
-      discount: 0,
-      finalAmount: Number(tx.amount || 0),
-      paymentStatus: tx.status === 'SUCCESS' ? 'PAID' : tx.status,
-      paymentMethod: tx.paymentMethod,
-      paymentAttempts: [{
-        id: `att-${tx.transactionId || tx.id}`,
-        orderId: String(tx.transactionId || tx.id),
-        method: tx.paymentMethod || 'SEPAY',
-        transactionCode: tx.gatewayTransactionId || `TX-${tx.transactionId || tx.id}`,
-        amount: Number(tx.amount || 0),
-        status: tx.status === 'SUCCESS' ? 'SUCCESS' : tx.status,
-        createdAt: tx.createdAt || new Date().toISOString(),
-        verifiedAt: tx.paidAt,
-      }],
-      createdAt: tx.createdAt,
-      updatedAt: tx.paidAt || tx.createdAt,
-    }))
+    return list.map(txToOrder)
+  },
+
+  /**
+   * Một trang đơn, lọc và phân trang ở server (backend /finance/ledger, tối đa 100 dòng/trang).
+   * Mock: lọc và cắt trang trên danh sách mock.
+   */
+  getOrdersPage: async (q: OrderPageQuery): Promise<OrderPage> => {
+    const size = PAGE_SIZE
+    if (APP_CONFIG.useMockApi) {
+      const all = (await httpClient.get<Order[]>('/finance/orders')).filter((o) =>
+        (!q.orderType || o.orderType === q.orderType) &&
+        (!q.paymentStatus || o.paymentStatus === q.paymentStatus) &&
+        (!q.keyword || o.orderCode.toLowerCase().includes(q.keyword.toLowerCase())))
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) // mới nhất trước, giống backend
+      return {
+        items: all.slice(q.page * size, (q.page + 1) * size),
+        page: q.page,
+        totalPages: Math.ceil(all.length / size),
+        totalElements: all.length,
+      }
+    }
+    const res = await httpClient.get<any>('/finance/ledger', {
+      params: {
+        page: q.page,
+        size,
+        transactionType: q.orderType ? TX_TYPE_OF[q.orderType] : undefined,
+        status: q.paymentStatus ? TX_STATUS_OF[q.paymentStatus] : undefined,
+        keyword: q.keyword || undefined,
+      },
+    })
+    const data = res?.data ?? res
+    return {
+      items: (data?.content ?? []).map(txToOrder),
+      page: Number(data?.number ?? q.page),
+      totalPages: Number(data?.totalPages ?? 0),
+      totalElements: Number(data?.totalElements ?? 0),
+    }
   },
 
   getOrderById: async (id: string): Promise<Order> => {

@@ -246,11 +246,18 @@ export interface PaymentComplaint {
   bankReference: string
   note?: string
   status: 'OPEN' | 'RESOLVED' | 'REJECTED'
+  /** SUCCESS (ghi đủ vào đơn), EXCESS_RETURNED (ghi đơn + trả phần thừa), RETURNED_TO_CUSTOMER (trả toàn bộ) */
   resolution?: string
   resolutionNote?: string
+  /** Số tiền kế toán đã chuyển trả lại khách (toàn bộ hoặc phần thừa) */
+  returnedAmount?: number
+  /** Số tiền đơn khách khai, để so với số khách chuyển */
+  orderAmount?: number
   resolvedAt?: string
   createdAt: string
 }
+
+export type ComplaintTarget = 'ORDER' | 'ORDER_RETURN_EXCESS' | 'RETURNED'
 
 export interface CreateComplaintInput {
   orderCode?: string
@@ -284,11 +291,33 @@ export interface SepayLog {
   receivedAt: string
 }
 
+/** Bộ lọc màn hình Nhật ký SePay; from/to dạng yyyy-MM-dd, tính trọn ngày */
+export interface SepayLogQuery {
+  source?: SepayLog['source']
+  from?: string
+  to?: string
+  page?: number
+  size?: number
+}
+
+/** Một trang nhật ký: total là tổng số dòng khớp bộ lọc, không phải số dòng của trang */
+export interface SepayLogResult {
+  items: SepayLog[]
+  total: number
+  page: number
+  size: number
+  totalPages: number
+}
+
 export interface SepayStatus {
   webhookKeyConfigured: boolean
   apiTokenConfigured: boolean
   accountNumber: string | null
   webhookPath: string
   lastWebhookAt: string | null
+  /** Tổng tiền SePay thật đã ghi nhận vào đơn, server tính trên toàn bộ nhật ký */
+  realTotal: number
+  /** Số lần SePay thật báo về (webhook + đồng bộ) */
+  realCount: number
   mock?: boolean
 }

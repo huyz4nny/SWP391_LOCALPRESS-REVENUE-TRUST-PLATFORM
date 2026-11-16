@@ -58,10 +58,12 @@ public class FinanceLedgerService {
     public Page<TransactionLedgerResponse> getLedgerEntries(LedgerFilterRequest filter) {
         log.info("Tra cứu sổ quỹ tài chính với bộ lọc: {}", filter);
 
+        // Chuẩn hóa phân trang: page >= 0, size mặc định 20, tối đa 100
         int page = Math.max(0, filter.getPage());
         int size = filter.getSize() <= 0 ? 20 : Math.min(filter.getSize(), 100);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
+        // Lọc sổ quỹ theo tiêu chí, map sang DTO rồi gắn tên/email khách
         Page<TransactionLedgerResponse> result = transactionRepository.searchLedger(
                 filter.getStatus(),
                 filter.getTransactionType(),
@@ -84,9 +86,11 @@ public class FinanceLedgerService {
     public TransactionDetailResponse getTransactionDetail(Long transactionId) {
         log.info("Xem chi tiết chứng từ giao dịch ID: {}", transactionId);
 
+        // Tìm chứng từ, không có thì báo 404
         TransactionDetailResponse detail = transactionRepository.findById(transactionId)
                 .map(TransactionDetailResponse::fromEntity)
                 .orElseThrow(() -> new AppException("Không tìm thấy chứng từ giao dịch #" + transactionId, HttpStatus.NOT_FOUND));
+        // Gắn tên/email khách vào chứng từ
         String[] customer = customersOf(List.of(detail.getUserId())).get(detail.getUserId());
         if (customer != null) {
             detail.setUserName(customer[0]);
@@ -103,9 +107,11 @@ public class FinanceLedgerService {
     public LedgerSummaryResponse getLedgerSummary() {
         log.info("Tổng hợp số liệu sổ quỹ tài chính tòa soạn");
 
+        // Tổng thu gộp và tổng tiền đã hoàn
         BigDecimal grossRevenue = transactionRepository.calculateTotalGrossRevenue();
         BigDecimal refundedAmount = transactionRepository.calculateTotalRefundedAmount();
 
+        // Doanh thu thuần = gộp - hoàn, kèm số đơn theo trạng thái
         return LedgerSummaryResponse.builder()
                 .totalGrossRevenue(grossRevenue)
                 .totalRefundedAmount(refundedAmount)
@@ -130,9 +136,11 @@ public class FinanceLedgerService {
 
     /** user_id -> {full_name, email}; bảng users của identity chỉ đọc, không ghi. */
     private Map<Long, String[]> customersOf(List<Long> userIds) {
+        // Bỏ id null/trùng, rỗng thì trả map rỗng
         List<Long> ids = userIds.stream().filter(Objects::nonNull).distinct().toList();
         Map<Long, String[]> result = new HashMap<>();
         if (ids.isEmpty()) return result;
+        // Một câu SELECT ... IN (?, ?, ...) cho cả danh sách
         String in = ids.stream().map(id -> "?").collect(Collectors.joining(","));
         jdbcTemplate.query("SELECT user_id, full_name, email FROM users WHERE user_id IN (" + in + ")",
                 rs -> { result.put(rs.getLong(1), new String[]{rs.getString(2), rs.getString(3)}); }, ids.toArray());
@@ -150,12 +158,14 @@ public class FinanceLedgerService {
         // "Doanh thu thực thu" = doanh thu thuần, cùng công thức với sổ quỹ (Rule 16): gộp - tiền đã hoàn
         BigDecimal netRevenue = transactionRepository.calculateTotalGrossRevenue()
                 .subtract(transactionRepository.calculateTotalRefundedAmount());
+        // 5 giao dịch mới nhất, kèm tên/email khách
         List<TransactionLedgerResponse> recentTransactions = transactionRepository
                 .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .map(TransactionLedgerResponse::fromEntity)
                 .getContent();
         attachCustomers(recentTransactions);
 
+        // Đếm đơn đã trả/chờ, hoàn tiền chờ duyệt, khiếu nại mở, khoản lệch đối soát
         return FinanceDashboardResponse.builder()
                 .totalRevenue(netRevenue)
                 .paidOrdersCount(transactionRepository.countByStatus(TransactionStatus.SUCCESS))
@@ -167,6 +177,7 @@ public class FinanceLedgerService {
                 .build();
     }
 
+    /** Chuỗi rỗng/khoảng trắng -> null để bộ lọc bỏ qua. */
     private static String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

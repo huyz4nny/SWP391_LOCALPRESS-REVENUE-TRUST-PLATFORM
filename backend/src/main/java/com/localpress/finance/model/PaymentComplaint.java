@@ -56,12 +56,19 @@ public class PaymentComplaint {
     @Builder.Default
     private Status status = Status.OPEN;
 
-    /** Kết quả xử lý: trạng thái từ luồng webhook (SUCCESS) hoặc RETURNED_TO_CUSTOMER (đã chuyển trả khách). */
+    /**
+     * Kết quả xử lý: trạng thái từ luồng webhook (SUCCESS), RETURNED_TO_CUSTOMER (đã chuyển trả toàn bộ)
+     * hoặc EXCESS_RETURNED (đơn đã ghi đúng số tiền đơn, phần chuyển thừa đã trả lại khách).
+     */
     @Column(name = "resolution", length = 50)
     private String resolution;
 
     @Column(name = "resolution_note", length = 500)
     private String resolutionNote;
+
+    /** Số tiền kế toán đã chuyển trả lại khách: toàn bộ (RETURNED_TO_CUSTOMER) hoặc phần thừa (EXCESS_RETURNED). */
+    @Column(name = "returned_amount", precision = 12, scale = 2)
+    private BigDecimal returnedAmount;
 
     @Column(name = "resolved_by")
     private Long resolvedBy;
@@ -74,10 +81,15 @@ public class PaymentComplaint {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public void resolve(Long accountantId, String resolution, String note) {
+        resolve(accountantId, resolution, note, null);
+    }
+
+    public void resolve(Long accountantId, String resolution, String note, BigDecimal returnedAmount) {
         assertOpen();
         this.status = Status.RESOLVED;
         this.resolution = resolution;
         this.resolutionNote = note;
+        this.returnedAmount = returnedAmount;
         this.resolvedBy = accountantId;
         this.resolvedAt = LocalDateTime.now();
     }

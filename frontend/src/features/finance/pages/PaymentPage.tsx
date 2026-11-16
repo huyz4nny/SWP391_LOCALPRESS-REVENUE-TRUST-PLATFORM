@@ -23,7 +23,7 @@ import { KeyValue, Notice } from '../components/LedgerUI'
 
 const POLL_INTERVAL_MS = 3000
 
-export const PAYMENT_COMPLAINT_PATH = '/payment-complaints'
+export const PAYMENT_COMPLAINT_PATH = '/payment-complaints' // chuyển thành hằng số để link nào cũng dùng được  
 
 const ORDER_TYPE_LABELS: Record<PaymentOrderView['orderType'], string> = {
   ARTICLE: 'Mua bài viết Premium',
@@ -40,7 +40,7 @@ const DEFAULT_RETURN: Record<PaymentOrderView['orderType'], { to: string; label:
 const IPN_MESSAGES: Record<string, string> = {
   SUCCESS: 'SePay xác nhận đã nhận đúng số tiền, đơn đã thanh toán.',
   ALREADY_PROCESSED: 'Webhook lặp lại: hệ thống bỏ qua, không ghi nhận trùng (Rule 5).',
-  AMOUNT_MISMATCH: 'Sai số tiền: đơn không được ghi nhận, khách gửi khiếu nại để kế toán chuyển trả.',
+  AMOUNT_MISMATCH: 'Sai số tiền: đơn chưa được ghi nhận. Khách gửi khiếu nại: chuyển thừa thì kế toán ghi đơn và trả lại phần thừa, chuyển thiếu thì trả lại toàn bộ.',
   LATE_PAYMENT: 'Tiền về sau khi đơn hết hiệu lực: không cấp quyền, kế toán chuyển trả (Rule 6).',
   ORDER_NOT_FOUND: 'Không tìm thấy đơn, chờ Kế toán đối soát.',
 }
@@ -58,9 +58,9 @@ function useCountdown(expiresAt?: string) {
   return { left, text: `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` }
 }
 
-function complaintLink(order: PaymentOrderView) {
-  return `${PAYMENT_COMPLAINT_PATH}?orderCode=${order.orderCode}&amount=${order.amount}`
-}
+function complaintLink(order: PaymentOrderView) {//chỉ dùng 2 trường: orderCode và amount, ghép vào URL trang khiếu nại.
+  return `${PAYMENT_COMPLAINT_PATH}?orderCode=${order.orderCode}&amount=${order.amount}`  //
+} //ghép thêm tham số mã đơn và tham số tiền
 
 export function PaymentPage() {
   const { orderCode = '' } = useParams<{ orderCode: string }>()
@@ -101,7 +101,7 @@ export function PaymentPage() {
     if (!order || order.status !== 'PENDING' || order.expired) return
     const t = setInterval(async () => {
       try {
-        const s = await paymentApi.getStatus(orderCode)
+        const s = await paymentApi.getStatus(orderCode)//gọi backend
         if (s.isPaid || s.status !== order.status || s.expired !== order.expired) await load()
       } catch {
         /* mạng chập chờn thì lần sau thử lại, không bắt khách trả tiền lại */
@@ -166,8 +166,8 @@ export function PaymentPage() {
       </div>
     )
   }
-
-  const back = returnUrl ? { to: returnUrl, label: 'Quay lại nội dung' } : DEFAULT_RETURN[order.orderType]
+//nếu đang đọc bài thì quay lại bài nếu không thì quay về trang mặc định 
+  const back = returnUrl ? { to: returnUrl, label: 'Quay lại nội dung' } : DEFAULT_RETURN[order.orderType] 
   const isDemo = APP_CONFIG.useMockApi || import.meta.env.DEV
   const detail = order.description && order.description !== ORDER_TYPE_LABELS[order.orderType] ? order.description : null
 
@@ -183,7 +183,7 @@ export function PaymentPage() {
           <h1 className="mt-2 text-2xl font-semibold leading-8">{ORDER_TYPE_LABELS[order.orderType]}</h1>
           {detail && <p className="mt-1 font-serif text-base text-slate-700">{detail}</p>}
           <div className="mt-4 text-[32px] font-semibold leading-10 tracking-[-0.01em] num">{formatCurrency(order.amount)}</div>
-          <dl className="mt-4">
+          <dl className="mt-4"> // hiện số tiền đã ck
             <KeyValue label="Mã đơn"><span className="font-mono">{order.orderCode}</span></KeyValue>
             <KeyValue label="Phương thức">Chuyển khoản QR SePay</KeyValue>
             <KeyValue label="Thời gian"><span className="num">{formatDateTime(order.paidAt)}</span></KeyValue>
@@ -284,13 +284,13 @@ export function PaymentPage() {
               <div>
                 {order.qrCodeUrl ? (
                   <img
-                    src={order.qrCodeUrl}
-                    alt={`Mã QR thanh toán ${formatCurrency(order.amount)}, nội dung ${order.transferContent}`}
+                    src={order.qrCodeUrl} // Hiển thị thị qr bằng link qrCodeUrl không có link thì hiện Chưa có Mã Qr
+                    alt={`Mã QR thanh toán ${formatCurrency(order.amount)}, nội dung ${order.transferContent}`}//Thuộc tính alt ghi số tiền và nội dung để trình đọc màn hình có thể đọc
                     className="mx-auto h-60 w-60 rounded-md border border-slate-200 bg-white object-contain"
                   />
                 ) : (
                   <div className="mx-auto flex h-60 w-60 items-center justify-center rounded-md border border-dashed border-slate-300 text-[13px] text-slate-500">
-                    Chưa có mã QR
+                    Chưa có mã QR 
                   </div>
                 )}
                 <div className="mt-2 flex items-center justify-center gap-1.5 text-[13px] text-slate-500">
@@ -310,7 +310,7 @@ export function PaymentPage() {
                   Tôi đã chuyển khoản, kiểm tra lại
                 </Button>
                 <Link
-                  to={complaintLink(order)}
+                  to={complaintLink(order)} 
                   className="mt-2 block text-center text-[13px] text-slate-600 hover:text-slate-900 hover:underline"
                 >
                   Chuyển hơn 15 phút mà chưa được ghi nhận? Gửi khiếu nại

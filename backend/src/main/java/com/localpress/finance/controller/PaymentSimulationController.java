@@ -4,6 +4,7 @@ import com.localpress.finance.dto.request.SepayIpnRequest;
 import com.localpress.finance.dto.response.OrderStatusResponse;
 import com.localpress.finance.service.FinanceCurrentUser;
 import com.localpress.finance.service.PaymentProcessingService;
+import com.localpress.finance.service.SePayService;
 import com.localpress.finance.service.SepayGatewayService;
 import com.localpress.finance.model.SepayWebhookLog;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class PaymentSimulationController {
     private final PaymentProcessingService paymentProcessingService;
     private final FinanceCurrentUser currentUser;
     private final SepayGatewayService sepayGatewayService;
+    private final SePayService sePayService;
 
     @PostMapping("/simulate-ipn")
     public ResponseEntity<Map<String, Object>> simulateIpn(
@@ -56,7 +58,8 @@ public class PaymentSimulationController {
 
         log.warn("DEV: giả lập IPN SePay cho đơn {} số tiền {}", orderCode, amount);
         SepayIpnRequest ipn = SepayIpnRequest.builder()
-                .gateway("Vietcombank")
+                // Ngân hàng nhận lấy từ cấu hình localpress.sepay.bank-code, không ghi cứng
+                .gateway(sePayService.getBankCode())
                 .transferType("in")
                 .code(orderCode)
                 .content("LOCALPRESS " + orderCode)

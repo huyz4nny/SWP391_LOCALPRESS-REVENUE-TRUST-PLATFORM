@@ -259,7 +259,7 @@ public class FinanceReconciliationService {
 
         // 2. Kế toán đã ghi nhận theo khiếu nại nhưng SePay chưa từng báo khoản đó
         String complaintSql = """
-            SELECT c.complaint_id, c.bank_reference, c.order_code, c.amount, c.resolution
+            SELECT c.complaint_id, c.bank_reference, c.order_code, c.amount, c.resolution, c.returned_amount
             FROM payment_complaints c
             WHERE c.status = 'RESOLVED' AND c.resolved_at >= ? AND c.resolved_at < ?
               AND NOT EXISTS (SELECT 1 FROM reconciliation_items i WHERE i.complaint_id = c.complaint_id)
@@ -268,14 +268,21 @@ public class FinanceReconciliationService {
                                 AND l.result_status NOT IN ('INVALID_SIGNATURE', 'IGNORED_OUTGOING'))
             """;
         jdbcTemplate.query(complaintSql, rs -> {
+            // Ghi đơn + trả phần thừa: hệ thống chỉ ghi phần của đơn, sao kê có thêm khoản chuyển trả phần thừa
+            BigDecimal amount = rs.getBigDecimal("amount");
+            BigDecimal returned = rs.getBigDecimal("returned_amount");
+            boolean excessReturned = PaymentComplaintService.EXCESS_RETURNED.equals(rs.getString("resolution"))
+                    && returned != null;
             insertItem(ReconciliationItem.builder()
                     .periodId(period.getPeriodId())
                     .itemType(ReconciliationItem.Type.RECORDED_WITHOUT_BANK)
                     .complaintId(rs.getLong("complaint_id"))
                     .referenceCode(rs.getString("bank_reference"))
                     .orderCode(rs.getString("order_code"))
-                    .amount(rs.getBigDecimal("amount"))
+                    .amount(excessReturned ? amount.subtract(returned) : amount)
                     .reason("Đã ghi nhận theo khiếu nại #" + rs.getLong("complaint_id") + " (" + rs.getString("resolution")
+                            + (excessReturned ? ", khách chuyển " + amount.toPlainString() + " VND, đã trả lại phần thừa "
+                                    + returned.toPlainString() + " VND" : "")
                             + ") nhưng SePay chưa báo khoản này, cần đối chiếu sao kê ngân hàng")
                     .build());
         }, from, to);

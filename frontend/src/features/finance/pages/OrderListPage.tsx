@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Order } from '../types'
-import { financeApi } from '../api'
+import { financeApi, PAGE_SIZE, type OrderPage } from '../api'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { PageHeader, Panel, Segmented, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
 
 const TYPE_OPTIONS = [
@@ -14,10 +14,10 @@ const TYPE_OPTIONS = [
   { value: 'AD_CAMPAIGN', label: 'Quảng cáo' },
 ]
 
+// Backend chỉ có 4 trạng thái giao dịch này (không có "Đang xác minh")
 const STATUS_OPTIONS = [
   { value: 'ALL', label: 'Mọi trạng thái' },
   { value: 'PENDING', label: 'Chờ thanh toán' },
-  { value: 'PROCESSING', label: 'Đang xác minh' },
   { value: 'PAID', label: 'Đã thanh toán' },
   { value: 'FAILED', label: 'Thất bại' },
   { value: 'REFUNDED', label: 'Đã hoàn tiền' },
@@ -37,23 +37,36 @@ const METHOD_LABELS: Record<string, string> = {
 }
 
 export function OrderListPage() {
-  const [orders, setOrders] = useState<Order[]>([])
+  const [result, setResult] = useState<OrderPage>({ items: [], page: 0, totalPages: 0, totalElements: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [search, setSearch] = useState('')
+  const [keyword, setKeyword] = useState('') // từ khóa đã gõ xong, gọi server sau 300 ms
+  const [page, setPage] = useState(0)
+
+  // Gõ tìm kiếm thì chờ 300 ms rồi mới gọi server
+  useEffect(() => {
+    const t = setTimeout(() => { setKeyword(search.trim()); setPage(0) }, 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   useEffect(() => {
     loadOrders()
-  }, [])
+  }, [typeFilter, statusFilter, keyword, page])
 
   const loadOrders = async () => {
     try {
       setLoading(true)
       setError('')
-      const data = await financeApi.getOrders()
-      setOrders(data)
+      const data = await financeApi.getOrdersPage({
+        page,
+        orderType: typeFilter === 'ALL' ? undefined : typeFilter,
+        paymentStatus: statusFilter === 'ALL' ? undefined : statusFilter,
+        keyword: keyword || undefined,
+      })
+      setResult(data)
     } catch (e: any) {
       setError(e?.message || 'Không tải được danh sách đơn')
     } finally {
@@ -61,29 +74,13 @@ export function OrderListPage() {
     }
   }
 
-  const filteredOrders = orders.filter((o) => {
-    if (typeFilter !== 'ALL' && o.orderType !== typeFilter) return false
-    if (statusFilter !== 'ALL' && o.paymentStatus !== statusFilter) return false
-    if (
-      search &&
-      !o.orderCode.toLowerCase().includes(search.toLowerCase()) &&
-      !o.userName.toLowerCase().includes(search.toLowerCase()) &&
-      !o.targetTitle.toLowerCase().includes(search.toLowerCase())
-    ) {
-      return false
-    }
-    return true
-  })
+  // Đổi bộ lọc thì quay về trang đầu
+  const changeType = (v: string) => { setTypeFilter(v); setPage(0) }
+  const changeStatus = (v: string) => { setStatusFilter(v); setPage(0) }
 
-  // Số đếm trên bộ lọc loại đơn tính theo trạng thái đang chọn
-  const typeCounts = useMemo(() => {
-    const scoped = orders.filter((o) => statusFilter === 'ALL' || o.paymentStatus === statusFilter)
-    return Object.fromEntries(
-      TYPE_OPTIONS.map((t) => [t.value, t.value === 'ALL' ? scoped.length : scoped.filter((o) => o.orderType === t.value).length])
-    )
-  }, [orders, statusFilter])
-
-  const filteredTotal = filteredOrders.reduce((acc, o) => acc + o.finalAmount, 0)
+  const orders = result.items
+  const firstRow = result.totalElements === 0 ? 0 : page * PAGE_SIZE + 1
+  const lastRow = page * PAGE_SIZE + orders.length
 
   if (loading && orders.length === 0) return <LoadingBlock rows={8} />
 
@@ -91,7 +88,7 @@ export function OrderListPage() {
     <div>
       <PageHeader
         title="Đơn thanh toán"
-        sub="Đơn từ mua bài lẻ, gói độc giả và quảng cáo. Trạng thái chỉ đổi khi webhook SePay hoặc thanh toán ví xác nhận."
+        sub="Đơn từ mua bài lẻ, gói độc giả và quảng cáo. Trạng thái chỉ đổi khi webhook SePay xác nhận."
       />
 
       <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -99,13 +96,13 @@ export function OrderListPage() {
           <Segmented
             label="Loại đơn"
             value={typeFilter}
-            onChange={setTypeFilter}
-            options={TYPE_OPTIONS.map((t) => ({ ...t, count: typeCounts[t.value] }))}
+            onChange={changeType}
+            options={TYPE_OPTIONS}
           />
           <select
             aria-label="Trạng thái thanh toán"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => changeStatus(e.target.value)}
             className="h-8 rounded-md border border-slate-300 bg-white px-2.5 text-[13px] text-slate-900 hover:border-slate-400 cursor-pointer"
           >
             {STATUS_OPTIONS.map((s) => (
@@ -117,7 +114,7 @@ export function OrderListPage() {
           <span className="sr-only">Tìm đơn</span>
           <Search className="pointer-events-none absolute left-3 top-2 h-4 w-4 text-slate-400" />
           <input
-            placeholder="Mã đơn, khách hàng, dịch vụ"
+            placeholder="Mã đơn hoặc mã giao dịch"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 hover:border-slate-400 focus:border-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-900/15"
@@ -128,11 +125,12 @@ export function OrderListPage() {
       {error && <div className="mb-3"><Notice tone="error">{error} <button onClick={loadOrders} className="font-medium underline cursor-pointer">Thử lại</button></Notice></div>}
 
       <Panel
-        title={<span className="num">{filteredOrders.length} / {orders.length} đơn{orders.length >= 100 ? ' mới nhất' : ''}</span>}
-        aside={<span>Tổng <span className="font-semibold text-slate-900 num">{formatCurrency(filteredTotal)}</span></span>}
+        title={<span className="num">{result.totalElements} đơn khớp bộ lọc</span>}
+        aside={result.totalElements > 0 ? <span className="num text-[13px] text-slate-500">Dòng {firstRow}-{lastRow}</span> : undefined}
         bodyClassName="px-0 pb-1"
       >
-        {filteredOrders.length === 0 ? (
+        <Pager className="pb-3" page={page} totalPages={result.totalPages} loading={loading} onChange={setPage} />
+        {orders.length === 0 ? (
           <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Không có đơn nào khớp bộ lọc.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -149,7 +147,7 @@ export function OrderListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((o) => (
+                {orders.map((o) => (
                   <tr key={o.id} className={tableCls.tr}>
                     <td className={tableCls.td}>
                       <span className={tableCls.code}>{o.orderCode}</span>
@@ -185,7 +183,35 @@ export function OrderListPage() {
             </table>
           </div>
         )}
+        <Pager className="border-t border-slate-100 pt-3 pb-2" page={page} totalPages={result.totalPages} loading={loading} onChange={setPage} />
       </Panel>
+    </div>
+  )
+}
+
+/**
+ * Thanh chuyển trang, đặt cả trên và dưới bảng. Trang 1 là đơn mới nhất:
+ * "Trang trước" về phía đơn mới hơn, "Trang sau" sang đơn cũ hơn.
+ */
+function Pager({ page, totalPages, loading, onChange, className = '' }: {
+  page: number
+  totalPages: number
+  loading: boolean
+  onChange: (p: number) => void
+  className?: string
+}) {
+  if (totalPages <= 1) return null
+  return (
+    <div className={`flex items-center justify-between px-5 ${className}`}>
+      <span className="num text-[13px] text-slate-500">Trang {page + 1} / {totalPages}</span>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" disabled={loading || page === 0} onClick={() => onChange(page - 1)}>
+          <ChevronLeft className="h-3.5 w-3.5" /> Trang trước
+        </Button>
+        <Button variant="outline" size="sm" disabled={loading || page + 1 >= totalPages} onClick={() => onChange(page + 1)}>
+          Trang sau <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   )
 }

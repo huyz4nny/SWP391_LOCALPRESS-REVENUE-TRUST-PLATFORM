@@ -67,19 +67,19 @@ export function FinanceDashboard() {
   // Bỏ bút toán hoàn, giống ô "Doanh thu thực thu".
   const daily = useMemo(() => {
     const paid = orders.filter(
-      (o) => o.paymentStatus === 'PAID' && o.orderType !== 'REFUND' && o.createdAt,
+      (o) => o.paymentStatus === 'PAID' && o.orderType !== 'REFUND' && o.createdAt,// lọc đơn
     )
     if (paid.length === 0) return { rows: [] as { day: string; label: string; revenue: number }[], total: 0, end: null as Date | null }
-    const end = new Date(Math.max(...paid.map((o) => Date.parse(o.updatedAt || o.createdAt))))
+    const end = new Date(Math.max(...paid.map((o) => Date.parse(o.updatedAt || o.createdAt)))) //tìm ngày kết thúc 
     const sums = new Map<string, number>()
     paid.forEach((o) => {
       const k = dayKey(new Date(o.updatedAt || o.createdAt))
-      sums.set(k, (sums.get(k) || 0) + o.finalAmount)
+      sums.set(k, (sums.get(k) || 0) + o.finalAmount) //cộng tiền theo ngày
     })
     const rows = Array.from({ length: CHART_DAYS }, (_, i) => {
       const d = new Date(end)
       d.setDate(end.getDate() - (CHART_DAYS - 1 - i))
-      return { day: dayKey(d), label: `${d.getDate()}/${d.getMonth() + 1}`, revenue: sums.get(dayKey(d)) || 0 }
+      return { day: dayKey(d), label: `${d.getDate()}/${d.getMonth() + 1}`, revenue: sums.get(dayKey(d)) || 0 } // tạo 14 cột
     })
     return { rows, total: rows.reduce((a, r) => a + r.revenue, 0), end }
   }, [orders])
@@ -140,7 +140,7 @@ export function FinanceDashboard() {
     stats.refundReviewCount > 0 && (isChief
       ? `${stats.refundReviewCount} đề xuất hoàn tiền chờ bạn duyệt`
       : `${stats.refundReviewCount} đề xuất hoàn tiền đang chờ duyệt`),
-    stats.reconciliationDiscrepancy !== 0 && `đối soát lệch ${formatCurrency(stats.reconciliationDiscrepancy)}`,
+    stats.reconciliationDiscrepancy !== 0 && `đối soát lệch ${formatCurrency(stats.reconciliationDiscrepancy)}`,  //stats.refundReviewCount > 0  → "N đề xuất hoàn tiền đang chờ duyệt"
   ].filter(Boolean) as string[]
 
   return (
@@ -167,14 +167,14 @@ export function FinanceDashboard() {
         }
       />
 
-      {/* Lưới 3 cột, gap 16: doanh thu chiếm 2 cột, việc cần làm 1 cột; bảng giao dịch trải hết 3 cột */}
+      {/* Lưới 3 cột, gap 16: doanh thu chiếm 2 cột, việc cần làm 1 cột; bảng giao dịch trải hết 3 cột  /tổng gộp các giao dịch − tổng tiền đã hoàn {formatCurrency(stats.totalRevenue) } */} 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Panel className="xl:col-span-2" bodyClassName="pt-0">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pt-4">
             <div>
               <h2 className="text-[13px] text-slate-500">Doanh thu thực thu</h2>
               <div className="mt-1 text-[32px] font-semibold leading-10 tracking-[-0.01em] text-slate-900 num">
-                {formatCurrency(stats.totalRevenue)}
+                {formatCurrency(stats.totalRevenue) }  
               </div>
               <div className="mt-0.5 text-[13px] text-slate-500">
                 từ <span className="text-slate-900 num">{stats.paidOrdersCount}</span> đơn đã thanh toán
@@ -182,7 +182,7 @@ export function FinanceDashboard() {
             </div>
             {daily.end && (
               <div className="text-right text-[13px] text-slate-500">
-                {CHART_DAYS} ngày đến {daily.end.getDate()}/{daily.end.getMonth() + 1}
+                {CHART_DAYS} ngày đến {daily.end.getDate()}/{daily.end.getMonth() + 1}  
                 <div className="text-base font-semibold text-slate-900 num">{formatCurrency(daily.total)}</div>
               </div>
             )}
