@@ -357,7 +357,7 @@ public class SepayGatewayService {
     /**
      * Phân trang nhật ký, mới nhất trước. from/to là ngày nhận (cả hai đều tính trọn ngày), null là không lọc.
      */
-    public LogPage searchLogs(SepayWebhookLog.Source source, LocalDate from, LocalDate to, int page, int size) {
+    public LogPage searchLogs(SepayWebhookLog.Source source, LocalDate from, LocalDate to, int page, int size) { // đọc từ db
         if (from != null && to != null && from.isAfter(to)) {
             throw new AppException("Từ ngày phải trước hoặc bằng đến ngày", HttpStatus.BAD_REQUEST);
         }

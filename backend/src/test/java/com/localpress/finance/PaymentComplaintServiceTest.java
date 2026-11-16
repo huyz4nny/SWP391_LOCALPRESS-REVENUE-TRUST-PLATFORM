@@ -163,6 +163,85 @@ class PaymentComplaintServiceTest {
         verify(paymentProcessingService, never()).processSepayIpn(any());
     }
 
+    private PaymentComplaint overpaid() {
+        PaymentComplaint c = open(ORDER);
+        c.setAmount(new BigDecimal("20000"));
+        return c;
+    }
+
+    @Test
+    @DisplayName("Chuyển thừa 20.000 cho đơn 15.000: ghi đơn đúng 15.000 qua luồng webhook, trả lại 5.000")
+    void resolve_orderReturnExcess_recordsOrderAmount() {
+        PaymentComplaint c = overpaid();
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(sepayLogRepository.findFirstByReferenceCodeAndAuthOkTrueAndTransferAmountNotNullOrderByReceivedAtAsc("FT123"))
+                .thenReturn(Optional.of(SepayWebhookLog.builder().referenceCode("FT123")
+                        .transferAmount(new BigDecimal("20000")).resultStatus("AMOUNT_MISMATCH").build()));
+        when(transactionRepository.findByGatewayTransactionId(ORDER)).thenReturn(Optional.of(order(6L, TransactionStatus.PENDING)));
+        when(paymentProcessingService.processSepayIpn(argThat(ipn -> ORDER.equals(ipn.resolveOrderCode())
+                && "FT123".equals(ipn.getReferenceCode())
+                && new BigDecimal("15000").compareTo(ipn.resolveAmount()) == 0)))
+                .thenReturn(Map.of("status", "SUCCESS"));
+        when(complaintRepository.save(c)).thenReturn(c);
+
+        service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER_RETURN_EXCESS, "Đã trả phần thừa, mã GD FT777");
+
+        assertEquals(PaymentComplaint.Status.RESOLVED, c.getStatus());
+        assertEquals(PaymentComplaintService.EXCESS_RETURNED, c.getResolution());
+        assertEquals(0, new BigDecimal("5000").compareTo(c.getReturnedAmount()));
+    }
+
+    @Test
+    @DisplayName("Ghi đơn + trả phần thừa: chuyển đủ / chuyển thiếu / thiếu mã GD trả -> từ chối, không ghi gì")
+    void resolve_orderReturnExcess_rejectsWhenNotOverpaid() {
+        PaymentComplaint exact = open(ORDER);
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(exact));
+        AppException noRef = assertThrows(AppException.class,
+                () -> service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER_RETURN_EXCESS, " "));
+        assertEquals(HttpStatus.BAD_REQUEST, noRef.getStatus());
+
+        when(transactionRepository.findByGatewayTransactionId(ORDER)).thenReturn(Optional.of(order(6L, TransactionStatus.PENDING)));
+        AppException equal = assertThrows(AppException.class,
+                () -> service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER_RETURN_EXCESS, "FT777"));
+        assertEquals(HttpStatus.CONFLICT, equal.getStatus());
+
+        exact.setAmount(new BigDecimal("10000"));
+        AppException under = assertThrows(AppException.class,
+                () -> service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER_RETURN_EXCESS, "FT777"));
+        assertEquals(HttpStatus.CONFLICT, under.getStatus());
+
+        assertEquals(PaymentComplaint.Status.OPEN, exact.getStatus());
+        verify(paymentProcessingService, never()).processSepayIpn(any());
+    }
+
+    @Test
+    @DisplayName("Ghi đơn + trả phần thừa nhưng đơn đã hết hạn -> 409, gợi ý trả lại toàn bộ")
+    void resolve_orderReturnExcess_lateOrder() {
+        PaymentComplaint c = overpaid();
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(transactionRepository.findByGatewayTransactionId(ORDER)).thenReturn(Optional.of(order(6L, TransactionStatus.PENDING)));
+        when(paymentProcessingService.processSepayIpn(any()))
+                .thenReturn(Map.of("status", "LATE_PAYMENT", "message", "Tiền về sau khi đơn hết hiệu lực"));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> service.resolve(9L, 2L, PaymentComplaintService.Target.ORDER_RETURN_EXCESS, "FT777"));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().contains("toàn bộ"));
+        assertEquals(PaymentComplaint.Status.OPEN, c.getStatus());
+    }
+
+    @Test
+    @DisplayName("Chuyển trả toàn bộ: lưu số tiền đã trả bằng số khách chuyển")
+    void resolve_returned_storesReturnedAmount() {
+        PaymentComplaint c = open(null);
+        when(complaintRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(c));
+        when(complaintRepository.save(c)).thenReturn(c);
+
+        service.resolve(9L, 2L, PaymentComplaintService.Target.RETURNED, "Đã chuyển trả, mã GD FT999");
+
+        assertEquals(0, new BigDecimal("15000").compareTo(c.getReturnedAmount()));
+    }
+
     @Test
     @DisplayName("Từ chối bắt buộc có lý do; khiếu nại đã xử lý không xử lý lại")
     void reject_rules() {

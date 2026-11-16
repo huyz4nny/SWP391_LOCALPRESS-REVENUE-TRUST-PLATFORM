@@ -19,10 +19,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * ==============================================================================
@@ -35,12 +39,16 @@ import java.util.Map;
  * (dùng mã giao dịch ngân hàng của khách), nên mọi nhánh đủ/thiếu/thừa/muộn và
  * idempotency giữ nguyên.
  *
- * LocalPress không giữ tiền khách (không có ví), kế toán chọn 1 trong 2 cách xử
+ * LocalPress không giữ tiền khách (không có ví), kế toán chọn 1 trong 3 cách xử
  * lý:
  * - ORDER : khoản tiền đúng là của đơn khách khai báo, đúng số tiền, đơn còn
  * chờ -> chạy luồng webhook cho đơn đó.
- * - RETURNED: không gán được vào đơn (sai số tiền, đơn hết hạn / đã trả, không
- * có mã đơn) -> kế toán chuyển trả
+ * - ORDER_RETURN_EXCESS: khách chuyển THỪA cho đơn còn chờ -> chạy luồng webhook
+ * với đúng số tiền đơn (đơn SUCCESS, chứng từ bằng số tiền đơn), kế toán chuyển
+ * trả phần thừa ngoài hệ thống rồi ghi mã GD chuyển trả. Phần thừa không phải
+ * hoàn tiền (không bút toán REFUND, không 4 mắt, không thu hồi quyền).
+ * - RETURNED: không gán được vào đơn (chuyển thiếu, đơn hết hạn / đã trả, không
+ * có mã đơn, hoặc khách muốn nhận lại toàn bộ) -> kế toán chuyển trả
  * lại tài khoản khách ngoài hệ thống rồi ghi mã GD chuyển trả vào ghi chú.
  *
  * Chống ghi nhận 2 lần (Rule 5), cả 2 chiều:
@@ -55,11 +63,14 @@ import java.util.Map;
 public class PaymentComplaintService {
 
     public enum Target {
-        ORDER, RETURNED
+        ORDER, ORDER_RETURN_EXCESS, RETURNED
     }
 
-    /** Kết quả lưu trên khiếu nại khi kế toán đã chuyển trả lại khách. */
+    /** Kết quả lưu trên khiếu nại khi kế toán đã chuyển trả lại khách toàn bộ khoản tiền. */
     public static final String RETURNED_TO_CUSTOMER = "RETURNED_TO_CUSTOMER";
+
+    /** Kết quả lưu trên khiếu nại khi đơn đã ghi đúng số tiền đơn và phần chuyển thừa đã trả lại khách. */
+    public static final String EXCESS_RETURNED = "EXCESS_RETURNED";
 
     private final PaymentComplaintRepository complaintRepository;
     private final TransactionRepository transactionRepository;
@@ -101,8 +112,7 @@ public class PaymentComplaintService {
 
     @Transactional(readOnly = true)
     public List<ComplaintResponse> listMine(Long userId) {
-        return complaintRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(ComplaintResponse::fromEntity).toList();
+        return withOrderAmounts(complaintRepository.findByUserIdOrderByCreatedAtDesc(userId));
     }
 
     @Transactional(readOnly = true)
@@ -110,7 +120,23 @@ public class PaymentComplaintService {
         List<PaymentComplaint> list = status == null
                 ? complaintRepository.findAllByOrderByCreatedAtDesc()
                 : complaintRepository.findByStatusOrderByCreatedAtAsc(status);
-        return list.stream().map(ComplaintResponse::fromEntity).toList();
+        return withOrderAmounts(list);
+    }
+
+    /** Kèm số tiền đơn để kế toán thấy ngay khách chuyển đủ / thừa / thiếu (1 truy vấn cho cả danh sách). */
+    private List<ComplaintResponse> withOrderAmounts(List<PaymentComplaint> list) {
+        Set<String> codes = list.stream().map(PaymentComplaint::getOrderCode).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, BigDecimal> amounts = codes.isEmpty() ? Map.of()
+                : transactionRepository.findByGatewayTransactionIdIn(codes).stream()
+                        .filter(tx -> tx.getTransactionType().isPurchase())
+                        .collect(Collectors.toMap(Transaction::getGatewayTransactionId, Transaction::getAmount,
+                                (a, b) -> a));
+        return list.stream().map(c -> {
+            ComplaintResponse r = ComplaintResponse.fromEntity(c);
+            r.setOrderAmount(c.getOrderCode() == null ? null : amounts.get(c.getOrderCode()));
+            return r;
+        }).toList();
     }
 
     /**
@@ -127,7 +153,11 @@ public class PaymentComplaintService {
         Target effective = target != null ? target : (c.getOrderCode() != null ? Target.ORDER : Target.RETURNED);
 
         String resultStatus;
-        if (effective == Target.ORDER) {
+        BigDecimal returnedAmount = null;
+        if (effective == Target.ORDER_RETURN_EXCESS) {
+            returnedAmount = recordOrderAndReturnExcess(c, note);
+            resultStatus = EXCESS_RETURNED;
+        } else if (effective == Target.ORDER) {
             if (c.getOrderCode() == null) {
                 throw new AppException("Khiếu nại không có mã đơn, hãy chuyển trả lại khách", HttpStatus.BAD_REQUEST);
             }
@@ -144,7 +174,10 @@ public class PaymentComplaintService {
             }
             if (!"SUCCESS".equals(resultStatus)) {
                 // Rollback: không ghi nhận gì, kế toán chọn chuyển trả lại khách
-                throw new AppException(result.get("message") + ". Hãy chuyển trả lại khách.", HttpStatus.CONFLICT);
+                String hint = "AMOUNT_MISMATCH".equals(resultStatus) && isOverpaidPendingOrder(c)
+                        ? ". Khách chuyển thừa: chọn ghi đơn và trả phần thừa, hoặc chuyển trả lại toàn bộ."
+                        : ". Hãy chuyển trả lại khách.";
+                throw new AppException(result.get("message") + hint, HttpStatus.CONFLICT);
             }
         } else {
             // Đơn còn chờ đúng số tiền thì phải ghi vào đơn, tránh vừa trả lại vừa để
@@ -164,11 +197,65 @@ public class PaymentComplaintService {
                 throw new AppException("Nhập mã giao dịch chuyển trả lại khách vào ghi chú", HttpStatus.BAD_REQUEST);
             }
             resultStatus = RETURNED_TO_CUSTOMER;
+            returnedAmount = c.getAmount();
         }
 
-        c.resolve(accountantId, resultStatus, note);
+        c.resolve(accountantId, resultStatus, note, returnedAmount);
         log.info("Kế toán #{} xử lý khiếu nại #{} -> {}", accountantId, complaintId, resultStatus);
         return ComplaintResponse.fromEntity(complaintRepository.save(c));
+    }
+
+    /**
+     * Khách chuyển thừa cho đơn còn chờ: ghi đơn bằng đúng số tiền đơn qua luồng webhook (Rule 5, chứng từ,
+     * PaymentSuccessEvent giữ nguyên), phần thừa kế toán đã chuyển trả ngoài hệ thống. Trả về số tiền thừa.
+     * Số tiền nhận lấy theo khiếu nại, đã đối chiếu với số SePay báo (nếu có) để khách không khai khống.
+     */
+    private BigDecimal recordOrderAndReturnExcess(PaymentComplaint c, String note) {
+        if (c.getOrderCode() == null) {
+            throw new AppException("Khiếu nại không có mã đơn, hãy chuyển trả lại toàn bộ cho khách",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (note == null || note.isBlank()) {
+            throw new AppException("Nhập mã giao dịch chuyển trả phần thừa vào ghi chú", HttpStatus.BAD_REQUEST);
+        }
+        assertAmountMatchesGateway(c);
+        Transaction tx = transactionRepository.findByGatewayTransactionId(c.getOrderCode())
+                .filter(t -> t.getTransactionType().isPurchase())
+                .orElseThrow(() -> new AppException("Không tìm thấy đơn " + c.getOrderCode()
+                        + ", hãy chuyển trả lại toàn bộ cho khách", HttpStatus.CONFLICT));
+        int cmp = c.getAmount().compareTo(tx.getAmount());
+        if (cmp <= 0) {
+            throw new AppException("Khách chuyển " + c.getAmount().toPlainString() + " VND, đơn cần "
+                    + tx.getAmount().toPlainString() + " VND: không có phần thừa. "
+                    + (cmp == 0 ? "Hãy ghi nhận vào đơn." : "Chuyển thiếu thì chuyển trả lại toàn bộ cho khách."),
+                    HttpStatus.CONFLICT);
+        }
+        Map<String, Object> result = paymentProcessingService.processSepayIpn(SepayIpnRequest.builder()
+                .content(c.getOrderCode())
+                .amount(tx.getAmount())
+                .referenceCode(c.getBankReference())
+                .build());
+        String status = String.valueOf(result.get("status"));
+        if ("ALREADY_PROCESSED".equals(status)) {
+            throw new AppException("Đơn " + c.getOrderCode() + " đã được ghi nhận trước đó, "
+                    + "hãy chuyển trả lại toàn bộ khoản này cho khách.", HttpStatus.CONFLICT);
+        }
+        if (!"SUCCESS".equals(status)) {
+            throw new AppException(result.get("message") + ". Hãy chuyển trả lại toàn bộ cho khách.",
+                    HttpStatus.CONFLICT);
+        }
+        BigDecimal excess = c.getAmount().subtract(tx.getAmount());
+        log.info("Khiếu nại #{}: ghi đơn {} = {} VND, trả lại phần thừa {} VND", c.getComplaintId(),
+                c.getOrderCode(), tx.getAmount(), excess);
+        return excess;
+    }
+
+    private boolean isOverpaidPendingOrder(PaymentComplaint c) {
+        return c.getOrderCode() != null && transactionRepository.findByGatewayTransactionId(c.getOrderCode())
+                .filter(tx -> tx.getStatus() == TransactionStatus.PENDING
+                        && !tx.isPaymentWindowClosed(LocalDateTime.now())
+                        && c.getAmount().compareTo(tx.getAmount()) > 0)
+                .isPresent();
     }
 
     /**

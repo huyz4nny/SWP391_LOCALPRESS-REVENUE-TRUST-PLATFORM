@@ -20,8 +20,9 @@ import java.util.List;
  * ==============================================================================
  * Khách: POST /api/v1/finance/complaints, GET /api/v1/finance/complaints/me
  * Kế toán: GET /api/v1/finance/complaints?status=OPEN
- * POST /api/v1/finance/complaints/{id}/resolve?target=ORDER|RETURNED (RETURNED:
- * đã chuyển trả khách, ghi chú = mã GD trả)
+ * POST /api/v1/finance/complaints/{id}/resolve?target=ORDER|ORDER_RETURN_EXCESS|RETURNED
+ * (ORDER_RETURN_EXCESS: ghi đơn đúng số tiền đơn + đã trả phần thừa; RETURNED: đã chuyển trả
+ * toàn bộ; ghi chú = mã GD trả)
  * POST /api/v1/finance/complaints/{id}/reject (bắt buộc lý do)
  * Phân quyền theo URL nằm ở SecurityConfig; kiểm tra lại vai trò kế toán tại
  * đây.

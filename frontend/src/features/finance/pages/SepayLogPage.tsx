@@ -30,7 +30,7 @@ const RESULT: Record<string, [string, NonNullable<BadgeProps['variant']>]> = {
   SUCCESS: ['Đã ghi nhận', 'success'],
   ALREADY_PROCESSED: ['Đã ghi nhận trước đó', 'secondary'],
   DUPLICATE_DELIVERY: ['SePay gửi lại, bỏ qua', 'secondary'],
-  AMOUNT_MISMATCH: ['Sai số tiền, chờ trả lại', 'warning'],
+  AMOUNT_MISMATCH: ['Sai số tiền, chờ khiếu nại', 'warning'],
   LATE_PAYMENT: ['Về muộn, chờ trả lại', 'warning'],
   AMOUNT_MISSING: ['Thiếu số tiền', 'warning'],
   ORDER_NOT_FOUND: ['Không khớp đơn', 'warning'],
@@ -70,7 +70,7 @@ export function SepayLogPage() {
     setLoading(true)
     setError('')
     try {
-      const [r, s] = await Promise.all([
+      const [r, s] = await Promise.all([ //gọi đồng thời cả 2
         sepayApi.logs({ source, from: from || undefined, to: to || undefined, page, size: PAGE_SIZE }),
         sepayApi.status(),
       ])
@@ -88,7 +88,7 @@ export function SepayLogPage() {
   }, [source, from, to, page])
 
   // Đổi bộ lọc thì quay về trang đầu
-  const changeSource = (v: SourceFilter) => { setSource(v); setPage(0) }
+  const changeSource = (v: SourceFilter) => { setSource(v); setPage(0) } // cập nhật source
   const changeFrom = (v: string) => { setFrom(v); setPage(0) }
   const changeTo = (v: string) => { setTo(v); setPage(0) }
 
@@ -109,13 +109,12 @@ export function SepayLogPage() {
     }
   }
 
-  // Server tính trên toàn bộ nhật ký (bỏ giả lập, log sai khóa),
-  // không phụ thuộc trang đang xem hay bộ lọc đang chọn
-  const realTotal = status?.realTotal ?? 0
-  const realCount = status?.realCount ?? 0
-  const logs = result.items
-  const firstRow = result.total === 0 ? 0 : result.page * result.size + 1
-  const lastRow = result.page * result.size + logs.length
+ // Tổng tiền, số lần do server tính trên toàn bảng; firstRow/lastRow là số thứ tự dòng của trang đang xem
+ const realTotal = status?.realTotal ?? 0 // tổng tiền SUCCESS của toàn bảng (bỏ giả lập, sai khóa)
+const realCount = status?.realCount ?? 0 // số lần SePay thật báo về của toàn bảng
+const logs = result.items // các dòng của trang đang xem
+const firstRow = result.total === 0 ? 0 : result.page * result.size + 1 // số thứ tự dòng đầu trang
+const lastRow = result.page * result.size + logs.length // số thứ tự dòng cuối trang
 
   return (
     <div>

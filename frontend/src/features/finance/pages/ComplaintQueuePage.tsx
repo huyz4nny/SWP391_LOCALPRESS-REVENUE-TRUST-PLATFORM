@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { complaintApi } from '../api/payment'
-import type { PaymentComplaint } from '../types'
+import type { ComplaintTarget, PaymentComplaint } from '../types'
 import { PageHeader, Panel, Segmented, Notice, tableCls } from '../components/LedgerUI'
 
 /**
@@ -14,6 +14,8 @@ import { PageHeader, Panel, Segmented, Notice, tableCls } from '../components/Le
  * ==============================================================================
  * Thay cho "duyệt chuyển khoản thủ công". Kế toán mở sao kê ngân hàng, tìm theo mã giao dịch & số tiền:
  *  - Thấy tiền + có đơn đúng số tiền -> "Ghi nhận vào đơn": chạy đúng luồng webhook (chống trùng).
+ *  - Khách chuyển THỪA cho đơn còn chờ -> "Ghi đơn + trả phần thừa": đơn ghi đúng số tiền đơn,
+ *    kế toán chuyển trả phần thừa rồi nhập mã GD trả. Không phải hoàn tiền (không 4 mắt, không thu hồi quyền).
  *  - Thấy tiền nhưng không gán được vào đơn (sai số tiền, đơn hết hạn / đã trả, không có mã đơn)
  *    -> kế toán chuyển trả lại tài khoản khách rồi bấm "Đã chuyển trả khách" kèm mã GD chuyển trả.
  *    LocalPress không giữ tiền khách, không có ví.
@@ -22,7 +24,13 @@ import { PageHeader, Panel, Segmented, Notice, tableCls } from '../components/Le
 
 const RESOLUTION_LABELS: Record<string, string> = {
   SUCCESS: 'Đã ghi nhận đơn thành công',
+  EXCESS_RETURNED: 'Đã ghi đơn, trả lại phần thừa',
   RETURNED_TO_CUSTOMER: 'Đã chuyển trả lại khách',
+}
+
+/** Chênh lệch số khách chuyển so với số tiền đơn: > 0 thừa, < 0 thiếu, null nếu không biết đơn. */
+export function complaintDiff(c: PaymentComplaint): number | null {
+  return c.orderAmount == null ? null : c.amount - c.orderAmount
 }
 
 export function ComplaintStatusBadge({ status }: { status: PaymentComplaint['status'] }) {
@@ -45,7 +53,7 @@ export function ComplaintQueuePage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [reason, setReason] = useState('')
-  const [returning, setReturning] = useState<string | null>(null)
+  const [returning, setReturning] = useState<{ id: string; target: Exclude<ComplaintTarget, 'ORDER'> } | null>(null)
   const [payoutRef, setPayoutRef] = useState('')
   const [confirm, setConfirm] = useState<PaymentComplaint | null>(null)
 
@@ -74,7 +82,7 @@ export function ComplaintQueuePage() {
     <div>
       <PageHeader
         title="Khiếu nại thanh toán"
-        sub="Khách báo đã chuyển tiền nhưng chưa được ghi nhận. Tìm đúng mã giao dịch và số tiền trên sao kê. Đúng đơn, đúng số tiền thì ghi nhận vào đơn (chạy lại luồng webhook, không ghi trùng); không gán được vào đơn thì chuyển trả lại khách, LocalPress không giữ tiền."
+        sub="Khách báo đã chuyển tiền nhưng chưa được ghi nhận. Tìm đúng mã giao dịch và số tiền trên sao kê. Đúng đơn, đúng số tiền thì ghi nhận vào đơn (chạy lại luồng webhook, không ghi trùng); chuyển thừa cho đơn còn chờ thì ghi đơn và trả lại phần thừa; không gán được vào đơn thì chuyển trả lại khách, LocalPress không giữ tiền."
       />
 
       <div className="mb-3">
@@ -119,15 +127,37 @@ export function ComplaintQueuePage() {
                       <ComplaintStatusBadge status={c.status} />
                       {c.resolution && <div className="mt-1 text-xs text-slate-500">{RESOLUTION_LABELS[c.resolution] ?? c.resolution}</div>}
                       {c.status === 'REJECTED' && c.resolutionNote && <div className="mt-1 max-w-[220px] text-xs text-[#831c1e]">{c.resolutionNote}</div>}
-                      {c.resolution === 'RETURNED_TO_CUSTOMER' && c.resolutionNote && <div className="mt-1 max-w-[220px] text-xs text-slate-500">{c.resolutionNote}</div>}
+                      {(c.resolution === 'RETURNED_TO_CUSTOMER' || c.resolution === 'EXCESS_RETURNED') && c.resolutionNote && <div className="mt-1 max-w-[220px] text-xs text-slate-500">{c.resolutionNote}</div>}
                     </td>
-                    <td className={`${tableCls.tdNum} align-top font-semibold`}>{formatCurrency(c.amount)}</td>
+                    <td className={`${tableCls.tdNum} align-top`}>
+                      <div className="font-semibold">{formatCurrency(c.amount)}</div>
+                      {c.orderAmount != null && (
+                        <div className="text-xs text-slate-500">Đơn cần {formatCurrency(c.orderAmount)}</div>
+                      )}
+                      {(() => {
+                        const diff = complaintDiff(c)
+                        if (!diff) return null
+                        return (
+                          <div className={`text-xs font-medium ${diff > 0 ? 'text-amber-700' : 'text-[#831c1e]'}`}>
+                            {diff > 0 ? 'Thừa' : 'Thiếu'} {formatCurrency(Math.abs(diff))}
+                          </div>
+                        )
+                      })()}
+                      {c.returnedAmount != null && (
+                        <div className="text-xs text-slate-500">Đã trả lại {formatCurrency(c.returnedAmount)}</div>
+                      )}
+                    </td>
                     <td className={`${tableCls.td} align-top text-right`}>
                       {c.status === 'OPEN' &&
-                        (returning === c.complaintId ? (
+                        (returning?.id === c.complaintId ? (
                           <div className="ml-auto w-60 space-y-1.5">
+                            {returning.target === 'ORDER_RETURN_EXCESS' && (
+                              <p className="text-left text-xs text-slate-500">
+                                Ghi đơn {formatCurrency(c.orderAmount ?? 0)}, chuyển trả khách {formatCurrency(complaintDiff(c) ?? 0)}
+                              </p>
+                            )}
                             <Input
-                              placeholder="Mã GD chuyển trả lại khách"
+                              placeholder={returning.target === 'ORDER_RETURN_EXCESS' ? 'Mã GD chuyển trả phần thừa' : 'Mã GD chuyển trả lại khách'}
                               value={payoutRef}
                               onChange={(e) => setPayoutRef(e.target.value)}
                               className="h-8 text-[13px]"
@@ -142,7 +172,13 @@ export function ComplaintQueuePage() {
                                 disabled={!payoutRef.trim() || busyId === c.complaintId}
                                 onClick={() =>
                                   run(c.complaintId, () =>
-                                    complaintApi.resolve(c.complaintId, 'RETURNED', `Đã chuyển trả khách, mã GD ${payoutRef.trim()}`)
+                                    complaintApi.resolve(
+                                      c.complaintId,
+                                      returning.target,
+                                      returning.target === 'ORDER_RETURN_EXCESS'
+                                        ? `Đã ghi đơn, chuyển trả phần thừa ${formatCurrency(complaintDiff(c) ?? 0)}, mã GD ${payoutRef.trim()}`
+                                        : `Đã chuyển trả khách, mã GD ${payoutRef.trim()}`
+                                    )
                                   ).then(() => setReturning(null))
                                 }
                               >
@@ -177,10 +213,23 @@ export function ComplaintQueuePage() {
                           </div>
                         ) : (
                           <div className="flex justify-end gap-1.5">
-                            {c.orderCode && (
-                              <Button size="sm" disabled={busyId === c.complaintId} onClick={() => setConfirm(c)}>
-                                Ghi nhận vào đơn
+                            {c.orderCode && (complaintDiff(c) ?? 0) > 0 ? (
+                              <Button
+                                size="sm"
+                                disabled={busyId === c.complaintId}
+                                onClick={() => {
+                                  setPayoutRef('')
+                                  setReturning({ id: c.complaintId, target: 'ORDER_RETURN_EXCESS' })
+                                }}
+                              >
+                                Ghi đơn + trả phần thừa
                               </Button>
+                            ) : (
+                              c.orderCode && (complaintDiff(c) ?? 0) === 0 && (
+                                <Button size="sm" disabled={busyId === c.complaintId} onClick={() => setConfirm(c)}>
+                                  Ghi nhận vào đơn
+                                </Button>
+                              )
                             )}
                             <Button
                               size="sm"
@@ -188,10 +237,10 @@ export function ComplaintQueuePage() {
                               disabled={busyId === c.complaintId}
                               onClick={() => {
                                 setPayoutRef('')
-                                setReturning(c.complaintId)
+                                setReturning({ id: c.complaintId, target: 'RETURNED' })
                               }}
                             >
-                              Đã chuyển trả khách
+                              {(complaintDiff(c) ?? 0) > 0 ? 'Trả lại toàn bộ' : 'Đã chuyển trả khách'}
                             </Button>
                             <Button
                               size="sm"

@@ -40,7 +40,7 @@ const DEFAULT_RETURN: Record<PaymentOrderView['orderType'], { to: string; label:
 const IPN_MESSAGES: Record<string, string> = {
   SUCCESS: 'SePay xác nhận đã nhận đúng số tiền, đơn đã thanh toán.',
   ALREADY_PROCESSED: 'Webhook lặp lại: hệ thống bỏ qua, không ghi nhận trùng (Rule 5).',
-  AMOUNT_MISMATCH: 'Sai số tiền: đơn không được ghi nhận, khách gửi khiếu nại để kế toán chuyển trả.',
+  AMOUNT_MISMATCH: 'Sai số tiền: đơn chưa được ghi nhận. Khách gửi khiếu nại: chuyển thừa thì kế toán ghi đơn và trả lại phần thừa, chuyển thiếu thì trả lại toàn bộ.',
   LATE_PAYMENT: 'Tiền về sau khi đơn hết hiệu lực: không cấp quyền, kế toán chuyển trả (Rule 6).',
   ORDER_NOT_FOUND: 'Không tìm thấy đơn, chờ Kế toán đối soát.',
 }
@@ -58,8 +58,8 @@ function useCountdown(expiresAt?: string) {
   return { left, text: `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` }
 }
 
-function complaintLink(order: PaymentOrderView) {
-  return `${PAYMENT_COMPLAINT_PATH}?orderCode=${order.orderCode}&amount=${order.amount}` 
+function complaintLink(order: PaymentOrderView) {//chỉ dùng 2 trường: orderCode và amount, ghép vào URL trang khiếu nại.
+  return `${PAYMENT_COMPLAINT_PATH}?orderCode=${order.orderCode}&amount=${order.amount}`  //
 } //ghép thêm tham số mã đơn và tham số tiền
 
 export function PaymentPage() {
@@ -101,7 +101,7 @@ export function PaymentPage() {
     if (!order || order.status !== 'PENDING' || order.expired) return
     const t = setInterval(async () => {
       try {
-        const s = await paymentApi.getStatus(orderCode)
+        const s = await paymentApi.getStatus(orderCode)//gọi backend
         if (s.isPaid || s.status !== order.status || s.expired !== order.expired) await load()
       } catch {
         /* mạng chập chờn thì lần sau thử lại, không bắt khách trả tiền lại */
@@ -167,7 +167,7 @@ export function PaymentPage() {
     )
   }
 //nếu đang đọc bài thì quay lại bài nếu không thì quay về trang mặc định 
-  const back = returnUrl ? { to: returnUrl, label: 'Quay lại nội dung' } : DEFAULT_RETURN[order.orderType]
+  const back = returnUrl ? { to: returnUrl, label: 'Quay lại nội dung' } : DEFAULT_RETURN[order.orderType] 
   const isDemo = APP_CONFIG.useMockApi || import.meta.env.DEV
   const detail = order.description && order.description !== ORDER_TYPE_LABELS[order.orderType] ? order.description : null
 
@@ -310,7 +310,7 @@ export function PaymentPage() {
                   Tôi đã chuyển khoản, kiểm tra lại
                 </Button>
                 <Link
-                  to={complaintLink(order)}
+                  to={complaintLink(order)} 
                   className="mt-2 block text-center text-[13px] text-slate-600 hover:text-slate-900 hover:underline"
                 >
                   Chuyển hơn 15 phút mà chưa được ghi nhận? Gửi khiếu nại

@@ -246,11 +246,18 @@ export interface PaymentComplaint {
   bankReference: string
   note?: string
   status: 'OPEN' | 'RESOLVED' | 'REJECTED'
+  /** SUCCESS (ghi đủ vào đơn), EXCESS_RETURNED (ghi đơn + trả phần thừa), RETURNED_TO_CUSTOMER (trả toàn bộ) */
   resolution?: string
   resolutionNote?: string
+  /** Số tiền kế toán đã chuyển trả lại khách (toàn bộ hoặc phần thừa) */
+  returnedAmount?: number
+  /** Số tiền đơn khách khai, để so với số khách chuyển */
+  orderAmount?: number
   resolvedAt?: string
   createdAt: string
 }
+
+export type ComplaintTarget = 'ORDER' | 'ORDER_RETURN_EXCESS' | 'RETURNED'
 
 export interface CreateComplaintInput {
   orderCode?: string

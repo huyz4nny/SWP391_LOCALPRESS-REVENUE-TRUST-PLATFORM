@@ -45,14 +45,14 @@ public class SepayGatewayController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        requireFinanceStaff();
+        requireFinanceStaff(); // phải chuẩn role
         return ResponseEntity.ok(ApiResponse.ok("Nhật ký SePay",
-                sepayGatewayService.searchLogs(source, from, to, page, size)));
+                sepayGatewayService.searchLogs(source, from, to, page, size))); // đọc bảng mới nhất trước
     }
 
     @GetMapping("/sepay/status")
     public ResponseEntity<ApiResponse<Map<String, Object>>> status() {
-        requireFinanceStaff();
+        requireFinanceStaff(); // phải chuẩn role
         return ResponseEntity.ok(ApiResponse.ok("Cấu hình SePay", sepayGatewayService.configStatus()));
     }
 

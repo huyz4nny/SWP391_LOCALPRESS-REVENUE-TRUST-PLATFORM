@@ -25,6 +25,10 @@ public class ComplaintResponse {
     private String status;
     private String resolution;
     private String resolutionNote;
+    /** Số tiền đã chuyển trả lại khách (toàn bộ hoặc phần thừa), null nếu không trả. */
+    private BigDecimal returnedAmount;
+    /** Số tiền của đơn khách khai (kế toán so với số khách chuyển), null nếu không có / không tìm thấy đơn. */
+    private BigDecimal orderAmount;
     private Long resolvedBy;
     private LocalDateTime resolvedAt;
     private LocalDateTime createdAt;
@@ -41,6 +45,7 @@ public class ComplaintResponse {
                 .status(c.getStatus().name())
                 .resolution(c.getResolution())
                 .resolutionNote(c.getResolutionNote())
+                .returnedAmount(c.getReturnedAmount())
                 .resolvedBy(c.getResolvedBy())
                 .resolvedAt(c.getResolvedAt())
                 .createdAt(c.getCreatedAt())

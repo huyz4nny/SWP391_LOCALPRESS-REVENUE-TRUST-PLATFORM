@@ -188,13 +188,16 @@ public class PaymentProcessingService {
      * Không có số tiền -> AMOUNT_MISSING, không đổi gì (Rule 4).
      * 3. Đơn đã đóng / booking quá hạn giữ chỗ -> LATE_PAYMENT, không cấp quyền
      * (Rule 6).
-     * 4. Số tiền khác số tiền đơn -> AMOUNT_MISMATCH, đơn giữ nguyên.
+     * 4. Số tiền khác số tiền đơn -> AMOUNT_MISMATCH, đơn giữ nguyên. Không tự ghi đơn khi
+     * chuyển thừa: kế toán đối chiếu sao kê qua khiếu nại (UC051) rồi mới ghi đơn + trả phần thừa.
      * 5. Đúng số tiền -> SUCCESS + chứng từ (UC057) + PaymentSuccessEvent.
      * Nhánh 3, 4 không giữ tiền trong hệ thống: kế toán đối chiếu sao kê và chuyển
      * trả lại khách.
      */
     @Transactional
-    public Map<String, Object> processSepayIpn(SepayIpnRequest ipnRequest) {
+    public Map<String, Object> processSepayIpn(SepayIpnRequest ipnRequest) { // tìm đơn theo mã trong nội dung chuyển
+                                                                             // khoản,đơn còn PENDING và chưa hết hạn? ,
+                                                                             // số tiền đúng với đơn?
         log.info("Nhận Webhook IPN từ SePay: payload={}", ipnRequest);
 
         String orderCode = ipnRequest.resolveOrderCode();
@@ -238,13 +241,14 @@ public class PaymentProcessingService {
         if (paidAmount.compareTo(tx.getAmount()) != 0) {
             log.warn("Đơn {} chuyển sai số tiền: nhận {} / cần {}", orderCode, paidAmount, tx.getAmount());
             return result(false, "AMOUNT_MISMATCH", orderCode, String.format(
-                    "Chuyển %s VND, đơn cần %s VND. Đơn chưa được ghi nhận, kế toán sẽ chuyển trả lại khách",
+                    "Chuyển %s VND, đơn cần %s VND. Đơn chưa được ghi nhận, khách gửi khiếu nại để kế toán xử lý "
+                            + "(chuyển thừa: ghi đơn và trả phần thừa; chuyển thiếu: trả lại toàn bộ)",
                     paidAmount.toPlainString(), tx.getAmount().toPlainString()));
         }
 
         // 5. Đúng số tiền
-        tx.markPaidByGateway(sePayService.getBankCode());
-        Transaction savedTx = transactionRepository.save(tx);
+        tx.markPaidByGateway(sePayService.getBankCode()); // trả về trạng thái succes
+        Transaction savedTx = transactionRepository.save(tx); // ghi vào db
         // UC057: cùng giao dịch với việc ghi tiền nên đơn SUCCESS nào cũng có đúng 1
         // chứng từ
         String documentNo = documentService.issueFor(savedTx).getDocumentNo();
