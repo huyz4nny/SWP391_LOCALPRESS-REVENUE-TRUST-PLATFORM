@@ -32,8 +32,8 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
  * 2. Phân quyền Endpoint Granular RBAC theo chuẩn SRS/SDS:
  *    - Public: Tin tức Free, chuyên mục, danh mục slot QC, webhook cổng thanh toán IPN.
  *    - Phân hệ Quảng cáo (SV1): Yêu cầu Role ADVERTISER hoặc SYSTEM_ADMIN.
- *    - Phân hệ Biên tập tòa soạn (SV2): Yêu cầu Role EDITOR, STAFF hoặc SYSTEM_ADMIN.
- *    - Phân hệ Tài chính kế toán (SV4): Yêu cầu Role ACCOUNTANT, CHIEF_ACCOUNTANT hoặc STAFF (không có SYSTEM_ADMIN).
+ *    - Phân hệ Biên tập tòa soạn (SV2): Yêu cầu Role EDITOR hoặc SYSTEM_ADMIN.
+ *    - Phân hệ Tài chính kế toán (SV4): Yêu cầu Role ACCOUNTANT hoặc CHIEF_ACCOUNTANT (không có SYSTEM_ADMIN).
  *    - Phân hệ Quản trị (SV5): Yêu cầu Role SYSTEM_ADMIN.
  * 3. Xác thực người dùng (Authentication):
  *    - Đăng nhập cấp JWT (Bearer). HTTP Basic chỉ bật khi localpress.security.http-basic=true (profile dev,
@@ -90,7 +90,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/advertiser/**").hasAnyRole("ADVERTISER", "SYSTEM_ADMIN")
 
                         // 7. Phân hệ Tòa soạn & Biên tập (SV2 - Trọng Phan, SV5 - Phóng viên CMS)
-                        .requestMatchers("/api/v1/editorial/**").hasAnyRole("EDITOR", "AUTHOR", "STAFF", "SYSTEM_ADMIN")
+                        .requestMatchers("/api/v1/editorial/**").hasAnyRole("EDITOR", "AUTHOR", "SYSTEM_ADMIN")
 
                         // 8. Phân hệ Kế toán, Thanh toán & Đối soát (SV4 - Huy Leader)
                         // Cho phép độc giả / doanh nghiệp đã đăng nhập tạo đơn và tra cứu trạng thái đơn hàng của mình
@@ -100,7 +100,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/finance/complaints", "/api/v1/finance/complaints/**").authenticated()
                         // Chứng từ (UC057): khách xem của mình, chi tiết đơn kiểm chủ đơn / kế toán trong service
                         .requestMatchers(HttpMethod.GET, "/api/v1/finance/documents/**").authenticated()
-                        .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "CHIEF_ACCOUNTANT", "STAFF")
+                        .requestMatchers("/api/v1/finance/**").hasAnyRole("ACCOUNTANT", "CHIEF_ACCOUNTANT")
 
                         // 9. Phân hệ Quản trị hệ thống & Cấu hình nền tảng (SV5 - Tùng)
                         .requestMatchers("/api/v1/admin/**", "/api/v1/administration/**").hasRole("SYSTEM_ADMIN")

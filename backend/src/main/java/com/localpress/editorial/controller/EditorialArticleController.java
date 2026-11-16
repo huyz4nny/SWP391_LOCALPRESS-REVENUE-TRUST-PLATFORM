@@ -26,7 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping(AppConstants.API_V1_PREFIX + "/editorial/articles")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('EDITOR', 'AUTHOR', 'STAFF', 'SYSTEM_ADMIN')")
+@PreAuthorize("hasAnyRole('EDITOR', 'AUTHOR', 'SYSTEM_ADMIN')")
 public class EditorialArticleController {
 
     private final ArticleReviewService articleReviewService;

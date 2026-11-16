@@ -19,7 +19,7 @@ INSERT INTO users (user_id, email, password_hash, full_name, phone, avatar_url, 
 (5, 'adv.canghaiphong@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Đặng Quang Huy (Logistics SV1)', '0934567890', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120', 'ADVERTISER', 'ACTIVE'),
 (6, 'reader.an@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Nguyễn Văn An (Độc giả Free SV3)', '0912345678', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120', 'READER', 'ACTIVE'),
 (7, 'reader.mai@gmail.com', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Trần Thị Mai (Độc giả VIP SV3)', '0988776655', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120', 'READER', 'ACTIVE'),
-(8, 'kiemduyet@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Phạm Kiểm Duyệt Bình Luận', '0907778899', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120', 'STAFF', 'ACTIVE');
+(8, 'kiemduyet@localpress.vn', '$2a$10$uUo2QJyp3FinXNd8TdhkfuZewBo/MxYQU918uS9BacWR7MYGr4Lfa', 'Phạm Kiểm Duyệt Bình Luận', '0907778899', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120', 'EDITOR', 'ACTIVE');
 
 -- 1.0.1 Kế toán trưởng (SV4, mắt 2 duyệt hoàn tiền / chốt kỳ đối soát). Bảng users không có role FINANCE_MANAGER
 -- (thuộc module identity), nhóm thống nhất SYSTEM_ADMIN giữ vai Kế toán trưởng (FinanceCurrentUser.FINANCE_MANAGER_ROLES).

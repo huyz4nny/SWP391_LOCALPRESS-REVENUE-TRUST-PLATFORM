@@ -111,7 +111,7 @@ npm run build
 | 5 | `user-adv-2` | Lê Hồng Phong | `ADVERTISER` | Đại diện Bất động sản Đất Cảng Hải Phòng (ADV-002) |
 | 6 | `user-editor` | Nguyễn Văn Biên Tập | `EDITOR` | Phóng viên soạn bài, lưu bản nháp, nộp duyệt |
 | 7 | `user-reviewer` | Trần Thị Thư Ký | `REVIEWER` | Thư ký tòa soạn: Duyệt bài, duyệt banner quảng cáo |
-| 8 | `user-fin-staff` | Lê Thị Thu Ngân | `FINANCE_STAFF` | Kế toán viên: Đối soát biên lai ngân hàng, lập đề xuất hoàn tiền |
+| 8 | `user-fin-staff` | Lê Thị Thu Ngân | `ACCOUNTANT` | Kế toán viên: Đối soát biên lai ngân hàng, lập đề xuất hoàn tiền |
 | 9 | `user-fin-mgr` | Phạm Trưởng Phòng | `FINANCE_MANAGER` | Kế toán trưởng: Duyệt hoàn tiền (4 mắt), đóng kỳ đối soát |
 | 10 | `user-admin` | Vũ Quản Trị | `SYSTEM_ADMIN` | Quản trị viên: Phân quyền, cấu hình Paywall, audit log |
 

@@ -27,8 +27,6 @@ describe('AUTHOR permissions and RBAC route helpers', () => {
     expect(PERMISSION_CHECKERS.getBackofficeLabel('SYSTEM_ADMIN')).toBe('Vào Quản Trị')
     expect(PERMISSION_CHECKERS.getBackofficeLabel('CHIEF_ACCOUNTANT')).toBe('Vào Tài Chính')
     expect(PERMISSION_CHECKERS.getBackofficeLabel('ACCOUNTANT')).toBe('Vào Tài Chính')
-    expect(PERMISSION_CHECKERS.getBackofficeLabel('STAFF')).toBe('Vào Tài Chính')
-    expect(PERMISSION_CHECKERS.getBackofficeLabel('FINANCE_STAFF')).toBe('Vào Tài Chính')
     expect(PERMISSION_CHECKERS.getBackofficeLabel('EDITOR')).toBe('Vào Tòa Soạn')
     expect(PERMISSION_CHECKERS.getBackofficeLabel('REVIEWER')).toBe('Vào Tòa Soạn')
     expect(PERMISSION_CHECKERS.getBackofficeLabel('AUTHOR')).toBe('Vào Tòa Soạn')

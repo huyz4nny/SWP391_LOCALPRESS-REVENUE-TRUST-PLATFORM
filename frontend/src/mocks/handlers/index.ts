@@ -1114,7 +1114,7 @@ export async function handleMockRequest(method: string, url: string, body?: any)
     if (!row) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 404, error: 'Not Found', message: 'Đơn chưa có chứng từ (chưa thu tiền)', path: pathname })
     }
-    const isFinance = ['ACCOUNTANT', 'FINANCE_STAFF', 'CHIEF_ACCOUNTANT', 'STAFF'].includes(currentUser.role)
+    const isFinance = ['ACCOUNTANT', 'CHIEF_ACCOUNTANT'].includes(currentUser.role)
     if (!isFinance && row.owner !== currentUser.id) {
       throw new AppApiError({ timestamp: new Date().toISOString(), status: 403, error: 'Forbidden', message: 'Bạn không có quyền xem chứng từ này', path: pathname })
     }

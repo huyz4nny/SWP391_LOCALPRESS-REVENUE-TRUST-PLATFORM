@@ -63,7 +63,7 @@ Hướng dẫn phân bổ chi tiết 48 màn hình và luồng giao diện cho 5
 ## 4. SV4: HUY (LEADER) — KẾ TOÁN, THANH TOÁN & ĐỐI SOÁT (FINANCE & RECONCILIATION)
 - **Thư mục làm việc:** `frontend/src/features/finance/` và Quản trị Tầng Dùng Chung toàn dự án (`src/components/`, `src/lib/`, `src/app/`)
 - **Màu sắc & Phong cách:** Tone Emerald Green / Slate Backoffice số liệu kế toán rõ ràng, chính xác.
-- **Vai trò đăng nhập demo:** `FINANCE_STAFF` (`user-fin-staff`), `FINANCE_MANAGER` (`user-fin-mgr`)
+- **Vai trò đăng nhập demo:** `ACCOUNTANT` (`user-fin-staff`), `FINANCE_MANAGER` (`user-fin-mgr`)
 - **Danh sách màn hình phụ trách:**
   1. `FinanceDashboard.tsx`: Báo cáo dòng tiền, tổng doanh thu B2B + B2C, tỷ lệ thanh toán tự động VietQR vs Chuyển khoản thủ công.
   2. `OrderListPage.tsx`: Quản lý toàn bộ đơn hàng hệ thống, phân loại (`SUBSCRIPTION`, `ARTICLE_PURCHASE`, `AD_CAMPAIGN`), lọc trạng thái thanh toán.

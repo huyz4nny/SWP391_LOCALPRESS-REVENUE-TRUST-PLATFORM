@@ -46,7 +46,7 @@ class EditorialAdvertisingControllerTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("GET /editorial/bookings yêu cầu role EDITOR hoặc STAFF, từ chối READER 403")
+    @DisplayName("GET /editorial/bookings yêu cầu role EDITOR, từ chối READER 403")
     @WithMockUser(roles = "READER")
     void getBookings_forbiddenForReader() throws Exception {
         mvc.perform(get("/api/v1/editorial/bookings"))
