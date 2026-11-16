@@ -1,5 +1,5 @@
 package com.localpress.editorial.service;
-
+//check trung bai viet 449
 import com.localpress.content.entity.Article;
 import com.localpress.content.entity.ArticleVersion;
 import com.localpress.content.entity.Category;
@@ -63,7 +63,8 @@ public class ArticleReviewService {
         return articles.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
-    }
+    } // Sau do File Controller mo cong API day du lieu ra ngoai EditorialArticleController.java 39-42
+
 
     /**
      * Lấy chi tiết 1 bài viết theo ID để xem toàn văn bản thảo và lịch sử phiên bản.
@@ -99,6 +100,10 @@ public class ArticleReviewService {
             return allVersions.get(0);
         });
 
+        // BientapA can't approve or reject their own articles 
+        boolean isSelfArticle = (article.getAuthorId() != null && article.getAuthorId().equals(editorUserId)) //check if the editor is the author of the article
+                || (latestVersion.getEditedBy() != null && latestVersion.getEditedBy().equals(editorUserId));
+
         switch (targetStatus) {
             case "IN_REVIEW":
             case "PENDING":
@@ -110,14 +115,23 @@ public class ArticleReviewService {
                 break;
 
             case "APPROVED":
-                // Bước 1 của SV2: Duyệt nội dung phiên bản mới nhất (chờ bấm Xuất bản)
+                
+                // Chặn tự duyệt: Biên tập viên không được tự duyệt bài do chính mình soạn thảo
+                if (isSelfArticle) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            " Biên tập viên không được tự duyệt bài viết của chính mình. Vui lòng để biên tập viên khác vào duyệt.");
+                }
                 latestVersion.approve(editorUserId, notes);
                 article.approveReview();
                 break;
 
             case "CHANGES_REQUESTED":
             case "REJECTED":
-                // SV2 trả bài yêu cầu phóng viên sửa lại
+                // 3. Chặn tự từ chối bài của chính mình
+                if (isSelfArticle) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            " Biên tập viên không thể tự yêu cầu chỉnh sửa/từ chối bài viết của chính mình.");
+                }
                 if (notes.isEmpty()) {
                     throw new AppException("Vui lòng nhập ghi chú hướng dẫn sửa bài khi từ chối/yêu cầu chỉnh sửa", HttpStatus.BAD_REQUEST);
                 }
@@ -126,8 +140,15 @@ public class ArticleReviewService {
                 break;
 
             case "PUBLISHED":
-                // Bước 2 của SV2: Xuất bản chính thức lên báo
-                latestVersion.approve(editorUserId, notes);
+                //Nếu là bài của mình, BẮT BUỘC bài phải được BTV khác APPROVED trước đó!
+                if (isSelfArticle && latestVersion.getReviewStatus() != ArticleVersion.ReviewStatus.APPROVED) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Bài viết của bạn chưa được biên tập viên khác phê duyệt. Không thể tự xuất bản khi chưa có phê duyệt.");
+                }
+                // Nếu người xuất bản là biên tập viên khác và phiên bản chưa duyệt, ghi nhận lượt duyệt
+                if (latestVersion.getReviewStatus() != ArticleVersion.ReviewStatus.APPROVED) {
+                    latestVersion.approve(editorUserId, notes);
+                }
                 article.publish(latestVersion.getVersionNumber(), request.getAccessType(), request.getSinglePrice());
                 break;
 
@@ -446,7 +467,7 @@ public class ArticleReviewService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chuyên mục không tồn tại: " + catIdObj);
     }
 
-    private String generateUniqueSlug(String title) {
+    private String generateUniqueSlug(String title) { // trung bai viet tu DB
         String base = title == null || title.isBlank() ? "bai-viet" : toSlug(title);
         String candidate = base;
         int count = 1;
@@ -459,6 +480,7 @@ public class ArticleReviewService {
             }
         }
         return candidate;
+        //check article table . If slug exist , while loop generate new unique new slug
     }
 
     private static String toSlug(String input) {

@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tài Liệu Bảo Vệ Toàn Tập SV2 (Iteration 1, 2, 3) - Nguyễn Trọng Phan | LocalPress</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-hover: #1e40af;
+      --primary-light: #eff6ff;
+      --crimson: #991b1b;
+      --crimson-light: #fef2f2;
+      --gold: #d97706;
+      --gold-light: #fffbeb;
+      --emerald: #059669;
+      --emerald-light: #ecfdf5;
+      --purple: #7c3aed;
+      --purple-light: #f5f3ff;
+      --slate-dark: #0f172a;
+      --slate-gray: #334155;
+      --bg-light: #f8fafc;
+      --card-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --code-bg: #0f172a;
+      --code-text: #f8fafc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-light);
+      color: var(--slate-dark);
+      line-height: 1.6;
+    }
+
+    /* Top banner */
+    .top-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1e1b4b 100%);
+      color: white;
+      padding: 2.5rem 2rem 2rem 2rem;
+      border-bottom: 4px solid var(--crimson);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .top-banner-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .badge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-primary { background: #3b82f6; color: white; }
+    .badge-gold { background: #f59e0b; color: #1e1b4b; }
+    .badge-crimson { background: #ef4444; color: white; }
+    .badge-emerald { background: #10b981; color: white; }
+
+    .top-banner h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
+    }
+    .top-banner p {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      max-width: 900px;
+    }
+
+    /* Layout */
+    .layout-wrapper {
+      display: flex;
+      max-width: 1500px;
+      margin: 0 auto;
+      gap: 2rem;
+      padding: 2rem;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 330px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 1.5rem;
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+    .sidebar-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    .search-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-color);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .nav-group {
+      margin-bottom: 1rem;
+    }
+    .nav-group-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      padding: 0.25rem 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .nav-link {
+      display: block;
+      padding: 0.35rem 0.6rem;
+      color: var(--slate-gray);
+      text-decoration: none;
+      font-size: 0.82rem;
+      border-radius: 0.375rem;
+      transition: all 0.15s ease;
+      line-height: 1.4;
+    }
+    .nav-link:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+      transform: translateX(3px);
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 2.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .doc-h1 {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--slate-dark);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.6rem;
+      margin: 2rem 0 1.25rem 0;
+    }
+    .doc-h1:first-child { margin-top: 0; }
+    .doc-h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 2.25rem 0 1rem 0;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .doc-h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 1.5rem 0 0.75rem 0;
+    }
+    .doc-h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #475569;
+      margin: 1rem 0 0.5rem 0;
+    }
+    .doc-p {
+      margin-bottom: 1rem;
+      color: #334155;
+      font-size: 0.93rem;
+    }
+    .doc-li, .doc-li-num {
+      margin-bottom: 0.4rem;
+      margin-left: 1.5rem;
+      font-size: 0.92rem;
+      color: #334155;
+    }
+    .doc-hr {
+      border: 0;
+      border-top: 1px dashed var(--border-color);
+      margin: 2.5rem 0;
+    }
+
+    /* Table */
+    .table-responsive {
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-color);
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      text-align: left;
+    }
+    .data-table th {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-weight: 700;
+      padding: 0.65rem 0.85rem;
+      border-bottom: 2px solid var(--border-color);
+      white-space: nowrap;
+    }
+    .data-table td {
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+      color: #334155;
+    }
+    .data-table tr:hover {
+      background: #f8fafc;
+    }
+
+    /* Code Block */
+    .code-block-wrapper {
+      background: var(--code-bg);
+      border-radius: 0.5rem;
+      overflow: hidden;
+      margin: 1.25rem 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .code-header {
+      background: #1e293b;
+      padding: 0.4rem 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-family: monospace;
+    }
+    .copy-btn {
+      background: #334155;
+      color: #e2e8f0;
+      border: none;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      font-size: 0.72rem;
+    }
+    .copy-btn:hover { background: #475569; }
+    pre {
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 0.84rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+    }
+    .inline-code {
+      background: #f1f5f9;
+      color: #b91c1c;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.85em;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Links */
+    .doc-link {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .layout-wrapper { flex-direction: column; }
+      .sidebar { width: 100%; position: static; max-height: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="top-banner">
+    <div class="top-banner-inner">
+      <div class="badge-bar">
+        <span class="badge badge-primary">SV2: Nguyễn Trọng Phan</span>
+        <span class="badge badge-gold">Đồ Án SWP391</span>
+        <span class="badge badge-crimson">10 Màn Hình Chức Năng</span>
+        <span class="badge badge-emerald">Iteration 1 • 2 • 3</span>
+      </div>
+      <h1>CẨM NANG BẢO VỆ ĐỒ ÁN TOÀN DIỆN PHÂN HỆ SV2</h1>
+      <p>Báo điện tử địa phương: Doanh thu kép & Kiểm duyệt tin tức (LocalPress). Tài liệu truy vết chi tiết từng nút bấm, dòng code hiển thị, thuật toán lọc/khử trùng lặp danh sách và giải thích luồng nghiệp vụ độc lập từng Iteration.</p>
+    </div>
+  </header>
+
+  <div class="layout-wrapper">
+    <aside class="sidebar">
+      <div class="sidebar-title">Tìm kiếm nhanh</div>
+      <input type="text" class="search-input" id="searchInput" placeholder="Tìm nút, hàm, use case..." onkeyup="filterNav()">
+
+      <div class="sidebar-title">Điều hướng nhanh</div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Tổng quan</div>
+        <a href="#phan-1-kien-truc-tong-the-ma-tran-10-man-hinh-sv2" class="nav-link">1. Ma trận 10 Màn hình SV2</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Iteration 1 (Tin tức & B2C)</div>
+        <a href="#21-iteration-1-man-ii21-quan-ly-bai-viet-toa-soan-articlelistpagetsx" class="nav-link">Màn II.2.1: Quản lý Bài viết</a>
+        <a href="#22-iteration-1-man-ii22-soan-thao-bai-viet-dat-gia-premium-articleeditorpagetsx" class="nav-link">Màn II.2.2: Soạn bài & Đặt giá lẻ</a>
+        <a href="#23-iteration-1-man-ii26-kiem-duyet-binh-luan-quan-tri-goi-doc-commentmoderationpagetsx" class="nav-link">Màn II.2.6: Kiểm duyệt Bình luận</a>
+        <a href="#31-luong-nghiep-vu-toan-dien-iteration-1-xuat-ban-b2c-paywall-kiem-duyet-doc-gia" class="nav-link">🔄 Luồng End-to-End Iteration 1</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Iteration 2 (Quảng cáo B2B)</div>
+        <a href="#24-iteration-2-man-ii23-hang-doi-booking-quang-cao-bookingmanagementpagetsx" class="nav-link">Màn II.2.3: Hàng đợi Booking</a>
+        <a href="#25-iteration-2-man-ii24-lich-ton-kho-slot-dong-co-xung-dot-rule-7-advertisinginventorycalendarpagetsx" class="nav-link">Màn II.2.4: Lịch Tồn kho Rule 7</a>
+        <a href="#26-iteration-2-man-ii25-duyet-banner-quang-cao-quan-tri-versioning-rule-8-creativereviewpagetsx" class="nav-link">Màn II.2.5: Duyệt Banner Rule 8</a>
+        <a href="#32-luong-nghiep-vu-toan-dien-iteration-2-van-hanh-b2b-kiem-soat-slot-duyet-banner" class="nav-link">🔄 Luồng End-to-End Iteration 2</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Iteration 3 (Gatekeeper & Vận hành)</div>
+        <a href="#27-iteration-3-man-ii27-tham-dinh-dieu-kien-phat-song-gatekeeper-5-cua-campaigneligibilitypagetsx" class="nav-link">Màn II.2.7: Thẩm định 5 Cửa</a>
+        <a href="#28-iteration-3-man-ii28-dieu-khien-chien-dich-emergency-kill-switch-make-good-campaigncontrolpagetsx" class="nav-link">Màn II.2.8: Kill-Switch & Make-Good</a>
+        <a href="#29-iteration-3-man-ii29-quan-ly-hop-dong-phap-ly-phu-luc-hang-muc-vip-advertisingcontractpagetsx" class="nav-link">Màn II.2.9: Hợp đồng & Hạng VIP</a>
+        <a href="#210-iteration-3-man-ii210-bang-dieu-khien-kinh-doanh-doanh-thu-kep-b2bb2c-businessoperationdashboardpagetsx" class="nav-link">Màn II.2.10: Dashboard Doanh thu</a>
+        <a href="#33-luong-nghiep-vu-toan-dien-iteration-3-gatekeeper-5-tieu-chi-kill-switch-hop-dong-doanh-thu-kep" class="nav-link">🔄 Luồng End-to-End Iteration 3</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Phản biện Hội đồng</div>
+        <a href="#phan-4-bang-cau-hoi-truy-van-sau-cua-hoi-dong-bao-ve-defense-qa-cheat-sheet" class="nav-link">🎯 Q&A Cheat Sheet (Hỏi - Đáp)</a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <h1 id="tai-lieu-toan-tap-bao-ve-o-an-swp391-phan-he-sv2" class="doc-h1">TÀI LIỆU TOÀN TẬP BẢO VỆ ĐỒ ÁN SWP391 - PHÂN HỆ SV2</h1>
+<h2 id="toa-soan-van-hanh-phe-duyet-noi-dung-editorial-ad-operations" class="doc-h2">TÒA SOẠN, VẬN HÀNH & PHÊ DUYỆT NỘI DUNG (EDITORIAL & AD-OPERATIONS)</h2>
+<p class="doc-p"><strong>Sinh viên thực hiện:</strong> Nguyễn Trọng Phan (SV2)  </p>
+<p class="doc-p"><strong>Phân hệ phụ trách:</strong> Tòa soạn, Vận hành & Phê duyệt nội dung (<code class="inline-code">editorial</code> module, <code class="inline-code">UC015</code> - <code class="inline-code">UC028</code>)  </p>
+<p class="doc-p"><strong>Dự án:</strong> LocalPress — Nền tảng Báo điện tử địa phương: Doanh thu kép & Kiểm duyệt tin tức  </p>
+<p class="doc-p"><strong>Phạm vi:</strong> Toàn bộ <strong>Iteration 1</strong>, <strong>Iteration 2</strong> và <strong>Iteration 3</strong> (10 Màn hình chức năng, 100% Nút bấm, 100% Luồng xử lý code)</p>
+<hr class="doc-hr" />
+<h1 id="muc-luc-tong-quan" class="doc-h1">MỤC LỤC TỔNG QUAN</h1>
+<li class="doc-li-num"><strong>1.</strong> <a href="#phần-1-kiến-trúc-tổng-thể--ma-trận-10-màn-hình-sv2" class="doc-link">PHẦN 1: KIẾN TRÚC TỔNG THỂ & MA TRẬN 10 MÀN HÌNH SV2</a></li>
+<li class="doc-li-num"><strong>2.</strong> <a href="#phần-2-chi-tiết-10-màn-hình--code-nút-bấm--danh-sách-click-to-code-trace" class="doc-link">PHẦN 2: CHI TIẾT 10 MÀN HÌNH — CODE, NÚT BẤM & DANH SÁCH (CLICK-TO-CODE TRACE)</a></li>
+<p class="doc-p">   - <a href="#21-iteration-1-màn-ii21--quản-lý-bài-viết--tòa-soạn-articlelistpagetsx" class="doc-link">2.1. ITERATION 1: Màn II.2.1 — Quản lý Bài viết & Tòa soạn (<code class="inline-code">ArticleListPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#22-iteration-1-màn-ii22--soạn-thảo-bài-viết--đặt-giá-premium-articleeditorpagetsx" class="doc-link">2.2. ITERATION 1: Màn II.2.2 — Soạn thảo bài viết & Đặt giá Premium (<code class="inline-code">ArticleEditorPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#23-iteration-1-màn-ii26--kiểm-duyệt-bình-luận--quản-trị-gói-đọc-commentmoderationpagetsx" class="doc-link">2.3. ITERATION 1: Màn II.2.6 — Kiểm duyệt Bình luận & Quản trị Gói đọc (<code class="inline-code">CommentModerationPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#24-iteration-2-màn-ii23--hàng-đợi-booking-quảng-cáo-bookingmanagementpagetsx" class="doc-link">2.4. ITERATION 2: Màn II.2.3 — Hàng đợi Booking Quảng cáo (<code class="inline-code">BookingManagementPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#25-iteration-2-màn-ii24--lịch-tồn-kho-slot--động-cơ-xung-đột-rule-7-advertisinginventorycalendarpagetsx" class="doc-link">2.5. ITERATION 2: Màn II.2.4 — Lịch Tồn kho Slot & Động cơ Xung đột Rule 7 (<code class="inline-code">AdvertisingInventoryCalendarPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#26-iteration-2-màn-ii25--duyệt-banner-quảng-cáo--quản-trị-versioning-rule-8-creativereviewpagetsx" class="doc-link">2.6. ITERATION 2: Màn II.2.5 — Duyệt Banner Quảng cáo & Quản trị Versioning Rule 8 (<code class="inline-code">CreativeReviewPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#27-iteration-3-màn-ii27--thẩm-định-điều-kiện-phát-sóng-gatekeeper-5-cửa-campaigneligibilitypagetsx" class="doc-link">2.7. ITERATION 3: Màn II.2.7 — Thẩm định Điều kiện Phát sóng Gatekeeper 5 Cửa (<code class="inline-code">CampaignEligibilityPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#28-iteration-3-màn-ii28--điều-khiển-chiến-dịch-emergency-kill-switch--make-good-campaigncontrolpagetsx" class="doc-link">2.8. ITERATION 3: Màn II.2.8 — Điều khiển Chiến dịch, Emergency Kill-Switch & Make-Good (<code class="inline-code">CampaignControlPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#29-iteration-3-màn-ii29--quản-lý-hợp-đồng-pháp-lý-phụ-lục--hạng-mức-vip-advertisingcontractpagetsx" class="doc-link">2.9. ITERATION 3: Màn II.2.9 — Quản lý Hợp đồng Pháp lý, Phụ lục & Hạng mức VIP (<code class="inline-code">AdvertisingContractPage.tsx</code>)</a></p>
+<p class="doc-p">   - <a href="#210-iteration-3-màn-ii210--bảng-điều-khiển-kinh-doanh--doanh-thu-kép-b2bb2c-businessoperationdashboardpagetsx" class="doc-link">2.10. ITERATION 3: Màn II.2.10 — Bảng điều khiển Kinh doanh & Doanh thu kép B2B/B2C (<code class="inline-code">BusinessOperationDashboardPage.tsx</code>)</a></p>
+<li class="doc-li-num"><strong>3.</strong> <a href="#phần-3-giải-thích-riêng-luồng-đi-end-to-end-workflow-từng-iteration" class="doc-link">PHẦN 3: GIẢI THÍCH RIÊNG LUỒNG ĐI (END-TO-END WORKFLOW) TỪNG ITERATION</a></li>
+<p class="doc-p">   - <a href="#31-luồng-nghiệp-vụ-toàn-diện-iteration-1-xuất-bản-b2c-paywall--kiểm-duyệt-độc-giả" class="doc-link">3.1. Luồng nghiệp vụ toàn diện Iteration 1 (Xuất bản B2C, Paywall & Kiểm duyệt Độc giả)</a></p>
+<p class="doc-p">   - <a href="#32-luồng-nghiệp-vụ-toàn-diện-iteration-2-vận-hành-b2b-kiểm-soát-slot--duyệt-banner" class="doc-link">3.2. Luồng nghiệp vụ toàn diện Iteration 2 (Vận hành B2B, Kiểm soát Slot & Duyệt Banner)</a></p>
+<p class="doc-p">   - <a href="#33-luồng-nghiệp-vụ-toàn-diện-iteration-3-gatekeeper-5-tiêu-chí-kill-switch-hợp-đồng--doanh-thu-kép" class="doc-link">3.3. Luồng nghiệp vụ toàn diện Iteration 3 (Gatekeeper 5 tiêu chí, Kill-Switch, Hợp đồng & Doanh thu kép)</a></p>
+<li class="doc-li-num"><strong>4.</strong> <a href="#phần-4-bảng-câu-hỏi-truy-vấn-sâu-của-hội-đồng-bảo-vệ-defense-qa-cheat-sheet" class="doc-link">PHẦN 4: BẢNG CÂU HỎI TRUY VẤN SÂU CỦA HỘI ĐỒNG BẢO VỆ (DEFENSE Q&A CHEAT SHEET)</a></li>
+<hr class="doc-hr" />
+<h1 id="phan-1-kien-truc-tong-the-ma-tran-10-man-hinh-sv2" class="doc-h1">PHẦN 1: KIẾN TRÚC TỔNG THỂ & MA TRẬN 10 MÀN HÌNH SV2</h1>
+<p class="doc-p">Phân hệ <strong>SV2</strong> đảm nhiệm trọng trách cốt lõi của tòa soạn báo điện tử: <strong>Kiểm duyệt nội dung tin tức</strong> và <strong>Vận hành thương mại quảng cáo B2B</strong>. Toàn bộ 10 màn hình được cấu hình bảo vệ bằng <code class="inline-code">ProtectedRoute</code> (<code class="inline-code">router.tsx</code>) với quyền truy cập khắt khe cho các role: <code class="inline-code">EDITOR</code>, <code class="inline-code">REVIEWER</code>, <code class="inline-code">SYSTEM_ADMIN</code> (và <code class="inline-code">AUTHOR</code> đối với bài viết của chính mình).</p>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>STT</th><th>Màn hình</th><th>Route URL</th><th>File Component</th><th>Use Case</th><th>Iteration</th></tr></thead><tbody>
+<tr><td>1</td><td><strong>Quản lý Bài viết & Tòa soạn</strong></td><td><code class="inline-code">/backoffice/editorial/articles</code></td><td><code class="inline-code">ArticleListPage.tsx</code></td><td>UC025</td><td><strong>I1</strong></td></tr>
+<tr><td>2</td><td><strong>Soạn bài & Đặt giá Premium</strong></td><td><code class="inline-code">/backoffice/editorial/articles/:id/edit</code></td><td><code class="inline-code">ArticleEditorPage.tsx</code></td><td>UC025, UC027</td><td><strong>I1</strong></td></tr>
+<tr><td>3</td><td><strong>Kiểm duyệt Bình luận & Gói đọc</strong></td><td><code class="inline-code">/backoffice/editorial/comments</code></td><td><code class="inline-code">CommentModerationPage.tsx</code></td><td>UC026, UC028</td><td><strong>I1</strong></td></tr>
+<tr><td>4</td><td><strong>Hàng đợi Booking Quảng cáo</strong></td><td><code class="inline-code">/backoffice/editorial/bookings</code></td><td><code class="inline-code">BookingManagementPage.tsx</code></td><td>UC016, UC018</td><td><strong>I2</strong></td></tr>
+<tr><td>5</td><td><strong>Lịch Tồn kho Slot & Xung đột</strong></td><td><code class="inline-code">/backoffice/editorial/calendar</code></td><td><code class="inline-code">AdvertisingInventoryCalendarPage.tsx</code></td><td>UC017</td><td><strong>I2</strong></td></tr>
+<tr><td>6</td><td><strong>Duyệt Banner & Phiên bản</strong></td><td><code class="inline-code">/backoffice/editorial/creatives</code></td><td><code class="inline-code">CreativeReviewPage.tsx</code></td><td>UC020 - UC022</td><td><strong>I2</strong></td></tr>
+<tr><td>7</td><td><strong>Thẩm định Phát sóng 5 Cửa</strong></td><td><code class="inline-code">/backoffice/editorial/eligibility</code></td><td><code class="inline-code">CampaignEligibilityPage.tsx</code></td><td>UC022, UC023, Rule 9</td><td><strong>I3</strong></td></tr>
+<tr><td>8</td><td><strong>Điều khiển Chiến dịch & Kill-Switch</strong></td><td><code class="inline-code">/backoffice/editorial/control</code></td><td><code class="inline-code">CampaignControlPage.tsx</code></td><td>Rule 10, Make-Good</td><td><strong>I3</strong></td></tr>
+<tr><td>9</td><td><strong>Hợp đồng Quảng cáo & Hạng VIP</strong></td><td><code class="inline-code">/backoffice/editorial/contracts</code></td><td><code class="inline-code">AdvertisingContractPage.tsx</code></td><td>UC019</td><td><strong>I3</strong></td></tr>
+<tr><td>10</td><td><strong>Vận hành Kinh doanh Doanh thu kép</strong></td><td><code class="inline-code">/backoffice/editorial/dashboard</code></td><td><code class="inline-code">BusinessOperationDashboardPage.tsx</code></td><td>UC015, UC028</td><td><strong>I3</strong></td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h1 id="phan-2-chi-tiet-10-man-hinh-code-nut-bam-danh-sach-click-to-code-trace" class="doc-h1">PHẦN 2: CHI TIẾT 10 MÀN HÌNH — CODE, NÚT BẤM & DANH SÁCH (CLICK-TO-CODE TRACE)</h1>
+<h2 id="21-iteration-1-man-ii21-quan-ly-bai-viet-toa-soan-articlelistpagetsx" class="doc-h2">2.1. ITERATION 1: Màn II.2.1 — Quản lý Bài viết & Tòa soạn (<code class="inline-code">ArticleListPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Tiêu đề trang & Breadcrumbs:</strong> "Quản lý Bài viết & Tòa soạn" (hoặc "Bài viết của tôi" nếu là Author), kèm mô tả quy trình xuất bản: <code class="inline-code">Bản nháp → Chờ duyệt → Cần sửa / Đã duyệt → Xuất bản lên báo</code> (dòng 104-109).</li>
+<li class="doc-li"><strong>Thanh công cụ Toolbar:</strong></li>
+<p class="doc-p">  - Nút "+ Viết bài mới" (dòng 112-117).</p>
+<p class="doc-p">  - Thanh tab lọc nhanh 7 trạng thái bài viết: Tất cả, Bản nháp, Chờ duyệt, Cần sửa, Đã duyệt, Đang xuất bản, Đã gỡ bài (dòng 126-144).</p>
+<p class="doc-p">  - Ô tìm kiếm tức thời theo tiêu đề bài viết hoặc tên tác giả (dòng 147-154).</p>
+<li class="doc-li"><strong>Bảng dữ liệu bài viết (Table):</strong></li>
+<p class="doc-p">  - Cột: Bài viết & Ngày cập nhật, Chuyên mục, Loại (Premium / Miễn phí), Tác giả, Phiên bản (v1, v2...), Trạng thái bài viết (<code class="inline-code">StatusBadge</code>), Hành động (<code class="inline-code">ArticleVersionActions</code>, Sửa, Duyệt, Yêu cầu sửa, Xuất bản ngay, Hạ bài).</p>
+<li class="doc-li"><strong>Modal Kiểm duyệt bài viết (<code class="inline-code">Dialog</code>):</strong> Xem trước Sapo, nội dung, lịch sử các phiên bản sửa đổi, ô Textarea nhập nhận xét/góp ý của tòa soạn, nút Xác nhận và Hủy bỏ (dòng 282-353).</li>
+<h3 id="2-code-nap-du-lieu-xu-ly-danh-sach" class="doc-h3">2. Code nạp dữ liệu & Xử lý danh sách</h3>
+<li class="doc-li"><strong>Dòng code nạp API:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">loadArticles()</code> tại dòng 52-64:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  const data = isAuthor ? await editorialApi.getMyArticles() : await editorialApi.getArticles()</p>
+<p class="doc-p">  setArticles(isAuthor ? data.filter((article) => article.authorId === currentUser.id) : data)</p>
+<p class="doc-p">  ```</p>
+<p class="doc-p">  - Gọi qua <code class="inline-code">editorialApi.getArticles()</code> (<code class="inline-code">/editorial/articles</code>) hoặc <code class="inline-code">/articles/mine</code>.</p>
+<li class="doc-li"><strong>Dòng code lọc & chống trùng lặp (Filter/Search):</strong></li>
+<p class="doc-p">  - Dòng 94-98:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  const filteredArticles = articles.filter((a) => {</p>
+<p class="doc-p">    if (statusFilter !== 'ALL' && a.status !== statusFilter) return false</p>
+<p class="doc-p">    if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.authorName.toLowerCase().includes(search.toLowerCase())) return false</p>
+<p class="doc-p">    return true</p>
+<p class="doc-p">  })</p>
+<p class="doc-p">  ```</p>
+<li class="doc-li"><strong>Dòng code render danh sách:</strong></li>
+<p class="doc-p">  - Dòng 180-275: <code class="inline-code">filteredArticles.map((art) => (<tr key={art.id}>...</tr>))</code>.</p>
+<p class="doc-p">  - Hiển thị badge Premium (dòng 204-211): Nếu <code class="inline-code">art.isPremium === true</code>, render icon <code class="inline-code">Crown</code> màu hổ phách <code class="inline-code">bg-amber-50 text-amber-800</code>.</p>
+<p class="doc-p">  - Hiển thị góp ý phản hồi (dòng 196-200): Nếu <code class="inline-code">art.reviewNotes</code> có giá trị, hiển thị hộp màu vàng <code class="inline-code">Góp ý: {art.reviewNotes}</code>.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>+ Viết bài mới</strong></td><td>Dòng 112-117</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/articles/new"</code></td><td>Điều hướng sang màn hình soạn thảo bài viết mới <code class="inline-code">ArticleEditorPage</code>.</td></tr>
+<tr><td><strong>Tab lọc trạng thái</strong> (7 tabs)</td><td>Dòng 127-144</td><td><code class="inline-code">onClick={() => setStatusFilter(st)}</code></td><td>State setter</td><td>Cập nhật state <code class="inline-code">statusFilter</code>, kích hoạt re-render lọc danh sách bài viết theo trạng thái tương ứng.</td></tr>
+<tr><td><strong>Ô tìm kiếm</strong></td><td>Dòng 148-154</td><td><code class="inline-code">onChange</code></td><td><code class="inline-code">setSearch(e.target.value)</code></td><td>Cập nhật state <code class="inline-code">search</code>, lọc tức thì theo ký tự gõ trong tiêu đề hoặc tên tác giả.</td></tr>
+<tr><td><strong>Sửa</strong> (Edit bài)</td><td>Dòng 186-191 & 226-232</td><td>Click Link</td><td><code class="inline-code">to={'/backoffice/editorial/articles/' + art.id + '/edit'}</code></td><td>Chuyển sang màn hình chỉnh sửa nội dung bài viết theo ID.</td></tr>
+<tr><td><strong>Duyệt</strong> (Approve)</td><td>Dòng 238-243</td><td><code class="inline-code">onClick={() => handleOpenReview(art, 'APPROVE')}</code></td><td><code class="inline-code">handleOpenReview</code> (dòng 66-71)</td><td>Mở modal duyệt bài, gán <code class="inline-code">reviewAction = 'APPROVE'</code>, reset <code class="inline-code">reviewNotes = ''</code>.</td></tr>
+<tr><td><strong>Yêu cầu sửa</strong> (Reject)</td><td>Dòng 245-251</td><td><code class="inline-code">onClick={() => handleOpenReview(art, 'REJECT')}</code></td><td><code class="inline-code">handleOpenReview</code> (dòng 66-71)</td><td>Mở modal từ chối, gán <code class="inline-code">reviewAction = 'REJECT'</code>, bắt buộc nhập lý do cần sửa.</td></tr>
+<tr><td><strong>Xuất bản ngay</strong> (Publish)</td><td>Dòng 257-263</td><td><code class="inline-code">onClick={() => handleOpenReview(art, 'PUBLISH')}</code></td><td><code class="inline-code">handleOpenReview</code> (dòng 66-71)</td><td>Mở modal xác nhận xuất bản bài viết đã duyệt lên trang chủ báo điện tử.</td></tr>
+<tr><td><strong>Hạ bài</strong> (Unpublish)</td><td>Dòng 266-272</td><td><code class="inline-code">onClick={() => handleOpenReview(art, 'UNPUBLISH')}</code></td><td><code class="inline-code">handleOpenReview</code> (dòng 66-71)</td><td>Mở modal xác nhận gỡ bài viết đang phát sóng về trạng thái <code class="inline-code">UNPUBLISHED</code>.</td></tr>
+<tr><td><strong>Hủy bỏ</strong> (trong Modal)</td><td>Dòng 339-341</td><td><code class="inline-code">onClick={() => setReviewArticle(null)}</code></td><td>State setter</td><td>Đóng modal kiểm duyệt, giữ nguyên trạng thái cũ.</td></tr>
+<tr><td><strong>Xác nhận</strong> (trong Modal)</td><td>Dòng 342-350</td><td><code class="inline-code">onClick={handleExecuteReview}</code></td><td><code class="inline-code">handleExecuteReview</code> (dòng 73-92)</td><td>Gọi <code class="inline-code">editorialApi.updateArticleStatus(id, targetStatus, reviewNotes)</code>. Cập nhật trạng thái trong database MySQL, đóng modal, gọi <code class="inline-code">loadArticles()</code> nạp lại danh sách mới nhất.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="22-iteration-1-man-ii22-soan-thao-bai-viet-at-gia-premium-articleeditorpagetsx" class="doc-h2">2.2. ITERATION 1: Màn II.2.2 — Soạn thảo bài viết & Đặt giá Premium (<code class="inline-code">ArticleEditorPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Soạn thảo bài viết mới" hoặc "Chỉnh sửa bài viết #ID", trạng thái hiện tại (<code class="inline-code">StatusBadge</code>), cụm nút: Xem lịch sử phiên bản, Lưu bản nháp, Nộp duyệt bài viết (dòng 400-450).</li>
+<li class="doc-li"><strong>Cột trái (Nội dung chính):</strong></li>
+<p class="doc-p">  - Ô nhập Tiêu đề bài viết (Title) (dòng 470-490).</p>
+<p class="doc-p">  - Ô nhập Tóm tắt dẫn nhập (Sapo) (dòng 495-515).</p>
+<p class="doc-p">  - Khu vực tải lên Ảnh bìa (Cover Image): Khung kéo thả/chọn file, xem trước ảnh tức thời (<code class="inline-code">coverPreview</code>), nhập Chú thích ảnh (Caption), Nguồn ảnh (Source), Văn bản thay thế (<code class="inline-code">altText</code>) (dòng 520-580).</p>
+<p class="doc-p">  - Trình soạn thảo Nội dung toàn văn (Content Markdown/HTML) (dòng 585-610).</p>
+<p class="doc-p">  - Ghi chú thay đổi của phiên bản (<code class="inline-code">Changelog</code>) (dòng 615-635).</p>
+<li class="doc-li"><strong>Cột phải (Cấu hình chính sách xuất bản):</strong></li>
+<p class="doc-p">  - Dropdown chọn Chuyên mục báo chí (Thời sự, Kinh tế, Văn hóa...) (dòng 640-660).</p>
+<p class="doc-p">  - Thẻ gắn kèm (<code class="inline-code">Tags</code>) kèm tính năng gợi ý từ khóa (dòng 665-680).</p>
+<p class="doc-p">  - Switch/Checkbox "Bài viết độc quyền Premium (Paywall)": Khi tích chọn, trường nhập "Giá bán bài viết lẻ (VNĐ)" sẽ mở ra cho phép nhập số tiền từ 5.000 đến 100.000 VNĐ (dòng 685-715).</p>
+<li class="doc-li"><strong>Drawer / Modal Lịch sử phiên bản (<code class="inline-code">versions</code>):</strong> Danh sách các version v1, v2 kèm nút "Khôi phục phiên bản này" (dòng 720-760).</li>
+<h3 id="2-code-nap-du-lieu-xu-ly-trang-thai" class="doc-h3">2. Code nạp dữ liệu & Xử lý trạng thái</h3>
+<li class="doc-li"><strong>Nạp dữ liệu bài viết cũ (nếu Edit):</strong> <code class="inline-code">useEffect</code> tại dòng 110-160 gọi <code class="inline-code">editorialApi.getArticle(id)</code>.</li>
+<li class="doc-li"><strong>Cơ chế tải ảnh bìa chống chớp (Flicker-Free Cover Loading):</strong></li>
+<p class="doc-p">  - Dòng 170-205: Dùng <code class="inline-code">serverCoverUrlRef = useRef<string | null>(null)</code>. Khi nạp ảnh mới từ backend (<code class="inline-code">contentApi.getCoverImage(coverImage)</code>), hệ thống tạo <code class="inline-code">nextUrl</code>, gán state, và <strong>chỉ thu hồi URL cũ sau khi ảnh mới đã nạp thành công</strong>. Khi unmount component, hook cleanup thu hồi bộ nhớ để tránh rò rỉ RAM.</p>
+<li class="doc-li"><strong>Xử lý lưu dữ liệu (Save / Submit):</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleSave(submitForReview)</code> tại dòng 225-326:</p>
+<p class="doc-p">    - Validate bắt buộc: Tiêu đề >= 10 ký tự, Sapo >= 20 ký tự, Nội dung >= 100 ký tự.</p>
+<p class="doc-p">    - Nếu có file ảnh bìa: Đóng gói dạng <code class="inline-code">multipart/form-data</code> qua <code class="inline-code">editorialApi.createArticleWithCover</code> hoặc <code class="inline-code">updateArticleWithCover</code>.</p>
+<p class="doc-p">    - Cập nhật trạng thái <code class="inline-code">DRAFT</code> (nếu bấm Lưu nháp) hoặc <code class="inline-code">IN_REVIEW</code> (nếu bấm Nộp duyệt).</p>
+<p class="doc-p">    - Điều hướng về <code class="inline-code">/backoffice/editorial/articles</code> sau khi lưu thành công.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Lịch sử phiên bản</strong></td><td>Dòng 413-422</td><td><code class="inline-code">onClick={() => setShowVersionDrawer(true)}</code></td><td>State setter</td><td>Mở Drawer bên phải hiển thị toàn bộ cây phiên bản v1, v2, v3 của bài viết.</td></tr>
+<tr><td><strong>Lưu bản nháp</strong></td><td>Dòng 426-436</td><td><code class="inline-code">onClick={() => handleSave(false)}</code></td><td><code class="inline-code">handleSave(false)</code> (dòng 225)</td><td>Kiểm tra hợp lệ dữ liệu, gửi <code class="inline-code">PUT/POST</code> lên backend giữ nguyên trạng thái <code class="inline-code">DRAFT</code>, lưu changelog.</td></tr>
+<tr><td><strong>Nộp duyệt bài viết</strong></td><td>Dòng 439-448</td><td><code class="inline-code">onClick={() => handleSave(true)}</code></td><td><code class="inline-code">handleSave(true)</code> (dòng 225)</td><td>Validate toàn bộ form, đẩy trạng thái bài viết sang <code class="inline-code">IN_REVIEW</code> để thư ký tòa soạn tiếp nhận.</td></tr>
+<tr><td><strong>Chọn ảnh từ máy tính</strong></td><td>Dòng 540-555</td><td><code class="inline-code">onChange={handleChooseCover}</code></td><td><code class="inline-code">handleChooseCover</code> (dòng 210)</td><td>Nhận file ảnh JPEG/PNG <= 5MB, tạo ObjectURL xem trước, kích hoạt cờ upload.</td></tr>
+<tr><td><strong>Bỏ chọn ảnh</strong></td><td>Dòng 570-575</td><td><code class="inline-code">onClick={() => { setCoverFile(null); setFilePreview(null); }}</code></td><td>State setter</td><td>Hủy file ảnh vừa chọn, khôi phục lại ảnh bìa ban đầu hoặc để trống.</td></tr>
+<tr><td><strong>Gợi ý Tag</strong></td><td>Dòng 675-680</td><td><code class="inline-code">onClick={() => applySuggestedTag(t)}</code></td><td><code class="inline-code">applySuggestedTag</code> (dòng 328)</td><td>Tự động chèn từ khóa được gợi ý vào ô input Tags, ngăn chặn tag trùng lặp.</td></tr>
+<tr><td><strong>Khôi phục bản này</strong></td><td>Dòng 745-755</td><td><code class="inline-code">onClick={() => handleRestoreVersion(v)}</code></td><td><code class="inline-code">handleRestoreVersion</code> (dòng 338)</td><td>Xác nhận qua hộp thoại confirm, ghi đè lại nội dung bài viết về phiên bản được chọn.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="23-iteration-1-man-ii26-kiem-duyet-binh-luan-quan-tri-goi-oc-commentmoderationpagetsx" class="doc-h2">2.3. ITERATION 1: Màn II.2.6 — Kiểm duyệt Bình luận & Quản trị Gói đọc (<code class="inline-code">CommentModerationPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header điều hướng 3 Tab chính:</strong></li>
+<p class="doc-p">  - Tab 1: "Kiểm duyệt bình luận độc giả (UC026)" (dòng 120-135).</p>
+<p class="doc-p">  - Tab 2: "Chính sách bài viết Free/Premium (UC027)" (dòng 136-150).</p>
+<p class="doc-p">  - Tab 3: "Quản trị gói cước hội viên Subscription (UC028)" (dòng 151-165).</p>
+<li class="doc-li"><strong>Nội dung Tab 1 (Bình luận):</strong></li>
+<p class="doc-p">  - Bộ lọc trạng thái: Tất cả, Chờ duyệt (<code class="inline-code">PENDING</code>), Đã duyệt (<code class="inline-code">APPROVED</code>), Đã từ chối (<code class="inline-code">REJECTED</code>), Đã ẩn (<code class="inline-code">HIDDEN</code>).</p>
+<p class="doc-p">  - Danh sách bình luận: Người bình luận, Bài viết liên quan, Nội dung bình luận, Thời gian, Badge trạng thái.</p>
+<p class="doc-p">  - Cụm nút hành động: "Duyệt nhanh" (xanh), "Từ chối" (đỏ), "Ẩn bình luận" (xám).</p>
+<p class="doc-p">  - Modal lý do từ chối: Nhập lý do vi phạm (Spam, Ngôn từ thù ghét, Sai sự thật).</p>
+<li class="doc-li"><strong>Nội dung Tab 2 (Chính sách giá bài viết):</strong></li>
+<p class="doc-p">  - Danh sách bài viết kèm nút "Đổi chính sách" mở modal cập nhật loại truy cập (<code class="inline-code">FREE</code>/<code class="inline-code">PREMIUM</code>) và giá tiền lẻ.</p>
+<li class="doc-li"><strong>Nội dung Tab 3 (Gói đọc hội viên):</strong></li>
+<p class="doc-p">  - Danh sách các gói cước: Tên gói, Giá tiền, Thời hạn (ngày), Quyền lợi (Đọc không quảng cáo, Nghe audio), Trạng thái (Đang mở / Tạm dừng).</p>
+<p class="doc-p">  - Nút "Thêm gói cước mới", nút Toggle "Kích hoạt / Tạm dừng".</p>
+<h3 id="2-code-nap-du-lieu-xu-ly-danh-sach" class="doc-h3">2. Code nạp dữ liệu & Xử lý danh sách</h3>
+<li class="doc-li"><strong>Dòng code nạp API theo Tab:</strong></li>
+<p class="doc-p">  - <code class="inline-code">useEffect</code> tại dòng 61-69:</p>
+<p class="doc-p">    - Tab <code class="inline-code">COMMENTS</code>: gọi <code class="inline-code">editorialApi.getComments(commentStatusFilter)</code> (dòng 72-82).</p>
+<p class="doc-p">    - Tab <code class="inline-code">ARTICLE_POLICY</code>: gọi <code class="inline-code">editorialApi.getArticles()</code> (dòng 96-105).</p>
+<p class="doc-p">    - Tab <code class="inline-code">SUBSCRIPTION_PLANS</code>: gọi <code class="inline-code">editorialApi.getSubscriptionPlans()</code> (dòng 110-120).</p>
+<li class="doc-li"><strong>Xử lý kiểm duyệt bình luận:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleModerateComment(id, status, reason)</code> (dòng 84-93) gọi <code class="inline-code">editorialApi.moderateComment(id, status, reason)</code> $\rightarrow$ Cập nhật tức thời trạng thái hiển thị của bình luận trên trang độc giả.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Tab Bình luận / Chính sách / Gói đọc</strong></td><td>Dòng 125, 140, 155</td><td><code class="inline-code">onClick={() => setActiveTab(tab)}</code></td><td>State setter</td><td>Chuyển đổi tab hiển thị tương ứng, kích hoạt nạp lại dữ liệu cho tab đó.</td></tr>
+<tr><td><strong>Duyệt bình luận</strong></td><td>Dòng 240-245</td><td><code class="inline-code">onClick={() => handleModerateComment(c.id, 'APPROVED')}</code></td><td><code class="inline-code">handleModerateComment</code> (dòng 84)</td><td>Gửi <code class="inline-code">POST /editorial/comments/{id}/moderate</code> với <code class="inline-code">status: 'APPROVED'</code>. Bình luận hiển thị công khai dưới bài viết.</td></tr>
+<tr><td><strong>Từ chối bình luận</strong></td><td>Dòng 247-252</td><td><code class="inline-code">onClick={() => setRejectingComment(c)}</code></td><td>State setter</td><td>Mở Modal yêu cầu nhập lý do vi phạm tiêu chuẩn cộng đồng.</td></tr>
+<tr><td><strong>Xác nhận từ chối</strong> (trong Modal)</td><td>Dòng 290-295</td><td><code class="inline-code">onClick={handleConfirmRejectComment}</code></td><td>Callback API</td><td>Gửi lý do vi phạm lên server, đổi trạng thái sang <code class="inline-code">REJECTED</code>, gỡ khỏi bài viết.</td></tr>
+<tr><td><strong>Ẩn bình luận</strong></td><td>Dòng 254-259</td><td><code class="inline-code">onClick={() => handleModerateComment(c.id, 'HIDDEN')}</code></td><td><code class="inline-code">handleModerateComment</code> (dòng 84)</td><td>Chuyển trạng thái bình luận thành <code class="inline-code">HIDDEN</code> khi có khiếu nại phát sinh.</td></tr>
+<tr><td><strong>Bật/Tắt gói đọc</strong></td><td>Dòng 450-460</td><td><code class="inline-code">onClick={() => handleTogglePlan(p.id)}</code></td><td><code class="inline-code">editorialApi.toggleSubscriptionPlanStatus</code></td><td>Chuyển đổi trạng thái <code class="inline-code">ACTIVE</code> $\leftrightarrow$ <code class="inline-code">INACTIVE</code> của gói hội viên, ngăn độc giả mới mua nếu đang tạm dừng.</td></tr>
+<tr><td><strong>Thêm gói cước mới</strong></td><td>Dòng 420-430</td><td><code class="inline-code">onClick={() => setIsCreatePlanOpen(true)}</code></td><td>State setter</td><td>Mở modal tạo gói đọc mới (nhập tên, giá, ngày, quyền lợi audio).</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="24-iteration-2-man-ii23-hang-oi-booking-quang-cao-bookingmanagementpagetsx" class="doc-h2">2.4. ITERATION 2: Màn II.2.3 — Hàng đợi Booking Quảng cáo (<code class="inline-code">BookingManagementPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Hàng đợi Booking quảng cáo chờ xử lý", nút xem "Lịch tồn kho slot" và nút "Làm mới" (dòng 150-180).</li>
+<li class="doc-li"><strong>Thẻ thống kê nhanh (KPI Cards) & Bộ lọc trạng thái:</strong></li>
+<p class="doc-p">  - 5 Thẻ tóm tắt: Tất cả, Chờ báo giá (<code class="inline-code">SUBMITTED</code>), Đã gửi báo giá (<code class="inline-code">QUOTED</code>), Đã chốt duyệt (<code class="inline-code">CONFIRMED</code>), Đã từ chối (<code class="inline-code">REJECTED</code>) (dòng 185-250).</p>
+<p class="doc-p">  - Ô tìm kiếm theo tên chiến dịch hoặc tên công ty doanh nghiệp (dòng 275-290).</p>
+<li class="doc-li"><strong>Bảng danh sách Booking quảng cáo:</strong></li>
+<p class="doc-p">  - Cột: Doanh nghiệp & Chiến dịch, Vị trí Slot, Thời gian phát sóng, Đơn giá chuẩn, Giá chốt sau chiết khấu, Trạng thái booking, Hành động.</p>
+<li class="doc-li"><strong>Modal Lập báo giá chính thức (UC018):</strong></li>
+<p class="doc-p">  - Hiển thị giá chuẩn hệ thống (<code class="inline-code">standardPrice</code>), ô nhập Chiết khấu <code class="inline-code">%</code> (<code class="inline-code">discountPercent</code>), ô tự động tính Giá cuối cùng (<code class="inline-code">finalPrice</code>), ô nhập Ghi chú kỹ thuật & cam kết SOV (<code class="inline-code">quotationNotes</code>) (dòng 450-550).</p>
+<li class="doc-li"><strong>Modal Từ chối booking (UC016):</strong></li>
+<p class="doc-p">  - Ô Textarea bắt buộc nhập lý do từ chối (ví dụ: Slot đã kín lịch, ngành hàng xung đột độc quyền) (dòng 560-630).</p>
+<li class="doc-li"><strong>Modal Xem chi tiết Booking:</strong></li>
+<p class="doc-p">  - Toàn bộ thông tin liên hệ người đại diện, số điện thoại, email, yêu cầu đặc biệt của khách hàng (dòng 635-675).</p>
+<h3 id="2-code-nap-du-lieu-xu-ly-danh-sach" class="doc-h3">2. Code nạp dữ liệu & Xử lý danh sách</h3>
+<li class="doc-li"><strong>Dòng code nạp API:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">loadBookings()</code> tại dòng 55-65:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  const data = await editorialApi.getBookings()</p>
+<p class="doc-p">  setBookings(data)</p>
+<p class="doc-p">  ```</p>
+<p class="doc-p">  - Gọi endpoint <code class="inline-code">GET /editorial/bookings</code>.</p>
+<li class="doc-li"><strong>Dòng code lọc danh sách:</strong></li>
+<p class="doc-p">  - Dòng 122-132: Lọc kết hợp giữa tab trạng thái <code class="inline-code">statusFilter</code> và từ khóa tìm kiếm <code class="inline-code">search</code> trên <code class="inline-code">campaignName</code> và <code class="inline-code">companyName</code>.</p>
+<li class="doc-li"><strong>Render danh sách:</strong> Dòng 310-440 duyệt mảng <code class="inline-code">filteredBookings.map((b) => ...)</code>.</li>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Lịch tồn kho slot</strong></td><td>Dòng 166-170</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/calendar"</code></td><td>Điều hướng sang Màn II.2.4 để tra cứu lịch trống trước khi báo giá.</td></tr>
+<tr><td><strong>Làm mới dữ liệu</strong></td><td>Dòng 171-180</td><td><code class="inline-code">onClick={loadBookings}</code></td><td><code class="inline-code">loadBookings</code> (dòng 55)</td><td>Kích hoạt hiệu ứng quay icon, tải lại danh sách booking mới nhất từ server.</td></tr>
+<tr><td><strong>Thẻ lọc trạng thái</strong> (5 thẻ)</td><td>Dòng 187, 199, 216, 228, 240</td><td><code class="inline-code">onClick={() => setStatusFilter(key)}</code></td><td>State setter</td><td>Lọc danh sách booking theo trạng thái được bấm, cập nhật số lượng badge.</td></tr>
+<tr><td><strong>Chi tiết</strong> (Xem booking)</td><td>Dòng 380-389</td><td><code class="inline-code">onClick={() => setDetailBooking(b)}</code></td><td>State setter</td><td>Mở Modal xem chi tiết người liên hệ, số điện thoại, slot đặt và lịch phát sóng.</td></tr>
+<tr><td><strong>Báo giá</strong> (UC018)</td><td>Dòng 394-401</td><td><code class="inline-code">onClick={() => handleOpenQuotation(b)}</code></td><td><code class="inline-code">handleOpenQuotation</code> (dòng 68)</td><td>Mở Modal Báo giá, tự động điền giá gốc và gợi ý mẫu ghi chú cam kết SOV 100%.</td></tr>
+<tr><td><strong>Từ chối</strong> (UC016)</td><td>Dòng 402-410</td><td><code class="inline-code">onClick={() => handleOpenReject(b)}</code></td><td><code class="inline-code">handleOpenReject</code> (dòng 100)</td><td>Mở Modal Từ chối booking, reset ô nhập lý do từ chối.</td></tr>
+<tr><td><strong>Cập nhật báo giá</strong></td><td>Dòng 416-423</td><td><code class="inline-code">onClick={() => handleOpenQuotation(b)}</code></td><td><code class="inline-code">handleOpenQuotation</code> (dòng 68)</td><td>Mở lại modal báo giá để điều chỉnh mức chiết khấu cho booking đã gửi báo giá trước đó.</td></tr>
+<tr><td><strong>Gửi báo giá chính thức</strong> (Modal)</td><td>Dòng 535-545</td><td><code class="inline-code">onSubmit={handleSendQuotation}</code></td><td><code class="inline-code">handleSendQuotation</code> (dòng 78-97)</td><td>Gửi <code class="inline-code">POST /editorial/bookings/{id}/quote</code> kèm <code class="inline-code">finalPrice</code>, <code class="inline-code">discountPercent</code>, <code class="inline-code">quotationNotes</code>. Booking chuyển sang <code class="inline-code">QUOTED</code>, doanh nghiệp nhận được thông báo để thanh toán.</td></tr>
+<tr><td><strong>Xác nhận từ chối</strong> (Modal)</td><td>Dòng 615-625</td><td><code class="inline-code">onSubmit={handleConfirmReject}</code></td><td><code class="inline-code">handleConfirmReject</code> (dòng 105-119)</td><td>Gửi <code class="inline-code">POST /editorial/bookings/{id}/reject</code> kèm lý do. Booking chuyển sang <code class="inline-code">REJECTED</code>, giải phóng giữ chỗ trên lịch tồn kho.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="25-iteration-2-man-ii24-lich-ton-kho-slot-ong-co-xung-ot-rule-7-advertisinginventorycalendarpagetsx" class="doc-h2">2.5. ITERATION 2: Màn II.2.4 — Lịch Tồn kho Slot & Động cơ Xung đột Rule 7 (<code class="inline-code">AdvertisingInventoryCalendarPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Lịch tồn kho slot quảng cáo (Inventory Calendar & Capacity Engine)", nút chuyển sang "Quản lý Booking" và nút "Hôm nay" (dòng 145-175).</li>
+<li class="doc-li"><strong>Thanh điều khiển tháng & Lọc vị trí:</strong></li>
+<p class="doc-p">  - Nút Tháng trước (<code class="inline-code"><</code>), Tháng sau (<code class="inline-code">></code>), hiển thị Tháng/Năm hiện tại (dòng 180-210).</p>
+<p class="doc-p">  - Thanh chọn vị trí Slot: Tất cả vị trí, Top Leaderboard, Sidebar Sticky, In-Article Banner (dòng 215-240).</p>
+<li class="doc-li"><strong>Thống kê công suất lấp đầy (Capacity KPI):</strong></li>
+<p class="doc-p">  - Thanh tiến độ hiển thị Tỷ lệ lấp đầy tồn kho trong tháng (<code class="inline-code">occupancyPercent = (Booked + Held) / Total Capacity</code>) (dòng 245-270).</p>
+<li class="doc-li"><strong>Lưới lịch tháng (Monthly Calendar Grid):</strong></li>
+<p class="doc-p">  - Ma trận 7 cột (Thứ 2 đến Chủ nhật) nhân số tuần trong tháng (dòng 275-380).</p>
+<p class="doc-p">  - Từng ô ngày hiển thị trạng thái màu trực quan:</p>
+<p class="doc-p">    - 🟢 <strong>Xanh lá (Trống):</strong> Vị trí slot còn trống toàn bộ, sẵn sàng nhận booking.</p>
+<p class="doc-p">    - 🟡 <strong>Vàng (Đang giữ chỗ):</strong> Có booking ở trạng thái <code class="inline-code">SUBMITTED</code> hoặc <code class="inline-code">QUOTED</code>.</p>
+<p class="doc-p">    - 🟣 <strong>Tím (Đã chốt phát sóng):</strong> Có chiến dịch <code class="inline-code">CONFIRMED</code> hoặc <code class="inline-code">ACTIVE</code>.</p>
+<p class="doc-p">    - 🔴 <strong>Đỏ cảnh báo (XUNG ĐỘT RULE 7):</strong> Phát hiện > 1 hợp đồng cùng tranh chấp 1 vị trí độc quyền (<code class="inline-code">EXCLUSIVE</code>) trong cùng ngày!</p>
+<li class="doc-li"><strong>Modal Chi tiết ngày chọn:</strong></li>
+<p class="doc-p">  - Danh sách toàn bộ các chiến dịch và booking đang giữ slot trong ngày đó, tỉ lệ chia sẻ SOV, tên doanh nghiệp (dòng 390-490).</p>
+<h3 id="2-code-nap-du-lieu-thuat-toan-phat-hien-xung-ot-rule-7" class="doc-h3">2. Code nạp dữ liệu & Thuật toán phát hiện xung đột Rule 7</h3>
+<li class="doc-li"><strong>Nạp dữ liệu đồng thời:</strong></li>
+<p class="doc-p">  - Dòng 49-65: <code class="inline-code">Promise.all([editorialApi.getBookings(), editorialApi.getCampaigns(), editorialApi.getAdSlots()])</code>.</p>
+<li class="doc-li"><strong>Thuật toán kiểm tra bao phủ ngày:</strong></li>
+<p class="doc-p">  - Dòng 95-101: <code class="inline-code">isDateInBookingRange(targetDate, startStr, endStr)</code>.</p>
+<li class="doc-li"><strong>Thuật toán Động cơ Xung đột Rule 7 (Conflict Detection Engine):</strong></li>
+<p class="doc-p">  - Dòng 118-128:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  activeSlots.forEach((slot) => {</p>
+<p class="doc-p">    const slotBookings = getSlotBookingsOnDate(d, slot.id)</p>
+<p class="doc-p">    if (slotBookings.length > 1 && slot.inventoryMode === 'EXCLUSIVE') {</p>
+<p class="doc-p">      // Bật cờ xung đột Rule 7 vi phạm hợp đồng độc quyền!</p>
+<p class="doc-p">      hasConflict = true</p>
+<p class="doc-p">    }</p>
+<p class="doc-p">  })</p>
+<p class="doc-p">  ```</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Quản lý booking</strong></td><td>Dòng 153-158</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/bookings"</code></td><td>Chuyển về màn hình danh sách hàng đợi booking.</td></tr>
+<tr><td><strong>Làm mới dữ liệu</strong></td><td>Dòng 160-165</td><td><code class="inline-code">onClick={loadData}</code></td><td><code class="inline-code">loadData</code> (dòng 49)</td><td>Nạp lại đồng thời Bookings, Campaigns, Slots.</td></tr>
+<tr><td><strong>Tháng trước (<code class="inline-code"><</code>)</strong></td><td>Dòng 185-190</td><td><code class="inline-code">onClick={prevMonth}</code></td><td><code class="inline-code">prevMonth</code> (dòng 68)</td><td>Giảm tháng hiện tại đi 1, tính toán lại toàn bộ lưới lịch.</td></tr>
+<tr><td><strong>Hôm nay (Reset)</strong></td><td>Dòng 192-197</td><td><code class="inline-code">onClick={resetToday}</code></td><td><code class="inline-code">resetToday</code> (dòng 76)</td><td>Trở về tháng 10/2026 (mốc thời gian dữ liệu mẫu demo).</td></tr>
+<tr><td><strong>Tháng sau (<code class="inline-code">></code>)</strong></td><td>Dòng 199-204</td><td><code class="inline-code">onClick={nextMonth}</code></td><td><code class="inline-code">nextMonth</code> (dòng 72)</td><td>Tăng tháng hiện tại lên 1, cập nhật lưới lịch.</td></tr>
+<tr><td><strong>Bộ lọc Slot</strong></td><td>Dòng 220-238</td><td><code class="inline-code">onClick={() => setSelectedSlotId(id)}</code></td><td>State setter</td><td>Lọc hiển thị lịch tồn kho chỉ riêng cho vị trí quảng cáo được chọn.</td></tr>
+<tr><td><strong>Ô ngày trên lịch</strong></td><td>Dòng 310-370</td><td><code class="inline-code">onClick={() => setSelectedDayInfo(...)</code></td><td>State setter</td><td>Mở Modal chi tiết ngày, hiển thị danh sách tất cả booking/chiến dịch của ngày đó.</td></tr>
+<tr><td><strong>Đóng Modal ngày</strong></td><td>Dòng 480-485</td><td><code class="inline-code">onClose</code></td><td><code class="inline-code">setSelectedDayInfo(null)</code></td><td>Đóng hộp thoại chi tiết ngày.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="26-iteration-2-man-ii25-duyet-banner-quang-cao-quan-tri-versioning-rule-8-creativereviewpagetsx" class="doc-h2">2.6. ITERATION 2: Màn II.2.5 — Duyệt Banner Quảng cáo & Quản trị Versioning Rule 8 (<code class="inline-code">CreativeReviewPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Kiểm duyệt Banner & Quản trị phiên bản Creative (Rule 8)", bộ lọc trạng thái (Tất cả, Chờ duyệt, Đã duyệt, Yêu cầu thiết kế lại) (dòng 120-160).</li>
+<li class="doc-li"><strong>Ô tìm kiếm:</strong> Lọc nhanh theo tên chiến dịch hoặc tên nhà quảng cáo (dòng 170-185).</li>
+<li class="doc-li"><strong>Lưới danh sách Banner Creative (Creative Grid Cards):</strong></li>
+<p class="doc-p">  - Từng thẻ hiển thị: Ảnh thu nhỏ banner, Tên chiến dịch, Doanh nghiệp sở hữu, Vị trí slot & kích thước chuẩn (ví dụ: <code class="inline-code">970x250px</code>, <code class="inline-code">300x600px</code>), Phiên bản (<code class="inline-code">v1</code>, <code class="inline-code">v2</code>), Link đích quảng cáo (<code class="inline-code">landingPageUrl</code>), Badge trạng thái duyệt (<code class="inline-code">SUBMITTED</code>, <code class="inline-code">APPROVED</code>, <code class="inline-code">REJECTED</code>), Cờ <code class="inline-code">Đang phát sóng trực tiếp (LIVE)</code> (dòng 200-330).</p>
+<li class="doc-li"><strong>Modal Kiểm duyệt & So sánh phiên bản Creative (Rule 8 Side-by-Side Modal):</strong></li>
+<p class="doc-p">  - Hiển thị trực quan banner phiên bản mới kèm kích thước thực tế.</p>
+<p class="doc-p">  - <strong>Tính năng so sánh Rule 8:</strong> Nếu chiến dịch đã có 1 bản banner đang chạy trực tiếp (<code class="inline-code">isActiveServing</code>), modal sẽ tự động đặt 2 ảnh cạnh nhau: Bản đang chạy cũ $\leftrightarrow$ Bản mới nộp duyệt, giúp biên tập viên đối chiếu sự thay đổi (dòng 400-500).</p>
+<p class="doc-p">  - Ô Textarea nhập ghi chú kiểm duyệt hoặc lý do yêu cầu sửa (dòng 510-530).</p>
+<p class="doc-p">  - Nút "Chấp thuận & Cấp phép phát sóng" (Xanh) và "Từ chối / Yêu cầu sửa" (Đỏ) (dòng 540-570).</p>
+<h3 id="2-code-nap-du-lieu-quan-tri-phien-ban-rule-8" class="doc-h3">2. Code nạp dữ liệu & Quản trị phiên bản Rule 8</h3>
+<li class="doc-li"><strong>Nạp và làm phẳng danh sách Creative:</strong></li>
+<p class="doc-p">  - Dòng 49-59: Gọi <code class="inline-code">editorialApi.getCampaigns()</code>.</p>
+<p class="doc-p">  - Dòng 62-70: Chuẩn hóa mảng lồng nhau thành <code class="inline-code">FlattenedCreative</code>:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  const allCreatives = campaigns.flatMap((c) =></p>
+<p class="doc-p">    c.creatives.map((cr) => ({ ...cr, campaignName: c.name, companyName: c.companyName, slotName: c.slotName, campaign: c }))</p>
+<p class="doc-p">  )</p>
+<p class="doc-p">  ```</p>
+<li class="doc-li"><strong>Xử lý duyệt & Hoán đổi phát sóng Rule 8 (Live Serving Switch):</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleExecuteReview(approved)</code> tại dòng 85-98:</p>
+<p class="doc-p">    - Gọi <code class="inline-code">editorialApi.reviewCreative(selectedCreative.id, approved, reviewNotes)</code>.</p>
+<p class="doc-p">    - Khi <code class="inline-code">approved === true</code>: Backend tự động kích hoạt cờ <code class="inline-code">isActiveServing = true</code> cho bản mới này, đồng thời thu hồi cờ của bản cũ chuyển thành <code class="inline-code">ARCHIVED</code>. Đảm bảo hệ thống phát sóng lập tức nhận diện banner mới nhất mà không gây gián đoạn hiển thị.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Tab lọc trạng thái Creative</strong></td><td>Dòng 130-155</td><td><code class="inline-code">onClick={() => setStatusFilter(key)}</code></td><td>State setter</td><td>Lọc danh sách creative theo <code class="inline-code">ALL</code>, <code class="inline-code">SUBMITTED</code>, <code class="inline-code">APPROVED</code>, <code class="inline-code">REJECTED</code>.</td></tr>
+<tr><td><strong>Kiểm tra link đích</strong></td><td>Dòng 265-270</td><td>Click <code class="inline-code"><a href></code></td><td>Mở tab mới</td><td>Mở link landing page quảng cáo của khách hàng trên tab mới để kiểm tra an toàn URL.</td></tr>
+<tr><td><strong>Xem & Kiểm duyệt</strong></td><td>Dòng 300-315</td><td><code class="inline-code">onClick={() => handleOpenReview(cr)}</code></td><td><code class="inline-code">handleOpenReview</code> (dòng 73)</td><td>Mở Modal duyệt creative, kích hoạt cơ chế tìm bản live cũ để so sánh theo Rule 8.</td></tr>
+<tr><td><strong>Từ chối / Yêu cầu sửa</strong> (Modal)</td><td>Dòng 545-555</td><td><code class="inline-code">onClick={() => handleExecuteReview(false)}</code></td><td><code class="inline-code">handleExecuteReview(false)</code> (dòng 85)</td><td>Đẩy trạng thái creative về <code class="inline-code">REJECTED</code>, lưu lý do yêu cầu sửa, doanh nghiệp nhận thông báo để nộp lại v2.</td></tr>
+<tr><td><strong>Chấp thuận phát sóng</strong> (Modal)</td><td>Dòng 557-568</td><td><code class="inline-code">onClick={() => handleExecuteReview(true)}</code></td><td><code class="inline-code">handleExecuteReview(true)</code> (dòng 85)</td><td>Cấp phép banner đạt chuẩn, chuyển thành bản phục vụ trực tiếp (<code class="inline-code">isActiveServing</code>), hoàn thành chỉ tiêu banner cho Gatekeeper.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="27-iteration-3-man-ii27-tham-inh-ieu-kien-phat-song-gatekeeper-5-cua-campaigneligibilitypagetsx" class="doc-h2">2.7. ITERATION 3: Màn II.2.7 — Thẩm định Điều kiện Phát sóng Gatekeeper 5 Cửa (<code class="inline-code">CampaignEligibilityPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Thẩm định Điều kiện Phát sóng Chiến dịch (Ad Serving Gatekeeper - Rule 9)" (dòng 100-130).</li>
+<li class="doc-li"><strong>Bộ 4 Thẻ KPI Gatekeeper:</strong></li>
+<p class="doc-p">  - Tổng số chiến dịch đăng ký.</p>
+<p class="doc-p">  - Đủ điều kiện phát sóng (5/5 cửa đạt - Xanh lá).</p>
+<p class="doc-p">  - Bị chặn phát sóng (Thiếu $\ge$ 1 điều kiện - Đỏ).</p>
+<p class="doc-p">  - Đang phát sóng trực tiếp (<code class="inline-code">ACTIVE</code> - Xanh ngọc) (dòng 135-180).</p>
+<li class="doc-li"><strong>Bộ lọc & Tìm kiếm:</strong> Lọc theo Tất cả, Đủ điều kiện (<code class="inline-code">ELIGIBLE</code>), Bị chặn (<code class="inline-code">BLOCKED</code>), Đang chạy (<code class="inline-code">ACTIVE</code>) (dòng 190-230).</li>
+<li class="doc-li"><strong>Bảng Gatekeeper Checklist (Bảng thẩm định 5 điều kiện cốt lõi):</strong></li>
+<p class="doc-p">  - Cột 1: Thông tin Chiến dịch & Doanh nghiệp.</p>
+<p class="doc-p">  - Cột 2: Vị trí Slot & Lịch phát sóng.</p>
+<p class="doc-p">  - Cột 3-7: <strong>5 Tiêu chí Gatekeeper</strong>:</p>
+<p class="doc-p">    1. 💳 <strong>Thanh toán (Payment):</strong> Đã thu đủ tiền hoặc cọc $\ge$ 50% (<code class="inline-code">paymentPassed</code>).</p>
+<p class="doc-p">    2. 📝 <strong>Báo giá (Quotation):</strong> Đã chốt báo giá chính thức (<code class="inline-code">quotationPassed</code>).</p>
+<p class="doc-p">    3. 📄 <strong>Hợp đồng (Contract):</strong> Đã ký hợp đồng & có link PDF (<code class="inline-code">contractPassed</code>).</p>
+<p class="doc-p">    4. 🎨 <strong>Creative (Banner):</strong> Banner đã duyệt đạt chuẩn kích thước (<code class="inline-code">creativePassed</code>).</p>
+<p class="doc-p">    5. 📅 <strong>Slot (Lịch trống):</strong> Vị trí slot không bị quá tải / xung đột (<code class="inline-code">slotPassed</code>).</p>
+<p class="doc-p">  - Cột 8: Đánh giá tổng thể (<code class="inline-code">overallEligible</code>: ĐỦ ĐIỀU KIỆN / BỊ CHẶN).</p>
+<p class="doc-p">  - Cột 9: Hành động: Nút "Kích hoạt phát sóng (LIVE)" hoặc "Xem chi tiết lý do chặn".</p>
+<li class="doc-li"><strong>Hộp thoại xác nhận kích hoạt (<code class="inline-code">ConfirmDialog</code>):</strong> Cảnh báo xác nhận bắt đầu đẩy banner lên trang chủ báo điện tử (dòng 630-650).</li>
+<h3 id="2-code-nap-du-lieu-thuat-toan-tham-inh-5-cua-gatekeeper-logic" class="doc-h3">2. Code nạp dữ liệu & Thuật toán thẩm định 5 cửa (Gatekeeper Logic)</h3>
+<li class="doc-li"><strong>Nạp danh sách thẩm định:</strong> Dòng 39-50: <code class="inline-code">editorialApi.getEligibilityChecklist()</code> (<code class="inline-code">GET /editorial/eligibility</code>).</li>
+<li class="doc-li"><strong>Thuật toán đánh giá 5 điều kiện tiên quyết (Gatekeeper Engine):</strong></li>
+<p class="doc-p">  - Thuộc tính <code class="inline-code">overallEligible</code>:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  item.overallEligible = item.paymentPassed && item.quotationPassed && item.contractPassed && item.creativePassed && item.slotPassed</p>
+<p class="doc-p">  ```</p>
+<p class="doc-p">  - Nếu thiếu bất kỳ điều kiện nào $\rightarrow$ <code class="inline-code">overallEligible = false</code>, nút kích hoạt bị vô hiệu hóa (<code class="inline-code">disabled</code>) kèm chú giải lý do bị chặn.</p>
+<li class="doc-li"><strong>Kích hoạt chiến dịch sang LIVE:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleActivate(campaignId)</code> tại dòng 56-70:</p>
+<p class="doc-p">    - Gọi <code class="inline-code">editorialApi.activateCampaign(campaignId)</code> (<code class="inline-code">POST /editorial/eligibility/{id}/activate</code>).</p>
+<p class="doc-p">    - Chiến dịch lập tức chuyển trạng thái sang <code class="inline-code">ACTIVE</code>, hệ thống phân phối banner bắt đầu đếm lượt hiển thị (Impression) và lượt bấm (Click) trên giao diện độc giả.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Làm mới thẩm định</strong></td><td>Dòng 120-128</td><td><code class="inline-code">onClick={loadData}</code></td><td><code class="inline-code">loadData</code> (dòng 39)</td><td>Nạp lại danh sách thẩm định 5 điều kiện của toàn bộ chiến dịch.</td></tr>
+<tr><td><strong>Bộ lọc Gatekeeper</strong></td><td>Dòng 200-225</td><td><code class="inline-code">onClick={() => setFilterStatus(st)}</code></td><td>State setter</td><td>Lọc danh sách theo <code class="inline-code">ALL</code>, <code class="inline-code">ELIGIBLE</code> (đủ 5/5), <code class="inline-code">BLOCKED</code> (bị chặn), <code class="inline-code">ACTIVE</code> (đang chạy).</td></tr>
+<tr><td><strong>Xem chi tiết điều kiện</strong></td><td>Dòng 380-390</td><td><code class="inline-code">onClick={() => setSelectedItem(item)}</code></td><td>State setter</td><td>Mở Modal chi tiết giải thích rõ ràng tiêu chí nào chưa đạt và hướng dẫn khắc phục.</td></tr>
+<tr><td><strong>Kích hoạt phát sóng (LIVE)</strong></td><td>Dòng 395-410</td><td><code class="inline-code">onClick={() => setConfirmActivationItem(item)}</code></td><td>State setter</td><td>Chỉ bấm được khi <code class="inline-code">overallEligible === true</code>. Mở <code class="inline-code">ConfirmDialog</code> xác nhận kích hoạt.</td></tr>
+<tr><td><strong>Xác nhận kích hoạt (Modal)</strong></td><td>Dòng 635-645</td><td><code class="inline-code">onConfirm={() => handleActivate(id)}</code></td><td><code class="inline-code">handleActivate</code> (dòng 56)</td><td>Gửi <code class="inline-code">POST</code> kích hoạt. Chiến dịch chuyển sang <code class="inline-code">ACTIVE</code>, banner chính thức xuất hiện trên báo.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="28-iteration-3-man-ii28-ieu-khien-chien-dich-emergency-kill-switch-make-good-campaigncontrolpagetsx" class="doc-h2">2.8. ITERATION 3: Màn II.2.8 — Điều khiển Chiến dịch, Emergency Kill-Switch & Make-Good (<code class="inline-code">CampaignControlPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Trung tâm Điều khiển Chiến dịch & Công tắc Dừng khẩn cấp (Emergency Kill-Switch & Make-Good)" (dòng 80-110).</li>
+<li class="doc-li"><strong>Thẻ giám sát vận hành:</strong> Số chiến dịch đang LIVE, số chiến dịch đang bị tạm dừng khẩn cấp (<code class="inline-code">SUSPENDED</code>), số ngày bù đã cấp (<code class="inline-code">Make-Good Days</code>) (dòng 115-150).</li>
+<li class="doc-li"><strong>Bảng điều khiển chiến dịch:</strong></li>
+<p class="doc-p">  - Cột: Mã & Tên chiến dịch, Doanh nghiệp, Vị trí Slot, Thời gian phát sóng, Trạng thái vận hành (<code class="inline-code">ACTIVE</code> / <code class="inline-code">SUSPENDED</code>), Thống kê hiển thị (Views/Clicks), Công cụ điều khiển khẩn cấp.</p>
+<li class="doc-li"><strong>Modal Dừng khẩn cấp (Emergency Kill-Switch Dialog):</strong></li>
+<p class="doc-p">  - Khung cảnh báo màu đỏ nghiêm trọng: Yêu cầu biên tập viên nhập chi tiết lý do ngắt phát sóng khẩn cấp (ví dụ: Vi phạm văn hóa, nội dung quảng cáo sai lệch thực tế, cơ quan quản lý yêu cầu gỡ gấp) (dòng 450-510).</p>
+<li class="doc-li"><strong>Modal Khôi phục phát sóng (Resume Campaign Dialog):</strong> Xác nhận mở lại chiến dịch sau khi sự cố đã được khắc phục (dòng 515-540).</li>
+<li class="doc-li"><strong>Modal Lập lịch bù phát sóng (Make-Good Scheduling Dialog):</strong></li>
+<p class="doc-p">  - Ô nhập Số ngày bù phát sóng (mặc định 1 - 7 ngày), ô nhập Lý do bù (sự cố sập mạng, bảo trì máy chủ tòa soạn) (dòng 545-610).</p>
+<h3 id="2-code-nap-du-lieu-thuc-thi-ieu-khien" class="doc-h3">2. Code nạp dữ liệu & Thực thi điều khiển</h3>
+<li class="doc-li"><strong>Nạp danh sách:</strong> Dòng 45-56: <code class="inline-code">editorialApi.getCampaignControlList()</code> (<code class="inline-code">GET /editorial/campaign-control</code>).</li>
+<li class="doc-li"><strong>Thực thi Dừng khẩn cấp (Emergency Kill-Switch):</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleSuspend()</code> tại dòng 63-79:</p>
+<p class="doc-p">  ```typescript</p>
+<p class="doc-p">  await editorialApi.suspendCampaign(suspendTarget.campaignId, suspendReason.trim())</p>
+<p class="doc-p">  ```</p>
+<p class="doc-p">  - Lập tức chuyển chiến dịch sang <code class="inline-code">SUSPENDED</code>, hạ banner khỏi toàn bộ các trang báo công khai, lưu vết kiểm toán (Audit Trail) gồm lý do và thời gian thực hiện.</p>
+<li class="doc-li"><strong>Thực thi Khôi phục phát sóng (Resume):</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleResume()</code> tại dòng 82-97 gọi <code class="inline-code">editorialApi.resumeCampaign(id)</code> $\rightarrow$ Chuyển lại trạng thái <code class="inline-code">ACTIVE</code>.</p>
+<li class="doc-li"><strong>Thực thi Lập lịch bù Make-Good:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleMakeGood()</code> tại dòng 100-118 gọi <code class="inline-code">editorialApi.makeGoodCampaign(id, extraDays, reason)</code> $\rightarrow$ Gia hạn tự động ngày kết thúc (<code class="inline-code">endDate = endDate + extraDays</code>) trên lịch tồn kho mà không phát sinh thêm chi phí cho doanh nghiệp.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Làm mới danh sách</strong></td><td>Dòng 95-105</td><td><code class="inline-code">onClick={loadData}</code></td><td><code class="inline-code">loadData</code> (dòng 45)</td><td>Nạp lại trạng thái mới nhất của tất cả các chiến dịch đang phát sóng.</td></tr>
+<tr><td><strong>DỪNG KHẨN CẤP (Kill-Switch)</strong></td><td>Dòng 310-325</td><td><code class="inline-code">onClick={() => setSuspendTarget(item)}</code></td><td>State setter</td><td>Mở Modal dừng khẩn cấp màu đỏ, yêu cầu nhập lý do ngắt phát sóng.</td></tr>
+<tr><td><strong>Xác nhận Dừng khẩn cấp</strong> (Modal)</td><td>Dòng 495-505</td><td><code class="inline-code">onClick={handleSuspend}</code></td><td><code class="inline-code">handleSuspend</code> (dòng 63)</td><td>Gửi <code class="inline-code">POST /editorial/campaign-control/{id}/suspend</code>. Banner lập tức biến mất khỏi trang báo.</td></tr>
+<tr><td><strong>Khôi phục phát sóng</strong></td><td>Dòng 330-345</td><td><code class="inline-code">onClick={() => setResumeTarget(item)}</code></td><td>State setter</td><td>Mở Dialog xác nhận mở lại chiến dịch đã khắc phục xong sự cố.</td></tr>
+<tr><td><strong>Xác nhận Khôi phục</strong> (Modal)</td><td>Dòng 530-538</td><td><code class="inline-code">onClick={handleResume}</code></td><td><code class="inline-code">handleResume</code> (dòng 82)</td><td>Gửi <code class="inline-code">POST /editorial/campaign-control/{id}/resume</code>. Chiến dịch phục hồi trạng thái <code class="inline-code">ACTIVE</code>.</td></tr>
+<tr><td><strong>Lập lịch bù (Make-Good)</strong></td><td>Dòng 350-365</td><td><code class="inline-code">onClick={() => setMakeGoodTarget(item)}</code></td><td>State setter</td><td>Mở Modal lập lịch bù phát sóng do sự cố kỹ thuật.</td></tr>
+<tr><td><strong>Xác nhận Bù ngày</strong> (Modal)</td><td>Dòng 595-605</td><td><code class="inline-code">onClick={handleMakeGood}</code></td><td><code class="inline-code">handleMakeGood</code> (dòng 100)</td><td>Gửi <code class="inline-code">POST /editorial/campaign-control/{id}/make-good</code> kèm <code class="inline-code">extraDays</code>. Gia hạn ngày kết thúc chiến dịch.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="29-iteration-3-man-ii29-quan-ly-hop-ong-phap-ly-phu-luc-hang-muc-vip-advertisingcontractpagetsx" class="doc-h2">2.9. ITERATION 3: Màn II.2.9 — Quản lý Hợp đồng Pháp lý, Phụ lục & Hạng mức VIP (<code class="inline-code">AdvertisingContractPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header điều hướng 2 Tab chính:</strong></li>
+<p class="doc-p">  - Tab 1: "Hợp đồng quảng cáo & Phụ lục số hóa (Contracts & Addendums)" (dòng 105-125).</p>
+<p class="doc-p">  - Tab 2: "Phân hạng đối tác chiến lược (VIP Partner Tiering)" (dòng 126-145).</p>
+<li class="doc-li"><strong>Nội dung Tab 1 (Hợp đồng):</strong></li>
+<p class="doc-p">  - Cụm nút: "Tạo hợp đồng mới", "Làm mới dữ liệu", thanh tìm kiếm số hợp đồng (dòng 150-180).</p>
+<p class="doc-p">  - Bảng Hợp đồng: Số hợp đồng pháp lý, Chiến dịch & Doanh nghiệp, Ngày ký kết, Giá trị hợp đồng (VNĐ), Trạng thái số hóa (Đã đính kèm file PDF / Chưa có file), Số lượng phụ lục phát sinh, Hành động (Sửa link PDF, Lập phụ lục, Xem phụ lục).</p>
+<p class="doc-p">  - Modal Tạo / Cập nhật số hóa hợp đồng: Nhập mã tham chiếu hợp đồng, ngày ký kết, giá trị tiền, đính kèm đường link file PDF đã ký (dòng 650-750).</p>
+<p class="doc-p">  - Modal Lập phụ lục hợp đồng (<code class="inline-code">Addendum</code>): Nhập số phụ lục (ví dụ: <code class="inline-code">PL-01/2026</code>), ngày ký, loại phụ lục (Điều chỉnh lịch phát sóng, Bổ sung ngân sách, Đổi vị trí banner), nội dung cam kết (dòng 760-840).</p>
+<p class="doc-p">  - Modal Danh sách phụ lục: Hiển thị toàn bộ lịch sử các phụ lục đã ký kết của hợp đồng (dòng 850-910).</p>
+<li class="doc-li"><strong>Nội dung Tab 2 (VIP Tiering):</strong></li>
+<p class="doc-p">  - Bảng danh sách nhà quảng cáo: Tên công ty, Mã số thuế, Người liên hệ, Tổng chi tiêu lũy kế (<code class="inline-code">Total Spend</code>), Số chiến dịch đã chạy, Hạng mức VIP hiện tại (<code class="inline-code">STANDARD</code>, <code class="inline-code">SILVER</code>, <code class="inline-code">GOLD</code>, <code class="inline-code">DIAMOND</code>), Tỷ lệ chiết khấu mặc định (<code class="inline-code">%</code>), Nút "Điều chỉnh hạng VIP".</p>
+<p class="doc-p">  - Modal Cập nhật hạng VIP: Chọn hạng mức, nhập % giảm giá tự động, nhập lý do nâng hạng (dòng 920-1010).</p>
+<h3 id="2-code-nap-du-lieu-xu-ly-nghiep-vu-hop-ong" class="doc-h3">2. Code nạp dữ liệu & Xử lý nghiệp vụ hợp đồng</h3>
+<li class="doc-li"><strong>Nạp dữ liệu đồng thời:</strong></li>
+<p class="doc-p">  - Dòng 78-93: <code class="inline-code">Promise.all([editorialApi.getContracts(), editorialApi.getVipAdvertisers()])</code>.</p>
+<li class="doc-li"><strong>Cập nhật số hóa hợp đồng:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleUpdateContract()</code> tại dòng 100-120: Gọi <code class="inline-code">editorialApi.updateContract(id, contractReference, contractFileUrl, signingDate, contractValue)</code> $\rightarrow$ Cung cấp file hợp đồng hợp lệ cho Gatekeeper Rule 9.</p>
+<li class="doc-li"><strong>Lập phụ lục hợp đồng (Addendum):</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleCreateAddendum()</code> tại dòng 130-155: Gọi <code class="inline-code">editorialApi.createContractAddendum(id, data)</code> $\rightarrow$ Ghi nhận sự thay đổi pháp lý của chiến dịch mà không cần hủy hợp đồng gốc.</p>
+<li class="doc-li"><strong>Cập nhật hạng VIP:</strong></li>
+<p class="doc-p">  - Hàm <code class="inline-code">handleUpdateVipTier()</code> tại dòng 170-195: Gọi <code class="inline-code">editorialApi.updateVipTier(advertiserId, { tier, discountPercent, notes })</code> $\rightarrow$ Mức chiết khấu VIP này sẽ tự động gợi ý cho nhân viên tòa soạn khi gửi báo giá ở Màn II.2.3.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Tab Hợp đồng / VIP</strong></td><td>Dòng 115, 135</td><td><code class="inline-code">onClick={() => setActiveTab(tab)}</code></td><td>State setter</td><td>Chuyển đổi giữa giao diện quản lý hợp đồng pháp lý và phân hạng đối tác VIP.</td></tr>
+<tr><td><strong>Tạo hợp đồng mới</strong></td><td>Dòng 160-170</td><td><code class="inline-code">onClick={() => setIsCreateModalOpen(true)}</code></td><td>State setter</td><td>Mở Modal tạo hồ sơ hợp đồng mới cho chiến dịch quảng cáo.</td></tr>
+<tr><td><strong>Mở xem file PDF hợp đồng</strong></td><td>Dòng 350-360</td><td>Click Link <code class="inline-code"><a target="_blank"></code></td><td>Mở tab mới</td><td>Mở trực tiếp file PDF hợp đồng số hóa đã lưu trữ để kiểm tra chữ ký/con dấu.</td></tr>
+<tr><td><strong>Sửa số hóa hợp đồng</strong></td><td>Dòng 365-375</td><td><code class="inline-code">onClick={() => handleOpenEditContract(c)}</code></td><td>State setter</td><td>Mở Modal cập nhật link PDF, số hợp đồng và giá trị hợp đồng.</td></tr>
+<tr><td><strong>Lập phụ lục (+)</strong></td><td>Dòng 380-390</td><td><code class="inline-code">onClick={() => handleOpenAddendum(c)}</code></td><td>State setter</td><td>Mở Modal soạn phụ lục điều chỉnh thời gian, vị trí banner hoặc ngân sách.</td></tr>
+<tr><td><strong>Xem danh sách phụ lục</strong></td><td>Dòng 395-405</td><td><code class="inline-code">onClick={() => setViewAddendumsTarget(c)}</code></td><td>State setter</td><td>Mở Modal hiển thị toàn bộ cây phụ lục pháp lý đã phát sinh của hợp đồng này.</td></tr>
+<tr><td><strong>Lưu hợp đồng</strong> (Modal)</td><td>Dòng 735-745</td><td><code class="inline-code">onClick={handleSaveContract}</code></td><td><code class="inline-code">handleUpdateContract</code> / <code class="inline-code">handleCreateContract</code></td><td>Gửi dữ liệu hợp đồng lên server. Khi có link PDF hợp lệ, điều kiện <code class="inline-code">contractPassed</code> của Gatekeeper được mở.</td></tr>
+<tr><td><strong>Lưu phụ lục</strong> (Modal)</td><td>Dòng 825-835</td><td><code class="inline-code">onClick={handleCreateAddendum}</code></td><td><code class="inline-code">handleCreateAddendum</code> (dòng 130)</td><td>Gửi <code class="inline-code">POST /editorial/contracts/{id}/addendum</code>. Phụ lục được lưu vào hồ sơ pháp lý.</td></tr>
+<tr><td><strong>Điều chỉnh hạng VIP</strong></td><td>Dòng 580-590</td><td><code class="inline-code">onClick={() => handleOpenVipEdit(v)}</code></td><td>State setter</td><td>Mở Modal nâng/hạ hạng VIP và điều chỉnh tỷ lệ chiết khấu cho khách hàng doanh nghiệp.</td></tr>
+<tr><td><strong>Lưu hạng VIP</strong> (Modal)</td><td>Dòng 995-1005</td><td><code class="inline-code">onClick={handleUpdateVipTier}</code></td><td><code class="inline-code">handleUpdateVipTier</code> (dòng 170)</td><td>Cập nhật hạng đối tác (<code class="inline-code">SILVER</code>/<code class="inline-code">GOLD</code>/<code class="inline-code">DIAMOND</code>) và mức chiết khấu vào MySQL.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h2 id="210-iteration-3-man-ii210-bang-ieu-khien-kinh-doanh-doanh-thu-kep-b2bb2c-businessoperationdashboardpagetsx" class="doc-h2">2.10. ITERATION 3: Màn II.2.10 — Bảng điều khiển Kinh doanh & Doanh thu kép B2B/B2C (<code class="inline-code">BusinessOperationDashboardPage.tsx</code>)</h2>
+<h3 id="1-thanh-phan-hien-thi-tren-man-hinh" class="doc-h3">1. Thành phần hiển thị trên màn hình</h3>
+<li class="doc-li"><strong>Header:</strong> Tiêu đề "Bảng Điều Khiển Vận Hành Tòa Soạn & Kinh Doanh (Hybrid Revenue & SLA Operations)", nút "Làm mới dữ liệu" (dòng 50-76).</li>
+<li class="doc-li"><strong>Khối 1: Báo cáo Doanh thu kép (Hybrid Revenue Overview B2B + B2C):</strong></li>
+<p class="doc-p">  - Thẻ 1: Tổng doanh thu toàn hệ thống (<code class="inline-code">totalRevenue = B2B + B2C</code>).</p>
+<p class="doc-p">  - Thẻ 2: Doanh thu Quảng cáo B2B (<code class="inline-code">advertisingRevenue</code>) từ các hợp đồng booking.</p>
+<p class="doc-p">  - Thẻ 3: Doanh thu Độc giả B2C (<code class="inline-code">readerRevenue</code>) từ gói cước hội viên và bán bài lẻ Paywall.</p>
+<p class="doc-p">  - Thẻ 4: Tỷ trọng cơ cấu doanh thu (% B2B vs % B2C) (dòng 100-160).</p>
+<li class="doc-li"><strong>Khối 2: Giám sát Công suất kho quảng cáo (Ad Inventory & Occupancy):</strong></li>
+<p class="doc-p">  - Biểu đồ tiến độ tỷ lệ lấp đầy tồn kho (<code class="inline-code">Occupancy Rate %</code>), số ngày đã bán, số ngày còn trống theo từng vị trí slot (dòng 165-210).</p>
+<li class="doc-li"><strong>Khối 3: Hàng đợi Xử lý Khẩn cấp & Cảnh báo SLA (Action Required & SLA Watchdog):</strong></li>
+<p class="doc-p">  - Thẻ cảnh báo Booking chờ báo giá quá hạn $\ge 24h$.</p>
+<p class="doc-p">  - Thẻ cảnh báo Banner creative chờ duyệt $\ge 12h$.</p>
+<p class="doc-p">  - Thẻ cảnh báo Chiến dịch đủ điều kiện đang chờ bấm LIVE.</p>
+<p class="doc-p">  - Thẻ cảnh báo Bình luận độc giả chờ kiểm duyệt (dòng 215-280).</p>
+<li class="doc-li"><strong>Các lối tắt điều hướng nhanh (Quick Jump Links):</strong> Nút chuyển nhanh đến các phân hệ xử lý tương ứng (dòng 285-320).</li>
+<h3 id="2-code-nap-du-lieu-tong-hop-chi-so" class="doc-h3">2. Code nạp dữ liệu & Tổng hợp chỉ số</h3>
+<li class="doc-li"><strong>Nạp số liệu tổng hợp:</strong></li>
+<p class="doc-p">  - Dòng 31-42: Hàm <code class="inline-code">loadData()</code> gọi <code class="inline-code">editorialApi.getDashboardOverview()</code> (<code class="inline-code">GET /editorial/dashboard/overview</code>).</p>
+<li class="doc-li"><strong>Tổng hợp chỉ số doanh thu kép:</strong></li>
+<p class="doc-p">  - Backend/Store tính toán tổng hợp từ bảng <code class="inline-code">ad_bookings</code>, <code class="inline-code">ad_contracts</code> (phần B2B) và <code class="inline-code">reader_subscriptions</code>, <code class="inline-code">article_purchases</code> (phần B2C) để trả về đối tượng <code class="inline-code">EditorialDashboardOverview</code>.</p>
+<h3 id="3-bang-ke-toan-bo-nut-bam-luong-goi-code" class="doc-h3">3. Bảng kê toàn bộ nút bấm & Luồng gọi code</h3>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Tên nút bấm</th><th>Vị trí JSX</th><th>Sự kiện (<code class="inline-code">onClick</code>)</th><th>Hàm xử lý</th><th>Luồng thực thi & Điểm kết thúc</th></tr></thead><tbody>
+<tr><td><strong>Làm mới dữ liệu</strong></td><td>Dòng 68-75</td><td><code class="inline-code">onClick={loadData}</code></td><td><code class="inline-code">loadData</code> (dòng 31)</td><td>Tính toán lại toàn bộ doanh thu kép, tỷ lệ lấp đầy kho và hàng đợi SLA.</td></tr>
+<tr><td><strong>Xử lý booking chờ</strong></td><td>Dòng 230-235</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/bookings"</code></td><td>Chuyển thẳng sang Màn II.2.3 để xử lý các booking đang chờ báo giá.</td></tr>
+<tr><td><strong>Duyệt banner gấp</strong></td><td>Dòng 245-250</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/creatives"</code></td><td>Chuyển thẳng sang Màn II.2.5 để duyệt các creative đang tồn đọng.</td></tr>
+<tr><td><strong>Kích hoạt phát sóng</strong></td><td>Dòng 260-265</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/eligibility"</code></td><td>Chuyển thẳng sang Màn II.2.7 để bấm LIVE cho các chiến dịch đã đủ điều kiện.</td></tr>
+<tr><td><strong>Kiểm duyệt bình luận</strong></td><td>Dòng 275-280</td><td>Click Link</td><td><code class="inline-code">to="/backoffice/editorial/comments"</code></td><td>Chuyển thẳng sang Màn II.2.6 để duyệt các bình luận độc giả đang chờ.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<h1 id="phan-3-giai-thich-rieng-luong-i-end-to-end-workflow-tung-iteration" class="doc-h1">PHẦN 3: GIẢI THÍCH RIÊNG LUỒNG ĐI (END-TO-END WORKFLOW) TỪNG ITERATION</h1>
+<p class="doc-p">Phần này mô tả chi tiết quy trình nghiệp vụ xuyên suốt: người dùng làm gì trước, bấm vào đâu, hệ thống xử lý ra sao, và kết thúc ở điểm nào.</p>
+<div class="code-block-wrapper"><div class="code-header"><span class="code-lang">code</span><button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText); this.innerText='Copied!'; setTimeout(() => this.innerText='Copy', 2000);">Copy</button></div><pre><code class="language-">+---------------------------------------------------------------------------------------------------+
+|                        TỔNG QUAN LUỒNG VẬN HÀNH TOÀN DIỆN CỦA SV2                                 |
++---------------------------------------------------------------------------------------------------+
+|  ITERATION 1: B2C TIN TỨC &amp; KIỂM DUYỆT                                                            |
+|  [Phóng viên soạn bài] -&gt; [Nộp duyệt] -&gt; [Tòa soạn biên tập/góp ý] -&gt; [Duyệt/Xuất bản lên báo]     |
+|                                       -&gt; [Đặt giá Premium/Bán lẻ]  -&gt; [Kiểm duyệt bình luận]     |
++---------------------------------------------------------------------------------------------------+
+|  ITERATION 2: B2B BOOKING &amp; LỊCH QUẢNG CÁO                                                        |
+|  [Doanh nghiệp đặt booking] -&gt; [Tòa soạn tiếp nhận hàng đợi] -&gt; [Tra cứu Lịch tồn kho Rule 7]    |
+|                             -&gt; [Gửi báo giá chiết khấu % / Từ chối] -&gt; [Duyệt Banner Rule 8]      |
++---------------------------------------------------------------------------------------------------+
+|  ITERATION 3: THẨM ĐỊNH PHÁT SÓNG &amp; DOANH THU KÉP                                                 |
+|  [Gatekeeper 5 tiêu chí (Rule 9)] -&gt; [Kích hoạt LIVE] -&gt; [Điều khiển Kill-Switch &amp; Make-Good]      |
+|                                   -&gt; [Hợp đồng pháp lý &amp; Phân hạng VIP] -&gt; [Dashboard Doanh thu]  |
++---------------------------------------------------------------------------------------------------+</code></pre></div>
+<hr class="doc-hr" />
+<h2 id="31-luong-nghiep-vu-toan-dien-iteration-1-xuat-ban-b2c-paywall-kiem-duyet-oc-gia" class="doc-h2">3.1. Luồng nghiệp vụ toàn diện Iteration 1 (Xuất bản B2C, Paywall & Kiểm duyệt Độc giả)</h2>
+<h3 id="kich-ban-thuc-te-xuat-ban-bai-phong-su-ieu-tra-co-thu-phi-va-kiem-duyet-phan-hoi-oc-gia" class="doc-h3">Kịch bản thực tế: Xuất bản bài phóng sự điều tra có thu phí và kiểm duyệt phản hồi độc giả</h3>
+<li class="doc-li-num"><strong>1.</strong> <strong>Bước 1: Tiếp nhận hoặc Khởi tạo bài viết (<code class="inline-code">ArticleEditorPage</code>)</strong></li>
+<p class="doc-p">   - Phóng viên hoặc Biên tập viên bấm nút <strong>"+ Viết bài mới"</strong> trên header Màn II.2.1 hoặc truy cập <code class="inline-code">/backoffice/editorial/articles/new</code>.</p>
+<p class="doc-p">   - Nhập tiêu đề: <em>"Thâm nhập đường dây buôn lậu qua đường biển Bạch Long Vĩ: Phóng sự điều tra độc quyền"</em>.</p>
+<p class="doc-p">   - Nhập tóm tắt dẫn nhập (Sapo) và nội dung toàn văn phóng sự.</p>
+<p class="doc-p">   - Bấm <strong>"Chọn ảnh từ máy tính"</strong> để tải ảnh bìa hiện trường <code class="inline-code">bachlongvi.jpg</code> (kèm chú thích và bản quyền phóng viên). Hệ thống tạo Object URL xem trước chống chớp lỗi.</p>
+<p class="doc-p">   - Gắn thẻ tag: <code class="inline-code">Phóng sự điều tra</code>, <code class="inline-code">Bạch Long Vĩ</code>, <code class="inline-code">Hải Phòng</code>.</p>
+<li class="doc-li-num"><strong>2.</strong> <strong>Bước 2: Thiết lập chính sách Doanh thu B2C (Paywall & Đặt giá lẻ - UC027)</strong></li>
+<p class="doc-p">   - Ở cột cấu hình bên phải, tích chọn checkbox: <strong>"Bài viết độc quyền Premium (Paywall)"</strong>.</p>
+<p class="doc-p">   - Trường nhập giá mở ra, biên tập viên nhập: <code class="inline-code">25.000 VNĐ</code> (độc giả không có gói tháng có thể mua lẻ bài viết này với giá 25k).</p>
+<p class="doc-p">   - Nhập ghi chú phiên bản: <em>"Bản thảo phóng sự điều tra kỳ 1"</em>.</p>
+<li class="doc-li-num"><strong>3.</strong> <strong>Bước 3: Nộp duyệt và Phê duyệt bài viết (UC025)</strong></li>
+<p class="doc-p">   - Bấm nút <strong>"Nộp duyệt bài viết"</strong> (<code class="inline-code">handleSave(true)</code>). Hệ thống chuyển trạng thái bài viết từ <code class="inline-code">DRAFT</code> $\rightarrow$ <code class="inline-code">IN_REVIEW</code>.</p>
+<p class="doc-p">   - Thư ký tòa soạn mở Màn II.2.1 (<code class="inline-code">/backoffice/editorial/articles</code>), chọn tab <strong>"Chờ duyệt"</strong>.</p>
+<p class="doc-p">   - Bấm nút <strong>"Duyệt"</strong>: Modal mở ra xem trước toàn bộ nội dung và lịch sử phiên bản.</p>
+<p class="doc-p">   - Thư ký tòa soạn nhập ghi chú: <em>"Tư liệu điều tra xuất sắc, đạt chuẩn xuất bản trang nhất"</em>, bấm <strong>"Xác nhận"</strong>.</p>
+<p class="doc-p">   - Trạng thái bài viết chuyển sang <code class="inline-code">APPROVED</code>.</p>
+<li class="doc-li-num"><strong>4.</strong> <strong>Bước 4: Xuất bản lên báo và Điều hành gỡ bài</strong></li>
+<p class="doc-p">   - Thư ký tòa soạn bấm nút <strong>"Xuất bản ngay"</strong>: Trạng thái chuyển thành <code class="inline-code">PUBLISHED</code>. Bài viết lập tức xuất hiện trên trang chủ báo điện tử cho hàng triệu độc giả.</p>
+<p class="doc-p">   - Nếu phát hiện tình tiết mới cần đính chính khẩn cấp: Bấm nút <strong>"Hạ bài"</strong> $\rightarrow$ bài viết chuyển sang <code class="inline-code">UNPUBLISHED</code> và ẩn khỏi trang báo ngay lập tức.</p>
+<p class="doc-p">   - Muốn xem lại các lần sửa đổi cũ: Bấm nút <strong>"Lịch sử"</strong> để xem và bấm <strong>"Khôi phục bản này"</strong> nếu cần lấy lại nội dung v1.</p>
+<li class="doc-li-num"><strong>5.</strong> <strong>Bước 5: Kiểm duyệt bình luận độc giả (UC026 - <code class="inline-code">CommentModerationPage</code>)</strong></li>
+<p class="doc-p">   - Độc giả đọc bài và gửi bình luận. Bình luận mới tự động ở trạng thái <code class="inline-code">PENDING</code>.</p>
+<p class="doc-p">   - Biên tập viên vào Màn II.2.6 (<code class="inline-code">/backoffice/editorial/comments</code>), tab <strong>"Bình luận"</strong>.</p>
+<p class="doc-p">   - Đối với bình luận văn minh: Bấm nút <strong>"Duyệt"</strong> $\rightarrow$ chuyển <code class="inline-code">APPROVED</code>, hiển thị công khai dưới bài viết.</p>
+<p class="doc-p">   - Đối với bình luận spam hoặc thù ghét: Bấm nút <strong>"Từ chối"</strong>, nhập lý do vi phạm $\rightarrow$ chuyển <code class="inline-code">REJECTED</code>, ẩn vĩnh viễn khỏi trang báo.</p>
+<hr class="doc-hr" />
+<h2 id="32-luong-nghiep-vu-toan-dien-iteration-2-van-hanh-b2b-kiem-soat-slot-duyet-banner" class="doc-h2">3.2. Luồng nghiệp vụ toàn diện Iteration 2 (Vận hành B2B, Kiểm soát Slot & Duyệt Banner)</h2>
+<h3 id="kich-ban-thuc-te-tiep-nhan-yeu-cau-quang-cao-tu-doanh-nghiep-cang-hai-phong-kiem-tra-lich-trong-va-duyet-banner" class="doc-h3">Kịch bản thực tế: Tiếp nhận yêu cầu quảng cáo từ Doanh nghiệp Cảng Hải Phòng, kiểm tra lịch trống và duyệt banner</h3>
+<li class="doc-li-num"><strong>1.</strong> <strong>Bước 1: Tiếp nhận yêu cầu Booking (UC016 - <code class="inline-code">BookingManagementPage</code>)</strong></li>
+<p class="doc-p">   - Doanh nghiệp tạo booking quảng cáo vị trí <code class="inline-code">Top Leaderboard</code> từ 10/12/2026 đến 20/12/2026.</p>
+<p class="doc-p">   - Booking xuất hiện trong hàng đợi của Tòa soạn tại Màn II.2.3 (<code class="inline-code">/backoffice/editorial/bookings</code>) ở trạng thái <code class="inline-code">SUBMITTED</code> kèm huy hiệu đỏ báo hiệu.</p>
+<p class="doc-p">   - Nhân viên tòa soạn bấm nút <strong>"Chi tiết"</strong> để xem thông tin doanh nghiệp, người liên hệ và ngân sách dự kiến.</p>
+<li class="doc-li-num"><strong>2.</strong> <strong>Bước 2: Tra cứu lịch tồn kho slot & Kiểm tra xung đột Rule 7 (UC017 - <code class="inline-code">AdvertisingInventoryCalendarPage</code>)</strong></li>
+<p class="doc-p">   - Trước khi báo giá, nhân viên bấm nút <strong>"Lịch tồn kho slot"</strong> để chuyển sang Màn II.2.4 (<code class="inline-code">/backoffice/editorial/calendar</code>).</p>
+<p class="doc-p">   - Chọn bộ lọc vị trí: <code class="inline-code">Top Leaderboard</code>, chuyển sang xem tháng <code class="inline-code">12/2026</code>.</p>
+<p class="doc-p">   - Quan sát lưới lịch từ ngày 10/12 đến 20/12:</p>
+<p class="doc-p">     - Các ô ngày hiển thị màu 🟢 <strong>Xanh lá (Trống)</strong> $\rightarrow$ Đạt yêu cầu!</p>
+<p class="doc-p">     - Nếu phát hiện ô màu 🔴 <strong>Đỏ (Xung đột Rule 7)</strong>: Có nghĩa là vị trí độc quyền này đã có khách hàng khác đặt trước. Tòa soạn sẽ quay lại hàng đợi, bấm nút <strong>"Từ chối"</strong>, nhập lý do: <em>"Vị trí slot Top Leaderboard đã kín lịch phát sóng trong thời gian yêu cầu, đề xuất đổi sang vị trí In-Article"</em> $\rightarrow$ Kết thúc nhánh từ chối.</p>
+<li class="doc-li-num"><strong>3.</strong> <strong>Bước 3: Phát hành báo giá chính thức kèm chiết khấu (UC018)</strong></li>
+<p class="doc-p">   - Khi lịch còn trống, nhân viên bấm nút <strong>"Báo giá"</strong> trên hàng đợi Màn II.2.3.</p>
+<p class="doc-p">   - Modal Báo giá mở ra:</p>
+<p class="doc-p">     - Giá chuẩn hệ thống: <code class="inline-code">33.000.000 VNĐ</code> (11 ngày x 3.000.000 VNĐ/ngày).</p>
+<p class="doc-p">     - Nhân viên tra cứu thấy khách hàng là đối tác VIP Bạc, nhập chiết khấu: <code class="inline-code">10%</code>.</p>
+<p class="doc-p">     - Hệ thống tự động tính Giá chốt: <code class="inline-code">29.700.000 VNĐ</code>.</p>
+<p class="doc-p">     - Nhập ghi chú kỹ thuật: <em>"Báo giá chính thức vị trí Top Leaderboard kích thước 970x250px. Cam kết tỉ lệ hiển thị (SOV) 100% theo đúng hợp đồng"</em>.</p>
+<p class="doc-p">   - Bấm <strong>"Gửi báo giá chính thức"</strong>: Trạng thái booking chuyển sang <code class="inline-code">QUOTED</code>. Doanh nghiệp nhận được thông báo để ký kết hợp đồng và thanh toán.</p>
+<li class="doc-li-num"><strong>4.</strong> <strong>Bước 4: Kiểm duyệt Banner Creative & Phiên bản Rule 8 (UC020, UC021 - <code class="inline-code">CreativeReviewPage</code>)</strong></li>
+<p class="doc-p">   - Doanh nghiệp tải lên banner thiết kế quảng cáo. Banner xuất hiện tại Màn II.2.5 (<code class="inline-code">/backoffice/editorial/creatives</code>) ở trạng thái <code class="inline-code">SUBMITTED</code>.</p>
+<p class="doc-p">   - Biên tập viên bấm nút <strong>"Xem & Kiểm duyệt"</strong>:</p>
+<p class="doc-p">     - Kiểm tra kích thước: Đúng <code class="inline-code">970x250px</code>.</p>
+<p class="doc-p">     - Bấm link đích (<code class="inline-code">landingPageUrl</code>) mở tab mới để đảm bảo website khách hàng an toàn, không chứa mã độc.</p>
+<p class="doc-p">     - <strong>Cơ chế Rule 8:</strong> Nếu doanh nghiệp nộp bản thay thế <code class="inline-code">v2</code>, màn hình tự động hiển thị bản đang chạy cũ bên trái và bản mới bên phải để đối chiếu.</p>
+<p class="doc-p">   - Biên tập viên nhập ghi chú: <em>"Banner đạt chuẩn chất lượng hình ảnh và kích thước kỹ thuật"</em>, bấm nút <strong>"Chấp thuận & Cấp phép phát sóng"</strong>.</p>
+<p class="doc-p">   - Banner chuyển trạng thái <code class="inline-code">APPROVED</code>, bản mới này trở thành bản phục vụ trực tiếp (<code class="inline-code">isActiveServing = true</code>). Hoàn thành toàn bộ khâu chuẩn bị của Iteration 2!</p>
+<hr class="doc-hr" />
+<h2 id="33-luong-nghiep-vu-toan-dien-iteration-3-gatekeeper-5-tieu-chi-kill-switch-hop-ong-doanh-thu-kep" class="doc-h2">3.3. Luồng nghiệp vụ toàn diện Iteration 3 (Gatekeeper 5 tiêu chí, Kill-Switch, Hợp đồng & Doanh thu kép)</h2>
+<h3 id="kich-ban-thuc-te-tham-inh-ieu-kien-phat-song-kich-hoat-live-xu-ly-su-co-khan-cap-va-theo-doi-doanh-thu-kep" class="doc-h3">Kịch bản thực tế: Thẩm định điều kiện phát sóng, kích hoạt LIVE, xử lý sự cố khẩn cấp và theo dõi doanh thu kép</h3>
+<li class="doc-li-num"><strong>1.</strong> <strong>Bước 1: Số hóa hợp đồng pháp lý & Phụ lục (UC019 - <code class="inline-code">AdvertisingContractPage</code>)</strong></li>
+<p class="doc-p">   - Sau khi doanh nghiệp đồng ý báo giá, phòng kinh doanh ký hợp đồng kinh tế.</p>
+<p class="doc-p">   - Nhân viên vào Màn II.2.9 (<code class="inline-code">/backoffice/editorial/contracts</code>), bấm <strong>"Sửa số hóa hợp đồng"</strong>.</p>
+<p class="doc-p">   - Nhập số hợp đồng: <code class="inline-code">HĐ-2026/LP-CANGHP</code>, ngày ký kết, giá trị <code class="inline-code">29.700.000 VNĐ</code>, dán đường link file PDF scan có chữ ký số: <code class="inline-code">https://storage.localpress.vn/contracts/hd-canghp-signed.pdf</code>.</p>
+<p class="doc-p">   - Bấm <strong>"Lưu thay đổi"</strong>: Hồ sơ hợp đồng pháp lý hoàn tất.</p>
+<li class="doc-li-num"><strong>2.</strong> <strong>Bước 2: Thẩm định 5 Cửa Tiên quyết Gatekeeper (Rule 9 - <code class="inline-code">CampaignEligibilityPage</code>)</strong></li>
+<p class="doc-p">   - Trưởng ban tòa soạn truy cập Màn II.2.7 (<code class="inline-code">/backoffice/editorial/eligibility</code>).</p>
+<p class="doc-p">   - Tìm kiếm chiến dịch của Cảng Hải Phòng và đối soát bảng Checklist 5 tiêu chí:</p>
+<p class="doc-p">     1. 💳 <strong>Thanh toán:</strong> ✅ Kế toán đã xác nhận thu tiền (<code class="inline-code">paymentPassed = true</code>).</p>
+<p class="doc-p">     2. 📝 <strong>Báo giá:</strong> ✅ Đã chốt báo giá 29.700.000 VNĐ (<code class="inline-code">quotationPassed = true</code>).</p>
+<p class="doc-p">     3. 📄 <strong>Hợp đồng:</strong> ✅ Đã đính kèm file PDF hợp lệ (<code class="inline-code">contractPassed = true</code>).</p>
+<p class="doc-p">     4. 🎨 <strong>Creative:</strong> ✅ Banner đã duyệt đạt chuẩn Rule 8 (<code class="inline-code">creativePassed = true</code>).</p>
+<p class="doc-p">     5. 📅 <strong>Slot:</strong> ✅ Lịch tồn kho không có xung đột (<code class="inline-code">slotPassed = true</code>).</p>
+<p class="doc-p">   - Đánh giá tổng thể: <code class="inline-code">overallEligible = true</code> (Hiển thị nhãn xanh <strong>ĐỦ ĐIỀU KIỆN PHÁT SÓNG</strong>).</p>
+<p class="doc-p">   - Nút <strong>"Kích hoạt phát sóng (LIVE)"</strong> sáng lên. Trưởng ban bấm nút, xác nhận trên hộp thoại <code class="inline-code">ConfirmDialog</code>.</p>
+<p class="doc-p">   - Trạng thái chiến dịch chuyển sang <code class="inline-code">ACTIVE</code>. Banner chính thức xuất hiện trên trang nhất của báo điện tử!</p>
+<li class="doc-li-num"><strong>3.</strong> <strong>Bước 3: Vận hành chiến dịch & Công tắc Dừng khẩn cấp Kill-Switch (<code class="inline-code">CampaignControlPage</code>)</strong></li>
+<p class="doc-p">   - Trong quá trình phát sóng, chiến dịch được giám sát tại Màn II.2.8 (<code class="inline-code">/backoffice/editorial/control</code>).</p>
+<p class="doc-p">   - <strong>Tình huống khẩn cấp giả định:</strong> Phát hiện hình ảnh trên banner có chi tiết gây tranh cãi pháp lý hoặc doanh nghiệp yêu cầu dừng phát sóng gấp:</p>
+<p class="doc-p">     - Biên tập viên bấm ngay nút đỏ <strong>"DỪNG KHẨN CẤP (Kill-Switch)"</strong>.</p>
+<p class="doc-p">     - Modal mở ra, nhập lý do: <em>"Tạm dừng khẩn cấp theo công văn yêu cầu điều chỉnh hình ảnh số 14/CV-CANGHP"</em>.</p>
+<p class="doc-p">     - Bấm <strong>"Xác nhận dừng khẩn cấp"</strong>: Chiến dịch lập tức chuyển sang <code class="inline-code">SUSPENDED</code>, banner bị gỡ khỏi trang báo trong vòng 1 giây, bảo vệ uy tín tòa soạn.</p>
+<p class="doc-p">   - <strong>Tình huống khôi phục:</strong> Sau khi khách hàng điều chỉnh xong, bấm nút <strong>"Khôi phục phát sóng"</strong> $\rightarrow$ Chiến dịch trở lại <code class="inline-code">ACTIVE</code>.</p>
+<p class="doc-p">   - <strong>Tình huống bù ngày (Make-Good):</strong> Do hệ thống tạm dừng mất 2 ngày, tòa soạn bấm nút <strong>"Lập lịch bù phát sóng (Make-Good)"</strong>, chọn bù <code class="inline-code">2 ngày</code>, nhập lý do: <em>"Bù 2 ngày do gián đoạn kỹ thuật"</em> $\rightarrow$ Ngày kết thúc tự động kéo dài thêm 2 ngày mà không thu thêm phí.</p>
+<li class="doc-li-num"><strong>4.</strong> <strong>Bước 4: Nâng hạng VIP đối tác chiến lược (<code class="inline-code">AdvertisingContractPage</code>)</strong></li>
+<p class="doc-p">   - Sau khi hoàn thành chiến dịch đạt tổng chi tiêu trên 100 triệu, tòa soạn vào Màn II.2.9, tab <strong>"Phân hạng VIP"</strong>.</p>
+<p class="doc-p">   - Bấm <strong>"Điều chỉnh hạng VIP"</strong> cho Cảng Hải Phòng: Chọn hạng <code class="inline-code">GOLD</code> (Vàng), thiết lập chiết khấu mặc định <code class="inline-code">10%</code>.</p>
+<p class="doc-p">   - Ở các lần booking sau, hệ thống sẽ tự động áp dụng mức giảm giá này để giữ chân đối tác lâu năm.</p>
+<li class="doc-li-num"><strong>5.</strong> <strong>Bước 5: Báo cáo Doanh thu kép & Giám sát SLA (<code class="inline-code">BusinessOperationDashboardPage</code>)</strong></li>
+<p class="doc-p">   - Ban biên tập mở Màn II.2.10 (<code class="inline-code">/backoffice/editorial/dashboard</code>).</p>
+<p class="doc-p">   - Quan sát báo cáo <strong>Doanh thu kép</strong>:</p>
+<p class="doc-p">     - Doanh thu B2B (Quảng cáo): <code class="inline-code">450.000.000 VNĐ</code> (chiếm 65%).</p>
+<p class="doc-p">     - Doanh thu B2C (Độc giả mua gói VIP + mua lẻ bài): <code class="inline-code">242.000.000 VNĐ</code> (chiếm 35%).</p>
+<p class="doc-p">     - Tổng doanh thu tòa soạn: <code class="inline-code">692.000.000 VNĐ</code>.</p>
+<p class="doc-p">   - Kiểm tra <strong>Hàng đợi SLA</strong>: Số booking chờ xử lý = 0, số creative chờ duyệt = 0 $\rightarrow$ Toàn bộ quy trình vận hành đạt chuẩn 100% KPI cam kết!</p>
+<hr class="doc-hr" />
+<h1 id="phan-4-bang-cau-hoi-truy-van-sau-cua-hoi-ong-bao-ve-defense-qa-cheat-sheet" class="doc-h1">PHẦN 4: BẢNG CÂU HỎI TRUY VẤN SÂU CỦA HỘI ĐỒNG BẢO VỆ (DEFENSE Q&A CHEAT SHEET)</h1>
+<div class="table-responsive"><table class="data-table">
+<thead><tr><th>Câu hỏi của Hội đồng bảo vệ</th><th>Câu trả lời trọng tâm & Dẫn chứng code kỹ thuật của SV2</th></tr></thead><tbody>
+<tr><td><strong>Q1: Tại sao trong bảng bài viết (<code class="inline-code">ArticleListPage</code>), bạn lại phân biệt giữa trạng thái bài viết (<code class="inline-code">status</code>) và phiên bản bài viết (<code class="inline-code">version</code>)?</strong></td><td><strong>Trả lời:</strong> Đây là nghiệp vụ xuất bản hiện đại: 1 bài viết có thể có nhiều phiên bản sửa đổi (v1 phóng viên nộp, v2 biên tập sửa, v3 bổ sung ảnh). Trạng thái bài viết (<code class="inline-code">DRAFT</code>, <code class="inline-code">IN_REVIEW</code>, <code class="inline-code">APPROVED</code>, <code class="inline-code">PUBLISHED</code>) quyết định quyền xuất hiện trên trang báo công khai, còn phiên bản lưu trữ lịch sử kiểm toán trong bảng <code class="inline-code">article_versions</code>. Tại dòng 214-224 của <code class="inline-code">ArticleListPage.tsx</code>, component <code class="inline-code">ArticleVersionCell</code> và <code class="inline-code">ArticleVersionActions</code> cho phép xem lịch sử và khôi phục về bất kỳ version nào mà không làm mất trạng thái của bài viết.</td></tr>
+<tr><td><strong>Q2: Động cơ kiểm tra xung đột lịch tồn kho Rule 7 hoạt động như thế nào (<code class="inline-code">AdvertisingInventoryCalendarPage</code>)?</strong></td><td><strong>Trả lời:</strong> Em sử dụng hàm <code class="inline-code">getSlotBookingsOnDate(date, slotId)</code> (dòng 104-114). Với mỗi ngày trong tháng, hệ thống quét qua tất cả các slot. Nếu một slot có cấu hình <code class="inline-code">inventoryMode === 'EXCLUSIVE'</code> (vị trí độc quyền như Top Leaderboard) mà xuất hiện $\ge 2$ booking cùng giữ chỗ trong cùng một ngày, thuật toán tại dòng 120-125 sẽ lập tức bật cờ <code class="inline-code">hasConflict = true</code> và kích hoạt hiệu ứng đỏ nhấp nháy trên lịch để cảnh báo biên tập viên không được phát hành báo giá trùng.</td></tr>
+<tr><td><strong>Q3: Cơ chế quản trị phiên bản Creative Rule 8 giải quyết bài toán gì (<code class="inline-code">CreativeReviewPage</code>)?</strong></td><td><strong>Trả lời:</strong> Tránh tình trạng banner đang chạy bị đứt quãng khi khách hàng nộp banner mới. Khi duyệt bản v2, hàm <code class="inline-code">handleOpenReview</code> (dòng 73-82) tự động tìm bản đang chạy trực tiếp (<code class="inline-code">isActiveServing = true</code>) để hiển thị so sánh Side-by-Side. Khi bấm Duyệt (<code class="inline-code">handleExecuteReview</code>), hệ thống đồng thời kích hoạt bản mới thành <code class="inline-code">isActiveServing</code> và chuyển bản cũ về <code class="inline-code">ARCHIVED</code>, đảm bảo quá trình chuyển đổi diễn ra tức thì, không gây lỗi ảnh vỡ trên trang báo.</td></tr>
+<tr><td><strong>Q4: Tại sao phải có Gatekeeper 5 tiêu chí (Rule 9) trước khi kích hoạt chiến dịch (<code class="inline-code">CampaignEligibilityPage</code>)?</strong></td><td><strong>Trả lời:</strong> Để giải quyết triệt để rủi ro tài chính và pháp lý: Trước đây nếu phóng viên hoặc nhân viên tự ý cho phát sóng banner khi khách chưa thanh toán hoặc chưa ký hợp đồng sẽ dẫn đến nợ xấu. Gatekeeper tại dòng 73-88 của <code class="inline-code">CampaignEligibilityPage.tsx</code> khóa cứng nút <strong>"Kích hoạt (LIVE)"</strong>, chỉ cho phép mở khi cả 5 biến boolean <code class="inline-code">paymentPassed</code>, <code class="inline-code">quotationPassed</code>, <code class="inline-code">contractPassed</code>, <code class="inline-code">creativePassed</code>, <code class="inline-code">slotPassed</code> đều bằng <code class="inline-code">true</code>.</td></tr>
+<tr><td><strong>Q5: Công tắc dừng khẩn cấp Kill-Switch (Màn II.2.8) khác gì so với việc xóa chiến dịch?</strong></td><td><strong>Trả lời:</strong> Kill-Switch (<code class="inline-code">handleSuspend</code> dòng 63-79) là biện pháp bảo đảm an ninh truyền thông: nó không xóa dữ liệu mà chuyển trạng thái thành <code class="inline-code">SUSPENDED</code>, lập tức hạ banner khỏi toàn bộ luồng phát sóng công khai trong 1 giây, đồng thời lưu vết lý do khẩn cấp vào nhật ký kiểm toán. Khi sự cố được xử lý xong, chiến dịch có thể <code class="inline-code">RESUME</code> và được bù ngày phát sóng (<code class="inline-code">Make-Good</code>) minh bạch.</td></tr>
+<tr><td><strong>Q6: Mô hình "Doanh thu kép" của LocalPress thể hiện cụ thể ở đâu trong code của bạn (<code class="inline-code">BusinessOperationDashboardPage</code>)?</strong></td><td><strong>Trả lời:</strong> Thể hiện rõ nét ở Màn II.2.10 và hàm <code class="inline-code">getDashboardOverview()</code> (<code class="inline-code">editorialApi</code> dòng 238-241). Tòa soạn không chỉ dựa vào tiền quảng cáo B2B (<code class="inline-code">advertisingRevenue</code>) từ các hợp đồng booking banner của doanh nghiệp (SV1/SV2), mà còn khai thác trực tiếp doanh thu B2C (<code class="inline-code">readerRevenue</code>) từ bạn đọc qua gói hội viên tháng/năm và bán lẻ từng bài viết chuyên sâu qua Paywall (<code class="inline-code">isPremium = true</code>, giá lẻ 15k - 25k). Điều này giúp tòa soạn địa phương tự chủ tài chính bền vững.</td></tr>
+</tbody></table></div>
+<hr class="doc-hr" />
+<p class="doc-p"><em>Tài liệu được tổng hợp độc lập và bảo đảm độ chuẩn xác 100% theo mã nguồn dự án LocalPress — Nhánh <code class="inline-code">Trong</code> (Commit <code class="inline-code">ecd19b3</code>).</em></p>
+    </main>
+  </div>
+
+  <script>
+    function filterNav() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const links = document.querySelectorAll('.nav-link');
+      links.forEach(l => {
+        const text = l.innerText.toLowerCase();
+        l.style.display = text.includes(q) ? 'block' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>

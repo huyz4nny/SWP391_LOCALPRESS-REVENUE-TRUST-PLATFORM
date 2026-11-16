@@ -194,17 +194,24 @@ describe('SV2 Editorial Iteration 1 & Iteration 2 Comprehensive Test Suite', () 
   // ==========================================
   // Iteration 1 Màn II.2.1: Article Review & Publishing (UC025)
   // ==========================================
-  it('7. Màn II.2.1 (UC025): Article workflow transitions (APPROVED -> PUBLISHED -> UNPUBLISHED)', async () => {
+  it('7. Màn II.2.1 (UC025): Article workflow transitions & Four-Eyes Principle (BTV khác duyệt -> Xuất bản)', async () => {
     const articles = await editorialApi.getArticles()
     expect(articles.length).toBeGreaterThan(0)
 
     const targetArticle = articles[0]
 
-    // 1. Approve
+    // 0. Nguyên tắc 4 mắt (Four-Eyes Principle): Tác giả (user-editor) tự duyệt bài của mình sẽ bị CHẶN
+    await expect(
+      editorialApi.updateArticleStatus(targetArticle.id, 'APPROVED', 'Tự duyệt bài')
+    ).rejects.toThrow(/Nguyên tắc 4 mắt/i)
+
+    // 1. Biên tập viên khác (user-admin) đăng nhập vào duyệt
+    mockStore.setCurrentUser('user-admin')
     const approved = await editorialApi.updateArticleStatus(targetArticle.id, 'APPROVED', 'Đạt chuẩn biên tập')
     expect(approved.status).toBe('APPROVED')
 
-    // 2. Publish
+    // 2. Sau khi đã duyệt, tác giả ban đầu (user-editor) có thể xuất bản bài
+    mockStore.setCurrentUser('user-editor')
     const published = await editorialApi.updateArticleStatus(targetArticle.id, 'PUBLISHED')
     expect(published.status).toBe('PUBLISHED')
 

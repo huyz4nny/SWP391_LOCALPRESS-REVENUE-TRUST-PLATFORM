@@ -210,7 +210,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'editorial/articles',
+        path: 'editorial/articles', //Dinh nghĩa route này để phân quyền cho các vai trò có thể xem danh sách bài viết -> ArticleListpage.tsx
         element: (
           <ProtectedRoute allowedRoles={ARTICLE_LIST_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
             <ArticleListPage />
@@ -234,11 +234,11 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'editorial/bookings',
+        path: 'editorial/bookings', 
         element: (
-          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">
+          <ProtectedRoute allowedRoles={EDITORIAL_ROLES} subsystemName="Tòa Soạn & Biên Tập (SV2)">  
             <BookingManagementPage />
-          </ProtectedRoute>
+          </ProtectedRoute> //config.ts hien thi danh sach booking management page cho cac role co quyen truy cap editorial
         ),
       },
       {

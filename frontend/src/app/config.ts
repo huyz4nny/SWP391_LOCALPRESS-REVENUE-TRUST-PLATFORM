@@ -90,7 +90,7 @@ export const PERMISSION_CHECKERS = {
     if (role === 'AUTHOR') {
       return '/backoffice/editorial/articles'
     }
-    if (['EDITOR', 'REVIEWER'].includes(role)) {
+    if (['EDITOR', 'REVIEWER'].includes(role)) { // Login ra vào tòa soạn, mặc định là danh sách bài viết
       return '/backoffice/editorial/articles'
     }
     if (['ACCOUNTANT', 'CHIEF_ACCOUNTANT'].includes(role)) {
