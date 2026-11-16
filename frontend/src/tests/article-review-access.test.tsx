@@ -50,10 +50,11 @@ it('keeps own draft editable but another author draft read-only', () => {
   expect(canEditOwnedDraft(article, '3')).toBe(false)
 })
 
-it('does not offer content editing for pending, approved, rejected or taken-down articles', () => {
-  for (const status of ['IN_REVIEW', 'APPROVED', 'CHANGES_REQUESTED', 'UNPUBLISHED'] as const) {
+it('does not offer content editing for pending, approved or taken-down articles, but allows changes requested', () => {
+  for (const status of ['IN_REVIEW', 'APPROVED', 'UNPUBLISHED'] as const) {
     expect(canEditOwnedDraft({ ...article, status }, '4')).toBe(false)
   }
+  expect(canEditOwnedDraft({ ...article, status: 'CHANGES_REQUESTED' }, '4')).toBe(true)
 })
 
 it('allows an own newer published draft but never the published approved version', () => {
