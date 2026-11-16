@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -62,6 +63,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
           AND (t.purchaseId = :targetId OR t.subscriptionId = :targetId OR t.campaignId = :targetId)
     """)
     List<Transaction> findPendingByTargetForUpdate(@Param("type") TransactionType type, @Param("targetId") Long targetId);
+
+    /**
+     * Rule 6: đơn booking quảng cáo quá hạn giữ chỗ mà chưa trả thì đóng hẳn (FAILED), để mọi màn hình
+     * (danh sách đơn, chi tiết, sổ quỹ, bộ lọc) thấy cùng một trạng thái. Một câu UPDATE có điều kiện nên
+     * chạy đồng thời với webhook vẫn an toàn: đơn webhook vừa ghi SUCCESS không còn PENDING để bị đóng.
+     * Đơn bài lẻ / gói không có hạn nên không đụng tới.
+     */
+    @Modifying
+    @Query("""
+        UPDATE Transaction t SET t.status = com.localpress.finance.model.TransactionStatus.FAILED
+        WHERE t.status = com.localpress.finance.model.TransactionStatus.PENDING
+          AND t.transactionType = com.localpress.finance.model.TransactionType.AD
+          AND t.expiresAt < :now
+    """)
+    int expireOverdueAdOrders(@Param("now") LocalDateTime now);
 
     /** "Đơn của tôi" (UC045 của SV3): đơn của 1 user, lọc theo loại nếu có. Dùng index idx_transactions_user_created. */
     @Query("""
