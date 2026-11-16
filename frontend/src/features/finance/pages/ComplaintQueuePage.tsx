@@ -40,10 +40,10 @@ export function ComplaintStatusBadge({ status }: { status: PaymentComplaint['sta
 }
 
 const FILTERS: { value: PaymentComplaint['status'] | undefined; label: string }[] = [
+  { value: undefined, label: 'Tất cả' },
   { value: 'OPEN', label: 'Chờ đối soát' },
   { value: 'RESOLVED', label: 'Đã xử lý' },
   { value: 'REJECTED', label: 'Từ chối' },
-  { value: undefined, label: 'Tất cả' },
 ]
 
 export function ComplaintQueuePage() {

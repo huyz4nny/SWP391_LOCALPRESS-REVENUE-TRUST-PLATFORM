@@ -4,7 +4,7 @@ import { mockStore } from '@/mocks/store'
 import { logout } from '@/features/identity/authSession'
 import { RoleSwitcherBar } from '@/components/shared/RoleSwitcherBar'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
-import { ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
+import { APP_CONFIG, ROLE_LABELS, PERMISSION_CHECKERS } from '@/app/config'
 import { Button } from '@/components/ui/button'
 import { financeApi } from '@/features/finance/api'
 import {
@@ -103,17 +103,25 @@ export function BackofficeLayout() {
             Bạn đang đăng nhập là <span className="font-medium text-slate-900">{currentUser.name}</span> ({ROLE_LABELS[currentUser.role]}).
             Khu vực nội bộ chỉ dành cho Biên tập viên, Kế toán và Quản trị viên.
           </p>
-          <div className="mt-5 grid gap-2">
-            <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-editor')}>
-              Demo: đăng nhập Biên tập viên (SV2)
+          {/* Nút demo chỉ đổi người dùng trong mock store (không có token), nên chỉ hiện ở chế độ mock;
+              chạy với backend thật thì phải đăng nhập thật, nếu không mọi API trả 401 */}
+          {APP_CONFIG.useMockApi ? (
+            <div className="mt-5 grid gap-2">
+              <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-editor')}>
+                Demo: đăng nhập Biên tập viên (SV2)
+              </Button>
+              <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-fin-staff')}>
+                Demo: đăng nhập Kế toán viên (SV4)
+              </Button>
+              <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-admin')}>
+                Demo: đăng nhập Quản trị viên (SV5)
+              </Button>
+            </div>
+          ) : (
+            <Button className="mt-5 w-full" onClick={() => navigate('/login', { state: { from: location } })}>
+              Đăng nhập bằng tài khoản nội bộ
             </Button>
-            <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-fin-staff')}>
-              Demo: đăng nhập Kế toán viên (SV4)
-            </Button>
-            <Button variant="outline" onClick={() => mockStore.setCurrentUser('user-admin')}>
-              Demo: đăng nhập Quản trị viên (SV5)
-            </Button>
-          </div>
+          )}
           <Link to="/" className="mt-4 inline-block text-sm text-slate-600 hover:text-slate-900 hover:underline">
             Quay lại trang báo
           </Link>

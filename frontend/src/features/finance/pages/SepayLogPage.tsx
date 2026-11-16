@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { RefreshCw, Download, ChevronLeft, ChevronRight } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { Badge, BadgeProps } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input, Label } from '@/components/ui/input'
 import { sepayApi } from '../api/payment'
 import type { SepayLog, SepayLogResult, SepayStatus } from '../types'
-import { PageHeader, Panel, KpiStrip, KeyValue, Notice, Segmented, tableCls } from '../components/LedgerUI'
+import { PageHeader, Panel, KpiStrip, KeyValue, Notice, Segmented, tableCls, Pager } from '../components/LedgerUI'
 
 /**
  * ==============================================================================
@@ -16,7 +16,7 @@ import { PageHeader, Panel, KpiStrip, KeyValue, Notice, Segmented, tableCls } fr
  * Mọi khoản tiền SePay báo về đều có 1 dòng ở đây, kèm payload thô: chứng minh đơn được ghi nhận
  * vì SePay xác nhận (Rule 4), không phải vì trình duyệt báo. Nguồn:
  *  - Webhook: SePay gọi POST /api/v1/finance/webhook/sepay (cần URL công khai).
- *  - Đồng bộ API: LocalPress hỏi API SePay khi chưa nhận được webhook.
+ *  - Đồng bộ API: đã bỏ (16/11/2026), chỉ còn dòng cũ; tiền chỉ vào qua webhook.
  *  - Giả lập: nút demo trên trang thanh toán (chỉ môi trường dev), không phải tiền thật.
  */
 
@@ -34,6 +34,7 @@ const RESULT: Record<string, [string, NonNullable<BadgeProps['variant']>]> = {
   LATE_PAYMENT: ['Về muộn, chờ trả lại', 'warning'],
   AMOUNT_MISSING: ['Thiếu số tiền', 'warning'],
   ORDER_NOT_FOUND: ['Không khớp đơn', 'warning'],
+  RECORDED_BY_COMPLAINT: ['Đã ghi qua khiếu nại', 'secondary'],
   IGNORED_OUTGOING: ['Tiền ra, bỏ qua', 'secondary'],
   INVALID_SIGNATURE: ['Sai khóa, từ chối', 'destructive'],
   ERROR: ['Lỗi xử lý', 'destructive'],
@@ -44,7 +45,6 @@ type SourceFilter = SepayLog['source'] | undefined
 const FILTERS: { value: SourceFilter; label: string }[] = [
   { value: undefined, label: 'Tất cả' },
   { value: 'WEBHOOK', label: 'Webhook' },
-  { value: 'API_SYNC', label: 'Đồng bộ API' },
   { value: 'SIMULATION', label: 'Giả lập' },
 ]
 
@@ -61,9 +61,7 @@ export function SepayLogPage() {
   const [result, setResult] = useState<SepayLogResult>(EMPTY_RESULT)
   const [status, setStatus] = useState<SepayStatus | null>(null)
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [selected, setSelected] = useState<SepayLog | null>(null)
 
   const load = async () => {
@@ -92,23 +90,6 @@ export function SepayLogPage() {
   const changeFrom = (v: string) => { setFrom(v); setPage(0) }
   const changeTo = (v: string) => { setTo(v); setPage(0) }
 
-  const handleSync = async () => {
-    setSyncing(true)
-    setError('')
-    setNotice('')
-    try {
-      const r = await sepayApi.sync(24)
-      setNotice(`Đã hỏi SePay 24 giờ gần nhất: ${r.fetched} giao dịch, xử lý mới ${r.processed}, đã có trước ${r.skippedDuplicate}.`)
-      // Dòng mới nằm ở trang đầu; đang ở trang đầu thì tải lại luôn
-      if (page === 0) await load()
-      else setPage(0)
-    } catch (e: any) {
-      setError(e?.message || 'Đồng bộ SePay thất bại')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
  // Tổng tiền, số lần do server tính trên toàn bảng; firstRow/lastRow là số thứ tự dòng của trang đang xem
  const realTotal = status?.realTotal ?? 0 // tổng tiền SUCCESS của toàn bảng (bỏ giả lập, sai khóa)
 const realCount = status?.realCount ?? 0 // số lần SePay thật báo về của toàn bảng
@@ -127,16 +108,6 @@ const lastRow = result.page * result.size + logs.length // số thứ tự dòng
               {!loading && <RefreshCw className="h-3.5 w-3.5" />} 
               Làm mới 
             </Button>
-            <Button
-              size="sm"
-              onClick={handleSync}
-              isLoading={syncing}
-              disabled={status?.mock || !status?.apiTokenConfigured}
-              title={status?.apiTokenConfigured ? undefined : 'Cần localpress.sepay.api-token trong application-secrets.yml'}
-            >
-              {!syncing && <Download className="h-3.5 w-3.5" />}
-              Đồng bộ từ SePay
-            </Button>
           </>
         }
       />
@@ -148,7 +119,7 @@ const lastRow = result.page * result.size + logs.length // số thứ tự dòng
               label: 'Tiền thật đã ghi nhận',
               value: formatCurrency(realTotal),
               lead: true,
-              note: `${realCount} lần SePay báo về (webhook + đồng bộ)`,
+              note: `${realCount} lần SePay báo về qua webhook`,
             },
             {
               label: 'Webhook',
@@ -157,10 +128,9 @@ const lastRow = result.page * result.size + logs.length // số thứ tự dòng
               note: status?.lastWebhookAt ? `Lần cuối ${formatDateTime(status.lastWebhookAt)}` : 'Chưa nhận lần nào',
             },
             {
-              label: 'Đồng bộ qua API SePay',
-              value: status?.apiTokenConfigured ? 'Bật' : 'Chưa có token',
-              tone: status?.apiTokenConfigured ? 'default' : 'muted',
-              note: `Tài khoản nhận ${status?.accountNumber ?? '—'}`,
+              label: 'Tài khoản nhận',
+              value: status?.accountNumber ?? '—',
+              note: 'Tiền chỉ được ghi khi SePay gọi webhook',
             },
           ]}
         />
@@ -169,13 +139,11 @@ const lastRow = result.page * result.size + logs.length // số thứ tự dòng
           <Notice tone="warning">
             Chưa nhận webhook thật nào. Máy local cần URL công khai: chạy <code className="font-mono">backend/scripts/sepay-tunnel.ps1</code>, rồi
             dán <code className="font-mono">https://&lt;địa-chỉ-tunnel&gt;{status.webhookPath}</code> vào my.sepay.vn &gt; Webhooks (chứng thực API Key).
-            Trong lúc chưa có tunnel, nút "Đồng bộ từ SePay" vẫn lấy được giao dịch thật nếu đã có token API.
           </Notice>
         )}
         {status?.mock && (
           <Notice tone="note">Đang chạy dữ liệu mock trong trình duyệt: chỉ có log giả lập. Chạy backend thật để thấy webhook SePay.</Notice>
         )}
-        {notice && <Notice tone="success">{notice}</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
 
         <div className="flex flex-wrap items-end gap-4">
@@ -200,6 +168,7 @@ const lastRow = result.page * result.size + logs.length // số thứ tự dòng
           aside={result.total > 0 ? <span className="num text-[13px] text-slate-500">Dòng {firstRow}-{lastRow}</span> : undefined}
           bodyClassName="px-0 pb-1"
         >
+          <Pager className="pb-3" page={result.page} totalPages={result.totalPages} loading={loading} onChange={setPage} />
           {logs.length === 0 ? (
             <p className="border-t border-slate-100 px-5 py-6 text-sm text-slate-500">Không có khoản tiền nào khớp bộ lọc.</p>
           ) : (
@@ -253,21 +222,7 @@ const lastRow = result.page * result.size + logs.length // số thứ tự dòng
               </table>
             </div>
           )}
-          {result.totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-5 pt-3 pb-2">
-              <span className="num text-[13px] text-slate-500">
-                Trang {result.page + 1} / {result.totalPages}
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={loading || result.page === 0} onClick={() => setPage(result.page - 1)}>
-                  <ChevronLeft className="h-3.5 w-3.5" /> Mới hơn
-                </Button>
-                <Button variant="outline" size="sm" disabled={loading || result.page + 1 >= result.totalPages} onClick={() => setPage(result.page + 1)}>
-                  Cũ hơn <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pager className="border-t border-slate-100 pt-3 pb-2" page={result.page} totalPages={result.totalPages} loading={loading} onChange={setPage} />
         </Panel>
       </div>
 

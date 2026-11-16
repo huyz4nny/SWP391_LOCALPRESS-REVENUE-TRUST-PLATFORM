@@ -92,15 +92,6 @@ export const paymentApi = {
     }
     return httpClient.post<IpnResult>(`/finance/orders/code/${orderCode}/simulate-ipn`, { amount, referenceCode })
   },
-
-  /**
-   * Nút "Tôi đã chuyển khoản, kiểm tra lại": backend hỏi thẳng API SePay cho đơn này (khi chưa nhận được webhook).
-   * checked=false khi chưa cấu hình token SePay hoặc vừa hỏi trong 10 giây; khi đó chỉ đọc lại trạng thái đơn.
-   */
-  checkWithSepay: async (orderCode: string): Promise<{ checked: boolean; reason?: string; found?: number }> => {
-    if (APP_CONFIG.useMockApi) return { checked: false, reason: 'MOCK_MODE' }
-    return unwrap(await httpClient.post<any>(`/finance/orders/code/${orderCode}/check-sepay`))
-  },
 }
 
 /**
@@ -156,7 +147,7 @@ function toComplaint(raw: any): PaymentComplaint {
 
 /**
  * Nhật ký tiền SePay báo về (UC048, UC049) - màn hình /backoffice/finance/sepay của kế toán.
- * Nguồn: WEBHOOK (SePay gọi vào), API_SYNC (LocalPress hỏi API SePay), SIMULATION (nút demo).
+ * Nguồn: WEBHOOK (SePay gọi vào), SIMULATION (nút demo); API_SYNC chỉ còn ở dòng cũ (đã bỏ đồng bộ API 16/11/2026).
  */
 export const sepayApi = {
   /** Một trang nhật ký, mới nhất trước. from/to dạng yyyy-MM-dd, tính trọn ngày; bỏ trống là không lọc. */
@@ -183,16 +174,12 @@ export const sepayApi = {
     if (APP_CONFIG.useMockApi) {
       const real = (mock.load().sepayLogs ?? []).filter((l) => l.source !== 'SIMULATION' && l.authOk)
       const realTotal = real.filter((l) => l.resultStatus === 'SUCCESS').reduce((a, l) => a + (l.amount ?? 0), 0)
-      return { webhookKeyConfigured: false, apiTokenConfigured: false, accountNumber: '****9981', webhookPath: '/api/v1/finance/webhook/sepay', lastWebhookAt: null, realTotal, realCount: real.length, mock: true }
+      return { webhookKeyConfigured: false, accountNumber: '****9981', webhookPath: '/api/v1/finance/webhook/sepay', lastWebhookAt: null, realTotal, realCount: real.length, mock: true }
     }
     const s = unwrap<any>(await httpClient.get<any>('/finance/sepay/status'))
     return { ...s, realTotal: Number(s?.realTotal ?? 0), realCount: Number(s?.realCount ?? 0) }
   },
 
-  sync: async (hours = 24): Promise<{ fetched: number; processed: number; skippedDuplicate: number; ignored: number }> => {
-    if (APP_CONFIG.useMockApi) throw new Error('Chế độ mock không gọi được API SePay. Chạy backend thật để đồng bộ.')
-    return unwrap(await httpClient.post<any>('/finance/sepay/sync', undefined, { params: { hours } }))
-  },
 }
 
 function toSepayLog(raw: any): SepayLog {

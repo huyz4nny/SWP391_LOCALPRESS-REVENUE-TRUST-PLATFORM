@@ -4,8 +4,8 @@ import { financeApi, PAGE_SIZE, type OrderPage } from '../api'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { PageHeader, Panel, Segmented, tableCls, LoadingBlock, Notice } from '../components/LedgerUI'
+import { Search } from 'lucide-react'
+import { PageHeader, Panel, Segmented, tableCls, LoadingBlock, Notice, Pager } from '../components/LedgerUI'
 
 const TYPE_OPTIONS = [
   { value: 'ALL', label: 'Tất cả' },
@@ -185,33 +185,6 @@ export function OrderListPage() {
         )}
         <Pager className="border-t border-slate-100 pt-3 pb-2" page={page} totalPages={result.totalPages} loading={loading} onChange={setPage} />
       </Panel>
-    </div>
-  )
-}
-
-/**
- * Thanh chuyển trang, đặt cả trên và dưới bảng. Trang 1 là đơn mới nhất:
- * "Trang trước" về phía đơn mới hơn, "Trang sau" sang đơn cũ hơn.
- */
-function Pager({ page, totalPages, loading, onChange, className = '' }: {
-  page: number
-  totalPages: number
-  loading: boolean
-  onChange: (p: number) => void
-  className?: string
-}) {
-  if (totalPages <= 1) return null
-  return (
-    <div className={`flex items-center justify-between px-5 ${className}`}>
-      <span className="num text-[13px] text-slate-500">Trang {page + 1} / {totalPages}</span>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={loading || page === 0} onClick={() => onChange(page - 1)}>
-          <ChevronLeft className="h-3.5 w-3.5" /> Trang trước
-        </Button>
-        <Button variant="outline" size="sm" disabled={loading || page + 1 >= totalPages} onClick={() => onChange(page + 1)}>
-          Trang sau <ChevronRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
     </div>
   )
 }
