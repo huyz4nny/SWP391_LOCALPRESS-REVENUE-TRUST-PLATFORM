@@ -265,8 +265,9 @@ describe('LocalPress Core Business Domain Tests', () => {
       expect(PERMISSION_CHECKERS.canApproveRefunds('ACCOUNTANT')).toBe(false)
       expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('ACCOUNTANT')).toBe('/backoffice/finance')
 
-      // Regular Finance Staff cannot approve refunds (4-eyes principle)
-      expect(PERMISSION_CHECKERS.canApproveRefunds('FINANCE_STAFF')).toBe(false)
+      // Người kiểm duyệt (EDITOR, trước là STAFF) không vào tài chính, không duyệt hoàn tiền
+      expect(PERMISSION_CHECKERS.canAccessFinance('EDITOR')).toBe(false)
+      expect(PERMISSION_CHECKERS.canApproveRefunds('EDITOR')).toBe(false)
       expect(PERMISSION_CHECKERS.canApproveRefunds('CHIEF_ACCOUNTANT')).toBe(true)
       expect(PERMISSION_CHECKERS.canAccessFinance('CHIEF_ACCOUNTANT')).toBe(true)
       expect(PERMISSION_CHECKERS.getDefaultBackofficeRoute('CHIEF_ACCOUNTANT')).toBe('/backoffice/finance')

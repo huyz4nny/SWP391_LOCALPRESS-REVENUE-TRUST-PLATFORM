@@ -24,7 +24,7 @@ import java.util.Set;
 public class FinanceCurrentUser {
 
     /** Nhân sự tài chính. SYSTEM_ADMIN không nằm trong đây: quản trị hệ thống không đụng vào tiền. */
-    private static final Set<String> FINANCE_ROLES = Set.of("ACCOUNTANT", "CHIEF_ACCOUNTANT", "STAFF");
+    private static final Set<String> FINANCE_ROLES = Set.of("ACCOUNTANT", "CHIEF_ACCOUNTANT");
 
     private final JdbcTemplate jdbcTemplate;
 

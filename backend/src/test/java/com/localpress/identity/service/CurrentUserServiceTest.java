@@ -63,7 +63,7 @@ class CurrentUserServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = User.Role.class, names = {"READER", "STAFF", "ACCOUNTANT", "ADVERTISER"})
+    @EnumSource(value = User.Role.class, names = {"READER", "ACCOUNTANT", "CHIEF_ACCOUNTANT", "ADVERTISER"})
     void otherRoleCannotUseCmsEvenWithEditorAuthorityInContext(User.Role role) {
         User user = User.createReader("User", EMAIL, "unused", null);
         ReflectionTestUtils.setField(user, "role", role);

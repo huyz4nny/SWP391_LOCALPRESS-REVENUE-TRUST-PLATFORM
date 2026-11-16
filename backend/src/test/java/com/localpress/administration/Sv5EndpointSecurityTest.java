@@ -56,7 +56,7 @@ class Sv5EndpointSecurityTest {
         String url = "/api/v1/editorial/ai/suggest";
         mvc.perform(post(url).contentType("application/json").content("{\"topic\":\"Topic\"}"))
                 .andExpect(status().isUnauthorized());
-        for (String role : List.of("STAFF", "READER", "ADVERTISER")) {
+        for (String role : List.of("ACCOUNTANT", "READER", "ADVERTISER")) {
             mvc.perform(post(url).with(user("test").roles(role)).contentType("application/json").content("{\"topic\":\"Topic\"}"))
                     .andExpect(status().isForbidden());
         }
@@ -102,7 +102,7 @@ class Sv5EndpointSecurityTest {
         String valid = "{\"name\":\"Top\",\"basePrice\":100,\"capacity\":1,\"status\":\"ACTIVE\",\"expectedRevision\":\"" + "a".repeat(64) + "\"}";
         mvc.perform(get(url)).andExpect(status().isUnauthorized());
         mvc.perform(put(url + "/1").contentType("application/json").content(valid)).andExpect(status().isUnauthorized());
-        for (String role : List.of("AUTHOR","EDITOR","STAFF","ACCOUNTANT","ADVERTISER","READER")) {
+        for (String role : List.of("AUTHOR","EDITOR","ACCOUNTANT","CHIEF_ACCOUNTANT","ADVERTISER","READER")) {
             mvc.perform(get(url).with(user("test").roles(role))).andExpect(status().isForbidden());
             mvc.perform(put(url + "/1").with(user("test").roles(role)).contentType("application/json").content(valid)).andExpect(status().isForbidden());
         }

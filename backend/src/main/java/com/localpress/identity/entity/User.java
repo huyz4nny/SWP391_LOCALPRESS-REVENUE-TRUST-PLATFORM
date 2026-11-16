@@ -84,7 +84,6 @@ public class User {
         READER,
         AUTHOR,
         EDITOR,
-        STAFF,
         ACCOUNTANT,
         CHIEF_ACCOUNTANT,
         ADVERTISER,

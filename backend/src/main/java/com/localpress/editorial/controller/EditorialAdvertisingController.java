@@ -29,7 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping(AppConstants.API_V1_PREFIX + "/editorial")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('EDITOR', 'STAFF', 'SYSTEM_ADMIN', 'ADMIN')")
+@PreAuthorize("hasAnyRole('EDITOR', 'SYSTEM_ADMIN', 'ADMIN')")
 public class EditorialAdvertisingController {
 
     private final EditorialAdvertisingService advertisingService;

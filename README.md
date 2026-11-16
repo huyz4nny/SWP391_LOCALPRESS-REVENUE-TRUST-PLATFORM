@@ -294,7 +294,7 @@ cd backend
 | `adv.canghaiphong@gmail.com` | `ADVERTISER` | Đặng Quang Huy (Đình Vũ Port) | **SV1:** Booking quảng cáo, xem báo cáo CTR |
 | `reader.an@gmail.com` | `READER` | Nguyễn Văn An (Độc giả Free) | **SV3:** Đọc tin tức miễn phí, mua lẻ bài điều tra |
 | `reader.mai@gmail.com` | `READER` | Trần Thị Mai (Hội viên VIP) | **SV3:** Đăng nhập 2 thiết bị, đọc không quảng cáo |
-| `kiemduyet@localpress.vn` | `STAFF` | Phạm Kiểm Duyệt CSKH | **SV4 & SV2:** Tiếp nhận khiếu nại, lập đề xuất hoàn tiền |
+| `kiemduyet@localpress.vn` | `EDITOR` | Phạm Kiểm Duyệt Bình Luận | **SV2:** Kiểm duyệt bình luận và báo cáo nội dung |
 
 
 ---
