@@ -70,6 +70,8 @@ __pycache__/
 # --- SePay / payment secrets (SV4) ---
 backend/config/application-secrets.yml
 backend/config/application-local.yml
+config/application-secrets.yml
+config/application-local.yml
 
 # --- taste-skill working files ---
 frontend/.taste-skill/
@@ -87,3 +89,11 @@ frontend/.taste-skill/
 /docs/
 /notebooklm_docs/
 /.agents/skills/iter-review/
+.audit-notes.json
+*.zip
+backend/uploads/
+uploads/
+/banner_blue_1140x120.jpg
+/banner_orange_1140x120.jpg
+/workflow_advertising_campaign.svg
+/workflow_banner_creative.svg

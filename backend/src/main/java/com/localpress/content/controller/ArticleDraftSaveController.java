@@ -14,6 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class ArticleDraftSaveController {
     private final ArticleDraftSaveService articleDraftSaveService;
 
+    // [SV2_FLOW_SOAN_BAI_4] MỐC 4: Controller đón nhận POST /api/v1/articles/drafts -> Gọi ArticleDraftSaveService
+    // ==> MỐC 5: Mở file ArticleDraftSaveService.java (Tìm [SV2_FLOW_SOAN_BAI_5])
     @PostMapping(value = "/drafts", consumes = "application/json")
     @ResponseStatus(HttpStatus.CREATED)
     public ArticleDraftDetailResponse createEditorDraft(

@@ -93,6 +93,8 @@ export const contentApi = {
         )
     },
 
+    // [SV2_FLOW_SOAN_BAI_3] MỐC 3: Gửi HTTP POST /api/v1/articles/drafts lưu bản nháp lên Backend.
+    // ==> MỐC 4: Mở file ArticleDraftSaveController.java (Tìm [SV2_FLOW_SOAN_BAI_4])
     saveDraft(id: string | undefined, request: SaveArticleDraftRequest,
               file?: File | null, info?: CoverImageInfoRequest): Promise<ArticleDraftDetailResponse> {
         const path = id ? `/articles/${encodeURIComponent(id)}` : '/articles/drafts'

@@ -27,6 +27,9 @@ public class ArticleDraftSaveService {
     private final ArticleMediaService articleMediaService;
     private final ArticleImageCleanupService articleImageCleanupService;
 
+    // [SV2_FLOW_SOAN_BAI_5] MỐC 5: Service tạo Article và ArticleVersion v1 với status = DRAFT lưu vào MySQL.
+    // -> Nếu bấm "Lưu bản nháp": Bài lưu xong và dừng tại trạng thái DRAFT.
+    // -> Nếu bấm "Lưu và tiếp tục gửi duyệt": Tiếp tục chuyển sang bước nộp duyệt (Tìm [SV2_FLOW_SOAN_BAI_6])
     @Transactional
     public ArticleDraftDetailResponse create(SaveArticleDraftRequest request, MultipartFile file,
                                              CoverImageInfoRequest info) {
@@ -41,13 +44,13 @@ public class ArticleDraftSaveService {
         var user = currentUserService.requireCurrentAuthor();
         Article article = articleRepository.findOwnedArticleForUpdate(id, user.getId())
                 .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Không tìm thấy bài viết"));
-        if (article.getStatus() != Article.Status.DRAFT) {
-            throw error(HttpStatus.CONFLICT, "Chỉ được lưu bài đang ở trạng thái bản nháp");
+        if (article.getStatus() != Article.Status.DRAFT && article.getStatus() != Article.Status.REJECTED) {
+            throw error(HttpStatus.CONFLICT, "Chỉ được lưu bài đang ở trạng thái bản nháp hoặc cần sửa");
         }
         ArticleVersion version = articleVersionRepository.findVersionForUpdate(id, article.getLatestVersion())
                 .orElseThrow(() -> error(HttpStatus.INTERNAL_SERVER_ERROR, "Không tìm thấy phiên bản mới nhất"));
-        if (version.getReviewStatus() != ArticleVersion.ReviewStatus.DRAFT) {
-            throw error(HttpStatus.CONFLICT, "Phiên bản không ở trạng thái bản nháp");
+        if (version.getReviewStatus() != ArticleVersion.ReviewStatus.DRAFT && version.getReviewStatus() != ArticleVersion.ReviewStatus.REJECTED) {
+            throw error(HttpStatus.CONFLICT, "Phiên bản không ở trạng thái bản nháp hoặc cần sửa");
         }
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Chuyên mục không tồn tại"));

@@ -57,6 +57,7 @@ export function ArticleEditorPage() {
   const [status, setStatus] = useState<Article['status']>('DRAFT')
   const [draftVersion, setDraftVersion] = useState<number | null>(null)
   const [versions, setVersions] = useState<ArticleVersion[]>([])
+  const [reviewFeedback, setReviewFeedback] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<EditorialCategoryOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,6 +98,7 @@ export function ArticleEditorPage() {
       setStatus('DRAFT')
       setDraftVersion(null)
       setVersions([])
+      setReviewFeedback(null)
 
       try {
         const [categoryOptions, article] = await Promise.all([
@@ -114,9 +116,10 @@ export function ArticleEditorPage() {
                 tags: draft.tags,
                 isPremium: draft.isPremium,
                 price: draft.price,
-                status: draft.status,
+                status: (draft.status === 'REJECTED' ? 'CHANGES_REQUESTED' : draft.status) as Article['status'],
                 currentVersion: draft.latestVersion,
                 versions: [] as ArticleVersion[],
+                reviewNotes: draft.reviewFeedback,
               })) : editorialApi.getArticle(id))
             : Promise.resolve(null),
         ])
@@ -141,6 +144,7 @@ export function ArticleEditorPage() {
           setStatus(article.status)
           setDraftVersion(article.currentVersion)
           setVersions(article.versions ?? [])
+          setReviewFeedback(article.reviewNotes ?? (article as any).reviewFeedback ?? null)
         } else {
           setCategoryId(
             categoryOptions.find((category) => category.id === 'cat-thoi-su')?.id
@@ -372,7 +376,7 @@ export function ArticleEditorPage() {
         initialTitle={title}
         initialSapo={sapo}
         initialContent={content}
-        metadataEditorPath={status === 'DRAFT' ? `/backoffice/editorial/articles/${encodeURIComponent(id)}/edit` : undefined}
+        metadataEditorPath={status === 'DRAFT' || status === 'CHANGES_REQUESTED' ? `/backoffice/editorial/articles/${encodeURIComponent(id)}/edit` : undefined}
       />
     )
   }
@@ -402,7 +406,7 @@ export function ArticleEditorPage() {
           <EditorialAiAssistant
             key={`article-ai:${id ?? 'new'}:${location.search}`}
             getTitle={() => title}
-            disabled={isSaving || loading || status !== 'DRAFT'}
+            disabled={isSaving || loading || (status !== 'DRAFT' && status !== 'CHANGES_REQUESTED')}
             onApplyTitle={setTitle}
             onApplySapo={setSapo}
             onApplyTag={applySuggestedTag}
@@ -422,7 +426,8 @@ export function ArticleEditorPage() {
             </Button>
           )}
 
-          {/* Save Draft */}
+          {/* [SV2_FLOW_SOAN_BAI_2A] NHÁNH 1 - LƯU BẢN NHÁP: Gọi handleSave(false) -> Lưu bài với status = DRAFT
+              ==> MỐC 3: Mở file frontend/src/features/content/api/index.ts (Tìm [SV2_FLOW_SOAN_BAI_3]) */}
           <Button
             type="button"
             variant="outline"
@@ -435,7 +440,8 @@ export function ArticleEditorPage() {
             Lưu bản nháp
           </Button>
 
-          {/* Submit for Review */}
+          {/* [SV2_FLOW_SOAN_BAI_2B] NHÁNH 2 - LƯU VÀ TIẾP TỤC GỬI DUYỆT: Gọi handleSave(true) -> Lưu nháp rồi chuyển tiếp sang nộp duyệt
+              ==> MỐC 3: Mở file frontend/src/features/content/api/index.ts (Tìm [SV2_FLOW_SOAN_BAI_3]) */}
           <Button
             type="button"
             size="sm"
@@ -444,10 +450,20 @@ export function ArticleEditorPage() {
             className="text-xs bg-sky-700 hover:bg-sky-800 font-bold"
           >
             <Send className="w-3.5 h-3.5 mr-1" />
-            {APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Lưu và tiếp tục gửi duyệt'}
+            {status === 'CHANGES_REQUESTED' ? 'Lưu & Nộp lại bài' : (APP_CONFIG.useMockApi ? 'Gửi kiểm duyệt (Submit)' : 'Lưu và tiếp tục gửi duyệt')}
           </Button>
         </div>
       </div>
+
+      {reviewFeedback && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm flex items-start space-x-3">
+          <History className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+          <div className="space-y-1">
+            <h4 className="font-bold text-sm text-amber-900">Ban biên tập yêu cầu chỉnh sửa bài viết:</h4>
+            <p className="text-xs text-amber-800 whitespace-pre-wrap leading-relaxed font-medium">"{reviewFeedback}"</p>
+          </div>
+        </div>
+      )}
 
       {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
       {/* Editor Body */}

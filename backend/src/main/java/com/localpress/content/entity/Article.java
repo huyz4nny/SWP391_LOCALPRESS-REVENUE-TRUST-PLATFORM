@@ -84,8 +84,8 @@ public class Article {
     }
 
     public void configureDraftAccess(boolean premium, BigDecimal price) {
-        if (status != Status.DRAFT) {
-            throw new IllegalStateException("Chỉ được thay đổi cấu hình bản nháp");
+        if (status != Status.DRAFT && status != Status.REJECTED) {
+            throw new IllegalStateException("Chỉ được thay đổi cấu hình bản nháp hoặc bài có yêu cầu sửa");
         }
         if (premium && (price == null || price.signum() <= 0)) {
             throw new IllegalArgumentException("Bài Premium cần giá lớn hơn 0");
@@ -104,9 +104,9 @@ public class Article {
 
     public void updateDraftMetadata(Long categoryId, String slug) {
 
-        if (status != Status.DRAFT) {
+        if (status != Status.DRAFT && status != Status.REJECTED) {
             throw new IllegalStateException(
-                    "Chỉ được cập nhật metadata bằng thao tác này khi bài đang là bản nháp"
+                    "Chỉ được cập nhật metadata bằng thao tác này khi bài đang là bản nháp hoặc bài có yêu cầu sửa"
             );
         }
 
@@ -163,6 +163,13 @@ public class Article {
         }
     }
 
+    // [SV2_FLOW_HA_BAI_5] KHI BẤM NÚT HẠ BÀI - MỐC 5 (BƯỚC 5 - ĐÍCH ĐẾN): Cập nhật trạng thái cốt lõi của bài viết.
+    // -> Gán this.status = Status.TAKEN_DOWN.
+    // -> JPA Hibernate thực thi câu lệnh SQL: UPDATE articles SET status = 'TAKEN_DOWN', updated_at = NOW() WHERE id = ?
+    // -> Tác động thực tế:
+    //    1) Phía Độc giả: Bài báo ngay lập tức biến mất khỏi trang công khai (API Reader chỉ SELECT WHERE status = 'PUBLISHED').
+    //    2) Phía Tòa soạn: Giao diện chuyển nhãn sang "Đã gỡ bài", nút "Hạ bài" đổi thành nút "Xuất bản ngay" để khôi phục khi cần.
+    // ==> KẾT THÚC CHU TRÌNH HẠ BÀI.
     public void unpublish() {
         this.status = Status.TAKEN_DOWN;
     }

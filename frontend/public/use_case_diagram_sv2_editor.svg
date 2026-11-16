@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1120" width="1100" height="1120" style="background:#ffffff; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <defs>
+    <!-- Arrow marker for <<include>> / <<extend>> -->
+    <marker id="uc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#0f172a" />
+    </marker>
+  </defs>
+
+  <!-- Title & Subtitle Header -->
+  <text x="550" y="30" font-size="16" font-weight="900" text-anchor="middle" fill="#0f172a" letter-spacing="0.5">USE CASE DIAGRAM — SV2 EDITORIAL &amp; OPERATIONS SUBSYSTEM</text>
+  <text x="550" y="48" font-size="11" font-weight="normal" fill="#475569" text-anchor="middle">LocalPress Platform • Newsroom Management • Four-Eyes Publishing • Ad Operations (UC015 – UC028)</text>
+
+  <!-- ====================================================================== -->
+  <!-- SYSTEM BOUNDARY RECTANGLE (Matching sample image sky blue #78bfe8)     -->
+  <!-- ====================================================================== -->
+  <rect x="250" y="65" width="600" height="1025" rx="8" ry="8" fill="#78bfe8" stroke="#0f172a" stroke-width="2.5" />
+  
+  <!-- System Boundary Title -->
+  <text x="550" y="93" font-size="13" font-weight="800" fill="#0f172a" text-anchor="middle" letter-spacing="0.5">LocalPress Platform — Editorial &amp; Operations Subsystem (SV2)</text>
+
+  <!-- ====================================================================== -->
+  <!-- PRIMARY ACTOR (LEFT): EDITOR (SV2 - Trọng Phan)                        -->
+  <!-- ====================================================================== -->
+  <g id="actor-editor">
+    <!-- Head (blue circle matching sample) -->
+    <circle cx="110" cy="520" r="16" fill="#38bdf8" stroke="#0f172a" stroke-width="2.2" />
+    <!-- Body -->
+    <line x1="110" y1="536" x2="110" y2="590" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Arms -->
+    <line x1="65" y1="552" x2="155" y2="552" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Left Leg -->
+    <line x1="110" y1="590" x2="75" y2="645" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Right Leg -->
+    <line x1="110" y1="590" x2="145" y2="645" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Label -->
+    <text x="110" y="672" font-size="14" font-weight="900" text-anchor="middle" fill="#0f172a">EDITOR</text>
+  </g>
+
+  <!-- ====================================================================== -->
+  <!-- SOLID ASSOCIATION LINES: EDITOR -> 14 USE CASES                        -->
+  <!-- ====================================================================== -->
+  <!-- Line to UC015 -->
+  <line x1="155" y1="540" x2="370" y2="125" stroke="#0f172a" stroke-width="1.2" />
+  <!-- Line to UC025 -->
+  <line x1="155" y1="542" x2="370" y2="190" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC026 -->
+  <line x1="155" y1="544" x2="370" y2="255" stroke="#0f172a" stroke-width="1.2" />
+  <!-- Line to UC027 -->
+  <line x1="155" y1="546" x2="370" y2="320" stroke="#0f172a" stroke-width="1.2" />
+  <!-- Line to UC028 -->
+  <line x1="155" y1="548" x2="370" y2="385" stroke="#0f172a" stroke-width="1.2" />
+  <!-- Line to UC016 -->
+  <line x1="155" y1="550" x2="370" y2="460" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC017 -->
+  <line x1="155" y1="552" x2="370" y2="530" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC018 -->
+  <line x1="155" y1="554" x2="370" y2="600" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC019 -->
+  <line x1="155" y1="556" x2="370" y2="670" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC020 -->
+  <line x1="155" y1="558" x2="370" y2="740" stroke="#0f172a" stroke-width="1.2" />
+  <!-- Line to UC021 -->
+  <line x1="155" y1="560" x2="370" y2="810" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC022 -->
+  <line x1="155" y1="562" x2="370" y2="880" stroke="#0f172a" stroke-width="1.2" />
+  <!-- Line to UC023 -->
+  <line x1="155" y1="564" x2="370" y2="950" stroke="#0f172a" stroke-width="1.3" />
+  <!-- Line to UC024 -->
+  <line x1="155" y1="566" x2="370" y2="1020" stroke="#0f172a" stroke-width="1.3" />
+
+  <!-- ====================================================================== -->
+  <!-- 14 USE CASE ELLIPSES (UC015 - UC028)                                   -->
+  <!-- Center: cx=550, rx=180, ry=22. Left=370, Right=730                     -->
+  <!-- ====================================================================== -->
+
+  <!-- UC015: Dashboard -->
+  <ellipse cx="550" cy="125" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="121" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">View Editorial &amp; Operations Dashboard</text>
+  <text x="550" y="136" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC015</text>
+
+  <!-- UC025: Article Review & Four-Eyes Publication -->
+  <ellipse cx="550" cy="190" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="186" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Review &amp; Publish Articles (Four-Eyes Principle)</text>
+  <text x="550" y="201" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC025</text>
+
+  <!-- UC026: Comment Moderation -->
+  <ellipse cx="550" cy="255" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="251" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Moderate Reader Comments (Approve / Hide)</text>
+  <text x="550" y="266" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC026</text>
+
+  <!-- UC027: Article Access Policy & Price -->
+  <ellipse cx="550" cy="320" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="316" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Manage Article Policy (Free / Premium &amp; Price)</text>
+  <text x="550" y="331" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC027</text>
+
+  <!-- UC028: Subscription Plans -->
+  <ellipse cx="550" cy="385" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="381" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Manage Subscription Membership Plans</text>
+  <text x="550" y="396" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC028</text>
+
+  <!-- UC016: Booking Queue & Rejection -->
+  <ellipse cx="550" cy="460" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="456" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Process &amp; Reject Advertising Booking</text>
+  <text x="550" y="471" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC016</text>
+
+  <!-- UC017: Slot Inventory & Capacity Calendar -->
+  <ellipse cx="550" cy="530" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="526" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Monitor Slot Inventory Calendar (Rule 7)</text>
+  <text x="550" y="541" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC017</text>
+
+  <!-- UC018: Quotation Management -->
+  <ellipse cx="550" cy="600" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="596" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Create &amp; Manage Quotation (VIP Discount)</text>
+  <text x="550" y="611" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC018</text>
+
+  <!-- UC019: Contracts & VIP Tiering -->
+  <ellipse cx="550" cy="670" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="666" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Manage Contracts &amp; VIP Partner Tiering</text>
+  <text x="550" y="681" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC019</text>
+
+  <!-- UC020: Review Creative Asset -->
+  <ellipse cx="550" cy="740" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="736" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Review Creative Asset (Specs &amp; Safety)</text>
+  <text x="550" y="751" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC020</text>
+
+  <!-- UC021: Approve / Reject Creative -->
+  <ellipse cx="550" cy="810" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="806" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Approve or Reject Banner Creative</text>
+  <text x="550" y="821" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC021</text>
+
+  <!-- UC022: Serving Switch (Rule 8) -->
+  <ellipse cx="550" cy="880" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="876" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Review Creative Replacement &amp; Switch (Rule 8)</text>
+  <text x="550" y="891" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC022</text>
+
+  <!-- UC023: Campaign Eligibility & Gatekeeper -->
+  <ellipse cx="550" cy="950" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="946" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Campaign Eligibility &amp; Gatekeeper 5-Door Audit</text>
+  <text x="550" y="961" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC023</text>
+
+  <!-- UC024: Campaign Control & Kill-Switch -->
+  <ellipse cx="550" cy="1020" rx="180" ry="22" fill="#f0f8ff" stroke="#0f172a" stroke-width="1.5" />
+  <text x="550" y="1016" font-size="11" font-weight="700" fill="#0f172a" text-anchor="middle">Control Campaign Operations &amp; Kill-Switch</text>
+  <text x="550" y="1031" font-size="9.5" font-weight="bold" fill="#0284c7" text-anchor="middle">UC024</text>
+
+  <!-- ====================================================================== -->
+  <!-- <<include>> RELATIONSHIPS (Matching sample image dashed arrows)         -->
+  <!-- ====================================================================== -->
+  <!-- UC021 (Approve/Reject) includes UC020 (Review Specs) -->
+  <line x1="660" y1="788" x2="660" y2="766" stroke="#0f172a" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#uc-arrow)" />
+  <text x="666" y="780" font-size="8.5" font-style="italic" fill="#0f172a">«include»</text>
+
+  <!-- UC016 (Process Booking) includes UC017 (Slot Inventory Calendar) -->
+  <line x1="440" y1="482" x2="440" y2="504" stroke="#0f172a" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#uc-arrow)" />
+  <text x="446" y="497" font-size="8.5" font-style="italic" fill="#0f172a">«include»</text>
+
+  <!-- ====================================================================== -->
+  <!-- SECONDARY ACTOR (RIGHT SIDE): SYSTEM (ONLY EDITOR & SYSTEM)           -->
+  <!-- ====================================================================== -->
+  <g id="actor-system">
+    <!-- Head -->
+    <circle cx="980" cy="520" r="16" fill="#38bdf8" stroke="#0f172a" stroke-width="2.2" />
+    <!-- Body -->
+    <line x1="980" y1="536" x2="980" y2="590" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Arms -->
+    <line x1="935" y1="552" x2="1025" y2="552" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Left Leg -->
+    <line x1="980" y1="590" x2="950" y2="645" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Right Leg -->
+    <line x1="980" y1="590" x2="1010" y2="645" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Label -->
+    <text x="980" y="672" font-size="14" font-weight="900" text-anchor="middle" fill="#0f172a">SYSTEM</text>
+
+    <!-- Association lines from SYSTEM to automated platform Use Cases -->
+    <!-- Line to UC025 (Four-Eyes & Publication Engine) -->
+    <line x1="935" y1="545" x2="730" y2="190" stroke="#0f172a" stroke-width="1.2" />
+    <!-- Line to UC017 (Slot Capacity & Overbooking Calculation) -->
+    <line x1="935" y1="550" x2="730" y2="530" stroke="#0f172a" stroke-width="1.2" />
+    <!-- Line to UC023 (Gatekeeper 5-Door Audit) -->
+    <line x1="935" y1="555" x2="730" y2="950" stroke="#0f172a" stroke-width="1.2" />
+    <!-- Line to UC024 (Kill-Switch & Make-Good Engine) -->
+    <line x1="935" y1="560" x2="730" y2="1020" stroke="#0f172a" stroke-width="1.2" />
+  </g>
+
+</svg>

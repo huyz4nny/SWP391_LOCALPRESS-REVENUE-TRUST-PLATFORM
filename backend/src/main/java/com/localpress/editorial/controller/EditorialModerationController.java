@@ -34,6 +34,7 @@ public class EditorialModerationController {
     // =========================================================================
 
     /**
+     * [SV2_FLOW_BL_5] [BACKEND CONTROLLER] Nhận request LỌC danh sách bình luận theo status (PENDING / APPROVED / REJECTED / ALL)
      * GET /api/v1/editorial/comments?status=PENDING
      * Lấy danh sách bình luận (lọc theo trạng thái).
      */
@@ -45,6 +46,7 @@ public class EditorialModerationController {
     }
 
     /**
+     * [SV2_FLOW_BL_6] [BACKEND CONTROLLER] Nhận request DUYỆT hoặc CHẶN bình luận (status = APPROVED / REJECTED)
      * POST /api/v1/editorial/comments/{id}/moderate
      * Duyệt / Từ chối / Ẩn bình luận độc giả.
      */
@@ -63,6 +65,7 @@ public class EditorialModerationController {
     // =========================================================================
 
     /**
+     * [SV2_FLOW_CHINH_SACH_4] [BACKEND CONTROLLER] Endpoint tiếp nhận đổi chính sách Free / Premium & Giá đọc lẻ
      * PUT /api/v1/editorial/articles/{id}/policy
      * Thiết lập chế độ Miễn phí (FREE) hoặc Trả phí (PREMIUM) và giá bán lẻ từng bài.
      * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
@@ -92,6 +95,7 @@ public class EditorialModerationController {
     }
 
     /**
+     * [SV2_FLOW_GOI_CUOC_4] [BACKEND CONTROLLER] Endpoint tạo mới gói cước hội viên
      * POST /api/v1/editorial/subscription-plans
      * Tạo mới một gói cước hội viên.
      * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
@@ -107,6 +111,7 @@ public class EditorialModerationController {
     }
 
     /**
+     * [SV2_FLOW_GOI_CUOC_4] [BACKEND CONTROLLER] Endpoint cập nhật thông tin gói cước
      * PUT /api/v1/editorial/subscription-plans/{id}
      * Cập nhật thông tin gói cước.
      * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.
@@ -123,6 +128,7 @@ public class EditorialModerationController {
     }
 
     /**
+     * [SV2_FLOW_GOI_CUOC_4] [BACKEND CONTROLLER] Endpoint Bật/Tắt (Tạm ngưng/Kích hoạt) gói cước
      * POST /api/v1/editorial/subscription-plans/{id}/toggle-status
      * Bật/Tắt trạng thái hoạt động của gói cước.
      * Chặn role AUTHOR, chỉ cho phép EDITOR hoặc SYSTEM_ADMIN.

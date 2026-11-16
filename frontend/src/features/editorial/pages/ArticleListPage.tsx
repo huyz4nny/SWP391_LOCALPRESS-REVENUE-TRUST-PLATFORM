@@ -65,6 +65,7 @@ export function ArticleListPage() {
 
   const handleOpenReview = (art: ArticleListItem, action: 'APPROVE' | 'REJECT' | 'PUBLISH' | 'UNPUBLISH') => {
     if (!canReview) return
+    // [SV2_FLOW_DUYET_BAI_1] [BÊN TÒA SOẠN SV2] Kiểm tra NGUYÊN TẮC 4 MẮT (Four-Eyes Principle) - Chặn BTV tự duyệt bài của mình
     const isSelfArticle = Boolean(art.authorId && String(art.authorId) === String(currentUser.id))
     if (isSelfArticle && (action === 'APPROVE' || action === 'REJECT')) {
       alert('Nguyên tắc 4 mắt (Four-Eyes Principle): Biên tập viên không được tự duyệt bài viết của chính mình. Vui lòng để biên tập viên khác đăng nhập vào duyệt.')
@@ -118,6 +119,8 @@ export function ArticleListPage() {
           </p>
         </div>
 
+        {/* [SV2_FLOW_SOAN_BAI_1] KHI BẤM "VIẾT BÀI MỚI" - MỐC 1: BTV click nút "Viết bài mới" -> Chuyển sang URL /backoffice/editorial/articles/new
+            ==> MỐC 2: Mở file ArticleEditorPage.tsx (Tìm [SV2_FLOW_SOAN_BAI_2]) */}
         <Link to="/backoffice/editorial/articles/new">
           <Button size="sm" className="text-xs font-bold bg-sky-700 hover:bg-sky-800">
             <PlusCircle className="w-3.5 h-3.5 mr-1" />
@@ -231,7 +234,7 @@ export function ArticleListPage() {
                   </td>
                   <td className="px-4 py-3 text-right space-x-1 shrink-0">
                     <ArticleVersionActions article={art} onRestored={() => { void loadArticles() }} />
-                    {(!isAuthor || art.status === 'DRAFT') && (
+                    {(!isAuthor || art.status === 'DRAFT' || art.status === 'CHANGES_REQUESTED') && (
                       <Link
                         to={`/backoffice/editorial/articles/${art.id}/edit`}
                         className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
@@ -244,6 +247,7 @@ export function ArticleListPage() {
                     {canReview &&
                       (art.status === 'IN_REVIEW' || art.status === 'CHANGES_REQUESTED') && (
                         <>
+                          {/* [SV2_FLOW_DUYET_BAI_1] [BÊN TÒA SOẠN SV2] Nếu bài do chính mình viết -> Khóa duyệt, hiện nhãn "Chờ BTV khác duyệt" (Nguyên tắc 4 mắt) */}
                           {Boolean(art.authorId && String(art.authorId) === String(currentUser.id)) ? (
                             <span
                               className="inline-flex items-center px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium"
@@ -253,6 +257,7 @@ export function ArticleListPage() {
                             </span>
                           ) : (
                             <>
+                              {/* [SV2_FLOW_DUYET_BAI_2] [BÊN TÒA SOẠN SV2] Nút bấm DUYỆT (APPROVE) phê duyệt bài viết */}
                               <button
                                 onClick={() => handleOpenReview(art, 'APPROVE')}
                                 className="px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold cursor-pointer"
@@ -260,6 +265,7 @@ export function ArticleListPage() {
                                 Duyệt
                               </button>
                               {art.status === 'IN_REVIEW' && (
+                                /* [SV2_FLOW_DUYET_BAI_2] [BÊN TÒA SOẠN SV2] Nút bấm YÊU CẦU SỬA (REJECT) kèm Modal nhập góp ý */
                                 <button
                                   onClick={() => handleOpenReview(art, 'REJECT')}
                                   className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold cursor-pointer"
@@ -272,8 +278,9 @@ export function ArticleListPage() {
                         </>
                       )}
 
-{canReview &&
-  (art.status === 'APPROVED' || art.status === 'UNPUBLISHED') && (
+                    {/* [SV2_FLOW_DUYET_BAI_2] [BÊN TÒA SOẠN SV2] Nút bấm XUẤT BẢN NGAY (PUBLISH) - Chỉ hiện khi bài đã được DUYỆT (APPROVED) */}
+                    {canReview &&
+                      (art.status === 'APPROVED' || art.status === 'UNPUBLISHED') && (
                       <button
                         onClick={() => handleOpenReview(art, 'PUBLISH')}
                         className="px-2 py-1 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold cursor-pointer"
@@ -282,6 +289,10 @@ export function ArticleListPage() {
                       </button>
                     )}
 
+                    {/* [SV2_FLOW_HA_BAI_1] KHI BẤM NÚT HẠ BÀI - MỐC 1 (BƯỚC 1): BTV click nút "Hạ bài" trên danh sách bài viết đã xuất bản.
+                        -> Kích hoạt handleOpenReview(art, 'UNPUBLISH') -> Mở modal Dialog nhập lý do gỡ bài.
+                        -> Khi nhấn xác nhận, hàm handleExecuteReview() gọi editorialApi.updateArticleStatus() với targetStatus = 'UNPUBLISHED'.
+                        ==> MỐC 2: Mở file frontend/src/features/editorial/api/index.ts (Tìm [SV2_FLOW_HA_BAI_2] hoặc MỐC 2) */}
                     {canReview && art.status === 'PUBLISHED' && (
                       <button
                         onClick={() => handleOpenReview(art, 'UNPUBLISH')}

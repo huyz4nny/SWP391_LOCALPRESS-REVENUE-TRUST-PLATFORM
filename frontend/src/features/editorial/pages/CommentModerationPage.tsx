@@ -105,12 +105,14 @@ export function CommentModerationPage() {
     }
   }
 
+  // [SV2_FLOW_CHINH_SACH_1] [BÊN TÒA SOẠN SV2] Mở modal cấu hình Chính sách truy cập bài viết (Free / Premium)
   const handleOpenEditPolicy = (art: Article) => {
     setEditingArticlePolicy(art)
     setPolicyAccessType(art.isPremium ? 'PREMIUM' : 'FREE')
     setPolicyPrice(art.price > 0 ? art.price : 15000)
   }
 
+  // [SV2_FLOW_CHINH_SACH_2] [BÊN TÒA SOẠN SV2] Bấm nút "Lưu chính sách" -> Gọi API cập nhật access_type và single_price
   const handleSavePolicy = async () => {
     if (!editingArticlePolicy) return
     setIsSubmittingPolicy(true)
@@ -160,6 +162,7 @@ export function CommentModerationPage() {
     setPlanFormAudio((p as any).hasAudio ?? false)
   }
 
+  // [SV2_FLOW_GOI_CUOC_2] [BÊN TÒA SOẠN SV2] Bấm nút "Lưu thay đổi" / "Tạo gói cước" (UC028)
   const handleSavePlan = async (isEdit: boolean) => {
     if (!planFormName.trim()) {
       alert('Vui lòng nhập tên gói cước')
@@ -190,6 +193,7 @@ export function CommentModerationPage() {
     }
   }
 
+  // [SV2_FLOW_GOI_CUOC_1] [BÊN TÒA SOẠN SV2] Bấm nút "Tạm ngưng" / "Kích hoạt" gói cước (UC028)
   const handleTogglePlan = async (planId: string) => {
     try {
       await editorialApi.toggleSubscriptionPlanStatus(planId)
@@ -269,7 +273,8 @@ export function CommentModerationPage() {
       {/* ========================================================================= */}
       {activeTab === 'COMMENTS' && (
         <div className="space-y-4">
-          {/* Status Filter */}
+          {/* [SV2_FLOW_BL_1] [BÊN TÒA SOẠN SV2] Các nút lọc trạng thái: Tất cả, Chờ duyệt (PENDING), Đã duyệt (APPROVED), Bị từ chối (REJECTED) */}
+          {/* Khi bấm PENDING/APPROVED/REJECTED -> gọi setCommentStatusFilter -> kích hoạt loadComments() gửi param status */}
           <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex items-center gap-2 text-xs">
             <span className="font-semibold text-slate-600">Trạng thái:</span>
             {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((st) => (
@@ -342,6 +347,7 @@ export function CommentModerationPage() {
                   </p>
 
                   <div className="flex justify-end space-x-2 pt-1">
+                    {/* [SV2_FLOW_BL_3] [BÊN TÒA SOẠN SV2] Nút bấm TỪ CHỐI / CHẶN vi phạm (Chuyển sang REJECTED) */}
                     {c.status !== 'REJECTED' && (
                       <Button
                         variant="outline"
@@ -353,6 +359,7 @@ export function CommentModerationPage() {
                         Từ chối / Chặn vi phạm
                       </Button>
                     )}
+                    {/* [SV2_FLOW_BL_2] [BÊN TÒA SOẠN SV2] Nút bấm DUYỆT hiển thị công khai (Chuyển sang APPROVED) */}
                     {c.status !== 'APPROVED' && (
                       <Button
                         size="sm"
@@ -459,6 +466,7 @@ export function CommentModerationPage() {
                       {art.isPremium ? formatCurrency(art.price) : '0 ₫'}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      {/* [SV2_FLOW_CHINH_SACH_1] [BÊN TÒA SOẠN SV2] Nút bấm [Đổi chính sách] trên bảng bài viết */}
                       <Button
                         size="sm"
                         variant="outline"
@@ -620,6 +628,7 @@ export function CommentModerationPage() {
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                {/* [SV2_FLOW_GOI_CUOC_1] [BÊN TÒA SOẠN SV2] Nút bấm [Tạm ngưng] / [Kích hoạt] gói cước */}
                 <Button
                   size="sm"
                   variant="outline"
@@ -630,6 +639,7 @@ export function CommentModerationPage() {
                   {p.isActive ? 'Tạm ngưng' : 'Kích hoạt'}
                 </Button>
 
+                {/* [SV2_FLOW_GOI_CUOC_2] [BÊN TÒA SOẠN SV2] Nút bấm [Sửa gói] hội viên */}
                 <Button
                   size="sm"
                   variant="outline"

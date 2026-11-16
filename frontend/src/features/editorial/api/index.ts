@@ -84,22 +84,32 @@ export const editorialApi = {
     return httpClient.put<Article>(`/editorial/articles/${id}`, { article, changelog, imageInfo })
   },
 
+  // [SV2_FLOW_DUYET_BAI_3] [FRONTEND API] Gửi HTTP request cập nhật trạng thái Duyệt (APPROVED), Yêu cầu sửa (CHANGES_REQUESTED), Xuất bản (PUBLISHED)
+  // [SV2_FLOW_HA_BAI_2] KHI BẤM NÚT HẠ BÀI - MỐC 2 (BƯỚC 2): Gửi HTTP request sang Backend qua Axios Client.
+  // -> Phương thức: POST /api/v1/editorial/articles/{id}/status
+  // -> Body payload: { status: 'UNPUBLISHED', reviewNotes: '...' }
+  // -> Header: Tự động đính kèm JWT Token của tài khoản BTV (EDITOR).
+  // ==> MỐC 3: Mở file EditorialArticleController.java (Tìm [SV2_FLOW_HA_BAI_3] hoặc MỐC 3)
   updateArticleStatus: (id: string, status: Article['status'], reviewNotes?: string) => {
     return httpClient.post<Article>(`/editorial/articles/${id}/status`, { status, reviewNotes })
   },
 
   // ==========================================
+  // [SV2_FLOW_BL_4] [FRONTEND API] Hàm nạp danh sách (theo status) & cập nhật trạng thái bình luận
   // UC026: Comment Moderation
   // ==========================================
+  // Khi bấm PENDING/APPROVED/REJECTED -> gửi GET /editorial/comments?status=...
   getComments: (status?: string) => {
     return httpClient.get<Comment[]>('/editorial/comments', { params: { status } })
   },
 
+  // Khi bấm Duyệt (APPROVED) hoặc Chặn (REJECTED) -> gửi POST /editorial/comments/{id}/moderate
   moderateComment: (id: string, status: 'APPROVED' | 'REJECTED' | 'HIDDEN', reason?: string) => {
     return httpClient.post<Comment>(`/editorial/comments/${id}/moderate`, { status, reason })
   },
 
   // ==========================================
+  // [SV2_FLOW_CHINH_SACH_3] [FRONTEND API] Gửi yêu cầu cập nhật chính sách Free / Premium & Giá đọc lẻ
   // UC027: Content Policy (Free / Premium & Price)
   // ==========================================
   updateArticlePolicy: (id: string, accessType: 'FREE' | 'PREMIUM', singlePrice?: number) => {
@@ -107,6 +117,7 @@ export const editorialApi = {
   },
 
   // ==========================================
+  // [SV2_FLOW_GOI_CUOC_3] [FRONTEND API] Các hàm gọi API quản lý gói cước hội viên (CRUD & Bật/Tắt)
   // UC028: Subscription Plans Management
   // ==========================================
   getSubscriptionPlans: () => {

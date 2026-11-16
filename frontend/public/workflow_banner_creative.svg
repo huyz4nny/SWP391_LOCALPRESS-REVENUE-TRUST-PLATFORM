@@ -20,7 +20,7 @@
   <!-- Swimlane Headers (Vertical Text) -->
   <g font-size="13" font-weight="bold" fill="#000000" text-anchor="middle">
     <text x="47" y="100" transform="rotate(-90 47 100)">Advertiser</text>
-    <text x="47" y="270" transform="rotate(-90 47 270)">Reviewer / Staff</text>
+    <text x="47" y="270" transform="rotate(-90 47 270)">Editor</text>
     <text x="47" y="440" transform="rotate(-90 47 440)">System / Platform</text>
   </g>
 

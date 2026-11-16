@@ -81,7 +81,7 @@ export function CreativeReviewPage() {
     setActiveServingCreative(currentLive || null)
   }
 
-  // Thực thi duyệt hoặc yêu cầu sửa
+  // [SV2_FLOW_QC_4] [BÊN SV2 TÒA SOẠN] Bấm nút Chấp thuận (APPROVED) phê duyệt banner Creative (UC021)
   const handleExecuteReview = async (approved: boolean) => {
     if (!selectedCreative) return
     setIsSubmitting(true)

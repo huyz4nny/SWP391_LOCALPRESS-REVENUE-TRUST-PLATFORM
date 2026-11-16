@@ -331,10 +331,13 @@ public class ArticleVersionService {
             );
         }
 
+        // [SV2_FLOW_SOAN_BAI_8] MỐC 8 (ĐÍCH ĐẾN): Gán version review_status = PENDING và article status = PENDING.
+        // -> Lưu MySQL: Bài viết chính thức chuyển sang "Chờ duyệt", sẵn sàng cho BTV khác vào thẩm định 4 mắt!
+        // ==> KẾT THÚC LUỒNG SOẠN BÀI & GỬI DUYỆT.
         version.submitForReview();
 
         // A pending revision must not take the currently published article offline.
-        if (article.getStatus() == Article.Status.DRAFT) {
+        if (article.getStatus() == Article.Status.DRAFT || article.getStatus() == Article.Status.REJECTED) {
             article.setStatus(Article.Status.PENDING);
         }
 

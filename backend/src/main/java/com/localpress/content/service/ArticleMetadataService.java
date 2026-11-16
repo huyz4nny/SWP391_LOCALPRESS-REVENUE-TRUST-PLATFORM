@@ -40,10 +40,10 @@ public class ArticleMetadataService {
                         "Không tìm thấy bài viết"
                 ));
 
-        if (article.getStatus() != Article.Status.DRAFT) {
+        if (article.getStatus() != Article.Status.DRAFT && article.getStatus() != Article.Status.REJECTED) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Chỉ được cập nhật metadata của bản nháp"
+                    "Chỉ được cập nhật metadata của bản nháp hoặc bài có yêu cầu sửa"
             );
         }
 

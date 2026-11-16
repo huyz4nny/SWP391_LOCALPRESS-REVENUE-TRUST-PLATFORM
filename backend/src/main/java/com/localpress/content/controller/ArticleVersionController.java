@@ -102,6 +102,8 @@ public class ArticleVersionController {
                 .body(updated);
     }
 
+    // [SV2_FLOW_SOAN_BAI_7] MỐC 7: Controller đón nhận POST /{articleId}/versions/{versionNumber}/submit
+    // ==> MỐC 8: Mở file ArticleVersionService.java (Tìm [SV2_FLOW_SOAN_BAI_8])
     @PostMapping("/{articleId:\\d+}/versions/{versionNumber:[1-9]\\d*}/submit")
     public ResponseEntity<ArticleVersionDetailResponse> submitVersionForReview(
             @PathVariable("articleId") Long articleId,

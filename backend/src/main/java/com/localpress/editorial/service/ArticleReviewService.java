@@ -100,7 +100,8 @@ public class ArticleReviewService {
             return allVersions.get(0);
         });
 
-        // BientapA can't approve or reject their own articles 
+        // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Thuật toán kiểm tra NGUYÊN TẮC 4 MẮT (Four-Eyes Principle)
+        // BTV không được tự duyệt hoặc tự yêu cầu sửa bài của chính mình (bắt buộc phải có BTV khác duyệt)
         boolean isSelfArticle = (article.getAuthorId() != null && article.getAuthorId().equals(editorUserId)) //check if the editor is the author of the article
                 || (latestVersion.getEditedBy() != null && latestVersion.getEditedBy().equals(editorUserId));
 
@@ -115,7 +116,7 @@ public class ArticleReviewService {
                 break;
 
             case "APPROVED":
-                
+                // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Phê duyệt bài viết: Chặn tự duyệt -> gán version APPROVED và article status = APPROVED
                 // Chặn tự duyệt: Biên tập viên không được tự duyệt bài do chính mình soạn thảo
                 if (isSelfArticle) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -127,6 +128,7 @@ public class ArticleReviewService {
 
             case "CHANGES_REQUESTED":
             case "REJECTED":
+                // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Yêu cầu sửa bài: Chặn tự từ chối -> gán version REJECTED và article status = CHANGES_REQUESTED kèm ghi chú góp ý
                 // 3. Chặn tự từ chối bài của chính mình
                 if (isSelfArticle) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -140,6 +142,7 @@ public class ArticleReviewService {
                 break;
 
             case "PUBLISHED":
+                // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Xuất bản bài: Bài BẮT BUỘC phải được APPROVED trước đó mới được PUBLISH
                 //Nếu là bài của mình, BẮT BUỘC bài phải được BTV khác APPROVED trước đó!
                 if (isSelfArticle && latestVersion.getReviewStatus() != ArticleVersion.ReviewStatus.APPROVED) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -152,6 +155,13 @@ public class ArticleReviewService {
                 article.publish(latestVersion.getVersionNumber(), request.getAccessType(), request.getSinglePrice());
                 break;
 
+            // [SV2_FLOW_HA_BAI_4] KHI BẤM NÚT HẠ BÀI - MỐC 4 (BƯỚC 4): Xử lý logic nghiệp vụ hạ bài tại Service.
+            // -> Nhận diện targetStatus là "UNPUBLISHED" hoặc "TAKEN_DOWN".
+            // -> Gọi article.unpublish() để chuyển trạng thái Entity sang TAKEN_DOWN.
+            // -> Nếu có ghi chú: gọi latestVersion.reject(editorUserId, notes) lưu người gỡ và lý do.
+            // -> Lưu vào Database: articleRepository.save(article) và versionRepository.save(latestVersion).
+            // -> Tự động ghi vết kiểm toán vào bảng audit_logs (hành động ARTICLE_STATUS_UNPUBLISHED).
+            // ==> MỐC 5: Mở file Article.java (Tìm [SV2_FLOW_HA_BAI_5] hoặc MỐC 5)
             case "UNPUBLISHED":
             case "TAKEN_DOWN":
                 // SV2 gỡ bài khỏi trang báo công khai

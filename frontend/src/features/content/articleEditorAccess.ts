@@ -7,11 +7,12 @@ export type ReviewArticle = Omit<Article, 'versions'> & {
 }
 
 export function canEditOwnedDraft(article: ReviewArticle, userId: string): boolean {
-  if (article.authorId !== userId) return false
-  if (article.status === 'DRAFT') return true
-  return article.status === 'PUBLISHED'
+  const isOwner = Boolean(article.authorId && String(article.authorId) === String(userId))
+  if (!isOwner) return false
+  if (article.status === 'DRAFT' || article.status === 'CHANGES_REQUESTED') return true
+  return (article.status === 'PUBLISHED' || article.status === 'UNPUBLISHED')
     && article.versions?.some(version => version.versionNumber === article.currentVersion
-      && version.reviewStatus === 'DRAFT') === true
+      && (version.reviewStatus === 'DRAFT' || version.reviewStatus === 'REJECTED')) === true
 }
 
 export async function loadArticleEditorAccess(articleId: string, userId: string) {

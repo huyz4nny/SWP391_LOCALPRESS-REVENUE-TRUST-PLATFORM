@@ -70,6 +70,7 @@ export const advertisingApi = {
     return httpClient.get<AdCampaign>(`/advertiser/campaigns/${id}`)
   },
 
+  // [SV2_FLOW_QC_2] [BÊN ADV] Gọi API tải file ảnh banner và link đích lên server
   uploadCreative: async (campaignId: string, data: { title: string; targetUrl: string; file: File }) => {
     if (APP_CONFIG.useMockApi) {
       const { width, height } = await readImageSize(data.file)
