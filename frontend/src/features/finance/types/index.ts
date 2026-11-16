@@ -273,7 +273,7 @@ export interface CreateComplaintInput {
 
 export interface SepayLog {
   logId: string
-  /** WEBHOOK = SePay gọi vào, API_SYNC = LocalPress hỏi API SePay, SIMULATION = nút demo */
+  /** WEBHOOK = SePay gọi vào, SIMULATION = nút demo, API_SYNC = dòng cũ từ lúc còn đồng bộ API (đã bỏ) */
   source: 'WEBHOOK' | 'API_SYNC' | 'SIMULATION'
   sepayId: number | null
   authOk: boolean
@@ -311,7 +311,6 @@ export interface SepayLogResult {
 
 export interface SepayStatus {
   webhookKeyConfigured: boolean
-  apiTokenConfigured: boolean
   accountNumber: string | null
   webhookPath: string
   lastWebhookAt: string | null

@@ -132,10 +132,10 @@ statuses = sorted(o[1].get("status") for o in outs)
 check("2 lần đồng thời cùng id -> 1 SUCCESS + 1 ALREADY_PROCESSED", statuses == ["ALREADY_PROCESSED", "SUCCESS"], str(statuses))
 check("DB: đúng 1 dòng log mang sepay_id đó", sql(f"SELECT COUNT(*) FROM sepay_webhook_logs WHERE sepay_id={base_id + 5}") == "1")
 
-# 10. Nút "kiểm tra lại" (API SePay)
-s, b = call("POST", f"/finance/orders/code/{code3}/check-sepay", None, {"Authorization": READER})
+# 10. Nút "kiểm tra lại": chỉ đọc lại trạng thái đơn (đã bỏ check-sepay, chỉ dùng webhook)
+s, b = call("GET", f"/finance/orders/code/{code3}/status", None, {"Authorization": READER})
 d = data((s, b))
-check("check-sepay trả kết quả + trạng thái đơn", s == 200 and isinstance(d, dict) and "order" in d, f"HTTP {s} checked={d.get('checked') if isinstance(d, dict) else d} reason={d.get('reason') if isinstance(d, dict) else ''}")
+check("Đọc lại trạng thái đơn sau webhook", s == 200 and isinstance(d, dict), f"HTTP {s}")
 
 # 11. Kế toán xem nhật ký; khách không xem được
 s, b = call("GET", "/finance/sepay/logs?page=0&size=20", None, {"Authorization": STAFF})

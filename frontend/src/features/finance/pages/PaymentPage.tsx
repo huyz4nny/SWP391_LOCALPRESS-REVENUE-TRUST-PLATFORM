@@ -110,17 +110,17 @@ export function PaymentPage() {
     return () => clearInterval(t)
   }, [order, orderCode, load])
 
-  // Hỏi thẳng API SePay cho đơn này rồi đọc lại. Không tự cấp quyền (Rule 4).
+  // Chỉ đọc lại trạng thái đơn (tiền chỉ vào qua webhook SePay). Không tự cấp quyền (Rule 4).
   const handleCheckAgain = async () => {
     setChecking(true)
     setActionError('')
     try {
-      const r = await paymentApi.checkWithSepay(orderCode)
-      if (r.checked && !r.found) {
-        setActionError('SePay chưa thấy khoản chuyển nào có mã này. Ngân hàng có thể chậm vài phút, hãy kiểm tra lại sau.')
+      const s = await paymentApi.getStatus(orderCode)
+      if (!s.isPaid) {
+        setActionError('Chưa nhận được tiền cho đơn này. Ngân hàng có thể chậm vài phút; nếu đã chuyển lâu mà vẫn chưa ghi nhận, hãy gửi khiếu nại.')
       }
     } catch (e: any) {
-      setActionError(e?.message || 'Không kiểm tra được với SePay')
+      setActionError(e?.message || 'Không kiểm tra được trạng thái đơn')
     }
     await load()
     setChecking(false)
