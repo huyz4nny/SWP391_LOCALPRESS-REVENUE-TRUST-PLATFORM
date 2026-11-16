@@ -12,15 +12,16 @@ public final class ArticleDraftPolicy {
 
     public static void requireEditable(Article article, ArticleVersion version) {
         boolean allowedArticleStatus = article.getStatus() == Article.Status.DRAFT
-                || article.getStatus() == Article.Status.PUBLISHED;
+                || article.getStatus() == Article.Status.PUBLISHED
+                || article.getStatus() == Article.Status.REJECTED;
 
         boolean belongsToArticle = Objects.equals(version.getArticleId(), article.getId());
 
         boolean latestVersion = Objects.equals(version.getVersionNumber(), article.getLatestVersion());
 
         boolean draftVersion =
-                version.getReviewStatus()
-                        == ArticleVersion.ReviewStatus.DRAFT;
+                version.getReviewStatus() == ArticleVersion.ReviewStatus.DRAFT
+                        || version.getReviewStatus() == ArticleVersion.ReviewStatus.REJECTED;
 
         boolean newerThanPublished =
                 article.getPublishedVersion() == null
@@ -34,7 +35,7 @@ public final class ArticleDraftPolicy {
         if(!allowedArticleStatus || !belongsToArticle || !latestVersion
         || !draftVersion || !newerThanPublished || !validPublishedArticle){
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Chỉ được chỉnh sửa bản nháp mới nhất, chưa xuất bản");
+                    "Chỉ được chỉnh sửa bản nháp mới nhất, chưa xuất bản hoặc bài có yêu cầu sửa");
         }
     }
 }

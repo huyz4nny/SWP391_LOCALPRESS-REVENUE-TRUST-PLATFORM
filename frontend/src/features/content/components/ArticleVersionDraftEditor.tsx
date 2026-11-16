@@ -48,11 +48,17 @@ export function ArticleVersionDraftEditor({
     const [submitted, setSubmitted] = useState(false)
     const [submissionUncertain, setSubmissionUncertain] = useState(false)
     const [revisionFeedback, setRevisionFeedback] = useState<string | null>(null)
+    const [draftReviewStatus, setDraftReviewStatus] = useState<string>('DRAFT')
     const [feedbackError, setFeedbackError] = useState('')
 
     useEffect(() => {
         let active = true
         void contentApi.getVersion(articleId, versionNumber).then(async draft => {
+            if (active) setDraftReviewStatus(draft.reviewStatus)
+            if (active && draft.reviewStatus === 'REJECTED') {
+                setRevisionFeedback(draft.reviewFeedback?.trim() || 'Biên tập viên chưa ghi phản hồi chi tiết.')
+                return
+            }
             const sourceVersion = draft.metadata.restoredFromVersion
             if (typeof sourceVersion !== 'number' || !Number.isSafeInteger(sourceVersion) || sourceVersion < 1) return
             const source = await contentApi.getVersion(articleId, sourceVersion)
@@ -214,7 +220,7 @@ export function ArticleVersionDraftEditor({
 
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span>Bài viết #{articleId}</span>
-                    <StatusBadge type="article" status={submitted ? 'IN_REVIEW' : 'DRAFT'} />
+                    <StatusBadge type="article" status={submitted ? 'IN_REVIEW' : (draftReviewStatus === 'REJECTED' ? 'CHANGES_REQUESTED' : 'DRAFT')} />
                 </div>
 
                 <p className="text-sm text-slate-600">

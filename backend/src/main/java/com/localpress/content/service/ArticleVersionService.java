@@ -337,7 +337,7 @@ public class ArticleVersionService {
         version.submitForReview();
 
         // A pending revision must not take the currently published article offline.
-        if (article.getStatus() == Article.Status.DRAFT) {
+        if (article.getStatus() == Article.Status.DRAFT || article.getStatus() == Article.Status.REJECTED) {
             article.setStatus(Article.Status.PENDING);
         }
 

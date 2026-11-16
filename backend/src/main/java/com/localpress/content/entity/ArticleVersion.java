@@ -129,8 +129,8 @@ public class ArticleVersion {
     }
 
     public void updateDraftContent(String title, String sapo, String content, String changelog) {
-        if (reviewStatus != ReviewStatus.DRAFT) {
-            throw new IllegalStateException("Chỉ được sửa nội dung phiên bản nháp");
+        if (reviewStatus != ReviewStatus.DRAFT && reviewStatus != ReviewStatus.REJECTED) {
+            throw new IllegalStateException("Chỉ được sửa nội dung phiên bản nháp hoặc cần sửa");
         }
         this.title = title.trim();
         this.sapo = sapo;
@@ -143,8 +143,8 @@ public class ArticleVersion {
     }
 
     public void updateDraftPresentation(String coverImage, java.util.List<String> tags) {
-        if (reviewStatus != ReviewStatus.DRAFT) {
-            throw new IllegalStateException("Chỉ được cập nhật metadata của phiên bản nháp");
+        if (reviewStatus != ReviewStatus.DRAFT && reviewStatus != ReviewStatus.REJECTED) {
+            throw new IllegalStateException("Chỉ được cập nhật metadata của phiên bản nháp hoặc cần sửa");
         }
         if (coverImage != null) {
             if (coverImage.length() > 1000) {

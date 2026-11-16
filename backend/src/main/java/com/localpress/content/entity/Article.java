@@ -84,8 +84,8 @@ public class Article {
     }
 
     public void configureDraftAccess(boolean premium, BigDecimal price) {
-        if (status != Status.DRAFT) {
-            throw new IllegalStateException("Chỉ được thay đổi cấu hình bản nháp");
+        if (status != Status.DRAFT && status != Status.REJECTED) {
+            throw new IllegalStateException("Chỉ được thay đổi cấu hình bản nháp hoặc bài có yêu cầu sửa");
         }
         if (premium && (price == null || price.signum() <= 0)) {
             throw new IllegalArgumentException("Bài Premium cần giá lớn hơn 0");
@@ -104,9 +104,9 @@ public class Article {
 
     public void updateDraftMetadata(Long categoryId, String slug) {
 
-        if (status != Status.DRAFT) {
+        if (status != Status.DRAFT && status != Status.REJECTED) {
             throw new IllegalStateException(
-                    "Chỉ được cập nhật metadata bằng thao tác này khi bài đang là bản nháp"
+                    "Chỉ được cập nhật metadata bằng thao tác này khi bài đang là bản nháp hoặc bài có yêu cầu sửa"
             );
         }
 

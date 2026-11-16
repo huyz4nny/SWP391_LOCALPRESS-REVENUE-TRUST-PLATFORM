@@ -234,7 +234,7 @@ export function ArticleListPage() {
                   </td>
                   <td className="px-4 py-3 text-right space-x-1 shrink-0">
                     <ArticleVersionActions article={art} onRestored={() => { void loadArticles() }} />
-                    {(!isAuthor || art.status === 'DRAFT') && (
+                    {(!isAuthor || art.status === 'DRAFT' || art.status === 'CHANGES_REQUESTED') && (
                       <Link
                         to={`/backoffice/editorial/articles/${art.id}/edit`}
                         className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"

@@ -21,7 +21,8 @@ public record ArticleDraftDetailResponse(
         String coverSource,
         boolean isPremium,
         java.math.BigDecimal price,
-        java.util.List<String> tags
+        java.util.List<String> tags,
+        String reviewFeedback
 ) {
 
     public static ArticleDraftDetailResponse from(
@@ -30,11 +31,15 @@ public record ArticleDraftDetailResponse(
     ) {
         Map<String, Object> metadata = version.getMetadata();
 
+        String resolvedStatus = article.getStatus() == Article.Status.REJECTED
+                ? "CHANGES_REQUESTED"
+                : (article.getStatus() != null ? article.getStatus().name() : "DRAFT");
+
         return new ArticleDraftDetailResponse(
                 article.getId().toString(),
                 article.getCategoryId().toString(),
                 article.getSlug(),
-                article.getStatus().name(),
+                resolvedStatus,
                 article.getLatestVersion(),
                 version.getTitle(),
                 version.getSapo(),
@@ -46,7 +51,8 @@ public record ArticleDraftDetailResponse(
                 getString(metadata, "coverSource"),
                 article.getAccessType() == Article.AccessType.PREMIUM,
                 article.getSinglePrice(),
-                getTags(metadata)
+                getTags(metadata),
+                version.getReviewFeedback()
         );
     }
 

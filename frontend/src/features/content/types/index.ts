@@ -34,7 +34,7 @@ export interface ArticleDraftResponse {
 
 export interface ArticleDraftDetailResponse
     extends Omit<ArticleDraftResponse, 'status'> {
-    status: 'DRAFT' | 'PUBLISHED'
+    status: 'DRAFT' | 'PUBLISHED' | 'CHANGES_REQUESTED' | 'REJECTED'
 
     categoryId: string
     title: string
@@ -50,6 +50,7 @@ export interface ArticleDraftDetailResponse
     isPremium: boolean
     price: number
     tags: string[]
+    reviewFeedback?: string | null
 }
 
 export interface UpdateArticleMetadataRequest {
