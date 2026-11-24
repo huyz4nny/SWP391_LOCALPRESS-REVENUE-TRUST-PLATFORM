@@ -65,11 +65,12 @@ it('allows an own newer published draft but never the published approved version
     versions: [{ ...version, reviewStatus: 'APPROVED' }] }, '4')).toBe(false)
 })
 
-it('renders the editorial draft as read-only and escapes unsafe content', () => {
-  const html = renderToStaticMarkup(<MemoryRouter><ArticleReviewPreview article={{ ...article, content: '<script>alert(1)</script>' }} /></MemoryRouter>)
+it('renders the editorial draft as read-only and removes unsafe content', () => {
+  const html = renderToStaticMarkup(<MemoryRouter><ArticleReviewPreview article={{ ...article, content: '<script>alert(1)</script>\n\nNội dung an toàn' }} /></MemoryRouter>)
   expect(html).toContain('Bản nháp của phóng viên')
   expect(html).toContain('Bản nháp')
-  expect(html).toContain('&lt;script&gt;')
+  expect(html).toContain('Nội dung an toàn')
+  expect(html).not.toContain('alert(1)')
   expect(html).not.toContain('<script>')
   expect(html).not.toContain('<form')
   expect(html).not.toContain('<textarea')

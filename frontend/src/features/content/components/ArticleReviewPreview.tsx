@@ -1,3 +1,4 @@
+import { ArticleContent } from '@/components/shared/ArticleContent'
 import { Link } from 'react-router-dom'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,9 +43,7 @@ export function ArticleReviewPreview({ article }: { article: ReviewArticle }) {
             caption={article.coverCaption}
             source={article.coverSource}
           />
-          <div className="whitespace-pre-wrap break-words leading-relaxed text-slate-800">
-            {article.content || 'Bài viết chưa có nội dung.'}
-          </div>
+          <ArticleContent content={article.content || 'Bài viết chưa có nội dung.'} />
           {article.reviewNotes && (
             <div className="border-t border-slate-200 pt-4">
               <h2 className="mb-2 font-semibold">Phản hồi kiểm duyệt</h2>
