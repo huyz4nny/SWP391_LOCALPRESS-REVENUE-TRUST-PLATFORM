@@ -1,3 +1,4 @@
+import { ArticleContent } from '@/components/shared/ArticleContent'
 import {useEffect, useRef, useState} from 'react'
 import {contentApi} from '../api'
 import type {
@@ -158,10 +159,7 @@ function VersionContent({
             <section className="space-y-2 border-t border-slate-200 pt-4">
                 <h5 className="font-semibold">Nội dung</h5>
 
-                {/* Hiển thị văn bản an toàn, không thực thi HTML từ bản thảo. */}
-                <div className="whitespace-pre-wrap break-words leading-7 text-slate-700">
-                    {version.content}
-                </div>
+                <ArticleContent content={version.content} />
             </section>
 
             {typeof changelog === 'string' && changelog.trim() && (

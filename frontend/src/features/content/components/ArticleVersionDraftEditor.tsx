@@ -1,3 +1,4 @@
+import { ArticleContentEditor } from '@/features/content/components/ArticleContentEditor'
 import { EditorialAiAssistant } from './EditorialAiAssistant'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -78,6 +79,7 @@ export function ArticleVersionDraftEditor({
         setError,
         clearErrors,
         getValues,
+        watch,
         setValue,
         formState: { errors, isSubmitting, isDirty },
     } = useForm<FormValues>({
@@ -280,11 +282,20 @@ export function ArticleVersionDraftEditor({
                     {textFields.map((field) => (
                         <div key={field.name} className="space-y-1">
                             <Label htmlFor={`version-${field.name}`}>{field.label}</Label>
-                            <Textarea
-                                id={`version-${field.name}`}
-                                rows={field.rows}
-                                {...register(field.name)}
-                            />
+                            {field.name === 'content' ? (
+                                <ArticleContentEditor
+                                    id="version-content"
+                                    rows={field.rows}
+                                    value={watch('content')}
+                                    disabled={aiDisabled}
+                                    onChange={value => {
+                                        setValue('content', value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })
+                                        setSuccess('')
+                                    }}
+                                />
+                            ) : (
+                                <Textarea id={`version-${field.name}`} rows={field.rows} {...register(field.name)} />
+                            )}
                             {errors[field.name] && (
                                 <p className="text-sm text-red-600">
                                     {errors[field.name]?.message}

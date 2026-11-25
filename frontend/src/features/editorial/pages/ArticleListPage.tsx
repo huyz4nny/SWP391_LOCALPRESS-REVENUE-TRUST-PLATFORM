@@ -1,3 +1,4 @@
+import { ArticleContent } from '@/components/shared/ArticleContent'
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Article, ArticleStatus } from '@/features/reader/types'
@@ -336,9 +337,7 @@ export function ArticleListPage() {
               <p className="font-medium text-slate-700 italic">
                 {reviewArticle.sapo}
               </p>
-              <div className="text-slate-600 pt-2 border-t border-slate-200 whitespace-pre-line">
-                {reviewArticle.content}
-              </div>
+              <ArticleContent content={reviewArticle.content ?? ''} className="pt-2 border-t border-slate-200" />
               {reviewArticle.versions && reviewArticle.versions.length > 0 && (
                 <div className="pt-2 border-t border-slate-200 space-y-1">
                   <span className="font-semibold text-slate-700 block">Lịch sử phiên bản ({reviewArticle.versions.length}):</span>

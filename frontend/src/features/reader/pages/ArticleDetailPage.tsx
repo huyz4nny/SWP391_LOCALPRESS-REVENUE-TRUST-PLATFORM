@@ -1,3 +1,4 @@
+import { ArticleContent } from '@/components/shared/ArticleContent'
 // Tác dụng: trang `/articles/:slug` — Free toàn văn (UC031), preview 30% (UC032), Premium đủ quyền (UC036).
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
@@ -183,21 +184,11 @@ export function ArticleDetailPage() {
           {/* than bai: full van hoac preview + khung paywall */}
           <div className="font-serif text-stone-800 text-sm sm:text-base leading-relaxed space-y-4">
             {isUnlocked ? (
-              // cat content theo doan de ve <p>, khong tu ghep preview
-              article.content?.split('\n\n').map((paragraph, idx) => {
-                if (paragraph.startsWith('### ')) {
-                  return (
-                    <h3 key={idx} className="font-sans text-lg font-bold text-stone-900 pt-4 pb-1">
-                      {paragraph.replace('### ', '')}
-                    </h3>
-                  )
-                }
-                return <p key={idx}>{paragraph}</p>
-              })
+              <ArticleContent content={article.content ?? ''} />
             ) : (
               // Preview only with Paywall callout
               <div>
-                <p className="text-stone-700 leading-relaxed">{article.previewContent}</p>
+                <ArticleContent content={article.previewContent ?? ''} />
                 <div className="h-12 bg-gradient-to-b from-transparent to-white" />
                 <PaywallPrompt article={article} />
               </div>

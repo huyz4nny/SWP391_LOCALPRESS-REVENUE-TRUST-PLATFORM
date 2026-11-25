@@ -1,3 +1,4 @@
+import { ArticleContentEditor } from '@/features/content/components/ArticleContentEditor'
 import {useEffect, useState} from 'react'
 import type {FormEvent} from 'react'
 import {Link, useNavigate, useParams} from 'react-router-dom'
@@ -258,12 +259,10 @@ export function ArticleEditorPage() {
 
                         <div>
                             <Label htmlFor="content">Nội dung</Label>
-                            <Textarea
+                            <ArticleContentEditor
                                 id="content"
                                 value={form.content}
-                                onChange={(e) =>
-                                    changeField('content', e.target.value)
-                                }
+                                onChange={(value) => changeField('content', value)}
                                 maxLength={100000}
                                 rows={12}
                             />

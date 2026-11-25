@@ -1,3 +1,4 @@
+import { ArticleContentEditor } from '@/features/content/components/ArticleContentEditor'
 import { EditorialAiAssistant } from '@/features/content/components/EditorialAiAssistant'
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
@@ -505,14 +506,14 @@ export function ArticleEditorPage() {
 
               <div>
                 <Label htmlFor="artContent" required>
-                  Nội dung chi tiết toàn văn (Hỗ trợ Markdown)
+                  Nội dung chi tiết toàn văn
                 </Label>
-                <Textarea
+                <ArticleContentEditor
                   id="artContent"
                   error={fieldErrors.content?.message}
                   value={content}
-                  onChange={(e) => { setContent(e.target.value); clearErrors('content') }}
-                  placeholder="Nội dung phóng sự... Dùng ### cho tiêu đề đoạn"
+                  onChange={(value) => { setContent(value); clearErrors('content') }}
+                  placeholder="Nhập nội dung bài viết..."
                   rows={14}
                   className="font-serif text-sm leading-relaxed"
                   required
