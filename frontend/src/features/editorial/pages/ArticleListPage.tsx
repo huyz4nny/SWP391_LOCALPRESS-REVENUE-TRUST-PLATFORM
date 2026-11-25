@@ -50,6 +50,15 @@ export function ArticleListPage() {
     loadArticles()
   }, [currentUser.id, currentUser.role])
 
+  // [SV2_DB_SOAN_BAI] [FRONTEND -> DB MAPPING: LẤY DANH SÁCH BÀI VIẾT]
+  // Gọi API: GET /api/v1/editorial/articles
+  // -> Backend Controller: EditorialArticleController.getAllArticles()
+  // -> Backend Service: ArticleReviewService.getAllArticles()
+  // -> Tương tác Database MySQL:
+  //    1. Bảng `articles`: Đọc article_id, category_id, author_id, slug, access_type, single_price, status, published_version, latest_version, view_count, published_at...
+  //    2. Bảng `article_versions`: Đọc version_id, title, summary (sapo), content, cover_image_url, review_status, review_feedback...
+  //    3. Bảng `categories`: Đọc tên chuyên mục (name)
+  //    4. Bảng `users`: Đọc tên tác giả (full_name)
   const loadArticles = async () => {
     try {
       setLoading(true)
@@ -77,6 +86,15 @@ export function ArticleListPage() {
     setReviewNotes('')
   }
 
+  // [SV2_DB_DUYET_BAI] [SV2_DB_HA_BAI] [FRONTEND -> DB MAPPING: PHÊ DUYỆT & XUẤT BẢN & HẠ BÀI]
+  // Gọi API: PUT /api/v1/editorial/articles/:id/status
+  // -> Backend Service: ArticleReviewService.updateArticleStatus()
+  // -> Tương tác Database MySQL:
+  //    1. APPROVE (Duyệt): articles.status = 'APPROVED', article_versions.review_status = 'APPROVED', reviewed_by = BTV_ID
+  //    2. REJECT (Yêu cầu sửa): articles.status = 'REJECTED', article_versions.review_status = 'REJECTED', review_feedback = lý do
+  //    3. PUBLISH (Xuất bản): articles.status = 'PUBLISHED', published_version = latestVersion, published_at = NOW()
+  //    4. UNPUBLISH (Hạ bài): articles.status = 'TAKEN_DOWN'
+  //    5. Bảng `audit_logs`: Insert dòng mới lưu người thực hiện, hành động và giá trị cũ/mới
   const handleExecuteReview = async () => {
     if (!canReview || !reviewArticle) return
     setIsSubmittingReview(true)
@@ -235,14 +253,27 @@ export function ArticleListPage() {
                   </td>
                   <td className="px-4 py-3 text-right space-x-1 shrink-0">
                     <ArticleVersionActions article={art} onRestored={() => { void loadArticles() }} />
-                    {(!isAuthor || art.status === 'DRAFT' || art.status === 'CHANGES_REQUESTED') && (
-                      <Link
-                        to={`/backoffice/editorial/articles/${art.id}/edit`}
-                        className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
-                      >
-                        <Edit className="w-3 h-3 mr-1" /> Sửa
-                      </Link>
-                    )}
+                    {(() => {
+                      const isMyArticle = Boolean(art.authorId && String(art.authorId) === String(currentUser.id))
+                      const canEdit = isMyArticle && (art.status === 'DRAFT' || art.status === 'CHANGES_REQUESTED')
+                      return canEdit ? (
+                        <Link
+                          to={`/backoffice/editorial/articles/${art.id}/edit`}
+                          className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
+                          title="Chỉnh sửa nội dung bài viết"
+                        >
+                          <Edit className="w-3 h-3 mr-1" /> Sửa
+                        </Link>
+                      ) : (
+                        <Link
+                          to={`/backoffice/editorial/articles/${art.id}/edit`}
+                          className="inline-flex items-center px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
+                          title="Xem chi tiết nội dung bài viết"
+                        >
+                          <Eye className="w-3 h-3 mr-1" /> Xem
+                        </Link>
+                      )
+                    })()}
 
                     {/* Reviewer / Admin Workflow Actions */}
                     {canReview &&
