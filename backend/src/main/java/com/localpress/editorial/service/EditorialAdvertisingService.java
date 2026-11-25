@@ -533,7 +533,19 @@ public class EditorialAdvertisingService {
     // =========================================================================
 
     /**
-     * Lấy danh sách kiểm tra 5 điều kiện tiên quyết phát sóng (Gatekeeper Checklist).
+     * [SV2_FLOW_QC_4] [SV2_DB_QC] [DATABASE INTERACTION - THẨM ĐỊNH PHÁT SÓNG 5 CỬA (GATEKEEPER 5 CHECKS)]
+     * Truy vấn kết hợp các bảng CSDL để thẩm định điều kiện phát sóng quảng cáo:
+     * 1. Bảng `ad_campaigns` (cột: campaign_id, advertiser_id, slot_id, campaign_name, start_date, end_date,
+     *                         quoted_amount, accepted_amount, payment_status, quotation_status, contract_reference, status)
+     * 2. Bảng `advertisers` (cột: advertiser_id, company_name)
+     * 3. Bảng `ad_slots` (cột: slot_id, slot_code, name, status)
+     * 4. Bảng `ad_creatives` (cột: creative_id, campaign_id, review_status = 'APPROVED', scan_status = 'SAFE')
+     * 5 điều kiện thẩm định:
+     *    Cửa 1: `payment_status` = 'PAID' (Kế toán đã thu đủ tiền)
+     *    Cửa 2: `quotation_status` = 'ACCEPTED' (Doanh nghiệp đã chấp nhận báo giá)
+     *    Cửa 3: `contract_reference` NOT NULL (Hợp đồng pháp lý đã ký kết)
+     *    Cửa 4: `ad_creatives.review_status` = 'APPROVED' (Banner ma-két đã qua kiểm duyệt)
+     *    Cửa 5: `ad_slots.status` = 'ACTIVE' (Vị trí quảng cáo không bị đóng băng/xung đột)
      */
     public List<CampaignEligibilityDto> getEligibilityChecklist() {
         String sql = "SELECT c.campaign_id, c.advertiser_id, a.company_name, c.campaign_name, " +
@@ -793,6 +805,14 @@ public class EditorialAdvertisingService {
     }
 
     /**
+     * [SV2_FLOW_QC_7] [SV2_DB_QC] [DATABASE INTERACTION - DỪNG KHẨN CẤP QUẢNG CÁO / KILL-SWITCH 1 GIÂY (UC024)]
+     * 1. Bảng `ad_campaigns`:
+     *    - Đọc khóa bi quan: `SELECT campaign_id, status FROM ad_campaigns WHERE campaign_id = ? FOR UPDATE`
+     *    - Cột cập nhật: `status` = 'SUSPENDED' (Dừng phát sóng ngay lập tức),
+     *                   `rejection_reason` = request.getReason() (Lưu lý do dừng khẩn cấp: vi phạm bản quyền/lừa đảo...)
+     * 2. Bảng `audit_logs`:
+     *    - Cột ghi: `user_id` = userId, `action` = 'CAMPAIGN_SUSPENDED', `target_type` = 'AD_CAMPAIGN',
+     *               `target_id` = campaignId, `new_value` = JSON chứa lý do & người dừng, `created_at` = NOW()
      * Dừng khẩn cấp chiến dịch quảng cáo (Emergency Kill-Switch - UC024).
      */
     @Transactional

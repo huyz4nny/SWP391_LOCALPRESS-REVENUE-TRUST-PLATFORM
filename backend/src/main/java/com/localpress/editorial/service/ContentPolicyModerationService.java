@@ -67,9 +67,13 @@ public class ContentPolicyModerationService {
     // =========================================================================
 
     /**
-     * [SV2_FLOW_BL_7] [BACKEND SERVICE] Xử lý LỌC danh sách bình luận từ Database theo status
-     * Khi bấm PENDING -> lọc PENDING; bấm APPROVED -> lọc APPROVED; bấm REJECTED -> lọc REJECTED.
-     * Lấy danh sách bình luận (hỗ trợ lọc theo trạng thái: ALL, PENDING, APPROVED, REJECTED).
+     * [SV2_FLOW_BL_7] [SV2_DB_BL] [DATABASE INTERACTION - LỌC & LẤY DANH SÁCH BÌNH LUẬN (GET COMMENTS)]
+     * - Bảng chính: `comments`
+     *   + Cột đọc: comment_id, article_id, user_id, parent_id, moderated_by, content, status, created_at, updated_at
+     *   + Điều kiện: `SELECT * FROM comments WHERE status = ? ORDER BY created_at DESC`
+     * - Bảng liên kết 1: `articles` (cột: article_id, slug, title từ bảng article_versions mới nhất)
+     * - Bảng liên kết 2: `users` (cột: user_id, full_name, avatar_url cho độc giả & BTV kiểm duyệt)
+     * Lấy danh sách bình luận (hỗ trợ lọc theo trạng thái: ALL, PENDING, APPROVED, REJECTED, HIDDEN).
      */
     @Transactional(readOnly = true)
     public List<EditorialCommentDto> getComments(String statusFilter) {
@@ -91,9 +95,15 @@ public class ContentPolicyModerationService {
     }
 
     /**
-     * [SV2_FLOW_BL_8] [BACKEND SERVICE] Xử lý CẬP NHẬT DB (approve / reject) & Ghi lịch sử kiểm toán Audit Log
-     * - switch("APPROVED"): gọi comment.approve() -> chuyển sang APPROVED
-     * - switch("REJECTED"): gọi comment.reject() -> chuyển sang REJECTED
+     * [SV2_FLOW_BL_8] [SV2_DB_BL] [DATABASE INTERACTION - DUYỆT / TỪ CHỐI / ẨN BÌNH LUẬN (MODERATE COMMENT)]
+     * 1. Bảng `comments`:
+     *    - Cột cập nhật:
+     *      + `status`: Chuyển sang 'APPROVED' (hiển thị công khai), 'REJECTED' (từ chối do vi phạm), hoặc 'HIDDEN' (ẩn khẩn cấp)
+     *      + `moderated_by`: Gán user_id của BTV đang kiểm duyệt (để truy vết trách nhiệm kiểm duyệt)
+     *      + `updated_at`: CURRENT_TIMESTAMP
+     * 2. Bảng `audit_logs`:
+     *    - Cột ghi: `user_id` = moderatorUserId, `action` = 'COMMENT_MODERATE_' + targetStatus,
+     *               `target_type` = 'comments', `target_id` = comment_id, `old_value`, `new_value`, `created_at` = NOW()
      * Duyệt / Từ chối / Ẩn bình luận độc giả (UC026).
      */
     @Transactional
@@ -189,11 +199,18 @@ public class ContentPolicyModerationService {
     // =========================================================================
 
     /**
-     * [SV2_FLOW_CHINH_SACH_5] [BACKEND SERVICE] Cập nhật chính sách truy cập bài viết FREE / PREMIUM và giá bán lẻ (UC027)
-     * Tuân thủ ràng buộc MySQL chk_articles_price:
-     * - FREE: single_price = 0
-     * - PREMIUM: single_price >= 0
-     * Đồng thời ghi nhật ký audit_logs (ARTICLE_POLICY_UPDATE).
+     * [SV2_FLOW_CHINH_SACH_5] [SV2_DB_CHINH_SACH] [DATABASE INTERACTION - THIẾT LẬP CHÍNH SÁCH BÀI VIẾT (ARTICLE ACCESS POLICY)]
+     * 1. Bảng `articles`:
+     *    - Cột cập nhật:
+     *      + `access_type`: Chuyển đổi giữa 'FREE' (Miễn phí 100%) và 'PREMIUM' (Thu phí Paywall)
+     *      + `single_price`: Nếu FREE thì ép về 0.00; Nếu PREMIUM thì lưu giá bán lẻ (ví dụ 15,000đ)
+     *      + `updated_at`: CURRENT_TIMESTAMP
+     *    - Ràng buộc toàn vẹn MySQL: CHECK constraint `chk_articles_price`:
+     *      ((access_type = 'FREE' AND (single_price IS NULL OR single_price = 0)) OR
+     *       (access_type = 'PREMIUM' AND single_price IS NOT NULL AND single_price >= 0))
+     * 2. Bảng `audit_logs`:
+     *    - Cột ghi: `user_id` = editorUserId, `action` = 'ARTICLE_POLICY_UPDATE',
+     *               `target_type` = 'articles', `target_id` = article_id, `new_value`, `created_at` = NOW()
      */
     @Transactional
     public EditorialArticleDto updateArticlePolicy(Long articleId, UpdateArticlePolicyRequest request, String email) {
@@ -370,8 +387,13 @@ public class ContentPolicyModerationService {
     }
 
     /**
-     * [SV2_FLOW_GOI_CUOC_5] [BACKEND SERVICE] Bật/Tắt trạng thái kích hoạt gói cước (ACTIVE <-> INACTIVE) - UC028
-     * Ghi nhận vết kiểm toán PLAN_TOGGLE vào audit_logs.
+     * [SV2_FLOW_GOI_CUOC_5] [SV2_DB_GOI_CUOC] [DATABASE INTERACTION - BẬT/TẮT TRẠNG THÁI GÓI CƯỚC HỘI VIÊN (SUBSCRIPTION PLANS)]
+     * 1. Bảng `subscription_plans`:
+     *    - Cột cập nhật: `status` = 'ACTIVE' (Mở bán) <-> 'INACTIVE' (Tạm ngưng)
+     *    - Cột đọc kiểm tra: `plan_id`, `name`, `price`, `duration_days`, `has_ad_free`, `has_audio`, `status`
+     * 2. Bảng `audit_logs`:
+     *    - Cột ghi: `user_id` = editorUserId, `action` = 'PLAN_TOGGLE', `target_type` = 'subscription_plans',
+     *               `target_id` = planId, `new_value`, `created_at` = NOW()
      */
     @Transactional
     public SubscriptionPlanDto togglePlanStatus(Long planId, String email) {

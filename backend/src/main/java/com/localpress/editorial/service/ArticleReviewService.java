@@ -55,7 +55,17 @@ public class ArticleReviewService {
     private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * Lấy danh sách toàn bộ bài viết trong tòa soạn kèm phiên bản mới nhất và lịch sử phiên bản.
+     * [SV2_DB_SOAN_BAI] [DATABASE INTERACTION - LẤY DANH SÁCH BÀI VIẾT (GET ALL ARTICLES)]
+     * - Bảng chính: `articles`
+     *   + Cột đọc: article_id, category_id, author_id, slug, access_type, single_price, status,
+     *              published_version, latest_version, view_count, published_at, updated_at
+     *   + Câu lệnh / Phương thức: `articleRepository.findAllByOrderByUpdatedAtDesc()`
+     * - Bảng liên kết 1: `article_versions`
+     *   + Cột đọc: version_id, article_id, version_number, title, summary (sapo), content,
+     *              cover_image_url, review_status, review_feedback, edited_by, reviewed_by, created_at
+     *   + Điều kiện: `findByArticleIdOrderByVersionNumberDesc(article.getId())`
+     * - Bảng liên kết 2: `categories` (cột: category_id, name, slug)
+     * - Bảng liên kết 3: `users` (cột: user_id, full_name, avatar_url cho tác giả bài viết)
      */
     @Transactional(readOnly = true)
     public List<EditorialArticleDto> getAllArticles() {
@@ -116,8 +126,11 @@ public class ArticleReviewService {
                 break;
 
             case "APPROVED":
-                // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Phê duyệt bài viết: Chặn tự duyệt -> gán version APPROVED và article status = APPROVED
-                // Chặn tự duyệt: Biên tập viên không được tự duyệt bài do chính mình soạn thảo
+                // [SV2_FLOW_DUYET_BAI_5] [SV2_DB_DUYET_BAI] [DATABASE INTERACTION - PHÊ DUYỆT BÀI VIẾT (APPROVE)]
+                // 1. Bảng `articles`: Cập nhật cột `status` = 'APPROVED', `updated_at` = CURRENT_TIMESTAMP
+                // 2. Bảng `article_versions`: Cập nhật cột `review_status` = 'APPROVED', `reviewed_by` = editorUserId,
+                //    `review_feedback` = notes (nếu có), `reviewed_at` = CURRENT_TIMESTAMP
+                // 3. Bảng `audit_logs`: Insert dòng mới (user_id, action = 'ARTICLE_STATUS_APPROVED', target_type = 'articles', target_id = article_id)
                 if (isSelfArticle) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                             " Biên tập viên không được tự duyệt bài viết của chính mình. Vui lòng để biên tập viên khác vào duyệt.");
@@ -128,8 +141,11 @@ public class ArticleReviewService {
 
             case "CHANGES_REQUESTED":
             case "REJECTED":
-                // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Yêu cầu sửa bài: Chặn tự từ chối -> gán version REJECTED và article status = CHANGES_REQUESTED kèm ghi chú góp ý
-                // 3. Chặn tự từ chối bài của chính mình
+                // [SV2_FLOW_DUYET_BAI_5] [SV2_DB_DUYET_BAI] [DATABASE INTERACTION - YÊU CẦU SỬA BÀI (CHANGES_REQUESTED / REJECT)]
+                // 1. Bảng `articles`: Cập nhật cột `status` = 'REJECTED' (trên UI hiển thị là Cần sửa / CHANGES_REQUESTED)
+                // 2. Bảng `article_versions`: Cập nhật cột `review_status` = 'REJECTED', `reviewed_by` = editorUserId,
+                //    `review_feedback` = notes (LƯU LỜI DẶN/GÓP Ý CỦA BTV), `reviewed_at` = CURRENT_TIMESTAMP
+                // 3. Bảng `audit_logs`: Ghi log kiểm toán ARTICLE_STATUS_CHANGES_REQUESTED
                 if (isSelfArticle) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                             " Biên tập viên không thể tự yêu cầu chỉnh sửa/từ chối bài viết của chính mình.");
@@ -142,8 +158,15 @@ public class ArticleReviewService {
                 break;
 
             case "PUBLISHED":
-                // [SV2_FLOW_DUYET_BAI_5] [BACKEND SERVICE] Xuất bản bài: Bài BẮT BUỘC phải được APPROVED trước đó mới được PUBLISH
-                //Nếu là bài của mình, BẮT BUỘC bài phải được BTV khác APPROVED trước đó!
+                // [SV2_FLOW_DUYET_BAI_5] [SV2_DB_DUYET_BAI] [DATABASE INTERACTION - XUẤT BẢN LÊN TRANG BÁO (PUBLISHED - TWO-PHASE PUBLISHING)]
+                // 1. Bảng `articles`: Cập nhật cột:
+                //    - `status` = 'PUBLISHED'
+                //    - `published_version` = latestVersion.getVersionNumber() (Trỏ con trỏ phiên bản xuất bản chính thức)
+                //    - `published_at` = CURRENT_TIMESTAMP
+                //    - `access_type` = 'FREE' hoặc 'PREMIUM'
+                //    - `single_price` = giá bán lẻ bài viết
+                // 2. Bảng `audit_logs`: Ghi log kiểm toán ARTICLE_STATUS_PUBLISHED
+                // 3. Bắn event `ArticlePublishedEvent` -> Gửi thông báo đến độc giả theo dõi chuyên mục (bảng `notifications`)
                 if (isSelfArticle && latestVersion.getReviewStatus() != ArticleVersion.ReviewStatus.APPROVED) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                             "Bài viết của bạn chưa được biên tập viên khác phê duyệt. Không thể tự xuất bản khi chưa có phê duyệt.");
@@ -155,13 +178,10 @@ public class ArticleReviewService {
                 article.publish(latestVersion.getVersionNumber(), request.getAccessType(), request.getSinglePrice());
                 break;
 
-            // [SV2_FLOW_HA_BAI_4] KHI BẤM NÚT HẠ BÀI - MỐC 4 (BƯỚC 4): Xử lý logic nghiệp vụ hạ bài tại Service.
-            // -> Nhận diện targetStatus là "UNPUBLISHED" hoặc "TAKEN_DOWN".
-            // -> Gọi article.unpublish() để chuyển trạng thái Entity sang TAKEN_DOWN.
-            // -> Nếu có ghi chú: gọi latestVersion.reject(editorUserId, notes) lưu người gỡ và lý do.
-            // -> Lưu vào Database: articleRepository.save(article) và versionRepository.save(latestVersion).
-            // -> Tự động ghi vết kiểm toán vào bảng audit_logs (hành động ARTICLE_STATUS_UNPUBLISHED).
-            // ==> MỐC 5: Mở file Article.java (Tìm [SV2_FLOW_HA_BAI_5] hoặc MỐC 5)
+            // [SV2_FLOW_HA_BAI_4] [SV2_DB_HA_BAI] [DATABASE INTERACTION - GỠ BÀI / HẠ BÀI KHẨN CẤP (UNPUBLISH / TAKEN_DOWN)]
+            // 1. Bảng `articles`: Cập nhật cột `status` = 'TAKEN_DOWN' (hoặc 'UNPUBLISHED'), bài báo lập tức biến mất khỏi trang chủ độc giả.
+            // 2. Bảng `article_versions`: Cập nhật cột `review_feedback` = notes (LƯU LÝ DO HẠ BÀI của Tòa soạn).
+            // 3. Bảng `audit_logs`: Tự động INSERT dòng kiểm toán (user_id, action = 'ARTICLE_STATUS_UNPUBLISHED', target_type = 'articles', target_id = article_id, created_at = NOW()).
             case "UNPUBLISHED":
             case "TAKEN_DOWN":
                 // SV2 gỡ bài khỏi trang báo công khai
@@ -221,7 +241,19 @@ public class ArticleReviewService {
     }
 
     /**
-     * Soạn bài mới từ phía Tòa soạn (POST /api/v1/editorial/articles)
+     * [SV2_DB_SOAN_BAI] [DATABASE INTERACTION - SOẠN VÀ LƯU BÀI VIẾT (CREATE ARTICLE / DRAFT)]
+     * Khi BTV hoặc Phóng viên bấm "Lưu nháp" hoặc "Gửi duyệt" từ giao diện:
+     * 1. Ghi vào bảng `articles`:
+     *    - Cột nhận: `category_id`, `author_id`, `slug`, `access_type` ('FREE'|'PREMIUM'), `single_price`,
+     *                `status` ('DRAFT' nếu lưu nháp, hoặc 'PENDING' nếu gửi duyệt),
+     *                `latest_version` = 1, `view_count` = 0, `created_at`, `updated_at`
+     * 2. Ghi vào bảng `article_versions`:
+     *    - Cột nhận: `article_id`, `edited_by`, `version_number` = 1, `title`, `summary` (sapo),
+     *                `content` (toàn văn rich text), `cover_image_url`, `review_status` ('DRAFT'|'PENDING'), `created_at`
+     * 3. Ghi vào bảng `tags` & `article_tags`:
+     *    - Cột nhận: `tags(name, slug)`, `article_tags(article_id, tag_id)`
+     * 4. Ghi vào bảng `audit_logs`:
+     *    - Cột nhận: `user_id` = authorId, `action` = 'ARTICLE_CREATE', `target_type` = 'articles', `target_id` = article_id
      */
     @Transactional
     public EditorialArticleDto createArticle(

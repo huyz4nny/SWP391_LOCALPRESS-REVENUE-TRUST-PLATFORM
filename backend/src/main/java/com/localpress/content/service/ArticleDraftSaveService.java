@@ -27,7 +27,14 @@ public class ArticleDraftSaveService {
     private final ArticleMediaService articleMediaService;
     private final ArticleImageCleanupService articleImageCleanupService;
 
-    // [SV2_FLOW_SOAN_BAI_5] MỐC 5: Service tạo Article và ArticleVersion v1 với status = DRAFT lưu vào MySQL.
+    // [SV2_FLOW_SOAN_BAI_5] [SV2_DB_SOAN_BAI] [DATABASE INTERACTION - LƯU BẢN NHÁP (SAVE DRAFT)]
+    // - Bảng 1: `articles`
+    //   + Cột ghi: `category_id`, `author_id`, `slug`, `access_type` ('FREE'|'PREMIUM'), `single_price`,
+    //              `status` = 'DRAFT', `latest_version` = 1, `view_count` = 0, `created_at`, `updated_at`
+    // - Bảng 2: `article_versions`
+    //   + Cột ghi: `article_id`, `edited_by`, `version_number` = 1, `title`, `summary` (sapo),
+    //              `content` (nội dung bài báo), `cover_image_url`, `review_status` = 'DRAFT', `created_at`
+    // - Bảng 3: `audit_logs`: Ghi nhận log khởi tạo bản thảo ARTICLE_CREATE
     // -> Nếu bấm "Lưu bản nháp": Bài lưu xong và dừng tại trạng thái DRAFT.
     // -> Nếu bấm "Lưu và tiếp tục gửi duyệt": Tiếp tục chuyển sang bước nộp duyệt (Tìm [SV2_FLOW_SOAN_BAI_6])
     @Transactional
